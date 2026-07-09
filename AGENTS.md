@@ -4,7 +4,26 @@ This file provides guidance to AI agents when working with code in this reposito
 
 ## Project Overview
 
-LeRobot is a PyTorch-based library for real-world robotics, providing datasets, pretrained policies, and tools for training, evaluation, data collection, and robot control. It integrates with Hugging Face Hub for model/dataset sharing.
+This is the **Hiwonder NexArm** fork of LeRobot — a PyTorch-based library for real-world robotics. It adds NexArm hardware support (motor driver, robot, teleoperator) on top of the upstream LeRobot codebase. It integrates with Hugging Face Hub for model/dataset sharing.
+
+**NexArm-specific modules** (added on top of upstream):
+
+| Path | What it does |
+|---|---|
+| `src/lerobot/motors/nexarm/` | CommProtocol UART framing, 6-servo sync read/write, torque, bridge mode (CMD 56/68/96/97/98) |
+| `src/lerobot/robots/nexarm_follower/` | `NexArmFollowerConfig` + `NexArmFollower` — connect, observe, send_action |
+| `src/lerobot/teleoperators/nexarm_leader/` | `NexArmLeaderConfig` + `NexArmLeader` — read positions, leader→follower joint mapping |
+| `examples/nexarm/` | Ready-to-run scripts for teleoperate, record, and rollout |
+
+**Modified upstream files:**
+
+| File | Change |
+|---|---|
+| `src/lerobot/robots/utils.py` | Added `nexarm_follower` branch in `make_robot_from_config()` |
+| `src/lerobot/teleoperators/utils.py` | Added `nexarm_leader` branch in `make_teleoperator_from_config()` |
+| `pyproject.toml` | Added `nexarm` optional dependency group |
+| `src/lerobot/cameras/opencv/camera_opencv.py` | Fixed `stop_event` race condition on Linux |
+| `src/lerobot/processor/normalize_processor.py` | Added device/dtype caching to avoid redundant `.to()` calls |
 
 ## Tech Stack
 

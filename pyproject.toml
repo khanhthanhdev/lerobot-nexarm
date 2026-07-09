@@ -17,11 +17,11 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project.urls]
-homepage = "https://huggingface.co/lerobot"
-documentation = "https://huggingface.co/docs/lerobot/index"
-source = "https://github.com/huggingface/lerobot"
-issues = "https://github.com/huggingface/lerobot/issues"
-discord = "https://discord.gg/s3KuuzsPFb"
+homepage = "https://github.com/Hiwonder-official/lerobot-nexarm"
+documentation = "https://github.com/Hiwonder-official/lerobot-nexarm#readme"
+source = "https://github.com/Hiwonder-official/lerobot-nexarm"
+issues = "https://github.com/Hiwonder-official/lerobot-nexarm/issues"
+upstream = "https://github.com/huggingface/lerobot"
 
 [project]
 name = "lerobot"

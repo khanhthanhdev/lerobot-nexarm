@@ -1,5 +1,7 @@
 # Hiwonder NexArm LeRobot VLA Open-Source 6-Axis Robotic Arm
 
+English | [中文](./README_cn.md)
+
 [NexArm](https://www.hiwonder.com/products/nexarm6-axis) is an open-source, [🤗 LeRobot](https://github.com/huggingface/lerobot)-native robotic arm designed for embodied AI research and rapid validation of imitation and reinforcement learning policies. Its dual‑chip architecture (ESP32 + AT32) enables synchronous leader‑follower teleoperation with millisecond‑level tracking latency, generating clean demonstration data that feeds directly into LeRobot training pipelines.
 
 The robotic arm features an all‑metal chassis driven by 65 kg·cm magnetic encoder servos, delivering ±2 mm repeatability and smooth, jitter‑free motion. Combined with advanced inverse kinematics and curve smoothing, it natively computes complex trajectories while minimizing start‑stop vibrations for fluid movement.
@@ -201,19 +203,20 @@ for i in range(10):
 
 Verify the leader-follower link. The leader arm runs torque-free so the operator can move it freely; the follower mirrors every joint in real time.
 
-Edit `examples/nexarm/teleoperate.yaml` with your actual port numbers and camera indices, then run:
+Edit `examples/nexarm/teleoperate.py` with your actual port numbers and camera indices, then run:
 
 ```bash
-python -m lerobot.scripts.lerobot_teleoperate --config_path=examples/nexarm/teleoperate.yaml
+python examples/nexarm/teleoperate.py \
+  --follower-port COM19 \
+  --leader-port COM18
 ```
 
-Or pass everything on the command line:
+Or pass everything on the command line directly:
 
 ```bash
-python -m lerobot.scripts.lerobot_teleoperate \
-  --robot.type=nexarm_follower --robot.port=COM19 \
-  --teleop.type=nexarm_leader  --teleop.port=COM18 \
-  --fps=30
+python examples/nexarm/teleoperate.py \
+  --follower-port COM19 --leader-port COM18 \
+  --front-cam 0 --wrist-cam 1 --fps 30
 ```
 
 ### Motion Speed and Acceleration
@@ -225,23 +228,22 @@ The follower arm's motion profile is controlled by two parameters in `NexArmFoll
 | `motion_speed` | `2000` | 0–3400 | Maximum servo speed in raw units/s. `0` = no limit. |
 | `motion_acc` | `100` | 0–254 | Acceleration ramp. `0` = instant (max acceleration). Higher = smoother ramp. |
 
-These are applied once at connection time via the firmware. You can override them in `examples/nexarm/teleoperate.yaml`:
+These are applied once at connection time via the firmware. You can override them in `examples/nexarm/teleoperate.py` by editing the `NexArmFollowerConfig`:
 
-```yaml
-robot:
-  type: nexarm_follower
-  port: COM19
-  motion_speed: 2000   # adjust for faster or slower movement
-  motion_acc: 100      # adjust for harder or softer acceleration
+```python
+follower_config = NexArmFollowerConfig(
+    port="COM19",
+    motion_speed=2000,   # adjust for faster or slower movement
+    motion_acc=100,      # adjust for harder or softer acceleration
+    cameras=camera_config,
+)
 ```
 
 Or on the command line:
 
 ```bash
-python -m lerobot.scripts.lerobot_teleoperate \
-  --robot.type=nexarm_follower --robot.port=COM19 \
-  --robot.motion_speed=2000 --robot.motion_acc=100 \
-  --teleop.type=nexarm_leader --teleop.port=COM18
+python examples/nexarm/teleoperate.py \
+  --follower-port COM19 --leader-port COM18
 ```
 
 > Note: the firmware handles speed/acceleration limiting internally — no software-side delta clamping is applied.
@@ -257,10 +259,14 @@ python -m lerobot.scripts.lerobot_teleoperate \
 
 Record demonstration episodes via teleoperation for imitation learning.
 
-Edit `examples/nexarm/record.yaml`, then run:
+Edit `examples/nexarm/record.py`, then run:
 
 ```bash
-python -m lerobot.scripts.lerobot_record --config_path=examples/nexarm/record.yaml
+python examples/nexarm/record.py \
+  --follower-port COM19 --leader-port COM18 \
+  --repo-id YOUR_HF_USERNAME/nexarm_pick \
+  --task "Pick up the red block" \
+  --num-episodes 50 --episode-time 10 --reset-time 10
 ```
 
 **Key parameters:**
@@ -337,9 +343,9 @@ outputs/train/nexarm_act/checkpoints/last/pretrained_model/
 Deploy the trained policy on the real robot. The follower arm executes actions predicted by the model — no leader arm needed.
 
 ```bash
-python -m lerobot.scripts.lerobot_rollout \
-  --config_path=examples/nexarm/inference.yaml \
-  --policy.path=outputs/train/nexarm_act/checkpoints/last/pretrained_model
+python examples/nexarm/rollout.py \
+  --follower-port COM19 \
+  --policy-path outputs/train/nexarm_act/checkpoints/last/pretrained_model
 ```
 
 **Notes:**

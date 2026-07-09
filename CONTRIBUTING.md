@@ -25,9 +25,9 @@ To contribute code, you need to set up a development environment.
 Fork the repository on GitHub, then clone your fork:
 
 ```bash
-git clone https://github.com/<your-handle>/lerobot.git
-cd lerobot
-git remote add upstream https://github.com/huggingface/lerobot.git
+git clone https://github.com/<your-handle>/lerobot-nexarm.git
+cd lerobot-nexarm
+git remote add upstream https://github.com/Hiwonder-official/lerobot-nexarm.git
 ```
 
 ### 2. Environment Installation
@@ -75,8 +75,8 @@ pytest -sv tests/test_specific_feature.py
 
 Use the templates for required fields and examples.
 
-- **Issues:** Follow the [ticket template](https://github.com/huggingface/lerobot/blob/main/.github/ISSUE_TEMPLATE/bug-report.yml).
-- **Pull requests:** Rebase on `upstream/main`, use a descriptive branch (don't work on `main`), run `pre-commit` and tests locally, and follow the [PR template](https://github.com/huggingface/lerobot/blob/main/.github/PULL_REQUEST_TEMPLATE.md).
+- **Issues:** Follow the [ticket template](https://github.com/Hiwonder-official/lerobot-nexarm/issues/new).
+- **Pull requests:** Rebase on `upstream/main`, use a descriptive branch (don't work on `main`), run `pre-commit` and tests locally, and follow the [PR template](https://github.com/Hiwonder-official/lerobot-nexarm/blob/main/.github/PULL_REQUEST_TEMPLATE.md).
 
 > [!IMPORTANT]
 > Community Review Policy: To help scale our efforts and foster a collaborative environment, we ask contributors to review at least one other person's open PR before their own receives attention. This shared responsibility multiplies our review capacity and helps everyone's code get merged faster!
