@@ -92,7 +92,7 @@ Frame: [0xFF][0xFF][ID][LEN][CMD][ARGS...][CHECKSUM]
 ### Option A — conda (recommended)
 
 ```bash
-git clone https://github.com/liangfuyuan581-creator/lerobot-nexarm.git
+git clone https://github.com/Hiwonder-official/lerobot-nexarm.git
 cd lerobot-nexarm
 
 conda create -n nexarm python=3.12 -y
@@ -110,7 +110,7 @@ pip install -e ".[nexarm,viz]"
 ### Option B — venv
 
 ```bash
-git clone https://github.com/liangfuyuan581-creator/lerobot-nexarm.git
+git clone https://github.com/Hiwonder-official/lerobot-nexarm.git
 cd lerobot-nexarm
 
 python -m venv .venv
