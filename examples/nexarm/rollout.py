@@ -2,21 +2,30 @@
 
 # Run inference with a trained policy on NexArm (no leader arm needed).
 #
-# Usage:
+# Replace YOUR_HF_USERNAME with your actual Hugging Face username.
+#
+# Usage — local checkpoint:
 #   python examples/nexarm/rollout.py \
 #       --follower-port COM19 \
 #       --policy-path outputs/train/nexarm_act/checkpoints/last/pretrained_model
 #
-# Or use a policy from Hugging Face Hub:
+# Usage — policy from Hugging Face Hub:
 #   python examples/nexarm/rollout.py \
 #       --follower-port COM19 \
-#       --policy-path <hf_username>/nexarm_act
+#       --policy-path YOUR_HF_USERNAME/nexarm_act
+#
+# Alternatively, use the CLI directly:
+#   lerobot-rollout \
+#       --strategy.type=sentry \
+#       --policy.path=outputs/train/nexarm_act/checkpoints/last/pretrained_model \
+#       --robot.type=nexarm_follower \
+#       --robot.port=COM19 \
+#       --robot.cameras='{"front":{"type":"opencv","index_or_path":0,"width":640,"height":480,"fps":30},"wrist":{"type":"opencv","index_or_path":1,"width":640,"height":480,"fps":30}}' \
+#       --display_data=true
 
 import argparse
-
-from lerobot.cameras.opencv import OpenCVCameraConfig
-from lerobot.robots.nexarm_follower import NexArmFollower, NexArmFollowerConfig
-from lerobot.scripts.lerobot_rollout import rollout
+import subprocess
+import sys
 
 
 def parse_args():
@@ -26,30 +35,37 @@ def parse_args():
     parser.add_argument("--fps", type=int, default=30)
     parser.add_argument("--front-cam", type=int, default=0)
     parser.add_argument("--wrist-cam", type=int, default=1)
-    parser.add_argument("--num-episodes", type=int, default=10)
-    parser.add_argument("--repo-id", default=None, help="Optional: save rollout as dataset (e.g. my_user/eval_nexarm)")
+    parser.add_argument(
+        "--strategy", default="sentry",
+        choices=["base", "sentry", "highlight", "dagger"],
+        help="Rollout strategy (default: sentry)"
+    )
+    parser.add_argument("--repo-id", default=None, help="Optional: save rollout dataset (e.g. YOUR_HF_USERNAME/eval_nexarm)")
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
 
-    camera_config = {
-        "front": OpenCVCameraConfig(index_or_path=args.front_cam, width=640, height=480, fps=args.fps),
-        "wrist": OpenCVCameraConfig(index_or_path=args.wrist_cam, width=640, height=480, fps=args.fps),
-    }
-
-    follower_config = NexArmFollowerConfig(port=args.follower_port, cameras=camera_config)
-    follower = NexArmFollower(follower_config)
-
-    rollout(
-        robot=follower,
-        policy_path=args.policy_path,
-        fps=args.fps,
-        num_episodes=args.num_episodes,
-        repo_id=args.repo_id,
-        display_data=True,
+    cameras_json = (
+        f'{{"front":{{"type":"opencv","index_or_path":{args.front_cam},"width":640,"height":480,"fps":{args.fps}}},'
+        f'"wrist":{{"type":"opencv","index_or_path":{args.wrist_cam},"width":640,"height":480,"fps":{args.fps}}}}}'
     )
+
+    cmd = [
+        sys.executable, "-m", "lerobot.scripts.lerobot_rollout",
+        f"--strategy.type={args.strategy}",
+        f"--policy.path={args.policy_path}",
+        "--robot.type=nexarm_follower",
+        f"--robot.port={args.follower_port}",
+        f"--robot.cameras={cameras_json}",
+        "--display_data=true",
+    ]
+
+    if args.repo_id:
+        cmd.append(f"--dataset.repo_id={args.repo_id}")
+
+    subprocess.run(cmd, check=True)
 
 
 if __name__ == "__main__":

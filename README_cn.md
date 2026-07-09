@@ -9,7 +9,7 @@
 板载 6 TOPS K230 视觉模块，支持在无 PC 的情况下运行多模态大模型和计算机视觉流程（YOLO 目标跟踪、手眼协调抓取等）。所有原理图、固件和代码完全开源。
 
 <p align="center">
-  <img src="./sources/2.png" alt="nexarm 2" width="600"/>
+  <img src="./media/readme/VLA_architecture.jpg" alt="nexarm" width="600"/>
 </p>
 
 ## 与 SO-ARM101 对比
@@ -121,7 +121,7 @@ pip install -e ".[nexarm]"
 ### 验证安装
 
 ```bash
-python -c "import lerobot.rollout; print('OK')"
+python -c "from lerobot.robots.nexarm_follower import NexArmFollower; print('OK')"
 ```
 
 ### 连接硬件
@@ -369,7 +369,7 @@ sudo usermod -a -G dialout $USER
 ```
 
 **找不到摄像头**
-- 运行 `lerobot_find_cameras opencv` 扫描可用索引
+- 运行 `lerobot-find-cameras opencv` 扫描可用索引
 - 关闭其他使用摄像头的程序（OBS、浏览器等）
 - 拔插 USB 设备后重新扫描
 

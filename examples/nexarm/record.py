@@ -2,23 +2,37 @@
 
 # Record a demonstration dataset with NexArm.
 #
+# This is a convenience wrapper around the lerobot-record CLI.
+# Replace YOUR_HF_USERNAME with your actual Hugging Face username
+# (run `huggingface-cli whoami` to confirm).
+#
 # Usage:
 #   python examples/nexarm/record.py \
 #       --follower-port COM19 --leader-port COM18 \
-#       --repo-id <hf_username>/nexarm_pick \
+#       --repo-id YOUR_HF_USERNAME/nexarm_pick \
 #       --num-episodes 50 --episode-time 10 --reset-time 10
 #
 # Keys during recording:
 #   Enter    start / confirm next episode
 #   ←        redo last episode
 #   ESC      finish early and save
+#
+# Alternatively, use the CLI directly:
+#   lerobot-record \
+#       --robot.type=nexarm_follower \
+#       --robot.port=COM19 \
+#       --robot.cameras='{"front":{"type":"opencv","index_or_path":0,"width":640,"height":480,"fps":30},"wrist":{"type":"opencv","index_or_path":1,"width":640,"height":480,"fps":30}}' \
+#       --teleop.type=nexarm_leader \
+#       --teleop.port=COM18 \
+#       --dataset.repo_id=YOUR_HF_USERNAME/nexarm_pick \
+#       --dataset.single_task="Pick up the object" \
+#       --dataset.num_episodes=50 \
+#       --dataset.episode_time_s=10 \
+#       --dataset.reset_time_s=10
 
 import argparse
-
-from lerobot.cameras.opencv import OpenCVCameraConfig
-from lerobot.robots.nexarm_follower import NexArmFollower, NexArmFollowerConfig
-from lerobot.scripts.lerobot_record import record
-from lerobot.teleoperators.nexarm_leader import NexArmLeader, NexArmLeaderConfig
+import subprocess
+import sys
 
 
 def parse_args():
@@ -40,29 +54,30 @@ def parse_args():
 def main():
     args = parse_args()
 
-    camera_config = {
-        "front": OpenCVCameraConfig(index_or_path=args.front_cam, width=640, height=480, fps=args.fps),
-        "wrist": OpenCVCameraConfig(index_or_path=args.wrist_cam, width=640, height=480, fps=args.fps),
-    }
-
-    follower_config = NexArmFollowerConfig(port=args.follower_port, cameras=camera_config)
-    leader_config = NexArmLeaderConfig(port=args.leader_port)
-
-    follower = NexArmFollower(follower_config)
-    leader = NexArmLeader(leader_config)
-
-    record(
-        robot=follower,
-        teleop=leader,
-        repo_id=args.repo_id,
-        single_task=args.task,
-        num_episodes=args.num_episodes,
-        episode_time_s=args.episode_time,
-        reset_time_s=args.reset_time,
-        fps=args.fps,
-        push_to_hub=args.push_to_hub,
-        display_data=True,
+    cameras_json = (
+        f'{{"front":{{"type":"opencv","index_or_path":{args.front_cam},"width":640,"height":480,"fps":{args.fps}}},'
+        f'"wrist":{{"type":"opencv","index_or_path":{args.wrist_cam},"width":640,"height":480,"fps":{args.fps}}}}}'
     )
+
+    cmd = [
+        sys.executable, "-m", "lerobot.scripts.lerobot_record",
+        "--robot.type=nexarm_follower",
+        f"--robot.port={args.follower_port}",
+        f"--robot.cameras={cameras_json}",
+        "--teleop.type=nexarm_leader",
+        f"--teleop.port={args.leader_port}",
+        f"--dataset.repo_id={args.repo_id}",
+        f"--dataset.single_task={args.task}",
+        f"--dataset.num_episodes={args.num_episodes}",
+        f"--dataset.episode_time_s={args.episode_time}",
+        f"--dataset.reset_time_s={args.reset_time}",
+        "--display_data=true",
+    ]
+
+    if args.push_to_hub:
+        cmd.append("--dataset.push_to_hub=true")
+
+    subprocess.run(cmd, check=True)
 
 
 if __name__ == "__main__":

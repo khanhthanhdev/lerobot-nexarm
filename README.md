@@ -9,7 +9,7 @@ The robotic arm features an all‑metal chassis driven by 65 kg·cm magnetic enc
 For on‑device perception, NexArm integrates a 6 TOPS K230 vision module, allowing you to run multimodal large models and computer vision pipelines—such as YOLO tracking and hand‑eye coordinated grasping—without a PC. All schematics, firmware, and code are open source, making NexArm a transparent and modifiable platform for academic research and real‑world robotic prototyping.
 
 <p align="center">
-  <img src="./sources/2.png" alt="nexarm 2" width="600"/>
+  <img src="./media/readme/VLA_architecture.jpg" alt="nexarm" width="600"/>
 </p>
 
 ## 🎯 Compared to SO‑ARM101:
@@ -129,7 +129,7 @@ pip install -e ".[nexarm]"
 ### Verify
 
 ```bash
-python -c "import lerobot.rollout; print('OK')"
+python -c "from lerobot.robots.nexarm_follower import NexArmFollower; print('OK')"
 ```
 
 ### Connect Hardware
@@ -403,7 +403,7 @@ sudo usermod -a -G dialout $USER
 ```
 
 **Camera not found**
-- Run `lerobot_find_cameras opencv` to scan available indices.
+- Run `lerobot-find-cameras opencv` to scan available indices.
 - Close other programs using the camera (OBS, browser, etc.).
 - Re-scan after unplugging and replugging USB devices.
 

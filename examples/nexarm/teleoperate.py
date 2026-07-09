@@ -13,11 +13,12 @@
 #   --no-display     Disable Rerun visualization
 
 import argparse
+import time
 
 from lerobot.cameras.opencv import OpenCVCameraConfig
 from lerobot.robots.nexarm_follower import NexArmFollower, NexArmFollowerConfig
 from lerobot.teleoperators.nexarm_leader import NexArmLeader, NexArmLeaderConfig
-from lerobot.utils.robot_utils import busy_wait
+from lerobot.utils.robot_utils import precise_sleep
 from lerobot.utils.visualization_utils import init_rerun, log_rerun_data
 
 
@@ -55,7 +56,7 @@ def main():
     print("Teleoperation started. Press Ctrl+C to stop.")
     try:
         while True:
-            start = follower.get_timestamp()
+            start = time.perf_counter()
 
             leader_pos = leader.get_action()
             follower.send_action(leader_pos)
@@ -64,7 +65,7 @@ def main():
             if not args.no_display:
                 log_rerun_data(obs)
 
-            busy_wait(1.0 / args.fps - (follower.get_timestamp() - start))
+            precise_sleep(1.0 / args.fps - (time.perf_counter() - start))
     except KeyboardInterrupt:
         print("Stopping teleoperation.")
     finally:
