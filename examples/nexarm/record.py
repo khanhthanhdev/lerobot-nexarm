@@ -10,6 +10,7 @@
 #   python examples/nexarm/record.py \
 #       --follower-port COM19 --leader-port COM18 \
 #       --repo-id YOUR_HF_USERNAME/nexarm_pick \
+#       --rerun-save-path outputs/rerun/nexarm_pick.rrd \
 #       --num-episodes 50 --episode-time 10 --reset-time 10
 #
 # Keys during recording:
@@ -48,6 +49,10 @@ def parse_args():
     parser.add_argument("--front-cam", type=int, default=0)
     parser.add_argument("--wrist-cam", type=int, default=1)
     parser.add_argument("--push-to-hub", action="store_true")
+    parser.add_argument(
+        "--rerun-save-path",
+        help="Optional .rrd path to save the live recording alongside the LeRobot dataset",
+    )
     return parser.parse_args()
 
 
@@ -76,6 +81,8 @@ def main():
 
     if args.push_to_hub:
         cmd.append("--dataset.push_to_hub=true")
+    if args.rerun_save_path:
+        cmd.append(f"--rerun_save_path={args.rerun_save_path}")
 
     subprocess.run(cmd, check=True)
 

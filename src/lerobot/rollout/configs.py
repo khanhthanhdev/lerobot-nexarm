@@ -235,6 +235,9 @@ class RolloutConfig:
     display_port: int | None = None
     # Whether to display compressed (JPEG) images instead of raw frames
     display_compressed_images: bool = False
+    # Optional local .rrd file for a replayable Rerun recording of this session.
+    # Requires display_data=True and display_mode="rerun".
+    rerun_save_path: str | None = None
     # Use vocal synthesis to read events
     play_sounds: bool = True
     resume: bool = False

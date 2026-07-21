@@ -186,6 +186,9 @@ class RecordConfig:
     display_port: int | None = None
     # Whether to display compressed (JPEG) images instead of raw frames
     display_compressed_images: bool = False
+    # Optional local .rrd file for a replayable Rerun recording of this session.
+    # Requires --display_data=true and --display_mode=rerun.
+    rerun_save_path: str | None = None
     # Use vocal synthesis to read events.
     play_sounds: bool = True
     # Resume recording on an existing dataset.
@@ -371,8 +374,14 @@ def record(
     logging.info(pformat(asdict(cfg)))
     if cfg.display_data:
         init_visualization(
-            cfg.display_mode, session_name="recording", ip=cfg.display_ip, port=cfg.display_port
+            cfg.display_mode,
+            session_name="recording",
+            ip=cfg.display_ip,
+            port=cfg.display_port,
+            rerun_save_path=cfg.rerun_save_path,
         )
+    elif cfg.rerun_save_path is not None:
+        raise ValueError("--rerun_save_path requires --display_data=true.")
     display_compressed_images = (
         True
         if (cfg.display_data and cfg.display_ip is not None and cfg.display_port is not None)

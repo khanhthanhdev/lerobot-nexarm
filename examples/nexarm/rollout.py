@@ -7,7 +7,8 @@
 # Usage — local checkpoint:
 #   python examples/nexarm/rollout.py \
 #       --follower-port COM19 \
-#       --policy-path outputs/train/nexarm_act/checkpoints/last/pretrained_model
+#       --policy-path outputs/train/nexarm_act/checkpoints/last/pretrained_model \
+#       --rerun-save-path outputs/rerun/nexarm_rollout.rrd
 #
 # Usage — policy from Hugging Face Hub:
 #   python examples/nexarm/rollout.py \
@@ -41,6 +42,10 @@ def parse_args():
         help="Rollout strategy (default: sentry)"
     )
     parser.add_argument("--repo-id", default=None, help="Optional: save rollout dataset (e.g. YOUR_HF_USERNAME/eval_nexarm)")
+    parser.add_argument(
+        "--rerun-save-path",
+        help="Optional .rrd path to save camera frames, observations, and policy actions",
+    )
     return parser.parse_args()
 
 
@@ -64,6 +69,8 @@ def main():
 
     if args.repo_id:
         cmd.append(f"--dataset.repo_id={args.repo_id}")
+    if args.rerun_save_path:
+        cmd.append(f"--rerun_save_path={args.rerun_save_path}")
 
     subprocess.run(cmd, check=True)
 

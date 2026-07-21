@@ -10,6 +10,7 @@
 #   --fps            Control loop rate (default: 30)
 #   --front-cam      OpenCV camera index for front camera (default: 0)
 #   --wrist-cam      OpenCV camera index for wrist camera (default: 1)
+#   --rerun-save-path outputs/rerun/nexarm_teleop.rrd  Save a replayable session
 #   --no-display     Disable Rerun visualization
 
 import argparse
@@ -19,7 +20,7 @@ from lerobot.cameras.opencv import OpenCVCameraConfig
 from lerobot.robots.nexarm_follower import NexArmFollower, NexArmFollowerConfig
 from lerobot.teleoperators.nexarm_leader import NexArmLeader, NexArmLeaderConfig
 from lerobot.utils.robot_utils import precise_sleep
-from lerobot.utils.visualization_utils import init_rerun, log_rerun_data
+from lerobot.utils.visualization_utils import init_rerun, log_rerun_data, shutdown_rerun
 
 
 def parse_args():
@@ -30,6 +31,10 @@ def parse_args():
     parser.add_argument("--front-cam", type=int, default=0)
     parser.add_argument("--wrist-cam", type=int, default=1)
     parser.add_argument("--no-display", action="store_true")
+    parser.add_argument(
+        "--rerun-save-path",
+        help="Optional .rrd path to save camera frames, joint observations, and actions",
+    )
     return parser.parse_args()
 
 
@@ -51,7 +56,9 @@ def main():
     leader.connect()
 
     if not args.no_display:
-        init_rerun(session_name="nexarm_teleoperate")
+        init_rerun(session_name="nexarm_teleoperate", save_path=args.rerun_save_path)
+    elif args.rerun_save_path:
+        raise ValueError("--rerun-save-path requires Rerun visualization; omit --no-display.")
 
     print("Teleoperation started. Press Ctrl+C to stop.")
     try:
@@ -63,7 +70,7 @@ def main():
             obs = follower.get_observation()
 
             if not args.no_display:
-                log_rerun_data(obs)
+                log_rerun_data(observation=obs, action=leader_pos)
 
             precise_sleep(1.0 / args.fps - (time.perf_counter() - start))
     except KeyboardInterrupt:
@@ -71,6 +78,8 @@ def main():
     finally:
         follower.disconnect()
         leader.disconnect()
+        if not args.no_display:
+            shutdown_rerun()
 
 
 if __name__ == "__main__":

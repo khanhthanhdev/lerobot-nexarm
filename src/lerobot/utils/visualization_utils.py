@@ -36,6 +36,7 @@ def init_visualization(
     session_name: str = "lerobot_control_loop",
     ip: str | None = None,
     port: int | None = None,
+    rerun_save_path: str | None = None,
 ) -> None:
     """Initializes the visualization backend selected by ``display_mode``.
 
@@ -45,8 +46,10 @@ def init_visualization(
     """
 
     if display_mode == "rerun":
-        init_rerun(session_name=session_name, ip=ip, port=port)
+        init_rerun(session_name=session_name, ip=ip, port=port, save_path=rerun_save_path)
     elif display_mode == "foxglove":
+        if rerun_save_path is not None:
+            raise ValueError("rerun_save_path requires display_mode='rerun'.")
         init_foxglove(host=ip or "127.0.0.1", port=port)
     else:
         raise ValueError(f"Unknown display_mode '{display_mode}'. Expected one of {VISUALIZATION_MODES}.")

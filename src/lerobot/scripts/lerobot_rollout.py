@@ -212,7 +212,15 @@ def rollout(cfg: RolloutConfig):
             cfg.display_ip,
             cfg.display_port,
         )
-        init_visualization(cfg.display_mode, session_name="rollout", ip=cfg.display_ip, port=cfg.display_port)
+        init_visualization(
+            cfg.display_mode,
+            session_name="rollout",
+            ip=cfg.display_ip,
+            port=cfg.display_port,
+            rerun_save_path=cfg.rerun_save_path,
+        )
+    elif cfg.rerun_save_path is not None:
+        raise ValueError("--rerun_save_path requires --display_data=true.")
 
     signal_handler = ProcessSignalHandler(use_threads=True, display_pid=False)
     shutdown_event = signal_handler.shutdown_event

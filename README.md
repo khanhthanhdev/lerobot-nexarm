@@ -219,6 +219,28 @@ python examples/nexarm/teleoperate.py \
   --front-cam 0 --wrist-cam 1 --fps 30
 ```
 
+### Live visualization and replayable Rerun recordings
+
+NexArm streams front/wrist camera frames, follower joint observations, and leader/policy actions to
+[Rerun](https://rerun.io/docs/overview/what-is-rerun). Install the visualization extra once:
+
+```bash
+pip install -e ".[nexarm,viz]"
+```
+
+Teleoperation opens the live Rerun Viewer by default. Add `--rerun-save-path` to also retain a
+replayable `.rrd` file; open it later with `rerun outputs/rerun/nexarm_teleop.rrd`.
+
+```bash
+python examples/nexarm/teleoperate.py \
+  --follower-port COM19 --leader-port COM18 \
+  --rerun-save-path outputs/rerun/nexarm_teleop.rrd
+```
+
+The same flag works with `examples/nexarm/record.py` and `examples/nexarm/rollout.py`. The LeRobot
+dataset remains the canonical training data; the `.rrd` file is a synchronized visual record for
+checking demonstrations, debugging failed rollouts, and sharing a session.
+
 ### Motion Speed and Acceleration
 
 The follower arm's motion profile is controlled by two parameters in `NexArmFollowerConfig` (or via the YAML / command line):

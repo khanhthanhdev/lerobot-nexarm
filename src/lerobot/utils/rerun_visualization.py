@@ -21,6 +21,7 @@ importing from here directly. Requires the ``viz`` extra (``pip install 'lerobot
 
 import numbers
 import os
+from pathlib import Path
 
 import numpy as np
 
@@ -38,7 +39,10 @@ def _is_scalar(x):
 
 
 def init_rerun(
-    session_name: str = "lerobot_control_loop", ip: str | None = None, port: int | None = None
+    session_name: str = "lerobot_control_loop",
+    ip: str | None = None,
+    port: int | None = None,
+    save_path: str | Path | None = None,
 ) -> None:
     """
     Initializes the Rerun SDK for visualizing the control loop.
@@ -47,6 +51,8 @@ def init_rerun(
         session_name: Name of the Rerun session.
         ip: Optional IP for connecting to a Rerun server.
         port: Optional port for connecting to a Rerun server.
+        save_path: Optional path for a local ``.rrd`` recording. The file preserves
+            the images, robot observations, and actions logged during the session.
     """
 
     require_package("rerun-sdk", extra="viz", import_name="rerun")
@@ -57,6 +63,10 @@ def init_rerun(
     batch_size = os.getenv("RERUN_FLUSH_NUM_BYTES", "8000")
     os.environ["RERUN_FLUSH_NUM_BYTES"] = batch_size
     rr.init(session_name)
+    if save_path is not None:
+        output_path = Path(save_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        rr.save(str(output_path))
     memory_limit = os.getenv("LEROBOT_RERUN_MEMORY_LIMIT", "10%")
     if ip and port:
         rr.connect_grpc(url=f"rerun+http://{ip}:{port}/proxy")
