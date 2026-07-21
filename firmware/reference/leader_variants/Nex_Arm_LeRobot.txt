@@ -1,0 +1,104 @@
+#include <Arduino.h>
+#include "HX_30HM.h"
+#include "CommProtocol.h"
+
+/* ---- LeRobot Leader Arm ----
+ * ESP32 直接连 HX 舵机总线（Serial1）
+ * USB Serial (Serial) 和 PC 通信，1Mbps
+ * 上电关力矩，PC 发命令读位置
+ * 
+ * CMD 96: 读 6 个舵机位置 → 返回 12 字节
+ * CMD 97: 写 6 个舵机位置（12 字节）
+ * CMD 98: torque 控制（1 字节：0=关, 1=开）
+ */
+
+#define BUZZER_PIN 23
+
+CommProtocol_t usb_protocol;
+
+static void beep(int freq, int duration) {
+    ledcSetup(0, freq, 8);
+    ledcAttachPin(BUZZER_PIN, 0);
+    ledcWrite(0, 128);
+    delay(duration);
+    ledcWrite(0, 0);
+}
+
+static void send_reply(uint8_t cmd, uint8_t *data, uint8_t len) {
+    uint8_t tx_len = usb_protocol.tx_packet_complete(0xFF, cmd, data, len);
+    Serial.write((const uint8_t *)&usb_protocol.tx_packet, tx_len);
+}
+
+static void handle_cmd(PacketTypeDef *pkt) {
+    uint8_t cmd = pkt->elements.cmd;
+    uint8_t *args = pkt->elements.args;
+
+    switch (cmd) {
+        case 96: { // CMD_LR_READ_POS
+            uint8_t ids[6] = {1,2,3,4,5,6};
+            int16_t rdata[6][5];
+            servo.sync_read_cur_pos_ex(ids, 6, rdata);
+            uint8_t buf[12];
+            for (int i = 0; i < 6; i++) {
+                buf[i*2]   = (uint8_t)(rdata[i][0] & 0xFF);
+                buf[i*2+1] = (uint8_t)((rdata[i][0] >> 8) & 0xFF);
+            }
+            send_reply(96, buf, 12);
+        } break;
+
+        case 97: { // CMD_LR_WRITE_POS
+            uint8_t ids[6] = {1,2,3,4,5,6};
+            int16_t positions[6];
+            for (int i = 0; i < 6; i++) {
+                positions[i] = (int16_t)(args[i*2] | (args[i*2+1] << 8));
+            }
+            int16_t send_data[6][4];
+            for (int i = 0; i < 6; i++) {
+                send_data[i][0] = i + 1;
+                send_data[i][1] = 0;   // acc
+                send_data[i][2] = 0;   // speed=0
+                send_data[i][3] = positions[i];
+            }
+            servo.sync_write_pos_ex(send_data, 6);
+        } break;
+
+        case 98: { // CMD_LR_TORQUE
+            uint8_t enable = args[0];
+            for (uint8_t i = 1; i <= 6; i++) {
+                if (enable) servo.enable_torque(i);
+                else servo.disable_torque(i);
+                delay(2);
+            }
+        } break;
+    }
+}
+
+void setup() {
+    Serial.begin(1000000);
+    setCpuFrequencyMhz(240);
+
+    servo.begin(Serial1, 1000000, 17, 16);
+    usb_protocol.begin();
+
+    // 关闭所有舵机力矩（主臂可自由拖动）
+    for (int i = 1; i <= 6; i++) {
+        servo.disable_torque(i);
+        delay(5);
+    }
+
+    beep(2000, 200);
+}
+
+void loop() {
+    // 读 USB Serial 命令
+    while (Serial.available()) {
+        uint8_t c = Serial.read();
+        usb_protocol.parsing(&c, 1);
+    }
+
+    // 检查是否收到完整帧
+    if (usb_protocol.rx_status == PARSING_SUCCESS) {
+        handle_cmd(&usb_protocol.rx_packet);
+        usb_protocol.rx_status = PARSING_HEADER_1;
+    }
+}

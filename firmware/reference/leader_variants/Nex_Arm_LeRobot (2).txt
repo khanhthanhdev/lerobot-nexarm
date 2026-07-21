@@ -1,0 +1,109 @@
+#include <Arduino.h>
+#include "HX_30HM.h"
+#include "CommProtocol.h"
+
+/* ---- LeRobot Leader Arm ----
+ * ESP32 直接连 HX 舵机总线（Serial1, 1Mbps）
+ * USB Serial (Serial, 1Mbps) 和 PC 通信
+ * 上电关力矩，PC 发命令读位置
+ *
+ * CMD 96 (0x60): 读 6 个舵机位置 → 返回 12 字节
+ * CMD 97 (0x61): 写 6 个舵机位置（12 字节）
+ * CMD 98 (0x62): torque 控制（1 字节：0=关, 1=开）
+ * CMD 68 (0x44): 进入 LeRobot 模式（兼容从臂协议）
+ */
+
+#define BUZZER_PIN 23
+
+CommProtocol_t usb_protocol;
+
+static void beep(int freq, int duration) {
+    ledcSetup(0, freq, 8);
+    ledcAttachPin(BUZZER_PIN, 0);
+    ledcWrite(0, 128);
+    delay(duration);
+    ledcWrite(0, 0);
+}
+
+static void send_reply(uint8_t cmd, uint8_t *data, uint8_t len) {
+    uint8_t tx_len = usb_protocol.tx_packet_complete(0xFF, cmd, data, len);
+    Serial.write((const uint8_t *)&usb_protocol.tx_packet, tx_len);
+}
+
+static void handle_cmd(PacketTypeDef *pkt) {
+    uint8_t cmd = pkt->elements.cmd;
+    uint8_t *args = pkt->elements.args;
+
+    switch (cmd) {
+        case 96: { // CMD_LR_READ_POS
+            uint8_t ids[6] = {1, 2, 3, 4, 5, 6};
+            int16_t rdata[6][5];
+            servo.sync_read_cur_pos_ex(ids, 6, rdata);
+            uint8_t buf[12];
+            for (int i = 0; i < 6; i++) {
+                buf[i * 2]     = (uint8_t)(rdata[i][0] & 0xFF);
+                buf[i * 2 + 1] = (uint8_t)((rdata[i][0] >> 8) & 0xFF);
+            }
+            send_reply(96, buf, 12);
+        } break;
+
+        case 97: { // CMD_LR_WRITE_POS
+            int16_t send_data[6][4];
+            for (int i = 0; i < 6; i++) {
+                int16_t pos = (int16_t)(args[i * 2] | (args[i * 2 + 1] << 8));
+                send_data[i][0] = i + 1;   // id
+                send_data[i][1] = 0;       // acc
+                send_data[i][2] = 0;       // speed=0
+                send_data[i][3] = pos;
+            }
+            servo.sync_write_pos_ex(send_data, 6);
+        } break;
+
+        case 98: { // CMD_LR_TORQUE
+            uint8_t enable = args[0];
+            for (uint8_t i = 1; i <= 6; i++) {
+                if (enable) servo.enable_torque(i);
+                else servo.disable_torque(i);
+                delay(2);
+            }
+            // 回复确认
+            send_reply(98, &enable, 1);
+        } break;
+
+        case 68: { // CMD_LEROBOT_MODE (兼容从臂协议，主臂直接回复OK)
+            uint8_t resp = 1;
+            send_reply(68, &resp, 1);
+        } break;
+    }
+}
+
+void setup() {
+    Serial.begin(1000000);
+    setCpuFrequencyMhz(240);
+
+    // 初始化舵机总线
+    servo.begin(Serial1, 1000000, SERVO_TX_PIN, SERVO_RX_PIN);
+
+    // 初始化 USB 协议解析
+    usb_protocol.begin();
+    usb_protocol.register_success_callback(handle_cmd);
+
+    // 关闭所有舵机力矩（主臂可自由拖动）
+    delay(100);
+    for (int i = 1; i <= 6; i++) {
+        servo.disable_torque(i);
+        delay(5);
+    }
+
+    beep(2000, 200);
+    Serial.println("[NexArm Leader] LeRobot mode ready.");
+}
+
+void loop() {
+    // 读 USB Serial 数据，喂给协议解析器
+    while (Serial.available()) {
+        uint8_t buf[64];
+        int n = Serial.readBytes(buf, min((int)Serial.available(), 64));
+        usb_protocol.parsing(buf, n);
+    }
+}
