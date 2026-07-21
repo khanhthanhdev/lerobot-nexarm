@@ -1,0 +1,39 @@
+# Supply the trained policy separately with --policy.path=... when launching.
+# Update the serial port, camera indexes, and repo_id for your machine.
+robot:
+  type: nexarm_follower
+  port: /dev/ttyUSB1
+  baudrate: 1000000
+  motion_acc: 100
+  motion_speed: 2000
+  cameras:
+    front:
+      type: opencv
+      index_or_path: 0
+      width: 640
+      height: 480
+      fps: 30
+    wrist:
+      type: opencv
+      index_or_path: 1
+      width: 640
+      height: 480
+      fps: 30
+
+strategy:
+  type: sentry
+
+dataset:
+  repo_id: local/rollout_nexarm_pick
+  single_task: Pick up the object
+  fps: 30
+  video: true
+  push_to_hub: false
+  streaming_encoding: true
+
+fps: 30
+duration: 30
+device: cuda
+task: Pick up the object
+display_data: false
+play_sounds: false

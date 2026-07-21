@@ -1,0 +1,28 @@
+# Update the serial ports and camera indexes for your machine.
+robot:
+  type: nexarm_follower
+  port: /dev/ttyUSB1
+  baudrate: 1000000
+  motion_acc: 100
+  motion_speed: 2000
+  cameras:
+    front:
+      type: opencv
+      index_or_path: 0
+      width: 640
+      height: 480
+      fps: 30
+    wrist:
+      type: opencv
+      index_or_path: 1
+      width: 640
+      height: 480
+      fps: 30
+
+teleop:
+  type: nexarm_leader
+  port: /dev/ttyUSB0
+  baudrate: 1000000
+
+fps: 30
+display_data: false
