@@ -166,6 +166,7 @@ from lerobot.robots import (  # noqa: F401
     hope_jr,
     koch_follower,
     nexarm_follower,
+    nexarm_sim,
     omx_follower,
     openarm_follower,
     reachy2,

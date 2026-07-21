@@ -126,6 +126,7 @@ from lerobot.robots import (  # noqa: F401
     koch_follower,
     make_robot_from_config,
     nexarm_follower,
+    nexarm_sim,
     omx_follower,
     openarm_follower,
     reachy2,

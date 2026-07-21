@@ -176,3 +176,15 @@ outputs/
 *.urdf
 *.xml
 *.part
+
+# NexArm simulation source and generated runtime assets. STL files are stored
+# through the repository's existing Git LFS rule in .gitattributes.
+!sim/
+sim/*
+!sim/README.md
+!sim/export_fusion_to_mujoco.py
+!sim/fusion_export/
+!sim/fusion_export/*.xml
+!sim/fusion_export/meshes/
+!sim/fusion_export/meshes/*.stl
+sim/**/__pycache__/

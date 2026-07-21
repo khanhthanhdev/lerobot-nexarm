@@ -1,0 +1,6 @@
+{
+	"url": "https://cad.onshape.com/documents/c8af13efe738f5464ee25a5b/w/9914315a5bc2b9b3a74a7463/e/cc55ef6f977361ce2cd47347",
+	"output_format": "mujoco",
+	"output_filename": "NexArm-sim",
+	"no_dynamics": true
+}
