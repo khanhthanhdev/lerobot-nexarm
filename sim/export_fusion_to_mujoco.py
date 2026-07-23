@@ -106,7 +106,7 @@ COLLISION_SPECS = {
         {
             "type": "box",
             "pos": "0.50559 -0.057 0.23044",
-            "size": "0.025 0.010 0.015",
+            "size": "0.027 0.010 0.015",
             "friction": "3 0.01 0.001",
             "condim": "4",
         },
@@ -115,7 +115,7 @@ COLLISION_SPECS = {
         {
             "type": "box",
             "pos": "0.57314 -0.057 0.23044",
-            "size": "0.025 0.010 0.015",
+            "size": "0.027 0.010 0.015",
             "friction": "3 0.01 0.001",
             "condim": "4",
         },
@@ -465,6 +465,16 @@ def run(_context: str):
         "joint",
         {"damping": "0.01", "frictionloss": "0", "armature": "0"},
     )
+    gripper_actuator_defaults = ET.SubElement(
+        defaults,
+        "default",
+        {"class": "gripper_actuator"},
+    )
+    ET.SubElement(
+        gripper_actuator_defaults,
+        "position",
+        {"kp": "1000", "kv": "5"},
+    )
     visual_defaults = ET.SubElement(defaults, "default", {"class": "visual"})
     ET.SubElement(
         visual_defaults,
@@ -587,7 +597,7 @@ def run(_context: str):
         "site",
         {
             "name": "gripper_frame",
-            "pos": "0.539 -0.09 0.230",
+            "pos": "0.53937 -0.057 0.23044",
             "size": "0.005",
             "rgba": "0.1 0.8 0.1 1",
         },
@@ -645,7 +655,7 @@ def run(_context: str):
         )
         attributes = {
             "name": actuator_name,
-            "class": "nexarm",
+            "class": "gripper_actuator" if joint_name == "right_jaw_slide_joint" else "nexarm",
             "joint": joint_name,
         }
         if "range" in joint_attributes:

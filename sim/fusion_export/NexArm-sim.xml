@@ -10,6 +10,9 @@
     <default class="gripper">
       <joint damping="0.01" frictionloss="0" armature="0" />
     </default>
+    <default class="gripper_actuator">
+      <position kp="1000" kv="5" />
+    </default>
     <default class="visual">
       <geom type="mesh" contype="0" conaffinity="0" group="2" />
     </default>
@@ -64,7 +67,7 @@
                 <body name="link_6_gripper_base" pos="0 0 0" quat="1 0 0 0">
                   <geom name="link_6_gripper_base_visual" type="mesh" mesh="link_6_gripper_base" class="visual" />
                   <geom name="link_6_gripper_base_collision_0" class="collision" type="box" pos="0.53937 -0.02192 0.23047" size="0.010 0.023 0.047" />
-                  <site name="gripper_frame" pos="0.539 -0.09 0.230" size="0.005" rgba="0.1 0.8 0.1 1" />
+                  <site name="gripper_frame" pos="0.53937 -0.057 0.23044" size="0.005" rgba="0.1 0.8 0.1 1" />
                   <inertial mass="0.0774928302785" pos="0.539368566486 -0.0210206927704 0.230601823149" fullinertia="8.95253759014e-06 9.85333441232e-05 9.25169280579e-05 1.88914933474e-11 5.42428324479e-15 7.9007785621e-08" />
                   <body name="link_6_pinion_gear" pos="0 0 0" quat="1 0 0 0">
                     <geom name="link_6_pinion_gear_visual" type="mesh" mesh="link_6_pinion_gear" class="visual" />
@@ -73,13 +76,13 @@
                   <body name="link_6_left_jaw" pos="0 0 0" quat="1 0 0 0">
                     <joint name="left_jaw_slide_joint" pos="0.539368648301 -0.0279461316442 0.230435863088" type="slide" axis="-1 0 0" limited="true" range="0 0.0255" class="gripper" />
                     <geom name="link_6_left_jaw_visual" type="mesh" mesh="link_6_left_jaw" class="visual" />
-                    <geom name="link_6_left_jaw_collision_0" class="collision" type="box" pos="0.50559 -0.057 0.23044" size="0.025 0.010 0.015" friction="3 0.01 0.001" condim="4" />
+                    <geom name="link_6_left_jaw_collision_0" class="collision" type="box" pos="0.50559 -0.057 0.23044" size="0.027 0.010 0.015" friction="3 0.01 0.001" condim="4" />
                     <inertial mass="0.111422606046" pos="0.504003187095 -0.0394122365348 0.229771944907" fullinertia="2.28042352486e-05 1.43750650678e-05 2.25552586022e-05 1.93422836022e-06 7.00590085088e-07 1.37928154779e-06" />
                   </body>
                   <body name="link_6_right_jaw" pos="0 0 0" quat="1 0 0 0">
                     <joint name="right_jaw_slide_joint" pos="0.539368644619 -0.0279461316442 0.230435863088" type="slide" axis="-1 0 0" limited="true" range="-0.0255 0" class="gripper" />
                     <geom name="link_6_right_jaw_visual" type="mesh" mesh="link_6_right_jaw" class="visual" />
-                    <geom name="link_6_right_jaw_collision_0" class="collision" type="box" pos="0.57314 -0.057 0.23044" size="0.025 0.010 0.015" friction="3 0.01 0.001" condim="4" />
+                    <geom name="link_6_right_jaw_collision_0" class="collision" type="box" pos="0.57314 -0.057 0.23044" size="0.027 0.010 0.015" friction="3 0.01 0.001" condim="4" />
                     <inertial mass="0.111422606059" pos="0.574734109829 -0.0394122993228 0.231095115243" fullinertia="2.28047609263e-05 1.43758557067e-05 2.25549938879e-05 -1.93429494168e-06 7.01727577012e-07 -1.37562632826e-06" />
                   </body>
                 </body>
@@ -115,6 +118,6 @@
     <position name="joint_3_link_2_to_link_3_control" class="nexarm" joint="joint_3_link_2_to_link_3" ctrllimited="true" ctrlrange="-2.35619449019 2.35619449019" />
     <position name="joint_4_link_3_to_link_4_control" class="nexarm" joint="joint_4_link_3_to_link_4" ctrllimited="true" ctrlrange="-1.74532925199 1.74532925199" />
     <position name="joint_5_link_4_to_link_5_control" class="nexarm" joint="joint_5_link_4_to_link_5" ctrllimited="true" ctrlrange="-3.14159265359 3.14159265359" />
-    <position name="gripper_control" class="nexarm" joint="right_jaw_slide_joint" ctrllimited="true" ctrlrange="-0.0255 0" />
+    <position name="gripper_control" class="gripper_actuator" joint="right_jaw_slide_joint" ctrllimited="true" ctrlrange="-0.0255 0" />
   </actuator>
 </mujoco>

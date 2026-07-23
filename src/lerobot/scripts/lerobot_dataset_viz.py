@@ -388,6 +388,14 @@ def main():
             "If not given, defaults to 1e-4."
         ),
     )
+    parser.add_argument(
+        "--video-backend",
+        default=None,
+        help=(
+            "Video decoder passed to LeRobotDataset, for example 'pyav' when "
+            "the installed TorchCodec is unavailable or incompatible."
+        ),
+    )
 
     parser.add_argument(
         "--display-compressed-images",
@@ -441,10 +449,17 @@ def main():
     repo_id = kwargs.pop("repo_id")
     root = kwargs.pop("root")
     tolerance_s = kwargs.pop("tolerance_s")
+    video_backend = kwargs.pop("video_backend")
 
     init_logging()
     logging.info("Loading dataset")
-    dataset = LeRobotDataset(repo_id, episodes=[args.episode_index], root=root, tolerance_s=tolerance_s)
+    dataset = LeRobotDataset(
+        repo_id,
+        episodes=[args.episode_index],
+        root=root,
+        tolerance_s=tolerance_s,
+        video_backend=video_backend,
+    )
 
     visualize_dataset(dataset, **kwargs)
 

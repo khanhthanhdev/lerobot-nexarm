@@ -166,6 +166,95 @@ class NexArmMujocoBackend:
             positions[f"{feature_name}.pos"] = self.control_to_raw(feature_name, qpos)
         return positions
 
+    def solve_ik(
+        self,
+        target_xyz: npt.ArrayLike,
+        *,
+        site_name: str = "gripper_frame",
+        max_iterations: int = 120,
+        tolerance_m: float = 0.003,
+        restarts: int = 8,
+        seed: int = 0,
+    ) -> dict[str, float] | None:
+        """Solve position-only IK for deterministic scripted data generation."""
+
+        target = np.asarray(target_xyz, dtype=np.float64)
+        if target.shape != (3,):
+            raise ValueError(f"target_xyz must have shape (3,), got {target.shape}")
+        site_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, site_name)
+        if site_id < 0:
+            raise ValueError(f"MuJoCo model is missing required IK site {site_name!r}")
+
+        arm_names = JOINT_NAMES[:-1]
+        qpos_addresses = [
+            int(self.model.jnt_qposadr[self._joint_ids[feature_name]]) for feature_name in arm_names
+        ]
+        dof_addresses = [
+            int(self.model.jnt_dofadr[self._joint_ids[feature_name]]) for feature_name in arm_names
+        ]
+        rng = np.random.default_rng(seed)
+        for restart in range(restarts + 1):
+            working = mujoco.MjData(self.model)
+            working.qpos[:] = self.data.qpos
+            if restart:
+                for feature_name, qpos_address in zip(arm_names, qpos_addresses, strict=True):
+                    low, high = self.model.jnt_range[self._joint_ids[feature_name]]
+                    working.qpos[qpos_address] = rng.uniform(low * 0.8, high * 0.8)
+
+            for _ in range(max_iterations):
+                mujoco.mj_forward(self.model, working)
+                error = target - working.site_xpos[site_id]
+                if np.linalg.norm(error) <= tolerance_m:
+                    return {
+                        feature_name: self.control_to_raw(
+                            feature_name,
+                            float(working.qpos[qpos_address]),
+                        )
+                        for feature_name, qpos_address in zip(
+                            arm_names,
+                            qpos_addresses,
+                            strict=True,
+                        )
+                    }
+
+                jacobian = np.zeros((3, self.model.nv), dtype=np.float64)
+                mujoco.mj_jacSite(self.model, working, jacobian, None, site_id)
+                selected = jacobian[:, dof_addresses]
+                damping = 1e-3
+                delta = selected.T @ np.linalg.solve(
+                    selected @ selected.T + damping * np.eye(3),
+                    error,
+                )
+                delta = np.clip(delta, -0.15, 0.15)
+                for index, (feature_name, qpos_address) in enumerate(
+                    zip(arm_names, qpos_addresses, strict=True)
+                ):
+                    low, high = self.model.jnt_range[self._joint_ids[feature_name]]
+                    working.qpos[qpos_address] = np.clip(
+                        working.qpos[qpos_address] + delta[index],
+                        low,
+                        high,
+                    )
+        return None
+
+    def site_position(self, name: str) -> npt.NDArray[np.float64]:
+        site_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, name)
+        if site_id < 0:
+            raise ValueError(f"MuJoCo model is missing site {name!r}")
+        return self.data.site_xpos[site_id].copy()
+
+    def body_position(self, name: str) -> npt.NDArray[np.float64]:
+        body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, name)
+        if body_id < 0:
+            raise ValueError(f"MuJoCo model is missing body {name!r}")
+        return self.data.xpos[body_id].copy()
+
+    def geom_position(self, name: str) -> npt.NDArray[np.float64]:
+        geom_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, name)
+        if geom_id < 0:
+            raise ValueError(f"MuJoCo model is missing geom {name!r}")
+        return self.data.geom_xpos[geom_id].copy()
+
     def render(self, camera_name: str) -> npt.NDArray[np.uint8]:
         if camera_name not in self.camera_names:
             raise KeyError(f"Camera {camera_name!r} is not configured")

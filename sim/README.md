@@ -8,7 +8,7 @@ position actuators instead of executing the Hiwonder ESP32/AT32 firmware.
 The shortest complete workflow is:
 
 1. Run `examples/nexarm/pick_place_sim.py` to verify the scene and controls.
-2. Record demonstrations with `lerobot-record` and the physical NexArm leader.
+2. Generate successful scripted demonstrations entirely in MuJoCo.
 3. Inspect at least one episode with `lerobot-dataset-viz`.
 4. Train a policy with `lerobot-train`.
 5. Run it with `lerobot-rollout`, then record good and failed rollouts as a
@@ -231,7 +231,49 @@ This path renders the `front` and `wrist` camera observations but does not open
 the interactive MuJoCo viewer. Use `examples/nexarm/simulate.py` when the main
 goal is visually playing with the scene.
 
-## 5. Record a LeRobot simulation dataset
+## 5. Generate a LeRobot dataset entirely in simulation
+
+No physical follower or leader is required. The generator uses damped
+least-squares IK, moves through approach/grasp/lift/transfer/release waypoints,
+and writes only episodes that pass `NexArmPickPlaceTask`'s physical success
+gate:
+
+```bash
+MUJOCO_GL=egl uv run python examples/nexarm/generate_sim_dataset.py \
+  --repo-id=local/nexarm_sim_pick_place \
+  --root=outputs/datasets/nexarm_sim_pick_place \
+  --episodes=20 \
+  --max-attempts=60
+```
+
+Each accepted episode contains the six raw NexArm state values, the six raw
+NexArm actions, and 640 x 480 `front` and `wrist` camera videos at 30 FPS.
+Seeds randomize the cube and target poses, failed IK or manipulation attempts
+are discarded, and the command exits nonzero if it cannot produce the requested
+accepted episode count. `generation_report.json` records the accepted seeds,
+rejection reasons, camera/FPS contract, and model SHA-256 so a dataset can be
+reproduced against the same scene.
+
+Use a small image-backed dataset to verify a new machine before committing to
+full-resolution video rendering:
+
+```bash
+MUJOCO_GL=egl uv run python examples/nexarm/generate_sim_dataset.py \
+  --repo-id=local/nexarm_sim_smoke \
+  --root=outputs/datasets/nexarm_sim_smoke \
+  --episodes=1 \
+  --max-attempts=3 \
+  --camera-width=96 \
+  --camera-height=96 \
+  --no-video
+```
+
+`--no-video` still stores both camera streams, but keeps individual images
+instead of encoding MP4 shards. Output roots must be new directories; this
+prevents an accidental mixture of schemas, resolutions, or partially generated
+runs.
+
+### Record with the physical leader later
 
 Set a Hub-compatible repository ID even when keeping the dataset local:
 
@@ -262,7 +304,7 @@ repeatable cube and target randomization for custom recording loops. The
 standard `lerobot-record` command still calls `NexArmSim.reset()` directly, so
 it does not opt into task randomization automatically.
 
-## 6. Inspect the recorded camera video, state, and actions
+## 6. Inspect the generated camera video, state, and actions
 
 Install the local dataset viewer:
 
@@ -274,8 +316,9 @@ Open episode 0 in Rerun:
 
 ```bash
 uv run lerobot-dataset-viz \
-  --repo-id=YOUR_HF_USERNAME/nexarm_sim_pick_cube \
-  --root=outputs/datasets/nexarm_sim_pick_cube \
+  --repo-id=local/nexarm_sim_pick_place \
+  --root=outputs/datasets/nexarm_sim_pick_place \
+  --video-backend=pyav \
   --episode-index=0
 ```
 
@@ -286,15 +329,16 @@ the viewer immediately with:
 
 ```bash
 uv run lerobot-dataset-viz \
-  --repo-id=YOUR_HF_USERNAME/nexarm_sim_pick_cube \
-  --root=outputs/datasets/nexarm_sim_pick_cube \
+  --repo-id=local/nexarm_sim_pick_place \
+  --root=outputs/datasets/nexarm_sim_pick_place \
+  --video-backend=pyav \
   --episode-index=0 \
   --save=1 \
   --output-dir=outputs/dataset_visualizations
 ```
 
 The encoded source camera videos are under
-`outputs/datasets/nexarm_sim_pick_cube/videos/`. LeRobot v3 may concatenate
+`outputs/datasets/nexarm_sim_pick_place/videos/`. LeRobot v3 may concatenate
 multiple episodes into an MP4 shard, so `lerobot-dataset-viz` is the reliable
 way to seek one episode using its metadata. If the dataset was pushed to the
 Hub, paste its repository ID into the
@@ -307,8 +351,8 @@ uv run lerobot-replay \
   --robot.type=nexarm_sim \
   --robot.id=nexarm_sim \
   --robot.model_path=sim/fusion_export/scene.xml \
-  --dataset.repo_id=YOUR_HF_USERNAME/nexarm_sim_pick_cube \
-  --dataset.root=outputs/datasets/nexarm_sim_pick_cube \
+  --dataset.repo_id=local/nexarm_sim_pick_place \
+  --dataset.root=outputs/datasets/nexarm_sim_pick_place \
   --dataset.episode=0
 ```
 
@@ -322,8 +366,8 @@ After checking the recorded camera frames and actions:
 
 ```bash
 uv run lerobot-train \
-  --dataset.repo_id=YOUR_HF_USERNAME/nexarm_sim_pick_cube \
-  --dataset.root=outputs/datasets/nexarm_sim_pick_cube \
+  --dataset.repo_id=local/nexarm_sim_pick_place \
+  --dataset.root=outputs/datasets/nexarm_sim_pick_place \
   --policy.type=act \
   --policy.device=cuda \
   --output_dir=outputs/train/act_nexarm_sim \
