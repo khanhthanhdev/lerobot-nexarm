@@ -78,7 +78,7 @@
     {
       "feature": "gripper",
       "source_joint": "right_jaw_slide_joint",
-      "axis": [1.0, 0.0, 0.0],
+      "axis": [-1.0, 0.0, 0.0],
       "range": [-0.0255, 0.0],
       "raw_range": [1195.0, 2833.0],
       "home_raw": 2833.0,

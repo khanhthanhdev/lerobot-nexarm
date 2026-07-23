@@ -7,7 +7,8 @@ It writes through WSL's UNC share so the generated model lands in this checkout.
 import json
 import math
 import os
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as ET  # nosec B405 - this exporter only creates XML
+from typing import Any
 
 import adsk.core
 import adsk.fusion
@@ -44,6 +45,20 @@ ARM_JOINTS = [
     "joint_4_link_3_to_link_4",
     "joint_5_link_4_to_link_5",
 ]
+
+# The Fusion slider directions describe the CAD joints, but both exported jaw
+# meshes must move away from the gripper center as the simulated control moves
+# from closed (0 m) to open (-0.0255 m). Keeping this correction in the
+# exporter prevents a future CAD export from silently reversing the policy
+# contract.
+JOINT_AXIS_OVERRIDES = {
+    "left_jaw_slide_joint": [-1.0, 0.0, 0.0],
+    "right_jaw_slide_joint": [-1.0, 0.0, 0.0],
+}
+GRIPPER_JOINTS = {
+    "left_jaw_slide_joint",
+    "right_jaw_slide_joint",
+}
 
 # Stable primitive contact geometry. The detailed STL files stay visual-only:
 # using the exported meshes directly for contact creates overlapping convex
@@ -88,10 +103,22 @@ COLLISION_SPECS = {
         {"type": "box", "pos": "0.53937 -0.02192 0.23047", "size": "0.010 0.023 0.047"},
     ],
     "link_6_left_jaw": [
-        {"type": "box", "pos": "0.50559 -0.03991 0.22931", "size": "0.017 0.029 0.020"},
+        {
+            "type": "box",
+            "pos": "0.50559 -0.057 0.23044",
+            "size": "0.025 0.010 0.015",
+            "friction": "3 0.01 0.001",
+            "condim": "4",
+        },
     ],
     "link_6_right_jaw": [
-        {"type": "box", "pos": "0.57314 -0.03991 0.23155", "size": "0.017 0.029 0.020"},
+        {
+            "type": "box",
+            "pos": "0.57314 -0.057 0.23044",
+            "size": "0.025 0.010 0.015",
+            "friction": "3 0.01 0.001",
+            "condim": "4",
+        },
     ],
 }
 
@@ -148,13 +175,13 @@ def _inertial_attributes(
     }
 
 
-def _joint_origin_m(joint: object) -> list[float]:
+def _joint_origin_m(joint: Any) -> list[float]:
     if joint.objectType == "adsk::fusion::Joint":
         return _point_m(joint.geometryOneTransform.translation)
     return _point_m(joint.geometry.origin)
 
 
-def _joint_attributes(joint: object) -> dict[str, str]:
+def _joint_attributes(joint: Any) -> dict[str, str]:
     motion = joint.jointMotion
     attributes = {
         "name": joint.name,
@@ -195,10 +222,14 @@ def _joint_attributes(joint: object) -> dict[str, str]:
             )
     else:
         raise RuntimeError(f"Unsupported movable joint type for {joint.name}: {motion.objectType}")
+    if joint.name in JOINT_AXIS_OVERRIDES:
+        attributes["axis"] = _format(JOINT_AXIS_OVERRIDES[joint.name])
+    if joint.name in GRIPPER_JOINTS:
+        attributes["class"] = "gripper"
     return attributes
 
 
-def _native_joint_config(joint: object) -> dict[str, object]:
+def _native_joint_config(joint: Any) -> dict[str, Any]:
     native = joint.nativeObject if joint.nativeObject else joint
     attribute = native.attributes.itemByName("mujoco", "config")
     if not attribute:
@@ -210,7 +241,7 @@ def _add_body(
     parent: ET.Element,
     name: str,
     occurrence: adsk.fusion.Occurrence,
-    joint: object | None = None,
+    joint: Any | None = None,
 ) -> ET.Element:
     body = ET.SubElement(
         parent,
@@ -243,7 +274,11 @@ def _add_body(
     return body
 
 
-def _write_scene(output_dir: str) -> None:
+def _offset_position(position: tuple[float, float, float], model_origin_m: list[float]) -> str:
+    return _format(tuple(value - origin for value, origin in zip(position, model_origin_m, strict=True)))
+
+
+def _write_scene(output_dir: str, model_origin_m: list[float]) -> None:
     scene = ET.Element("mujoco", {"model": "NexArm-scene"})
     ET.SubElement(scene, "include", {"file": "NexArm-sim.xml"})
     visual = ET.SubElement(scene, "visual")
@@ -278,12 +313,19 @@ def _write_scene(output_dir: str) -> None:
         {
             "name": "front",
             "mode": "fixed",
-            "pos": "0.9 -0.55 0.55",
+            "pos": _offset_position((0.9, -0.55, 0.55), model_origin_m),
             "xyaxes": "0.857493 0.514496 0 -0.240504 0.400841 0.884016",
             "fovy": "55",
         },
     )
-    cube = ET.SubElement(worldbody, "body", {"name": "cube", "pos": "0.539 -0.18 0.025"})
+    cube = ET.SubElement(
+        worldbody,
+        "body",
+        {
+            "name": "cube",
+            "pos": _offset_position((0.539, -0.18, 0.01), model_origin_m),
+        },
+    )
     ET.SubElement(cube, "freejoint", {"name": "cube_joint"})
     ET.SubElement(
         cube,
@@ -291,12 +333,32 @@ def _write_scene(output_dir: str) -> None:
         {
             "name": "cube_collision",
             "type": "box",
-            "size": "0.018 0.018 0.018",
-            "mass": "0.05",
+            "size": "0.01 0.01 0.01",
+            "mass": "0.02",
             "rgba": "0.85 0.15 0.1 1",
             "friction": "1.2 0.01 0.001",
             "contype": "2",
             "conaffinity": "3",
+        },
+    )
+    target = ET.SubElement(
+        worldbody,
+        "body",
+        {
+            "name": "target_zone",
+            "pos": _offset_position((0.45, -0.18, 0.002), model_origin_m),
+        },
+    )
+    ET.SubElement(
+        target,
+        "geom",
+        {
+            "name": "target_zone_visual",
+            "type": "cylinder",
+            "size": "0.05 0.002",
+            "rgba": "0.1 0.8 0.2 0.45",
+            "contype": "0",
+            "conaffinity": "0",
         },
     )
     ET.indent(scene, space="  ")
@@ -330,13 +392,15 @@ def run(_context: str):
 
     joints = {joint.name: joint for joint in list(root.allJoints) + list(root.allAsBuiltJoints)}
     required_joints = set(ARM_JOINTS) | {
-        "gripper_pinion_joint",
         "left_jaw_slide_joint",
         "right_jaw_slide_joint",
     }
     missing_joints = sorted(required_joints - joints.keys())
     if missing_joints:
         raise RuntimeError(f"Missing required joints: {missing_joints}")
+
+    model_origin_m = _joint_origin_m(joints[ARM_JOINTS[0]])
+    model_origin_m[2] = 0.0
 
     export_manager = design.exportManager
     exported_meshes = []
@@ -347,7 +411,10 @@ def run(_context: str):
             raise RuntimeError(f"Unable to create STL export options for {path}")
         options.isBinaryFormat = True
         options.isOneFilePerBody = False
-        options.meshRefinement = adsk.fusion.MeshRefinementSettings.MeshRefinementMedium
+        # Collision uses stable primitives, so low-refinement visual meshes are
+        # sufficient and keep simulator startup, rendering, and LFS artifacts
+        # manageable. Use the CAD model for manufacturing-quality geometry.
+        options.meshRefinement = adsk.fusion.MeshRefinementSettings.MeshRefinementLow
         options.unitType = adsk.fusion.DistanceUnits.MillimeterDistanceUnits
         options.sendToPrintUtility = False
         if not export_manager.execute(options):
@@ -358,12 +425,22 @@ def run(_context: str):
     ET.SubElement(
         mujoco,
         "compiler",
-        {"angle": "radian", "meshdir": "meshes", "autolimits": "true"},
+        {
+            "angle": "radian",
+            "meshdir": "meshes",
+            "autolimits": "true",
+        },
     )
     ET.SubElement(
         mujoco,
         "option",
-        {"timestep": "0.002", "integrator": "implicitfast", "gravity": "0 0 -9.81"},
+        {
+            "timestep": "0.002",
+            "integrator": "implicitfast",
+            "gravity": "0 0 -9.81",
+            "cone": "elliptic",
+            "impratio": "10",
+        },
     )
 
     defaults = ET.SubElement(mujoco, "default")
@@ -382,6 +459,12 @@ def run(_context: str):
             "kv": str(actuator_defaults.get("kv", 0.2)),
         },
     )
+    gripper_defaults = ET.SubElement(defaults, "default", {"class": "gripper"})
+    ET.SubElement(
+        gripper_defaults,
+        "joint",
+        {"damping": "0.01", "frictionloss": "0", "armature": "0"},
+    )
     visual_defaults = ET.SubElement(defaults, "default", {"class": "visual"})
     ET.SubElement(
         visual_defaults,
@@ -394,7 +477,10 @@ def run(_context: str):
         "geom",
         {
             "contype": "1",
-            "conaffinity": "2",
+            # Robot primitives accept both robot (bit 1) and environment
+            # (bit 2) contacts. Adjacent-link pairs are excluded explicitly
+            # below, while non-adjacent self-collision remains active.
+            "conaffinity": "3",
             "group": "3",
             "rgba": "0 0 0 0",
             "friction": "1.1 0.01 0.001",
@@ -414,8 +500,17 @@ def run(_context: str):
         )
 
     worldbody = ET.SubElement(mujoco, "worldbody")
-    base = _add_body(
+    mount = ET.SubElement(
         worldbody,
+        "body",
+        {
+            "name": "nexarm_mount",
+            "pos": _format(tuple(-value for value in model_origin_m)),
+            "childclass": "nexarm",
+        },
+    )
+    base = _add_body(
+        mount,
         "base_link",
         occurrences[BODY_SPECS["base_link"][0]],
     )
@@ -458,7 +553,6 @@ def run(_context: str):
         gripper_base,
         "link_6_pinion_gear",
         occurrences[BODY_SPECS["link_6_pinion_gear"][0]],
-        joints["gripper_pinion_joint"],
     )
     _add_body(
         gripper_base,
@@ -499,6 +593,27 @@ def run(_context: str):
         },
     )
 
+    contact = ET.SubElement(mujoco, "contact")
+    for body1, body2 in (
+        ("base_link", "link_1"),
+        ("link_1", "link_2"),
+        ("link_2", "link_3"),
+        ("link_3", "link_4"),
+        ("link_4", "link_5"),
+        ("link_5", "link_6_gripper_base"),
+        ("link_6_gripper_base", "link_6_left_jaw"),
+        ("link_6_gripper_base", "link_6_right_jaw"),
+    ):
+        ET.SubElement(
+            contact,
+            "exclude",
+            {
+                "name": f"{body1}_to_{body2}",
+                "body1": body1,
+                "body2": body2,
+            },
+        )
+
     equality = ET.SubElement(mujoco, "equality")
     ET.SubElement(
         equality,
@@ -514,18 +629,6 @@ def run(_context: str):
     )
     right_limits = adsk.fusion.SliderJointMotion.cast(joints["right_jaw_slide_joint"].jointMotion).slideLimits
     right_travel_m = (right_limits.maximumValue - right_limits.minimumValue) * 0.01
-    ET.SubElement(
-        equality,
-        "joint",
-        {
-            "name": "gripper_pinion_to_right_jaw",
-            "joint1": "gripper_pinion_joint",
-            "joint2": "right_jaw_slide_joint",
-            "polycoef": f"0 {math.tau / right_travel_m:.12g} 0 0 0",
-            "solref": "0.002 1",
-            "solimp": "0.99 0.999 0.0005 0.5 2",
-        },
-    )
 
     actuators = ET.SubElement(mujoco, "actuator")
     actuator_count = 0
@@ -558,7 +661,7 @@ def run(_context: str):
     ET.indent(mujoco, space="  ")
     model_path = os.path.join(OUTPUT_DIR, "NexArm-sim.xml")
     ET.ElementTree(mujoco).write(model_path, encoding="utf-8", xml_declaration=True)
-    _write_scene(OUTPUT_DIR)
+    _write_scene(OUTPUT_DIR, model_origin_m)
 
     print(
         json.dumps(

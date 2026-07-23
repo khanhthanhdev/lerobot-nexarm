@@ -8,12 +8,12 @@
   <worldbody>
     <light pos="0 0 3" dir="0 0 -1" directional="true" />
     <geom name="floor" type="plane" size="1 1 0.05" rgba="0.8 0.8 0.8 1" friction="1 0.005 0.0001" contype="2" conaffinity="2" />
-    <camera name="front" mode="fixed" pos="0.9 -0.55 0.55" xyaxes="0.857493 0.514496 0 -0.240504 0.400841 0.884016" fovy="55" />
-    <body name="cube" pos="0.539 -0.18 0.025">
+    <camera name="front" mode="fixed" pos="0.360630977001 -0.613972762847 0.55" xyaxes="0.857493 0.514496 0 -0.240504 0.400841 0.884016" fovy="55" />
+    <body name="cube" pos="-0.000369022999 -0.243972762847 0.01">
       <freejoint name="cube_joint" />
-      <geom name="cube_collision" type="box" size="0.018 0.018 0.018" mass="0.05" rgba="0.85 0.15 0.1 1" friction="1.2 0.01 0.001" contype="2" conaffinity="3" />
+      <geom name="cube_collision" type="box" size="0.01 0.01 0.01" mass="0.02" rgba="0.85 0.15 0.1 1" friction="1.2 0.01 0.001" contype="2" conaffinity="3" />
     </body>
-    <body name="target_zone" pos="0.45 -0.18 0.002">
+    <body name="target_zone" pos="-0.089369022999 -0.243972762847 0.002">
       <geom name="target_zone_visual" type="cylinder" size="0.05 0.002" rgba="0.1 0.8 0.2 0.45" contype="0" conaffinity="0" />
     </body>
   </worldbody>

@@ -83,6 +83,21 @@ def test_generated_formats_share_joint_limits_axes_mounts_and_mimic() -> None:
             assert [
                 float(urdf_joint.find("limit").attrib[key]) for key in ("lower", "upper")
             ] == pytest.approx(joint.sim_range)
+        mjcf_right_jaw = mjcf.find(f".//body[@name='{side}_right_jaw']")
+        mjcf_left_jaw = mjcf.find(f".//body[@name='{side}_left_jaw']")
+        assert mjcf_right_jaw is not None and mjcf_left_jaw is not None
+        assert [float(value) for value in mjcf_right_jaw.attrib["pos"].split()] == pytest.approx(
+            [0.017, 0, 0]
+        )
+        assert [float(value) for value in mjcf_left_jaw.attrib["pos"].split()] == pytest.approx(
+            [-0.017, 0, 0]
+        )
+
+        urdf_gripper = urdf.find(f".//joint[@name='{side}_gripper']")
+        urdf_mimic = urdf.find(f".//joint[@name='{side}_gripper_mimic']")
+        assert urdf_gripper is not None and urdf_mimic is not None
+        assert urdf_gripper.find("parent").attrib["link"] == f"{side}_gripper_base"
+        assert urdf_mimic.find("parent").attrib["link"] == f"{side}_gripper_base"
     equalities = {item.attrib["name"] for item in mjcf.findall(".//equality/joint")}
     assert equalities == {
         "left_gripper_mimic_constraint",
@@ -108,6 +123,28 @@ def test_seeded_reset_and_first_task_clamps(robot: MobileBiNexArmSim) -> None:
     assert sent["right_shoulder_pan.pos"] == robot.contract.home_action["right_shoulder_pan.pos"]
     assert sent["x.vel"] == 0
     assert sent["lift_axis.height_mm"] == robot.contract.payload["lift"]["home_mm"]
+
+
+def test_mobile_gripper_opening_increases_jaw_separation(robot: MobileBiNexArmSim) -> None:
+    model = robot.backend.model
+    data = robot.backend.data
+    jaw_ids = [
+        mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, f"left_{side}_jaw_collision")
+        for side in ("left", "right")
+    ]
+
+    home = robot.contract.home_action
+    for _ in range(10):
+        robot.send_action(home)
+    closed_separation = np.linalg.norm(data.geom_xpos[jaw_ids[1]] - data.geom_xpos[jaw_ids[0]])
+
+    opened = home | {"left_gripper.pos": 1195}
+    for _ in range(10):
+        robot.send_action(opened)
+    open_separation = np.linalg.norm(data.geom_xpos[jaw_ids[1]] - data.geom_xpos[jaw_ids[0]])
+
+    assert open_separation > closed_separation
+    assert open_separation - closed_separation == pytest.approx(0.051, abs=0.002)
 
 
 def test_body_frame_base_velocity_when_mobile() -> None:

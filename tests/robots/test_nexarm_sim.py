@@ -58,12 +58,15 @@ def test_backend_steps_and_renders(backend: NexArmMujocoBackend) -> None:
 def test_gripper_collision_geometry_contacts_cube(backend: NexArmMujocoBackend) -> None:
     model = backend.model
     data = backend.data
+    action = {f"{name}.pos": HOME_POSITIONS[name] for name in JOINT_NAMES}
+    for _ in range(60):
+        backend.step(action)
+
+    jaw_center = _jaw_center(backend)
     cube_joint_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, "cube_joint")
     cube_qpos_address = model.jnt_qposadr[cube_joint_id]
     data.qpos[cube_qpos_address : cube_qpos_address + 7] = [
-        0.53937,
-        -0.03991,
-        0.2305,
+        *jaw_center,
         1,
         0,
         0,
@@ -71,8 +74,7 @@ def test_gripper_collision_geometry_contacts_cube(backend: NexArmMujocoBackend) 
     ]
     mujoco.mj_forward(model, data)
 
-    action = {f"{name}.pos": HOME_POSITIONS[name] for name in JOINT_NAMES}
-    for _ in range(60):
+    for _ in range(10):
         backend.step(action)
 
     cube_contact_geoms: set[str] = set()
@@ -87,6 +89,65 @@ def test_gripper_collision_geometry_contacts_cube(backend: NexArmMujocoBackend) 
 
     assert "link_6_left_jaw_collision_0" in cube_contact_geoms
     assert "link_6_right_jaw_collision_0" in cube_contact_geoms
+
+
+def test_gripper_opening_increases_jaw_separation(backend: NexArmMujocoBackend) -> None:
+    model = backend.model
+    left_geom = mujoco.mj_name2id(
+        model,
+        mujoco.mjtObj.mjOBJ_GEOM,
+        "link_6_left_jaw_collision_0",
+    )
+    right_geom = mujoco.mj_name2id(
+        model,
+        mujoco.mjtObj.mjOBJ_GEOM,
+        "link_6_right_jaw_collision_0",
+    )
+    action = {f"{name}.pos": HOME_POSITIONS[name] for name in JOINT_NAMES}
+
+    for _ in range(60):
+        backend.step(action)
+    closed_separation = abs(backend.data.geom_xpos[right_geom, 0] - backend.data.geom_xpos[left_geom, 0])
+
+    action["gripper.pos"] = RAW_RANGES["gripper"][0]
+    for _ in range(60):
+        backend.step(action)
+    open_separation = abs(backend.data.geom_xpos[right_geom, 0] - backend.data.geom_xpos[left_geom, 0])
+
+    assert open_separation > closed_separation
+    assert open_separation - closed_separation == pytest.approx(0.051, abs=0.002)
+
+
+def test_robot_defaults_and_collision_masks_are_active(backend: NexArmMujocoBackend) -> None:
+    model = backend.model
+    arm_joint_names = (
+        "joint_1_base_to_link_1",
+        "joint_2_link_1_to_link_2",
+        "joint_3_link_2_to_link_3",
+        "joint_4_link_3_to_link_4",
+        "joint_5_link_4_to_link_5",
+    )
+    arm_dofs = [
+        model.jnt_dofadr[mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, name)]
+        for name in arm_joint_names
+    ]
+    assert np.all(model.dof_damping[arm_dofs] > 0)
+    assert np.all(model.dof_frictionloss[arm_dofs] > 0)
+    assert np.all(model.dof_armature[arm_dofs] > 0)
+
+    left_jaw = mujoco.mj_name2id(
+        model,
+        mujoco.mjtObj.mjOBJ_GEOM,
+        "link_6_left_jaw_collision_0",
+    )
+    right_jaw = mujoco.mj_name2id(
+        model,
+        mujoco.mjtObj.mjOBJ_GEOM,
+        "link_6_right_jaw_collision_0",
+    )
+    cube = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, "cube_collision")
+    assert model.geom_contype[left_jaw] & model.geom_conaffinity[right_jaw]
+    assert model.geom_contype[left_jaw] & model.geom_conaffinity[cube]
 
 
 def test_sim_robot_matches_physical_feature_contract() -> None:
@@ -127,6 +188,14 @@ def _set_cube_position(backend: NexArmMujocoBackend, xyz: tuple[float, float, fl
     mujoco.mj_forward(backend.model, backend.data)
 
 
+def _jaw_center(backend: NexArmMujocoBackend) -> tuple[float, float, float]:
+    positions = []
+    for name in ("link_6_left_jaw_collision_0", "link_6_right_jaw_collision_0"):
+        geom_id = mujoco.mj_name2id(backend.model, mujoco.mjtObj.mjOBJ_GEOM, name)
+        positions.append(backend.data.geom_xpos[geom_id])
+    return tuple(np.mean(positions, axis=0))
+
+
 def test_pick_place_task_reset_is_seeded(backend: NexArmMujocoBackend) -> None:
     task = NexArmPickPlaceTask(backend)
     task.reset(seed=17)
@@ -145,12 +214,11 @@ def test_pick_place_task_accepts_stable_released_placement(
     task = NexArmPickPlaceTask(backend)
     task.reset(seed=2)
     target = task.target_position
-    _set_cube_position(backend, (float(target[0]), float(target[1]), 0.018))
-    gripper_joint_id = backend._joint_ids["gripper"]
-    open_control = backend.raw_to_control("gripper", RAW_RANGES["gripper"][0])
-    backend.data.qpos[backend.model.jnt_qposadr[gripper_joint_id]] = open_control
-    backend.data.ctrl[backend._actuator_ids["gripper"]] = open_control
-    mujoco.mj_forward(backend.model, backend.data)
+    _set_cube_position(backend, (float(target[0]), float(target[1]), 0.01))
+    action = {f"{name}.pos": HOME_POSITIONS[name] for name in JOINT_NAMES}
+    action["gripper.pos"] = RAW_RANGES["gripper"][0]
+    for _ in range(60):
+        backend.step(action)
 
     status = task.observe()
     for _ in range(25):
@@ -199,9 +267,11 @@ def test_pick_place_task_rejects_outside_unreleased_drop_and_timeout(
 def test_pick_place_task_reports_two_jaw_grasp(backend: NexArmMujocoBackend) -> None:
     task = NexArmPickPlaceTask(backend)
     task.reset(seed=7)
-    _set_cube_position(backend, (0.53937, -0.03991, 0.2305))
     action = {f"{name}.pos": HOME_POSITIONS[name] for name in JOINT_NAMES}
     for _ in range(60):
+        backend.step(action)
+    _set_cube_position(backend, _jaw_center(backend))
+    for _ in range(10):
         backend.step(action)
 
     assert task.status().is_grasped

@@ -44,12 +44,12 @@
                               <body name="left_gripper" pos="0 0 0" gravcomp="1">
                                 <geom type="box" size="0.025 0.045 0.025" mass="0.2" />
                                 <site name="left_tcp" pos="0 0.055 0" size="0.005" rgba="0.1 0.8 0.1 1" />
-                                <body name="left_right_jaw">
-                                  <joint name="left_gripper" type="slide" axis="1 0 0" range="-0.0255 0" limited="true" damping="0.2" />
+                                <body name="left_right_jaw" pos="0.017 0 0">
+                                  <joint name="left_gripper" type="slide" axis="-1 0 0" range="-0.0255 0" limited="true" damping="0.2" />
                                   <geom name="left_right_jaw_collision" type="box" pos="0 0.055 0" size="0.008 0.035 0.04" friction="3 0.01 0.001" condim="4" />
                                 </body>
-                                <body name="left_left_jaw">
-                                  <joint name="left_gripper_mimic" type="slide" axis="1 0 0" range="0 0.0255" limited="true" />
+                                <body name="left_left_jaw" pos="-0.017 0 0">
+                                  <joint name="left_gripper_mimic" type="slide" axis="-1 0 0" range="0 0.0255" limited="true" />
                                   <geom name="left_left_jaw_collision" type="box" pos="0 0.055 0" size="0.008 0.035 0.04" friction="3 0.01 0.001" condim="4" />
                                 </body>
                                 <camera name="left_wrist" pos="0 0 0.08" quat="0.612372435696 0.353553390593 0.353553390593 -0.612372435696" fovy="70.0" />
@@ -89,12 +89,12 @@
                               <body name="right_gripper" pos="0 0 0" gravcomp="1">
                                 <geom type="box" size="0.025 0.045 0.025" mass="0.2" />
                                 <site name="right_tcp" pos="0 0.055 0" size="0.005" rgba="0.1 0.8 0.1 1" />
-                                <body name="right_right_jaw">
-                                  <joint name="right_gripper" type="slide" axis="1 0 0" range="-0.0255 0" limited="true" damping="0.2" />
+                                <body name="right_right_jaw" pos="0.017 0 0">
+                                  <joint name="right_gripper" type="slide" axis="-1 0 0" range="-0.0255 0" limited="true" damping="0.2" />
                                   <geom name="right_right_jaw_collision" type="box" pos="0 0.055 0" size="0.008 0.035 0.04" friction="3 0.01 0.001" condim="4" />
                                 </body>
-                                <body name="right_left_jaw">
-                                  <joint name="right_gripper_mimic" type="slide" axis="1 0 0" range="0 0.0255" limited="true" />
+                                <body name="right_left_jaw" pos="-0.017 0 0">
+                                  <joint name="right_gripper_mimic" type="slide" axis="-1 0 0" range="0 0.0255" limited="true" />
                                   <geom name="right_left_jaw_collision" type="box" pos="0 0.055 0" size="0.008 0.035 0.04" friction="3 0.01 0.001" condim="4" />
                                 </body>
                                 <camera name="right_wrist" pos="0 0 0.08" quat="0.612372435696 -0.353553390593 0.353553390593 0.612372435696" fovy="70.0" />

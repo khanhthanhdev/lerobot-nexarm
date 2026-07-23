@@ -50,8 +50,12 @@ class NexArmPickPlaceTask:
         self._cube_body_id = self._required_id(mujoco.mjtObj.mjOBJ_BODY, "cube")
         self._target_body_id = self._required_id(mujoco.mjtObj.mjOBJ_BODY, "target_zone")
         self._cube_geom_id = self._required_id(mujoco.mjtObj.mjOBJ_GEOM, "cube_collision")
+        self._cube_half_size_m = float(self.backend.model.geom_size[self._cube_geom_id, 0])
         self._left_jaw_geom_id = self._required_id(mujoco.mjtObj.mjOBJ_GEOM, "link_6_left_jaw_collision_0")
         self._right_jaw_geom_id = self._required_id(mujoco.mjtObj.mjOBJ_GEOM, "link_6_right_jaw_collision_0")
+        cube_qpos = int(self.backend.model.jnt_qposadr[self._cube_joint_id])
+        self._cube_spawn_xy = self.backend.model.qpos0[cube_qpos : cube_qpos + 2].copy()
+        self._target_spawn_xy = self.backend.model.body_pos[self._target_body_id, :2].copy()
         self._start_time = 0.0
         self._hold_start_time: float | None = None
         self._failure_reason: str | None = None
@@ -73,25 +77,20 @@ class NexArmPickPlaceTask:
     def reset(self, *, seed: int = 0, settle_steps: int = 0) -> NexArmPickPlaceStatus:
         self.backend.reset(settle_steps=0)
         rng = np.random.default_rng(seed)
-        cube_xy = np.array(
-            [
-                rng.uniform(0.51, 0.57),
-                rng.uniform(-0.21, -0.13),
-            ]
-        )
-        target_xy = np.array(
-            [
-                rng.uniform(0.42, 0.48),
-                rng.uniform(-0.21, -0.13),
-            ]
-        )
+        # Randomize relative to the poses declared by the scene instead of
+        # assuming the original Fusion world coordinates. This keeps the task
+        # valid when the robot is mounted or the scene is recentered.
+        cube_center = self._cube_spawn_xy + np.array([0.001, 0.01])
+        target_center = self._target_spawn_xy + np.array([0.0, 0.01])
+        cube_xy = cube_center + rng.uniform((-0.03, -0.04), (0.03, 0.04))
+        target_xy = target_center + rng.uniform((-0.03, -0.04), (0.03, 0.04))
         if np.linalg.norm(cube_xy - target_xy) < self.target_radius_m + 0.04:
-            target_xy[0] = 0.42
+            target_xy[0] = target_center[0] - 0.03
         cube_qpos = int(self.backend.model.jnt_qposadr[self._cube_joint_id])
         self.backend.data.qpos[cube_qpos : cube_qpos + 7] = [
             cube_xy[0],
             cube_xy[1],
-            0.018,
+            self._cube_half_size_m,
             1,
             0,
             0,
@@ -119,7 +118,10 @@ class NexArmPickPlaceTask:
         """Update the success/failure gate without advancing physics."""
         cube = self.cube_position
         target = self.target_position
-        inside = np.linalg.norm(cube[:2] - target[:2]) <= self.target_radius_m - 0.018 and cube[2] >= 0.015
+        inside = (
+            np.linalg.norm(cube[:2] - target[:2]) <= self.target_radius_m - self._cube_half_size_m
+            and cube[2] >= 0.8 * self._cube_half_size_m
+        )
         released = self._is_released()
         cube_dof = int(self.backend.model.jnt_dofadr[self._cube_joint_id])
         cube_speed = np.linalg.norm(self.backend.data.qvel[cube_dof : cube_dof + 3])
@@ -137,7 +139,10 @@ class NexArmPickPlaceTask:
     def status(self) -> NexArmPickPlaceStatus:
         cube = self.cube_position
         target = self.target_position
-        inside = np.linalg.norm(cube[:2] - target[:2]) <= self.target_radius_m - 0.018 and cube[2] >= 0.015
+        inside = (
+            np.linalg.norm(cube[:2] - target[:2]) <= self.target_radius_m - self._cube_half_size_m
+            and cube[2] >= 0.8 * self._cube_half_size_m
+        )
         released = self._is_released()
         hold_time = (
             0.0 if self._hold_start_time is None else float(self.backend.data.time - self._hold_start_time)

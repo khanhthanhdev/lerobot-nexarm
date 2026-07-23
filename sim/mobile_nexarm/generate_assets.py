@@ -7,7 +7,7 @@ import argparse
 import hashlib
 import json
 import math
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as ET  # nosec B405 - source XML is a repository-owned model
 from pathlib import Path
 from typing import Any
 
@@ -39,7 +39,7 @@ def _source_joint_contract(
     spec: dict[str, Any], spec_path: Path
 ) -> dict[str, tuple[list[float], list[float]]]:
     source = (spec_path.parent / spec["source"]["arm_description"]).resolve()
-    root = ET.parse(source).getroot()
+    root = ET.parse(source).getroot()  # nosec B314 - source is resolved from the checked-in spec
     result: dict[str, tuple[list[float], list[float]]] = {}
     for joint in root.findall(".//joint"):
         if "axis" in joint.attrib and "range" in joint.attrib:
@@ -111,7 +111,12 @@ def _add_arm_mjcf(parent: ET.Element, side: str, spec: dict[str, Any]) -> None:
         size="0.005",
         rgba="0.1 0.8 0.1 1",
     )
-    right_jaw = ET.SubElement(gripper_body, "body", name=f"{side}_right_jaw")
+    right_jaw = ET.SubElement(
+        gripper_body,
+        "body",
+        name=f"{side}_right_jaw",
+        pos="0.017 0 0",
+    )
     ET.SubElement(
         right_jaw,
         "joint",
@@ -132,7 +137,12 @@ def _add_arm_mjcf(parent: ET.Element, side: str, spec: dict[str, Any]) -> None:
         friction="3 0.01 0.001",
         condim="4",
     )
-    left_jaw = ET.SubElement(gripper_body, "body", name=f"{side}_left_jaw")
+    left_jaw = ET.SubElement(
+        gripper_body,
+        "body",
+        name=f"{side}_left_jaw",
+        pos="-0.017 0 0",
+    )
     ET.SubElement(
         left_jaw,
         "joint",
@@ -289,7 +299,7 @@ def generate_mjcf(spec: dict[str, Any]) -> str:
         kv="10",
     )
     ET.indent(model)
-    return ET.tostring(model, encoding="unicode", xml_declaration=True)
+    return ET.tostring(model, encoding="unicode", xml_declaration=True) + "\n"
 
 
 def generate_urdf(spec: dict[str, Any]) -> str:
@@ -337,18 +347,22 @@ def generate_urdf(spec: dict[str, Any]) -> str:
         ET.SubElement(fixed, "child", link=mount_link)
         ET.SubElement(fixed, "origin", xyz=_values(mount["mount_xyz_m"]), rpy=_values(mount["mount_rpy_rad"]))
         previous = mount_link
-        for index, joint in enumerate(spec["joints"], 1):
-            link = f"{side}_link_{index}" if joint["feature"] != "gripper" else f"{side}_gripper"
+        previous_length = 0.0
+        for index, (joint, length) in enumerate(
+            zip(spec["joints"][:5], spec["kinematics"]["link_lengths_m"], strict=True),
+            1,
+        ):
+            link = f"{side}_link_{index}"
             ET.SubElement(robot, "link", name=link)
             node = ET.SubElement(
                 robot,
                 "joint",
                 name=f"{side}_{joint['feature']}",
-                type="prismatic" if joint["feature"] == "gripper" else "revolute",
+                type="revolute",
             )
             ET.SubElement(node, "parent", link=previous)
             ET.SubElement(node, "child", link=link)
-            ET.SubElement(node, "origin", xyz="0 0.08 0", rpy="0 0 0")
+            ET.SubElement(node, "origin", xyz=f"0 {previous_length:.12g} 0", rpy="0 0 0")
             ET.SubElement(node, "axis", xyz=_values(joint["axis"]))
             ET.SubElement(
                 node,
@@ -359,16 +373,53 @@ def generate_urdf(spec: dict[str, Any]) -> str:
                 velocity="3",
             )
             previous = link
+            previous_length = length
+
+        gripper = spec["joints"][5]
+        gripper_base = f"{side}_gripper_base"
+        ET.SubElement(robot, "link", name=gripper_base)
+        fixed_gripper = ET.SubElement(
+            robot,
+            "joint",
+            name=f"{side}_gripper_base_joint",
+            type="fixed",
+        )
+        ET.SubElement(fixed_gripper, "parent", link=previous)
+        ET.SubElement(fixed_gripper, "child", link=gripper_base)
+        ET.SubElement(fixed_gripper, "origin", xyz=f"0 {previous_length:.12g} 0", rpy="0 0 0")
+
+        right_jaw = f"{side}_gripper"
+        ET.SubElement(robot, "link", name=right_jaw)
+        gripper_joint = ET.SubElement(
+            robot,
+            "joint",
+            name=f"{side}_gripper",
+            type="prismatic",
+        )
+        ET.SubElement(gripper_joint, "parent", link=gripper_base)
+        ET.SubElement(gripper_joint, "child", link=right_jaw)
+        ET.SubElement(gripper_joint, "origin", xyz="0.017 0 0", rpy="0 0 0")
+        ET.SubElement(gripper_joint, "axis", xyz=_values(gripper["axis"]))
+        ET.SubElement(
+            gripper_joint,
+            "limit",
+            lower=str(gripper["range"][0]),
+            upper=str(gripper["range"][1]),
+            effort="100",
+            velocity="0.1",
+        )
+
         mimic_link = f"{side}_left_jaw"
         ET.SubElement(robot, "link", name=mimic_link)
         mimic = ET.SubElement(robot, "joint", name=f"{side}_gripper_mimic", type="prismatic")
-        ET.SubElement(mimic, "parent", link=previous)
+        ET.SubElement(mimic, "parent", link=gripper_base)
         ET.SubElement(mimic, "child", link=mimic_link)
-        ET.SubElement(mimic, "axis", xyz=_values(spec["joints"][5]["axis"]))
+        ET.SubElement(mimic, "origin", xyz="-0.017 0 0", rpy="0 0 0")
+        ET.SubElement(mimic, "axis", xyz=_values(gripper["axis"]))
         ET.SubElement(mimic, "limit", lower="0", upper="0.0255", effort="100", velocity="0.1")
         ET.SubElement(mimic, "mimic", joint=f"{side}_gripper", multiplier="-1", offset="0")
     ET.indent(robot)
-    return ET.tostring(robot, encoding="unicode", xml_declaration=True)
+    return ET.tostring(robot, encoding="unicode", xml_declaration=True) + "\n"
 
 
 def generate_usda(spec: dict[str, Any]) -> str:
