@@ -1,0 +1,30 @@
+{
+  "capture": {
+    "orientation": "landscape",
+    "extract_fps": 8
+  },
+  "lingbot": {
+    "stride": 1,
+    "sliding_window": 48,
+    "fp8_kv_cache": true
+  },
+  "tsdf": {
+    "voxel_m": 0.004,
+    "sdf_trunc_m": 0.02,
+    "confidence_threshold": 2.3
+  },
+  "splat": {
+    "initial_points": 350000,
+    "iterations": 10000,
+    "packed": true,
+    "pose_optimization": true,
+    "pruning": "spatial_only",
+    "prune_radius_m": 0.2
+  },
+  "collider": {
+    "target_triangles": 300000
+  },
+  "isaac": {
+    "dome_light_intensity": 450
+  }
+}

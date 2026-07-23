@@ -1,0 +1,61 @@
+name: Mobile NexArm Simulation
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "sim/mobile_nexarm/**"
+      - "src/lerobot/robots/mobile_bi_nexarm_sim/**"
+      - "src/lerobot/datasets/mobile_nexarm_artifact.py"
+      - "tests/robots/test_mobile_bi_nexarm_sim.py"
+      - "tests/datasets/test_mobile_nexarm_artifact.py"
+      - ".github/workflows/mobile_nexarm_sim.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  cpu-contract:
+    runs-on: ubuntu-latest
+    env:
+      MUJOCO_GL: egl
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          lfs: true
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+        with:
+          version: "0.8.0"
+          python-version: "3.12"
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg libegl1
+      - run: uv sync --locked --extra test --extra dataset
+      - run: uv run python sim/mobile_nexarm/generate_assets.py --check
+      - run: uv run pytest tests/robots/test_mobile_bi_nexarm_sim.py tests/datasets/test_mobile_nexarm_artifact.py -q
+
+  maniskill-gpu:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: [self-hosted, linux, gpu, maniskill]
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          lfs: true
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+        with:
+          version: "0.8.0"
+          python-version: "3.12"
+      - run: uv sync
+        working-directory: sim/mobile_nexarm/maniskill
+      - run: uv run python generate.py --output "${RUNNER_TEMP}/mobile-nexarm" --preflight
+        working-directory: sim/mobile_nexarm/maniskill
+
+  video2sim-gpu:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: [self-hosted, linux, gpu, isaac-sim]
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          lfs: true
+      - run: python sim/mobile_nexarm/video2sim/preflight.py "$VIDEO2SIM_MANIFEST" --check-imports

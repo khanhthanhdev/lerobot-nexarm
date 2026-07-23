@@ -1,0 +1,16 @@
+{
+  "workspace": "/absolute/path/to/video2sim-workspace",
+  "interpreters": {
+    "reconstruction": "/absolute/path/to/reconstruction-venv/bin/python",
+    "nurec": "/absolute/path/to/nurec-venv/bin/python",
+    "isaac": "/absolute/path/to/isaac-sim/python.sh"
+  },
+  "repositories": {
+    "lingbot": "/absolute/path/to/LingBot-Depth",
+    "nurec": "/absolute/path/to/3dgrut"
+  },
+  "assets": {
+    "input_video": "/absolute/path/to/room-landscape.mp4",
+    "robot_usd": "../generated/mobile_bi_nexarm.usda"
+  }
+}

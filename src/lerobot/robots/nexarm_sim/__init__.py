@@ -16,5 +16,11 @@
 
 from .config_nexarm_sim import NexArmSimConfig
 from .nexarm_sim import NexArmSim
+from .pick_place_task import NexArmPickPlaceStatus, NexArmPickPlaceTask
 
-__all__ = ["NexArmSim", "NexArmSimConfig"]
+__all__ = [
+    "NexArmPickPlaceStatus",
+    "NexArmPickPlaceTask",
+    "NexArmSim",
+    "NexArmSimConfig",
+]

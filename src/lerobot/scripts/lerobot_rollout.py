@@ -165,6 +165,7 @@ from lerobot.robots import (  # noqa: F401
     earthrover_mini_plus,
     hope_jr,
     koch_follower,
+    mobile_bi_nexarm_sim,
     nexarm_follower,
     nexarm_sim,
     omx_follower,

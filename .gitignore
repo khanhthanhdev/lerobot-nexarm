@@ -187,4 +187,6 @@ sim/*
 !sim/fusion_export/*.xml
 !sim/fusion_export/meshes/
 !sim/fusion_export/meshes/*.stl
+!sim/mobile_nexarm/
+!sim/mobile_nexarm/**
 sim/**/__pycache__/

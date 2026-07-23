@@ -15,7 +15,8 @@ position actuators instead of executing the Hiwonder ESP32/AT32 firmware.
 | Front and wrist RGB cameras | Ready | Both render at 640 x 480 by default. |
 | Object contact and grasping | Ready | The scene contains a free red cube and jaw collision bodies. |
 | LeRobot record, replay, and rollout | Ready | Uses the same six action/state feature names as the physical follower. |
-| Automatic task reset, reward, and success detection | Not implemented | A Gymnasium task environment is still needed for benchmark-style evaluation. |
+| Seeded pick/place reset and success detection | Ready | `NexArmPickPlaceTask` checks grasp, release, stable placement, drop, and timeout. |
+| Gymnasium reward environment | Not implemented | The current task wrapper is intentionally smaller than a benchmark environment. |
 | Hiwonder follower firmware in the simulation loop | Not implemented | MuJoCo replaces the follower firmware and servo controller. |
 | Calibrated HX-30HM motor dynamics | Approximate | Position gains and friction are stable defaults, not an identified motor model. |
 | Isaac Sim model | Not implemented | The current implementation is MuJoCo-first. |
@@ -70,16 +71,18 @@ the same leader serial port at the same time.
   six position actuators, equality constraints, wrist camera, and primitive
   contact geometry.
 - `fusion_export/scene.xml` includes the robot and adds the front camera, floor,
-  lighting, and red cube.
+  lighting, red cube, and green target zone.
 - `fusion_export/meshes/` contains detailed STL visual meshes. These are
   visual-only because using the complete meshes for contact produced unstable
   overlapping convex hulls.
 - `export_fusion_to_mujoco.py` is executed inside Fusion 360 through Fusion MCP
   and regenerates the model, scene, and STL files.
 - `../src/lerobot/robots/nexarm_sim/` contains the LeRobot simulation backend
-  and `NexArmSim` robot implementation.
+  and `NexArmSim` robot implementation. `pick_place_task.py` adds the optional
+  seeded single-arm task without changing the six-feature robot contract.
 - `../examples/nexarm/simulate.py` launches the viewer and optional leader
   control loop.
+- `../examples/nexarm/pick_place_sim.py` launches the seeded pick/place test.
 
 The model uses a 2 ms physics timestep, or 500 physics steps per second. At the
 default 30 Hz LeRobot control rate, each action advances approximately 17
@@ -152,6 +155,16 @@ You can load a different scene explicitly:
 uv run python examples/nexarm/simulate.py --model sim/fusion_export/scene.xml --fps 30
 ```
 
+For the repeatable single-arm test, use:
+
+```bash
+uv run python examples/nexarm/pick_place_sim.py --seed 0
+```
+
+Move the red cube into the green zone, open the gripper, and leave the cube
+stable for 0.5 seconds. Add `--auto-reset` to start the next deterministic seed
+after success, drop, or timeout.
+
 ## 3. Control MuJoCo with the physical leader
 
 Find the leader serial port:
@@ -219,11 +232,10 @@ uv run lerobot-record \
 ```
 
 The dataset contains six raw joint state values, six raw action values, and the
-front and wrist RGB streams. The current `NexArmSim` resets only when it
-connects or when `reset()` is called directly. `lerobot-record` does not yet
-randomize or reposition the cube automatically between episodes, so task-level
-simulation recording still requires a reset extension for repeatable large
-datasets.
+front and wrist RGB streams. `NexArmPickPlaceTask.reset(seed=...)` provides
+repeatable cube and target randomization for custom recording loops. The
+standard `lerobot-record` command still calls `NexArmSim.reset()` directly, so
+it does not opt into task randomization automatically.
 
 ## 6. Replay a recorded episode
 
@@ -297,12 +309,50 @@ uv run lerobot-rollout \
   --display_data=true
 ```
 
-This is policy rollout through the LeRobot `Robot` interface. It is not yet a
-`lerobot-eval --env.type=nexarm` benchmark because the reset, reward, terminal
-condition, and success metric have not been implemented as a Gymnasium
-environment.
+This is policy rollout through the LeRobot `Robot` interface. It does not run
+the seeded task success gate or produce comparable policy metrics; use the
+benchmark command below for that.
 
-## 9. Re-export from Fusion 360
+## 9. Benchmark ACT, pi0, and SmolVLA
+
+Install the policy-specific server dependencies once:
+
+```bash
+uv sync --locked --extra dataset --extra pi --extra smolvla
+```
+
+Pass each trained checkpoint with a unique label. Policies are loaded one at a
+time so large VLA checkpoints do not remain together in GPU memory:
+
+```bash
+MUJOCO_GL=egl uv run lerobot-nexarm-sim-benchmark \
+  --policy act=outputs/train/act_nexarm_sim/checkpoints/last/pretrained_model \
+  --policy pi0=outputs/train/pi0_nexarm_sim/checkpoints/last/pretrained_model \
+  --policy smolvla=outputs/train/smolvla_nexarm_sim/checkpoints/last/pretrained_model \
+  --episodes=20 \
+  --device=cuda \
+  --output-dir=outputs/nexarm_sim_benchmark
+```
+
+The command runs the same seed range for every policy and writes
+`benchmark.json` plus a flat `benchmark.csv`. Results include pick/place
+success rate, termination reasons, inference mean/p50/p95 latency, achieved
+control rate, load time, parameter count, and peak CUDA memory. Add
+`--realtime` when wall-clock control timing matters; without it, MuJoCo runs as
+fast as inference and rendering allow.
+
+Each checkpoint must have been trained or fine-tuned on the six NexArm action
+features and the configured `front`/`wrist` cameras. A generic base VLA
+checkpoint does not have the NexArm normalization statistics or action
+contract, so it is not directly comparable.
+
+The same entry point is available as:
+
+```bash
+MUJOCO_GL=egl uv run python examples/nexarm/benchmark_sim.py --policy act=PATH
+```
+
+## 10. Re-export from Fusion 360
 
 The Fusion design is the source of truth. Moving through Onshape is unnecessary
 for the current pipeline.

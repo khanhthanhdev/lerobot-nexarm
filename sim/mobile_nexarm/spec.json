@@ -1,0 +1,129 @@
+{
+  "schema_version": 1,
+  "name": "mobile_bi_nexarm",
+  "source": {
+    "arm_description": "../fusion_export/NexArm-sim.xml",
+    "mesh_directory": "../fusion_export/meshes"
+  },
+  "base": {
+    "footprint_m": [0.55, 0.45, 0.18],
+    "mass_kg": 18.0,
+    "velocity_limits": {
+      "x_m_s": [-0.5, 0.5],
+      "y_m_s": [-0.5, 0.5],
+      "theta_deg_s": [-90.0, 90.0]
+    }
+  },
+  "lift": {
+    "joint": "lift_axis",
+    "range_mm": [0.0, 350.0],
+    "home_mm": 180.0,
+    "axis": [0.0, 0.0, 1.0],
+    "mass_kg": 8.0
+  },
+  "arms": {
+    "left": {
+      "mount_xyz_m": [0.0, 0.22, 0.27],
+      "mount_rpy_rad": [0.0, 0.0, -1.5707963267948966]
+    },
+    "right": {
+      "mount_xyz_m": [0.0, -0.22, 0.27],
+      "mount_rpy_rad": [0.0, 0.0, 1.5707963267948966]
+    }
+  },
+  "kinematics": {
+    "link_lengths_m": [0.08, 0.19, 0.15, 0.07, 0.06]
+  },
+  "joints": [
+    {
+      "feature": "shoulder_pan",
+      "source_joint": "joint_1_base_to_link_1",
+      "axis": [0.0, 0.0, -1.0],
+      "range": [-2.35619449019, 2.35619449019],
+      "raw_range": [0.0, 4095.0],
+      "home_raw": 2048.0
+    },
+    {
+      "feature": "shoulder_lift",
+      "source_joint": "joint_2_link_1_to_link_2",
+      "axis": [-1.0, 0.0, 0.0],
+      "range": [-2.09439510239, 2.09439510239],
+      "raw_range": [0.0, 4095.0],
+      "home_raw": 2048.0
+    },
+    {
+      "feature": "elbow_flex",
+      "source_joint": "joint_3_link_2_to_link_3",
+      "axis": [-1.0, 0.0, 0.0],
+      "range": [-2.35619449019, 2.35619449019],
+      "raw_range": [0.0, 4095.0],
+      "home_raw": 2048.0
+    },
+    {
+      "feature": "wrist_flex",
+      "source_joint": "joint_4_link_3_to_link_4",
+      "axis": [1.0, 0.0, 0.0],
+      "range": [-1.74532925199, 1.74532925199],
+      "raw_range": [0.0, 4095.0],
+      "home_raw": 2048.0
+    },
+    {
+      "feature": "wrist_roll",
+      "source_joint": "joint_5_link_4_to_link_5",
+      "axis": [0.0, -1.0, 0.0],
+      "range": [-3.14159265359, 3.14159265359],
+      "raw_range": [0.0, 4095.0],
+      "home_raw": 2048.0
+    },
+    {
+      "feature": "gripper",
+      "source_joint": "right_jaw_slide_joint",
+      "axis": [1.0, 0.0, 0.0],
+      "range": [-0.0255, 0.0],
+      "raw_range": [1195.0, 2833.0],
+      "home_raw": 2833.0,
+      "open_raw": 1195.0,
+      "closed_raw": 2833.0,
+      "mimic_joint": "left_jaw_slide_joint",
+      "mimic_multiplier": -1.0,
+      "opening_mm": 51.0
+    }
+  ],
+  "cameras": {
+    "front": {
+      "parent": "lift_carriage",
+      "xyz_m": [0.18, 0.0, 0.66],
+      "rpy_rad": [0.0, 0.35, 0.0],
+      "fovy_deg": 55.0
+    },
+    "left_wrist": {
+      "parent": "left_gripper",
+      "xyz_m": [0.0, 0.0, 0.08],
+      "rpy_rad": [0.0, 1.0471975511965976, -1.5707963267948966],
+      "fovy_deg": 70.0
+    },
+    "right_wrist": {
+      "parent": "right_gripper",
+      "xyz_m": [0.0, 0.0, 0.08],
+      "rpy_rad": [0.0, 1.0471975511965976, 1.5707963267948966],
+      "fovy_deg": 70.0
+    }
+  },
+  "collision_groups": {
+    "robot": 1,
+    "task": 2,
+    "table": 4
+  },
+  "task": {
+    "table_top_m": 0.39,
+    "cube_half_size_m": 0.01,
+    "target_radius_m": 0.06,
+    "success_hold_s": 0.5
+  },
+  "dataset_profile": {
+    "fps": 30,
+    "width": 640,
+    "height": 480,
+    "cameras": ["front", "left_wrist"]
+  }
+}

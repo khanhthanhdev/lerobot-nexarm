@@ -1,0 +1,177 @@
+#usda 1.0
+(
+    defaultPrim = "mobile_bi_nexarm"
+    metersPerUnit = 1
+    upAxis = "Z"
+)
+def Xform "mobile_bi_nexarm" (
+    prepend apiSchemas = ["PhysicsArticulationRootAPI"]
+)
+{
+    def Xform "world_anchor" {}
+    def Xform "base_x_link" (prepend apiSchemas = ["PhysicsRigidBodyAPI"]) {}
+    def PhysicsPrismaticJoint "base_x"
+    {
+        rel physics:body0 = </mobile_bi_nexarm/world_anchor>
+        rel physics:body1 = </mobile_bi_nexarm/base_x_link>
+        uniform token physics:axis = "X"
+        float physics:lowerLimit = -10
+        float physics:upperLimit = 10
+    }
+    def Xform "base_y_link" (prepend apiSchemas = ["PhysicsRigidBodyAPI"]) {}
+    def PhysicsPrismaticJoint "base_y"
+    {
+        rel physics:body0 = </mobile_bi_nexarm/base_x_link>
+        rel physics:body1 = </mobile_bi_nexarm/base_y_link>
+        uniform token physics:axis = "Y"
+        float physics:lowerLimit = -10
+        float physics:upperLimit = 10
+    }
+    def Xform "mobile_base" (prepend apiSchemas = ["PhysicsRigidBodyAPI"]) {}
+    def PhysicsRevoluteJoint "base_yaw"
+    {
+        rel physics:body0 = </mobile_bi_nexarm/base_y_link>
+        rel physics:body1 = </mobile_bi_nexarm/mobile_base>
+        uniform token physics:axis = "Z"
+    }
+    def Xform "lift_carriage" (prepend apiSchemas = ["PhysicsRigidBodyAPI"]) {}
+    def PhysicsPrismaticJoint "lift_axis"
+    {
+        rel physics:body0 = </mobile_bi_nexarm/mobile_base>
+        rel physics:body1 = </mobile_bi_nexarm/lift_carriage>
+        uniform token physics:axis = "Z"
+        float physics:lowerLimit = 0.0
+        float physics:upperLimit = 0.35
+    }
+    def Xform "left_arm_mount" (prepend apiSchemas = ["PhysicsRigidBodyAPI"])
+    {
+        double3 xformOp:translate = (0.0, 0.22, 0.27)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+    def PhysicsFixedJoint "left_mount_joint"
+    {
+        rel physics:body0 = </mobile_bi_nexarm/lift_carriage>
+        rel physics:body1 = </mobile_bi_nexarm/left_arm_mount>
+    }
+    def Xform "left_shoulder_pan_link" (prepend apiSchemas = ["PhysicsRigidBodyAPI"]) {}
+    def PhysicsRevoluteJoint "left_shoulder_pan"
+    {
+        rel physics:body0 = </mobile_bi_nexarm/left_arm_mount>
+        rel physics:body1 = </mobile_bi_nexarm/left_shoulder_pan_link>
+        uniform token physics:axis = "Z"
+        float physics:lowerLimit = -2.35619449019
+        float physics:upperLimit = 2.35619449019
+    }
+    def Xform "left_shoulder_lift_link" (prepend apiSchemas = ["PhysicsRigidBodyAPI"]) {}
+    def PhysicsRevoluteJoint "left_shoulder_lift"
+    {
+        rel physics:body0 = </mobile_bi_nexarm/left_shoulder_pan_link>
+        rel physics:body1 = </mobile_bi_nexarm/left_shoulder_lift_link>
+        uniform token physics:axis = "X"
+        float physics:lowerLimit = -2.09439510239
+        float physics:upperLimit = 2.09439510239
+    }
+    def Xform "left_elbow_flex_link" (prepend apiSchemas = ["PhysicsRigidBodyAPI"]) {}
+    def PhysicsRevoluteJoint "left_elbow_flex"
+    {
+        rel physics:body0 = </mobile_bi_nexarm/left_shoulder_lift_link>
+        rel physics:body1 = </mobile_bi_nexarm/left_elbow_flex_link>
+        uniform token physics:axis = "X"
+        float physics:lowerLimit = -2.35619449019
+        float physics:upperLimit = 2.35619449019
+    }
+    def Xform "left_wrist_flex_link" (prepend apiSchemas = ["PhysicsRigidBodyAPI"]) {}
+    def PhysicsRevoluteJoint "left_wrist_flex"
+    {
+        rel physics:body0 = </mobile_bi_nexarm/left_elbow_flex_link>
+        rel physics:body1 = </mobile_bi_nexarm/left_wrist_flex_link>
+        uniform token physics:axis = "X"
+        float physics:lowerLimit = -1.74532925199
+        float physics:upperLimit = 1.74532925199
+    }
+    def Xform "left_wrist_roll_link" (prepend apiSchemas = ["PhysicsRigidBodyAPI"]) {}
+    def PhysicsRevoluteJoint "left_wrist_roll"
+    {
+        rel physics:body0 = </mobile_bi_nexarm/left_wrist_flex_link>
+        rel physics:body1 = </mobile_bi_nexarm/left_wrist_roll_link>
+        uniform token physics:axis = "Y"
+        float physics:lowerLimit = -3.14159265359
+        float physics:upperLimit = 3.14159265359
+    }
+    def Xform "left_gripper_link" (prepend apiSchemas = ["PhysicsRigidBodyAPI"]) {}
+    def PhysicsPrismaticJoint "left_gripper"
+    {
+        rel physics:body0 = </mobile_bi_nexarm/left_wrist_roll_link>
+        rel physics:body1 = </mobile_bi_nexarm/left_gripper_link>
+        uniform token physics:axis = "X"
+        float physics:lowerLimit = -0.0255
+        float physics:upperLimit = 0.0
+    }
+    def Xform "right_arm_mount" (prepend apiSchemas = ["PhysicsRigidBodyAPI"])
+    {
+        double3 xformOp:translate = (0.0, -0.22, 0.27)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+    def PhysicsFixedJoint "right_mount_joint"
+    {
+        rel physics:body0 = </mobile_bi_nexarm/lift_carriage>
+        rel physics:body1 = </mobile_bi_nexarm/right_arm_mount>
+    }
+    def Xform "right_shoulder_pan_link" (prepend apiSchemas = ["PhysicsRigidBodyAPI"]) {}
+    def PhysicsRevoluteJoint "right_shoulder_pan"
+    {
+        rel physics:body0 = </mobile_bi_nexarm/right_arm_mount>
+        rel physics:body1 = </mobile_bi_nexarm/right_shoulder_pan_link>
+        uniform token physics:axis = "Z"
+        float physics:lowerLimit = -2.35619449019
+        float physics:upperLimit = 2.35619449019
+    }
+    def Xform "right_shoulder_lift_link" (prepend apiSchemas = ["PhysicsRigidBodyAPI"]) {}
+    def PhysicsRevoluteJoint "right_shoulder_lift"
+    {
+        rel physics:body0 = </mobile_bi_nexarm/right_shoulder_pan_link>
+        rel physics:body1 = </mobile_bi_nexarm/right_shoulder_lift_link>
+        uniform token physics:axis = "X"
+        float physics:lowerLimit = -2.09439510239
+        float physics:upperLimit = 2.09439510239
+    }
+    def Xform "right_elbow_flex_link" (prepend apiSchemas = ["PhysicsRigidBodyAPI"]) {}
+    def PhysicsRevoluteJoint "right_elbow_flex"
+    {
+        rel physics:body0 = </mobile_bi_nexarm/right_shoulder_lift_link>
+        rel physics:body1 = </mobile_bi_nexarm/right_elbow_flex_link>
+        uniform token physics:axis = "X"
+        float physics:lowerLimit = -2.35619449019
+        float physics:upperLimit = 2.35619449019
+    }
+    def Xform "right_wrist_flex_link" (prepend apiSchemas = ["PhysicsRigidBodyAPI"]) {}
+    def PhysicsRevoluteJoint "right_wrist_flex"
+    {
+        rel physics:body0 = </mobile_bi_nexarm/right_elbow_flex_link>
+        rel physics:body1 = </mobile_bi_nexarm/right_wrist_flex_link>
+        uniform token physics:axis = "X"
+        float physics:lowerLimit = -1.74532925199
+        float physics:upperLimit = 1.74532925199
+    }
+    def Xform "right_wrist_roll_link" (prepend apiSchemas = ["PhysicsRigidBodyAPI"]) {}
+    def PhysicsRevoluteJoint "right_wrist_roll"
+    {
+        rel physics:body0 = </mobile_bi_nexarm/right_wrist_flex_link>
+        rel physics:body1 = </mobile_bi_nexarm/right_wrist_roll_link>
+        uniform token physics:axis = "Y"
+        float physics:lowerLimit = -3.14159265359
+        float physics:upperLimit = 3.14159265359
+    }
+    def Xform "right_gripper_link" (prepend apiSchemas = ["PhysicsRigidBodyAPI"]) {}
+    def PhysicsPrismaticJoint "right_gripper"
+    {
+        rel physics:body0 = </mobile_bi_nexarm/right_wrist_roll_link>
+        rel physics:body1 = </mobile_bi_nexarm/right_gripper_link>
+        uniform token physics:axis = "X"
+        float physics:lowerLimit = -0.0255
+        float physics:upperLimit = 0.0
+    }
+    def Camera "front" {}
+    def Camera "left_wrist" {}
+    def Camera "right_wrist" {}
+}

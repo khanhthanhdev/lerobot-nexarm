@@ -1,0 +1,156 @@
+<?xml version='1.0' encoding='utf-8'?>
+<robot name="mobile_bi_nexarm">
+  <link name="world" />
+  <link name="base_x_link" />
+  <joint name="base_x" type="prismatic">
+    <parent link="world" />
+    <child link="base_x_link" />
+    <axis xyz="1 0 0" />
+    <limit lower="-10" upper="10" effort="1000" velocity="0.5" />
+  </joint>
+  <link name="base_y_link" />
+  <joint name="base_y" type="prismatic">
+    <parent link="base_x_link" />
+    <child link="base_y_link" />
+    <axis xyz="0 1 0" />
+    <limit lower="-10" upper="10" effort="1000" velocity="0.5" />
+  </joint>
+  <link name="mobile_base" />
+  <joint name="base_yaw" type="continuous">
+    <parent link="base_y_link" />
+    <child link="mobile_base" />
+    <axis xyz="0 0 1" />
+    <limit effort="1000" velocity="1.57079632679" />
+  </joint>
+  <link name="lift_carriage" />
+  <joint name="lift_axis" type="prismatic">
+    <parent link="mobile_base" />
+    <child link="lift_carriage" />
+    <axis xyz="0 0 1" />
+    <limit lower="0.0" upper="0.35" effort="500" velocity="0.25" />
+  </joint>
+  <link name="left_arm_mount" />
+  <joint name="left_arm_mount_joint" type="fixed">
+    <parent link="lift_carriage" />
+    <child link="left_arm_mount" />
+    <origin xyz="0 0.22 0.27" rpy="0 0 -1.57079632679" />
+  </joint>
+  <link name="left_link_1" />
+  <joint name="left_shoulder_pan" type="revolute">
+    <parent link="left_arm_mount" />
+    <child link="left_link_1" />
+    <origin xyz="0 0.08 0" rpy="0 0 0" />
+    <axis xyz="0 0 -1" />
+    <limit lower="-2.35619449019" upper="2.35619449019" effort="100" velocity="3" />
+  </joint>
+  <link name="left_link_2" />
+  <joint name="left_shoulder_lift" type="revolute">
+    <parent link="left_link_1" />
+    <child link="left_link_2" />
+    <origin xyz="0 0.08 0" rpy="0 0 0" />
+    <axis xyz="-1 0 0" />
+    <limit lower="-2.09439510239" upper="2.09439510239" effort="100" velocity="3" />
+  </joint>
+  <link name="left_link_3" />
+  <joint name="left_elbow_flex" type="revolute">
+    <parent link="left_link_2" />
+    <child link="left_link_3" />
+    <origin xyz="0 0.08 0" rpy="0 0 0" />
+    <axis xyz="-1 0 0" />
+    <limit lower="-2.35619449019" upper="2.35619449019" effort="100" velocity="3" />
+  </joint>
+  <link name="left_link_4" />
+  <joint name="left_wrist_flex" type="revolute">
+    <parent link="left_link_3" />
+    <child link="left_link_4" />
+    <origin xyz="0 0.08 0" rpy="0 0 0" />
+    <axis xyz="1 0 0" />
+    <limit lower="-1.74532925199" upper="1.74532925199" effort="100" velocity="3" />
+  </joint>
+  <link name="left_link_5" />
+  <joint name="left_wrist_roll" type="revolute">
+    <parent link="left_link_4" />
+    <child link="left_link_5" />
+    <origin xyz="0 0.08 0" rpy="0 0 0" />
+    <axis xyz="0 -1 0" />
+    <limit lower="-3.14159265359" upper="3.14159265359" effort="100" velocity="3" />
+  </joint>
+  <link name="left_gripper" />
+  <joint name="left_gripper" type="prismatic">
+    <parent link="left_link_5" />
+    <child link="left_gripper" />
+    <origin xyz="0 0.08 0" rpy="0 0 0" />
+    <axis xyz="1 0 0" />
+    <limit lower="-0.0255" upper="0.0" effort="100" velocity="3" />
+  </joint>
+  <link name="left_left_jaw" />
+  <joint name="left_gripper_mimic" type="prismatic">
+    <parent link="left_gripper" />
+    <child link="left_left_jaw" />
+    <axis xyz="1 0 0" />
+    <limit lower="0" upper="0.0255" effort="100" velocity="0.1" />
+    <mimic joint="left_gripper" multiplier="-1" offset="0" />
+  </joint>
+  <link name="right_arm_mount" />
+  <joint name="right_arm_mount_joint" type="fixed">
+    <parent link="lift_carriage" />
+    <child link="right_arm_mount" />
+    <origin xyz="0 -0.22 0.27" rpy="0 0 1.57079632679" />
+  </joint>
+  <link name="right_link_1" />
+  <joint name="right_shoulder_pan" type="revolute">
+    <parent link="right_arm_mount" />
+    <child link="right_link_1" />
+    <origin xyz="0 0.08 0" rpy="0 0 0" />
+    <axis xyz="0 0 -1" />
+    <limit lower="-2.35619449019" upper="2.35619449019" effort="100" velocity="3" />
+  </joint>
+  <link name="right_link_2" />
+  <joint name="right_shoulder_lift" type="revolute">
+    <parent link="right_link_1" />
+    <child link="right_link_2" />
+    <origin xyz="0 0.08 0" rpy="0 0 0" />
+    <axis xyz="-1 0 0" />
+    <limit lower="-2.09439510239" upper="2.09439510239" effort="100" velocity="3" />
+  </joint>
+  <link name="right_link_3" />
+  <joint name="right_elbow_flex" type="revolute">
+    <parent link="right_link_2" />
+    <child link="right_link_3" />
+    <origin xyz="0 0.08 0" rpy="0 0 0" />
+    <axis xyz="-1 0 0" />
+    <limit lower="-2.35619449019" upper="2.35619449019" effort="100" velocity="3" />
+  </joint>
+  <link name="right_link_4" />
+  <joint name="right_wrist_flex" type="revolute">
+    <parent link="right_link_3" />
+    <child link="right_link_4" />
+    <origin xyz="0 0.08 0" rpy="0 0 0" />
+    <axis xyz="1 0 0" />
+    <limit lower="-1.74532925199" upper="1.74532925199" effort="100" velocity="3" />
+  </joint>
+  <link name="right_link_5" />
+  <joint name="right_wrist_roll" type="revolute">
+    <parent link="right_link_4" />
+    <child link="right_link_5" />
+    <origin xyz="0 0.08 0" rpy="0 0 0" />
+    <axis xyz="0 -1 0" />
+    <limit lower="-3.14159265359" upper="3.14159265359" effort="100" velocity="3" />
+  </joint>
+  <link name="right_gripper" />
+  <joint name="right_gripper" type="prismatic">
+    <parent link="right_link_5" />
+    <child link="right_gripper" />
+    <origin xyz="0 0.08 0" rpy="0 0 0" />
+    <axis xyz="1 0 0" />
+    <limit lower="-0.0255" upper="0.0" effort="100" velocity="3" />
+  </joint>
+  <link name="right_left_jaw" />
+  <joint name="right_gripper_mimic" type="prismatic">
+    <parent link="right_gripper" />
+    <child link="right_left_jaw" />
+    <axis xyz="1 0 0" />
+    <limit lower="0" upper="0.0255" effort="100" velocity="0.1" />
+    <mimic joint="right_gripper" multiplier="-1" offset="0" />
+  </joint>
+</robot>

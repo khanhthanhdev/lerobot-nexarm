@@ -9,7 +9,11 @@ import numpy as np
 import pytest
 
 from lerobot.motors.nexarm.nexarm import JOINT_NAMES
-from lerobot.robots.nexarm_sim import NexArmSim, NexArmSimConfig
+from lerobot.robots.nexarm_sim import (
+    NexArmPickPlaceTask,
+    NexArmSim,
+    NexArmSimConfig,
+)
 from lerobot.robots.nexarm_sim.mujoco_backend import HOME_POSITIONS, RAW_RANGES, NexArmMujocoBackend
 
 MODEL_PATH = Path(__file__).resolve().parents[2] / "sim" / "fusion_export" / "scene.xml"
@@ -112,3 +116,92 @@ def test_sim_robot_matches_physical_feature_contract() -> None:
         robot.disconnect()
 
     assert not robot.is_connected
+
+
+def _set_cube_position(backend: NexArmMujocoBackend, xyz: tuple[float, float, float]) -> None:
+    cube_joint_id = mujoco.mj_name2id(backend.model, mujoco.mjtObj.mjOBJ_JOINT, "cube_joint")
+    qpos_address = backend.model.jnt_qposadr[cube_joint_id]
+    backend.data.qpos[qpos_address : qpos_address + 7] = [*xyz, 1, 0, 0, 0]
+    dof_address = backend.model.jnt_dofadr[cube_joint_id]
+    backend.data.qvel[dof_address : dof_address + 6] = 0
+    mujoco.mj_forward(backend.model, backend.data)
+
+
+def test_pick_place_task_reset_is_seeded(backend: NexArmMujocoBackend) -> None:
+    task = NexArmPickPlaceTask(backend)
+    task.reset(seed=17)
+    first_cube = task.cube_position
+    first_target = task.target_position
+
+    task.reset(seed=17)
+    assert task.cube_position == pytest.approx(first_cube)
+    assert task.target_position == pytest.approx(first_target)
+    assert np.linalg.norm(first_cube[:2] - first_target[:2]) >= task.target_radius_m + 0.04
+
+
+def test_pick_place_task_accepts_stable_released_placement(
+    backend: NexArmMujocoBackend,
+) -> None:
+    task = NexArmPickPlaceTask(backend)
+    task.reset(seed=2)
+    target = task.target_position
+    _set_cube_position(backend, (float(target[0]), float(target[1]), 0.018))
+    gripper_joint_id = backend._joint_ids["gripper"]
+    open_control = backend.raw_to_control("gripper", RAW_RANGES["gripper"][0])
+    backend.data.qpos[backend.model.jnt_qposadr[gripper_joint_id]] = open_control
+    backend.data.ctrl[backend._actuator_ids["gripper"]] = open_control
+    mujoco.mj_forward(backend.model, backend.data)
+
+    status = task.observe()
+    for _ in range(25):
+        status = task.step()
+        if status.success:
+            break
+
+    assert status.success
+    assert status.reason == "success"
+    assert status.is_inside_target
+    assert status.is_released
+    assert status.hold_time_s >= 0.5
+
+
+def test_pick_place_task_rejects_outside_unreleased_drop_and_timeout(
+    backend: NexArmMujocoBackend,
+) -> None:
+    task = NexArmPickPlaceTask(backend, timeout_s=1)
+
+    task.reset(seed=3)
+    target = task.target_position
+    _set_cube_position(backend, (float(target[0] + 0.08), float(target[1]), 0.018))
+    assert not task.observe().is_inside_target
+
+    task.reset(seed=4)
+    target = task.target_position
+    _set_cube_position(backend, (float(target[0]), float(target[1]), 0.018))
+    backend.data.time = 1
+    status = task.observe()
+    assert status.terminated
+    assert status.reason == "unreleased_grasp"
+
+    task.reset(seed=5)
+    _set_cube_position(backend, (0.53, -0.17, -0.03))
+    status = task.observe()
+    assert status.terminated
+    assert status.reason == "dropped_cube"
+
+    task.reset(seed=6)
+    backend.data.time = 1
+    status = task.observe()
+    assert status.terminated
+    assert status.reason == "timeout"
+
+
+def test_pick_place_task_reports_two_jaw_grasp(backend: NexArmMujocoBackend) -> None:
+    task = NexArmPickPlaceTask(backend)
+    task.reset(seed=7)
+    _set_cube_position(backend, (0.53937, -0.03991, 0.2305))
+    action = {f"{name}.pos": HOME_POSITIONS[name] for name in JOINT_NAMES}
+    for _ in range(60):
+        backend.step(action)
+
+    assert task.status().is_grasped
