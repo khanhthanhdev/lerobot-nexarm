@@ -100,7 +100,10 @@ COLLISION_SPECS = {
         },
     ],
     "link_6_gripper_base": [
-        {"type": "box", "pos": "0.53937 -0.02192 0.23047", "size": "0.010 0.023 0.047"},
+        # Padded envelope of link_6_gripper_base.stl. Keep the half-extents
+        # ordered as X/Y/Z: the previous 0.010/0.023/0.047 values produced a
+        # narrow, deep, 94 mm-tall obstacle in front of the jaw pads.
+        {"type": "box", "pos": "0.53937 -0.02327 0.22519", "size": "0.052 0.008 0.021"},
     ],
     "link_6_left_jaw": [
         {

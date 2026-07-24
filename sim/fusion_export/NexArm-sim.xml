@@ -66,7 +66,7 @@
                 <inertial mass="0.0877645173099" pos="0.539308600819 0.00213395624175 0.226224940969" fullinertia="1.61873455873e-05 1.81853478741e-05 1.80887992735e-05 1.9977723024e-08 -7.53848706523e-08 -3.82108689215e-07" />
                 <body name="link_6_gripper_base" pos="0 0 0" quat="1 0 0 0">
                   <geom name="link_6_gripper_base_visual" type="mesh" mesh="link_6_gripper_base" class="visual" />
-                  <geom name="link_6_gripper_base_collision_0" class="collision" type="box" pos="0.53937 -0.02192 0.23047" size="0.010 0.023 0.047" />
+                  <geom name="link_6_gripper_base_collision_0" class="collision" type="box" pos="0.53937 -0.02327 0.22519" size="0.052 0.008 0.021" />
                   <site name="gripper_frame" pos="0.53937 -0.057 0.23044" size="0.005" rgba="0.1 0.8 0.1 1" />
                   <inertial mass="0.0774928302785" pos="0.539368566486 -0.0210206927704 0.230601823149" fullinertia="8.95253759014e-06 9.85333441232e-05 9.25169280579e-05 1.88914933474e-11 5.42428324479e-15 7.9007785621e-08" />
                   <body name="link_6_pinion_gear" pos="0 0 0" quat="1 0 0 0">

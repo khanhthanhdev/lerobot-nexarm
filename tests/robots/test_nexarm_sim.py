@@ -118,6 +118,17 @@ def test_gripper_opening_increases_jaw_separation(backend: NexArmMujocoBackend) 
     assert open_separation - closed_separation == pytest.approx(0.051, abs=0.002)
 
 
+def test_gripper_base_collision_matches_visual_envelope(backend: NexArmMujocoBackend) -> None:
+    """Keep the gripper base collider aligned with the STL's X/Y/Z envelope."""
+    gripper_base = mujoco.mj_name2id(
+        backend.model,
+        mujoco.mjtObj.mjOBJ_GEOM,
+        "link_6_gripper_base_collision_0",
+    )
+
+    assert backend.model.geom_size[gripper_base] == pytest.approx([0.052, 0.008, 0.021])
+
+
 def test_robot_defaults_and_collision_masks_are_active(backend: NexArmMujocoBackend) -> None:
     model = backend.model
     arm_joint_names = (
