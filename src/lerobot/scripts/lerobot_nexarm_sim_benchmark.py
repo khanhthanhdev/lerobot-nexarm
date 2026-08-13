@@ -74,6 +74,7 @@ class EpisodeMetrics:
     inference_mean_ms: float
     inference_p50_ms: float
     inference_p95_ms: float
+    rrd_path: str | None = None
 
 
 def parse_policy_spec(value: str) -> PolicySpec:
@@ -206,7 +207,9 @@ def _reset_cuda_peak(device: torch.device) -> None:
         torch.cuda.reset_peak_memory_stats(device)
 
 
-def _run_control_step(ctx, task: NexArmPickPlaceTask, device: torch.device) -> tuple[Any, float]:
+def _run_control_step(
+    ctx, task: NexArmPickPlaceTask, device: torch.device
+) -> tuple[Any, float, dict[str, Any], dict[str, float]]:
     robot = ctx.hardware.robot_wrapper
     obs_raw = robot.get_observation()
     obs_processed = ctx.processors.robot_observation_processor(obs_raw)
@@ -230,7 +233,57 @@ def _run_control_step(ctx, task: NexArmPickPlaceTask, device: torch.device) -> t
     action = {key: float(action_tensor[index]) for index, key in enumerate(ordered_keys)}
     action = ctx.processors.robot_action_processor((action, obs_raw))
     robot.send_action(action)
-    return task.observe(), inference_s
+    return task.observe(), inference_s, obs_raw, action
+
+
+def _start_episode_recording(path: Path, *, label: str, seed: int):
+    """Create a headless Rerun file sink with a synchronized playback layout."""
+
+    import rerun as rr
+    import rerun.blueprint as rrb
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    recording = rr.RecordingStream(
+        application_id="nexarm_sim_benchmark",
+        recording_id=f"{label}_seed_{seed:06d}",
+    )
+    recording.save(path)
+    recording.send_blueprint(
+        rrb.Blueprint(
+            rrb.Grid(
+                rrb.Spatial2DView(origin="observation/images/front", name="Front camera"),
+                rrb.Spatial2DView(origin="observation/images/wrist", name="Wrist camera"),
+                rrb.TimeSeriesView(origin="observation/state", name="Observation"),
+                rrb.TimeSeriesView(origin="action", name="Action"),
+            )
+        )
+    )
+    return recording
+
+
+def _log_episode_step(
+    recording,
+    *,
+    step: int,
+    simulation_time_s: float,
+    observation: dict[str, Any],
+    action: dict[str, float],
+) -> None:
+    """Log one synchronized simulation step to an episode recording."""
+
+    import rerun as rr
+
+    recording.set_time("step", sequence=step)
+    recording.set_time("simulation_time", duration=simulation_time_s)
+    for key, value in observation.items():
+        if isinstance(value, np.ndarray) and value.ndim == 3:
+            recording.log(f"observation/images/{key}", rr.Image(value).compress())
+        elif np.isscalar(value):
+            recording.log(f"observation/state/{key}", rr.Scalars(float(value)))
+        elif isinstance(value, np.ndarray) and value.ndim == 1:
+            recording.log(f"observation/state/{key}", rr.Scalars(value.astype(float)))
+    for key, value in action.items():
+        recording.log(f"action/{key}", rr.Scalars(float(value)))
 
 
 def _run_episode(
@@ -242,6 +295,8 @@ def _run_episode(
     settle_steps: int,
     realtime: bool,
     device: torch.device,
+    rrd_path: Path | None = None,
+    label: str = "policy",
 ) -> EpisodeMetrics:
     task.reset(seed=seed, settle_steps=settle_steps)
     ctx.policy.inference.reset()
@@ -251,14 +306,28 @@ def _run_episode(
     status = task.status()
     steps = 0
     max_steps = math.ceil((task.timeout_s + task.success_hold_s + 1) * fps)
+    recording = _start_episode_recording(rrd_path, label=label, seed=seed) if rrd_path else None
 
-    while not status.terminated and steps < max_steps:
-        step_started = time.perf_counter()
-        status, inference_s = _run_control_step(ctx, task, device)
-        latencies.append(inference_s)
-        steps += 1
-        if realtime:
-            precise_sleep(max(0.0, 1 / fps - (time.perf_counter() - step_started)))
+    try:
+        while not status.terminated and steps < max_steps:
+            step_started = time.perf_counter()
+            status, inference_s, observation, action = _run_control_step(ctx, task, device)
+            latencies.append(inference_s)
+            if recording is not None:
+                _log_episode_step(
+                    recording,
+                    step=steps,
+                    simulation_time_s=float(task.backend.data.time),
+                    observation=observation,
+                    action=action,
+                )
+            steps += 1
+            if realtime:
+                precise_sleep(max(0.0, 1 / fps - (time.perf_counter() - step_started)))
+    finally:
+        if recording is not None:
+            recording.flush()
+            recording.disconnect()
 
     wall_time_s = time.perf_counter() - started_wall
     simulation_time_s = float(task.backend.data.time) - started_sim
@@ -275,6 +344,7 @@ def _run_episode(
         inference_mean_ms=latency["mean_ms"],
         inference_p50_ms=latency["p50_ms"],
         inference_p95_ms=latency["p95_ms"],
+        rrd_path=str(rrd_path) if rrd_path else None,
     )
 
 
@@ -351,6 +421,12 @@ def benchmark_policy(spec: PolicySpec, args: argparse.Namespace) -> dict[str, An
                 settle_steps=args.settle_steps,
                 realtime=args.realtime,
                 device=device,
+                rrd_path=(
+                    args.rrd_dir / spec.label / f"episode_seed_{args.seed_start + index:06d}.rrd"
+                    if args.rrd_dir
+                    else None
+                ),
+                label=spec.label,
             )
             for index in range(args.episodes)
         ]
@@ -466,6 +542,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--model", type=Path, default=Path("sim/fusion_export/scene.xml"))
     parser.add_argument("--output-dir", type=Path, default=Path("outputs/nexarm_sim_benchmark"))
+    parser.add_argument(
+        "--rrd-dir",
+        type=Path,
+        help="Save one synchronized Rerun .rrd recording per episode under this directory.",
+    )
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--episodes", type=int, default=10)
     parser.add_argument("--seed-start", type=int, default=0)

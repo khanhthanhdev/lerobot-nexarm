@@ -42,6 +42,12 @@ def test_parse_args_rejects_duplicate_labels() -> None:
         parse_args(["--policy", "act=one", "--policy", "act=two"])
 
 
+def test_parse_args_accepts_episode_recording_directory(tmp_path) -> None:
+    args = parse_args(["--policy", "act=checkpoint", "--rrd-dir", str(tmp_path)])
+
+    assert args.rrd_dir == tmp_path
+
+
 def test_validate_policy_contract_requires_six_actions_and_matching_cameras() -> None:
     config = ACTConfig(
         input_features={
