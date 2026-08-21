@@ -91,45 +91,33 @@ Frame: [0xFF][0xFF][ID][LEN][CMD][ARGS...][CHECKSUM]
 
 ## Installation
 
-### Option A — conda (recommended)
+### Recommended — uv (locked and reproducible)
 
 ```bash
 git clone https://github.com/Hiwonder-official/lerobot-nexarm.git
 cd lerobot-nexarm
 
-conda create -n nexarm python=3.12 -y
-conda activate nexarm
-
-pip install -e ".[nexarm]"
+uv sync --locked --extra nexarm
 ```
 
 To enable real-time Rerun visualization during teleoperation:
 
 ```bash
-pip install -e ".[nexarm,viz]"
+uv sync --locked --extra nexarm --extra viz
 ```
 
-### Option B — venv
+`uv sync --locked` creates the project-local `.venv` using Python 3.12 and installs the exact versions in `uv.lock`. Run project commands through `uv run`; do not activate the environment or install packages into it with `pip`.
+
+### Alternative — pip for released packages
 
 ```bash
-git clone https://github.com/Hiwonder-official/lerobot-nexarm.git
-cd lerobot-nexarm
-
-python -m venv .venv
-
-# Activate
-# Windows:
-.venv\Scripts\activate
-# Linux / macOS:
-source .venv/bin/activate
-
-pip install -e ".[nexarm]"
+pip install "lerobot[nexarm]"
 ```
 
 ### Verify
 
 ```bash
-python -c "from lerobot.robots.nexarm_follower import NexArmFollower; print('OK')"
+uv run python -c "from lerobot.robots.nexarm_follower import NexArmFollower; print('OK')"
 ```
 
 ### Connect Hardware
@@ -153,7 +141,7 @@ python -c "from lerobot.robots.nexarm_follower import NexArmFollower; print('OK'
 Identify which port corresponds to the leader and which to the follower.
 
 ```bash
-python -m lerobot.scripts.lerobot_find_port
+uv run python -m lerobot.scripts.lerobot_find_port
 ```
 
 Typical output on Windows:
@@ -174,7 +162,7 @@ On Linux these are typically `/dev/ttyUSB0` and `/dev/ttyUSB1`.
 Identify which camera index is `front` and which is `wrist`.
 
 ```bash
-python -m lerobot.scripts.lerobot_find_cameras opencv
+uv run python -m lerobot.scripts.lerobot_find_cameras opencv
 ```
 
 Or scan manually and save images to compare:
@@ -206,7 +194,7 @@ Verify the leader-follower link. The leader arm runs torque-free so the operator
 Edit `examples/nexarm/teleoperate.py` with your actual port numbers and camera indices, then run:
 
 ```bash
-python examples/nexarm/teleoperate.py \
+uv run python examples/nexarm/teleoperate.py \
   --follower-port COM19 \
   --leader-port COM18
 ```
@@ -214,7 +202,7 @@ python examples/nexarm/teleoperate.py \
 Or pass everything on the command line directly:
 
 ```bash
-python examples/nexarm/teleoperate.py \
+uv run python examples/nexarm/teleoperate.py \
   --follower-port COM19 --leader-port COM18 \
   --front-cam 0 --wrist-cam 1 --fps 30
 ```
@@ -225,14 +213,14 @@ NexArm streams front/wrist camera frames, follower joint observations, and leade
 [Rerun](https://rerun.io/docs/overview/what-is-rerun). Install the visualization extra once:
 
 ```bash
-pip install -e ".[nexarm,viz]"
+uv sync --locked --extra nexarm --extra viz
 ```
 
 Teleoperation opens the live Rerun Viewer by default. Add `--rerun-save-path` to also retain a
 replayable `.rrd` file; open it later with `rerun outputs/rerun/nexarm_teleop.rrd`.
 
 ```bash
-python examples/nexarm/teleoperate.py \
+uv run python examples/nexarm/teleoperate.py \
   --follower-port COM19 --leader-port COM18 \
   --rerun-save-path outputs/rerun/nexarm_teleop.rrd
 ```
@@ -264,7 +252,7 @@ follower_config = NexArmFollowerConfig(
 Or on the command line:
 
 ```bash
-python examples/nexarm/teleoperate.py \
+uv run python examples/nexarm/teleoperate.py \
   --follower-port COM19 --leader-port COM18
 ```
 
@@ -284,7 +272,7 @@ Record demonstration episodes via teleoperation for imitation learning.
 Edit `examples/nexarm/record.py`, then run:
 
 ```bash
-python examples/nexarm/record.py \
+uv run python examples/nexarm/record.py \
   --follower-port COM19 --leader-port COM18 \
   --repo-id YOUR_HF_USERNAME/nexarm_pick \
   --task "Pick up the red block" \
@@ -322,13 +310,13 @@ Train an ACT (Action Chunking with Transformers) policy on the collected dataset
 Install training dependencies:
 
 ```bash
-pip install -e ".[nexarm,training]"
+uv sync --locked --extra nexarm --extra training
 ```
 
 Run training:
 
 ```bash
-python -m lerobot.scripts.lerobot_train \
+uv run python -m lerobot.scripts.lerobot_train \
   --dataset.repo_id=local/nexarm_pick \
   --policy.type=act \
   --output_dir=outputs/train/nexarm_act \
@@ -365,7 +353,7 @@ outputs/train/nexarm_act/checkpoints/last/pretrained_model/
 Deploy the trained policy on the real robot. The follower arm executes actions predicted by the model — no leader arm needed.
 
 ```bash
-python examples/nexarm/rollout.py \
+uv run python examples/nexarm/rollout.py \
   --follower-port COM19 \
   --policy-path outputs/train/nexarm_act/checkpoints/last/pretrained_model
 ```

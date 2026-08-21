@@ -3138,6 +3138,10 @@ multi-task-dit = [
     { name = "diffusers" },
     { name = "transformers" },
 ]
+nexarm = [
+    { name = "deepdiff" },
+    { name = "pyserial" },
+]
 notebook = [
     { name = "ipykernel" },
     { name = "jupyter" },
@@ -3344,6 +3348,7 @@ requires-dist = [
     { name = "lerobot", extras = ["deepdiff-dep"], marker = "extra == 'dynamixel'" },
     { name = "lerobot", extras = ["deepdiff-dep"], marker = "extra == 'feetech'" },
     { name = "lerobot", extras = ["deepdiff-dep"], marker = "extra == 'hardware'" },
+    { name = "lerobot", extras = ["deepdiff-dep"], marker = "extra == 'nexarm'" },
     { name = "lerobot", extras = ["dev"], marker = "extra == 'all'" },
     { name = "lerobot", extras = ["diffusers-dep"], marker = "extra == 'diffusion'" },
     { name = "lerobot", extras = ["diffusers-dep"], marker = "extra == 'fastwam'" },
@@ -3400,6 +3405,7 @@ requires-dist = [
     { name = "lerobot", extras = ["pyserial-dep"], marker = "extra == 'dynamixel'" },
     { name = "lerobot", extras = ["pyserial-dep"], marker = "extra == 'feetech'" },
     { name = "lerobot", extras = ["pyserial-dep"], marker = "extra == 'hardware'" },
+    { name = "lerobot", extras = ["pyserial-dep"], marker = "extra == 'nexarm'" },
     { name = "lerobot", extras = ["pyserial-dep"], marker = "extra == 'unitree-g1'" },
     { name = "lerobot", extras = ["pyzmq-dep"], marker = "extra == 'lekiwi'" },
     { name = "lerobot", extras = ["pyzmq-dep"], marker = "extra == 'unitree-g1'" },
@@ -3491,7 +3497,7 @@ requires-dist = [
     { name = "qwen-vl-utils", marker = "extra == 'qwen-vl-utils-dep'", specifier = ">=0.0.11,<0.1.0" },
     { name = "reachy2-sdk", marker = "extra == 'reachy2'", specifier = ">=1.0.15,<1.1.0" },
     { name = "requests", specifier = ">=2.32.0,<3.0.0" },
-    { name = "rerun-sdk", marker = "extra == 'viz'", specifier = ">=0.24.0,<0.34.0" },
+    { name = "rerun-sdk", marker = "extra == 'viz'", specifier = ">=0.36.2,<0.37.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.14.1" },
     { name = "safetensors", specifier = ">=0.4.3,<1.0.0" },
     { name = "scikit-image", marker = "extra == 'video-benchmark'", specifier = ">=0.23.2,<0.26.0" },
@@ -3513,7 +3519,7 @@ requires-dist = [
     { name = "transformers", marker = "extra == 'transformers-dep'", specifier = ">=5.4.0,<5.6.0" },
     { name = "wandb", marker = "extra == 'training'", specifier = ">=0.24.0,<0.28.0" },
 ]
-provides-extras = ["dataset", "training", "hardware", "viz", "core-scripts", "evaluation", "dataset-viz", "av-dep", "pygame-dep", "placo-dep", "transformers-dep", "grpcio-dep", "accelerate-dep", "can-dep", "peft-dep", "scipy-dep", "diffusers-dep", "qwen-vl-utils-dep", "matplotlib-dep", "pyserial-dep", "deepdiff-dep", "pynput-dep", "pyzmq-dep", "motorbridge-dep", "motorbridge-smart-servo-dep", "timm-dep", "feetech", "dynamixel", "damiao", "robstride", "openarms", "gamepad", "hopejr", "lekiwi", "unitree-g1", "reachy2", "rebot", "kinematics", "intelrealsense", "phone", "diffusion", "wallx", "pi", "molmoact2", "smolvla", "multi-task-dit", "groot", "sarm", "robometer", "topreward", "xvla", "eo1", "fastwam", "evo1", "hilserl", "vla-jepa", "lingbot-va", "async", "peft", "annotations", "dev", "notebook", "test", "video-benchmark", "aloha", "pusht", "libero", "metaworld", "all"]
+provides-extras = ["dataset", "training", "hardware", "viz", "core-scripts", "evaluation", "dataset-viz", "av-dep", "pygame-dep", "placo-dep", "transformers-dep", "grpcio-dep", "accelerate-dep", "can-dep", "peft-dep", "scipy-dep", "diffusers-dep", "qwen-vl-utils-dep", "matplotlib-dep", "pyserial-dep", "deepdiff-dep", "pynput-dep", "pyzmq-dep", "motorbridge-dep", "motorbridge-smart-servo-dep", "timm-dep", "nexarm", "feetech", "dynamixel", "damiao", "robstride", "openarms", "gamepad", "hopejr", "lekiwi", "unitree-g1", "reachy2", "rebot", "kinematics", "intelrealsense", "phone", "diffusion", "wallx", "pi", "molmoact2", "smolvla", "multi-task-dit", "groot", "sarm", "robometer", "topreward", "xvla", "eo1", "fastwam", "evo1", "hilserl", "vla-jepa", "lingbot-va", "async", "peft", "annotations", "dev", "notebook", "test", "video-benchmark", "aloha", "pusht", "libero", "metaworld", "all"]
 
 [[package]]
 name = "librt"
@@ -5874,7 +5880,7 @@ wheels = [
 
 [[package]]
 name = "rerun-sdk"
-version = "0.33.1"
+version = "0.36.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "attrs" },
@@ -5885,10 +5891,10 @@ dependencies = [
     { name = "typing-extensions" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/16/07/380198590b194f1c17052d672865aa4a56e606eae47665f66edfb391999d/rerun_sdk-0.33.1-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:c0115b710289022587bd2e9ecb715f98d1e87dd7d8ac48e053324131d4addc89", size = 125706253, upload-time = "2026-06-22T09:04:18.974Z" },
-    { url = "https://files.pythonhosted.org/packages/f8/eb/6741bbf6868175ab126aff58d372066241c6cd2fc1c4f82ed64069728e73/rerun_sdk-0.33.1-cp310-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:14451d31bc7bd0f7c6bcc9c1213ed679ab81b65ecd8b36eae99f738219897dc5", size = 135278374, upload-time = "2026-06-22T09:04:26.768Z" },
-    { url = "https://files.pythonhosted.org/packages/04/28/fd3b832652900fe3415739e7411c8af8af4c44e9e1a9d55d79e37f7f9094/rerun_sdk-0.33.1-cp310-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:0f87da7a270614074aca37846350f9e257f65081345474748f578c7da64fdeba", size = 139565470, upload-time = "2026-06-22T09:04:34.941Z" },
-    { url = "https://files.pythonhosted.org/packages/19/41/339920f5a6734054c07bcae543365a7ef3368ceee3eb67906e2e38bd1d67/rerun_sdk-0.33.1-cp310-abi3-win_amd64.whl", hash = "sha256:b2c2af67f3c2a85b282669d97b52596593fcfdd19bf57c423f18827c837a6e49", size = 120411717, upload-time = "2026-06-22T09:04:42.643Z" },
+    { url = "https://files.pythonhosted.org/packages/e2/cd/b6889ca236ee678f1647c699d2d648a20fe15a81a23abec3ce5647b9b2c0/rerun_sdk-0.36.2-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:6e5c052ce81cb5b0c6e72730edb3e0f2eca97b4b607d08ac4d0f42c2cde2a319", size = 147515678, upload-time = "2026-08-21T16:48:06.019Z" },
+    { url = "https://files.pythonhosted.org/packages/c7/56/3fda522118a012acbff390f85d4c0332e56e54ed54b6802abaa1109264ba/rerun_sdk-0.36.2-cp310-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:dcbfc53d2e8b5acac87487b3e1011fe04885c02ac5aa181a38d4dc43355fa183", size = 157787400, upload-time = "2026-08-21T16:48:14.063Z" },
+    { url = "https://files.pythonhosted.org/packages/e7/66/9c3e574c6c359a2a58af9fed67dad7895e507eb37fb4967d9203eb1a4006/rerun_sdk-0.36.2-cp310-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:4870263016b8d97d88563a247c3981dcd7b439f431b7fe99e0ea99243585f53a", size = 163004149, upload-time = "2026-08-21T16:48:21.778Z" },
+    { url = "https://files.pythonhosted.org/packages/c9/4d/f4e6204bb1ba64b124cbb50a899f3c8a10debc0dc611a284cc50404e6fdd/rerun_sdk-0.36.2-cp310-abi3-win_amd64.whl", hash = "sha256:d7c73d60f02ca6d52ffd55fa633e1ba76ff162b5f85d8ab19115aaf3fe54f550", size = 140645647, upload-time = "2026-08-21T16:48:28.794Z" },
 ]
 
 [[package]]

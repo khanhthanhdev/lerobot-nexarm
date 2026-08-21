@@ -121,7 +121,7 @@ hardware = [
     "lerobot[deepdiff-dep]",
 ]
 viz = [
-    "rerun-sdk>=0.24.0,<0.34.0",
+    "rerun-sdk>=0.36.2,<0.37.0",
     "foxglove-sdk>=0.25.1,<0.26.0",
 ]
 # ── User-facing composite extras (map to CLI scripts) ─────
@@ -162,6 +162,11 @@ pyzmq-dep = ["pyzmq>=26.2.1,<28.0.0"]
 motorbridge-dep = ["motorbridge>=0.3.2,<0.4.0"]
 motorbridge-smart-servo-dep = ["motorbridge-smart-servo>=0.0.4,<0.1.0"]
 timm-dep = ["timm>=1.0.0,<1.1.0"]
+
+# NexArm hardware uses the USB serial transport and compares calibrated joint
+# configuration during setup. Keep this public extra aligned with the setup
+# commands in the README.
+nexarm = ["lerobot[pyserial-dep]", "lerobot[deepdiff-dep]"]
 
 # Motors
 feetech = ["feetech-servo-sdk>=1.0.0,<2.0.0", "lerobot[pyserial-dep]", "lerobot[deepdiff-dep]"]

@@ -83,45 +83,33 @@ NexArm 通过 USB 串口使用自定义 CommProtocol：
 
 ## 安装
 
-### 方式 A — conda（推荐）
+### 推荐方式 — uv（锁定版本、可复现）
 
 ```bash
 git clone https://github.com/Hiwonder-official/lerobot-nexarm.git
 cd lerobot-nexarm
 
-conda create -n nexarm python=3.12 -y
-conda activate nexarm
-
-pip install -e ".[nexarm]"
+uv sync --locked --extra nexarm
 ```
 
 开启 Rerun 实时可视化：
 
 ```bash
-pip install -e ".[nexarm,viz]"
+uv sync --locked --extra nexarm --extra viz
 ```
 
-### 方式 B — venv
+`uv sync --locked` 会使用 Python 3.12 创建项目本地 `.venv`，并安装 `uv.lock` 中的精确版本。所有项目命令都通过 `uv run` 运行；不要激活该环境或直接用 `pip` 安装包。
+
+### 备选方式 — 已发布包使用 pip
 
 ```bash
-git clone https://github.com/Hiwonder-official/lerobot-nexarm.git
-cd lerobot-nexarm
-
-python -m venv .venv
-
-# 激活虚拟环境
-# Windows:
-.venv\Scripts\activate
-# Linux / macOS:
-source .venv/bin/activate
-
-pip install -e ".[nexarm]"
+pip install "lerobot[nexarm]"
 ```
 
 ### 验证安装
 
 ```bash
-python -c "from lerobot.robots.nexarm_follower import NexArmFollower; print('OK')"
+uv run python -c "from lerobot.robots.nexarm_follower import NexArmFollower; print('OK')"
 ```
 
 ### 连接硬件
@@ -145,7 +133,7 @@ python -c "from lerobot.robots.nexarm_follower import NexArmFollower; print('OK'
 确认哪个端口对应主臂，哪个对应从臂。
 
 ```bash
-python -m lerobot.scripts.lerobot_find_port
+uv run python -m lerobot.scripts.lerobot_find_port
 ```
 
 Windows 典型输出：
@@ -166,7 +154,7 @@ Linux 通常为 `/dev/ttyUSB0` 和 `/dev/ttyUSB1`。
 确认哪个摄像头索引对应 `front`，哪个对应 `wrist`。
 
 ```bash
-python -m lerobot.scripts.lerobot_find_cameras opencv
+uv run python -m lerobot.scripts.lerobot_find_cameras opencv
 ```
 
 或手动扫描并保存图片对比：
@@ -196,7 +184,7 @@ for i in range(10):
 验证主从联动。主臂无扭矩，操作员可自由拖动；从臂实时镜像每个关节。
 
 ```bash
-python examples/nexarm/teleoperate.py \
+uv run python examples/nexarm/teleoperate.py \
   --follower-port COM19 \
   --leader-port COM18
 ```
@@ -204,7 +192,7 @@ python examples/nexarm/teleoperate.py \
 或指定摄像头和帧率：
 
 ```bash
-python examples/nexarm/teleoperate.py \
+uv run python examples/nexarm/teleoperate.py \
   --follower-port COM19 --leader-port COM18 \
   --front-cam 0 --wrist-cam 1 --fps 30
 ```
@@ -230,7 +218,7 @@ python examples/nexarm/teleoperate.py \
 通过遥操作录制示教片段，用于模仿学习。
 
 ```bash
-python examples/nexarm/record.py \
+uv run python examples/nexarm/record.py \
   --follower-port COM19 --leader-port COM18 \
   --repo-id YOUR_HF_USERNAME/nexarm_pick \
   --task "拿起红色积木" \
@@ -268,13 +256,13 @@ python examples/nexarm/record.py \
 安装训练依赖：
 
 ```bash
-pip install -e ".[nexarm,training]"
+uv sync --locked --extra nexarm --extra training
 ```
 
 运行训练：
 
 ```bash
-python -m lerobot.scripts.lerobot_train \
+uv run python -m lerobot.scripts.lerobot_train \
   --dataset.repo_id=local/nexarm_pick \
   --policy.type=act \
   --output_dir=outputs/train/nexarm_act \
@@ -311,7 +299,7 @@ outputs/train/nexarm_act/checkpoints/last/pretrained_model/
 将训练好的策略部署到真实机器人上。从臂执行模型预测的动作，无需主臂。
 
 ```bash
-python examples/nexarm/rollout.py \
+uv run python examples/nexarm/rollout.py \
   --follower-port COM19 \
   --policy-path outputs/train/nexarm_act/checkpoints/last/pretrained_model
 ```
@@ -319,7 +307,7 @@ python examples/nexarm/rollout.py \
 使用 HuggingFace Hub 上的策略：
 
 ```bash
-python examples/nexarm/rollout.py \
+uv run python examples/nexarm/rollout.py \
   --follower-port COM19 \
   --policy-path YOUR_HF_USERNAME/nexarm_act
 ```
