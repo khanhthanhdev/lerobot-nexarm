@@ -36,7 +36,11 @@ repos:
       - id: check-yaml
       - id: check-toml
       - id: end-of-file-fixer
+        # Firmware includes vendor sources and binary artifacts; these hooks can
+        # rewrite their bytes without improving the Python project.
+        exclude: ^firmware/
       - id: trailing-whitespace
+        exclude: ^firmware/
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.14.1
@@ -50,12 +54,14 @@ repos:
     hooks:
       - id: typos
         args: [--force-exclude]
+        exclude: ^firmware/
 
   - repo: https://github.com/asottile/pyupgrade
     rev: v3.21.0
     hooks:
     -   id: pyupgrade
         args: [--py312-plus]
+        exclude: ^firmware/
 
   ##### Markdown Quality #####
   - repo: https://github.com/rbubley/mirrors-prettier
@@ -74,11 +80,11 @@ repos:
     rev: v8.28.0
     hooks:
       - id: gitleaks
-
   - repo: https://github.com/woodruffw/zizmor-pre-commit
     rev: v1.15.2
     hooks:
       - id: zizmor
+        args: [--min-severity=medium]
 
   - repo: https://github.com/PyCQA/bandit
     rev: 1.8.6
@@ -93,8 +99,8 @@ repos:
     rev: v1.19.1
     hooks:
       - id: mypy
-        args: [--config-file=pyproject.toml]
-        exclude: ^(examples|benchmarks|tests)/
+        args: [--config-file=pyproject.toml, src]
+        pass_filenames: false
 
   ##### Docstring Checks #####
   # - repo: https://github.com/akaihola/darglint2

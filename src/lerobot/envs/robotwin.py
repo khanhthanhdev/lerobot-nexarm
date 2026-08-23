@@ -384,7 +384,9 @@ class RoboTwinEnv(gym.Env):
 
         self._env: Any | None = None  # deferred — created on first reset() inside worker
         self._step_count: int = 0
-        self._black_frame = np.zeros((self.observation_height, self.observation_width, 3), dtype=np.uint8)
+        self._black_frame: np.ndarray = np.zeros(
+            (self.observation_height, self.observation_width, 3), dtype=np.uint8
+        )
 
         image_spaces = {
             cam: spaces.Box(
@@ -496,6 +498,7 @@ class RoboTwinEnv(gym.Env):
 
         with torch.enable_grad():
             if self.action_mode == "ee":
+                assert self._init_eef_pose is not None, "EEF mode requires reset() before step()"
                 ee_action = _add_init_eef_pose(np.asarray(action, dtype=np.float64), self._init_eef_pose)
                 self._env.take_action(ee_action, action_type="ee")
             elif hasattr(self._env, "take_action"):

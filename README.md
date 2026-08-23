@@ -22,14 +22,14 @@ For on‑device perception, NexArm integrates a 6 TOPS K230 vision module, allow
 
 ## End-to-End Robotic Arm Comparison
 
-| Model | NexArm | SO-ARM101 |
-|-------|--------|-----------|
-| Payload | 500 g | 200 g |
-| Repeatability | ±2 mm | ±3 mm |
-| Workspace | 0.5 m | 0.4 m |
-| Joint Servo | Dual-output-shaft magnetic encoder bus servo | Single-output-shaft magnetic encoder bus servo with fixed shaft |
-| Body Material | Aerospace-grade metal structure | PLA 3D-printed structural parts |
-| End Effector | Parallel rail gripper | 3D-printed vertical-opening gripper |
+| Model               | NexArm                                                              | SO-ARM101                                                           |
+| ------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Payload             | 500 g                                                               | 200 g                                                               |
+| Repeatability       | ±2 mm                                                               | ±3 mm                                                               |
+| Workspace           | 0.5 m                                                               | 0.4 m                                                               |
+| Joint Servo         | Dual-output-shaft magnetic encoder bus servo                        | Single-output-shaft magnetic encoder bus servo with fixed shaft     |
+| Body Material       | Aerospace-grade metal structure                                     | PLA 3D-printed structural parts                                     |
+| End Effector        | Parallel rail gripper                                               | 3D-printed vertical-opening gripper                                 |
 | Product Positioning | Advanced end-to-end development / advanced embodied AI applications | Entry-level end-to-end development / basic embodied AI applications |
 
 ---
@@ -53,23 +53,23 @@ For on‑device perception, NexArm integrates a 6 TOPS K230 vision module, allow
 
 ### Components
 
-| Component | Description |
-|-----------|-------------|
-| **Leader arm** | ESP32 board driving 6 × HX-30HM servos. Operator freely moves this arm during teleoperation. |
-| **Follower arm** | ESP32 + AT32F421 co-processor driving 6 × HX-30HM servos. Mirrors the leader or executes policy output. |
-| **Servos** | HX-30HM serial bus servos — 12-bit resolution (0–4095), 1 Mbps, high torque. |
-| **Cameras** | 2 × USB cameras: `front` (top-down workspace view) and `wrist` (end-effector close-up), 640×480 @ 30 FPS. |
+| Component        | Description                                                                                               |
+| ---------------- | --------------------------------------------------------------------------------------------------------- |
+| **Leader arm**   | ESP32 board driving 6 × HX-30HM servos. Operator freely moves this arm during teleoperation.              |
+| **Follower arm** | ESP32 + AT32F421 co-processor driving 6 × HX-30HM servos. Mirrors the leader or executes policy output.   |
+| **Servos**       | HX-30HM serial bus servos — 12-bit resolution (0–4095), 1 Mbps, high torque.                              |
+| **Cameras**      | 2 × USB cameras: `front` (top-down workspace view) and `wrist` (end-effector close-up), 640×480 @ 30 FPS. |
 
 ### Joint Layout (6 DOF)
 
-| Joint | Name | Notes |
-|-------|------|-------|
-| 1 | `shoulder_pan` | Base rotation |
-| 2 | `shoulder_lift` | Mirrored between leader and follower (4096 − pos) |
-| 3 | `elbow_flex` | Elbow |
-| 4 | `wrist_flex` | Wrist pitch |
-| 5 | `wrist_roll` | Wrist rotation |
-| 6 | `gripper` | Open/close, mapped range [1195, 2833] |
+| Joint | Name            | Notes                                             |
+| ----- | --------------- | ------------------------------------------------- |
+| 1     | `shoulder_pan`  | Base rotation                                     |
+| 2     | `shoulder_lift` | Mirrored between leader and follower (4096 − pos) |
+| 3     | `elbow_flex`    | Elbow                                             |
+| 4     | `wrist_flex`    | Wrist pitch                                       |
+| 5     | `wrist_roll`    | Wrist rotation                                    |
+| 6     | `gripper`       | Open/close, mapped range [1195, 2833]             |
 
 ### Communication Protocol
 
@@ -79,13 +79,13 @@ NexArm uses a custom CommProtocol over USB serial:
 Frame: [0xFF][0xFF][ID][LEN][CMD][ARGS...][CHECKSUM]
 ```
 
-| CMD | Function | Direction |
-|-----|----------|-----------|
-| 56 | Set motion speed and acceleration (`motion_speed`, `motion_acc`) | Host → Follower |
-| 68 | Enter/exit LeRobot bridge mode (follower only) | Host → Follower |
-| 96 | Read 6 servo positions (12-byte reply) | Host → Device → Host |
-| 97 | Write 6 servo positions (12 bytes, no reply) | Host → Device |
-| 98 | Enable/disable torque | Host → Device |
+| CMD | Function                                                         | Direction            |
+| --- | ---------------------------------------------------------------- | -------------------- |
+| 56  | Set motion speed and acceleration (`motion_speed`, `motion_acc`) | Host → Follower      |
+| 68  | Enter/exit LeRobot bridge mode (follower only)                   | Host → Follower      |
+| 96  | Read 6 servo positions (12-byte reply)                           | Host → Device → Host |
+| 97  | Write 6 servo positions (12 bytes, no reply)                     | Host → Device        |
+| 98  | Enable/disable torque                                            | Host → Device        |
 
 ---
 
@@ -128,11 +128,11 @@ uv run python -c "from lerobot.robots.nexarm_follower import NexArmFollower; pri
 
 ### Platform Support
 
-| Platform | Status | Notes |
-|----------|--------|-------|
-| Windows 10/11 | Verified | Install CH340 driver; port format `COM19` |
+| Platform      | Status   | Notes                                                   |
+| ------------- | -------- | ------------------------------------------------------- |
+| Windows 10/11 | Verified | Install CH340 driver; port format `COM19`               |
 | Ubuntu 20.04+ | Verified | Port format `/dev/ttyUSB0`; add user to `dialout` group |
-| macOS | Verified | Port format `/dev/tty.usbserial-xxx` |
+| macOS         | Verified | Port format `/dev/tty.usbserial-xxx`                    |
 
 ---
 
@@ -146,9 +146,9 @@ uv run python -m lerobot.scripts.lerobot_find_port
 
 Typical output on Windows:
 
-| Port | Device |
-|------|--------|
-| COM18 | Leader ESP32 |
+| Port  | Device         |
+| ----- | -------------- |
+| COM18 | Leader ESP32   |
 | COM19 | Follower ESP32 |
 
 On Linux these are typically `/dev/ttyUSB0` and `/dev/ttyUSB1`.
@@ -233,10 +233,10 @@ checking demonstrations, debugging failed rollouts, and sharing a session.
 
 The follower arm's motion profile is controlled by two parameters in `NexArmFollowerConfig` (or via the YAML / command line):
 
-| Parameter | Default | Range | Description |
-|-----------|---------|-------|-------------|
-| `motion_speed` | `2000` | 0–3400 | Maximum servo speed in raw units/s. `0` = no limit. |
-| `motion_acc` | `100` | 0–254 | Acceleration ramp. `0` = instant (max acceleration). Higher = smoother ramp. |
+| Parameter      | Default | Range  | Description                                                                  |
+| -------------- | ------- | ------ | ---------------------------------------------------------------------------- |
+| `motion_speed` | `2000`  | 0–3400 | Maximum servo speed in raw units/s. `0` = no limit.                          |
+| `motion_acc`   | `100`   | 0–254  | Acceleration ramp. `0` = instant (max acceleration). Higher = smoother ramp. |
 
 These are applied once at connection time via the firmware. You can override them in `examples/nexarm/teleoperate.py` by editing the `NexArmFollowerConfig`:
 
@@ -259,6 +259,7 @@ uv run python examples/nexarm/teleoperate.py \
 > Note: the firmware handles speed/acceleration limiting internally — no software-side delta clamping is applied.
 
 **What to check:**
+
 - Follower tracks the leader smoothly across all joints.
 - `shoulder_lift` direction is automatically mirrored.
 - Gripper open/close maps correctly.
@@ -281,21 +282,23 @@ uv run python examples/nexarm/record.py \
 
 **Key parameters:**
 
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `dataset.repo_id` | `local/nexarm_pick` | Dataset name (saved locally) |
-| `dataset.num_episodes` | 50 | Number of episodes to record |
-| `dataset.episode_time_s` | 10 | Duration of each episode (seconds) |
-| `dataset.reset_time_s` | 10 | Time between episodes to reset the scene |
-| `dataset.fps` | 30 | Recording frame rate |
-| `dataset.push_to_hub` | false | Upload to HuggingFace Hub |
+| Parameter                | Default             | Description                              |
+| ------------------------ | ------------------- | ---------------------------------------- |
+| `dataset.repo_id`        | `local/nexarm_pick` | Dataset name (saved locally)             |
+| `dataset.num_episodes`   | 50                  | Number of episodes to record             |
+| `dataset.episode_time_s` | 10                  | Duration of each episode (seconds)       |
+| `dataset.reset_time_s`   | 10                  | Time between episodes to reset the scene |
+| `dataset.fps`            | 30                  | Recording frame rate                     |
+| `dataset.push_to_hub`    | false               | Upload to HuggingFace Hub                |
 
 **Recording flow:**
+
 1. Script connects both arms and cameras automatically.
 2. Per episode: press Enter to start → move the leader arm → recording stops after `episode_time_s` → reset the scene within `reset_time_s`.
 3. Dataset is saved locally after all episodes complete.
 
 **Data quality tips:**
+
 - Record at least **50 episodes** for usable training results.
 - Keep start positions consistent across episodes.
 - Ensure clear camera views and stable lighting.
@@ -327,13 +330,13 @@ uv run python -m lerobot.scripts.lerobot_train \
 
 **Training recommendations:**
 
-| Item | Recommended | Notes |
-|------|-------------|-------|
-| Hardware | CUDA GPU | RTX 3090 or better preferred |
-| Episodes | 50+ | More is better |
-| Steps | 100,000 | Adjust based on loss curve |
-| Batch size | 32 | Reduce to 16 if VRAM is limited |
-| Save frequency | 25,000 | Checkpoint every 25 k steps |
+| Item           | Recommended | Notes                           |
+| -------------- | ----------- | ------------------------------- |
+| Hardware       | CUDA GPU    | RTX 3090 or better preferred    |
+| Episodes       | 50+         | More is better                  |
+| Steps          | 100,000     | Adjust based on loss curve      |
+| Batch size     | 32          | Reduce to 16 if VRAM is limited |
+| Save frequency | 25,000      | Checkpoint every 25 k steps     |
 
 Checkpoints are saved to:
 
@@ -359,6 +362,7 @@ uv run python examples/nexarm/rollout.py \
 ```
 
 **Notes:**
+
 - No `--teleop` argument needed — the policy replaces the human operator.
 - Each run appends a timestamp to `repo_id` automatically to avoid conflicts.
 - The run is recorded as a dataset for later analysis.
@@ -366,12 +370,12 @@ uv run python examples/nexarm/rollout.py \
 
 **Rollout strategies:**
 
-| Strategy | Flag | Description |
-|----------|------|-------------|
-| `base` | `--strategy.type=base` | Inference only, no recording |
-| `sentry` | `--strategy.type=sentry` | Continuous recording + auto-save (recommended for evaluation) |
-| `highlight` | `--strategy.type=highlight` | Ring buffer, press key to save highlights |
-| `dagger` | `--strategy.type=dagger` | Human-robot collaboration, requires leader arm |
+| Strategy    | Flag                        | Description                                                   |
+| ----------- | --------------------------- | ------------------------------------------------------------- |
+| `base`      | `--strategy.type=base`      | Inference only, no recording                                  |
+| `sentry`    | `--strategy.type=sentry`    | Continuous recording + auto-save (recommended for evaluation) |
+| `highlight` | `--strategy.type=highlight` | Ring buffer, press key to save highlights                     |
+| `dagger`    | `--strategy.type=dagger`    | Human-robot collaboration, requires leader arm                |
 
 ---
 
@@ -394,47 +398,54 @@ src/lerobot/
 
 **Modified upstream files:**
 
-| File | Change |
-|------|--------|
-| `src/lerobot/robots/utils.py` | Added `nexarm_follower` branch in `make_robot_from_config()` |
-| `src/lerobot/teleoperators/utils.py` | Added `nexarm_leader` branch in `make_teleoperator_from_config()` |
-| `pyproject.toml` | Added `nexarm` optional dependency group |
-| `src/lerobot/cameras/opencv/camera_opencv.py` | Fixed `stop_event` race condition on Linux |
-| `src/lerobot/processor/normalize_processor.py` | Added device/dtype caching to avoid redundant `.to()` calls |
+| File                                           | Change                                                            |
+| ---------------------------------------------- | ----------------------------------------------------------------- |
+| `src/lerobot/robots/utils.py`                  | Added `nexarm_follower` branch in `make_robot_from_config()`      |
+| `src/lerobot/teleoperators/utils.py`           | Added `nexarm_leader` branch in `make_teleoperator_from_config()` |
+| `pyproject.toml`                               | Added `nexarm` optional dependency group                          |
+| `src/lerobot/cameras/opencv/camera_opencv.py`  | Fixed `stop_event` race condition on Linux                        |
+| `src/lerobot/processor/normalize_processor.py` | Added device/dtype caching to avoid redundant `.to()` calls       |
 
 ---
 
 ## Troubleshooting
 
 **Serial port permission denied (Linux)**
+
 ```bash
 sudo usermod -a -G dialout $USER
 # Log out and back in
 ```
 
 **Camera not found**
+
 - Run `lerobot-find-cameras opencv` to scan available indices.
 - Close other programs using the camera (OBS, browser, etc.).
 - Re-scan after unplugging and replugging USB devices.
 
 **Follower arm does not move during teleoperation**
+
 1. Confirm the follower COM port is correct.
 2. Confirm the follower ESP32 firmware supports CMD 68 (LeRobot bridge mode).
 3. Try power-cycling the follower arm.
 
 **TimeoutError during data collection**
+
 ```
 TimeoutError: No position reply from NexArm
 ```
+
 The leader firmware prints debug lines over Serial that corrupt protocol frames. The driver retries 3 times automatically. To eliminate the issue permanently, comment out the `Serial.printf` calls in `Nex_Arm.ino` inside the `lerobotMode == true` branch and reflash the firmware.
 
 **Training loss does not decrease**
+
 - Ensure you have at least 50 episodes.
 - Verify camera frames are not black or blurry.
 - Try increasing the learning rate: `--policy.optimizer_lr=1e-4`.
 
 **Robot moves hesitantly / small motion amplitude**
 The model collapsed to the mean. Try:
+
 - Lower `kl_weight`: `--policy.kl_weight=5.0` or `1.0`
 - Increase `batch_size`: `--batch_size=64`
 - Record more consistent episodes (same start position, complete task each time)
@@ -442,6 +453,7 @@ The model collapsed to the mean. Try:
 
 **Low inference FPS on CPU**
 ACT uses action chunking (chunk_size=100) so CPU inference is normally 20–30 Hz. If slower:
+
 - Check no background processes are saturating the CPU.
 - Dual-camera capture adds ~45 ms per frame — this is expected.
 

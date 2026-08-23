@@ -8,22 +8,22 @@ This is the **Hiwonder NexArm** fork of LeRobot — a PyTorch-based library for 
 
 **NexArm-specific modules** (added on top of upstream):
 
-| Path | What it does |
-|---|---|
-| `src/lerobot/motors/nexarm/` | CommProtocol UART framing, 6-servo sync read/write, torque, bridge mode (CMD 56/68/96/97/98) |
-| `src/lerobot/robots/nexarm_follower/` | `NexArmFollowerConfig` + `NexArmFollower` — connect, observe, send_action |
-| `src/lerobot/teleoperators/nexarm_leader/` | `NexArmLeaderConfig` + `NexArmLeader` — read positions, leader→follower joint mapping |
-| `examples/nexarm/` | Ready-to-run scripts for teleoperate, record, and rollout |
+| Path                                       | What it does                                                                                 |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| `src/lerobot/motors/nexarm/`               | CommProtocol UART framing, 6-servo sync read/write, torque, bridge mode (CMD 56/68/96/97/98) |
+| `src/lerobot/robots/nexarm_follower/`      | `NexArmFollowerConfig` + `NexArmFollower` — connect, observe, send_action                    |
+| `src/lerobot/teleoperators/nexarm_leader/` | `NexArmLeaderConfig` + `NexArmLeader` — read positions, leader→follower joint mapping        |
+| `examples/nexarm/`                         | Ready-to-run scripts for teleoperate, record, and rollout                                    |
 
 **Modified upstream files:**
 
-| File | Change |
-|---|---|
-| `src/lerobot/robots/utils.py` | Added `nexarm_follower` branch in `make_robot_from_config()` |
-| `src/lerobot/teleoperators/utils.py` | Added `nexarm_leader` branch in `make_teleoperator_from_config()` |
-| `pyproject.toml` | Added `nexarm` optional dependency group |
-| `src/lerobot/cameras/opencv/camera_opencv.py` | Fixed `stop_event` race condition on Linux |
-| `src/lerobot/processor/normalize_processor.py` | Added device/dtype caching to avoid redundant `.to()` calls |
+| File                                           | Change                                                            |
+| ---------------------------------------------- | ----------------------------------------------------------------- |
+| `src/lerobot/robots/utils.py`                  | Added `nexarm_follower` branch in `make_robot_from_config()`      |
+| `src/lerobot/teleoperators/utils.py`           | Added `nexarm_leader` branch in `make_teleoperator_from_config()` |
+| `pyproject.toml`                               | Added `nexarm` optional dependency group                          |
+| `src/lerobot/cameras/opencv/camera_opencv.py`  | Fixed `stop_event` race condition on Linux                        |
+| `src/lerobot/processor/normalize_processor.py` | Added device/dtype caching to avoid redundant `.to()` calls       |
 
 ## Tech Stack
 
@@ -41,10 +41,22 @@ git lfs install && git lfs pull             # Test artifacts
 ## Key Commands
 
 ```bash
-uv run pytest tests -svv --maxfail=10                 # All tests
-DEVICE=cuda make test-end-to-end                      # All E2E tests
-pre-commit run --all-files                           # Lint + format (ruff, typos, bandit, etc.)
+uv run pytest tests -svv --maxfail=10                # All tests
+DEVICE=cuda make test-end-to-end                     # All E2E tests
+uv run pre-commit run --all-files --show-diff-on-failure  # Full quality suite
 ```
+
+## Linting and Formatting
+
+```bash
+uv run pre-commit install --install-hooks            # Once per clone; run checks before each commit
+uv run pre-commit run --all-files --show-diff-on-failure  # Lint, format, type, spelling, and security checks
+uv run ruff check . --no-fix                         # Check Python lint rules without modifying files
+uv run ruff format . --check                         # Check Python formatting without modifying files
+uv run ruff format .                                 # Apply Python formatting intentionally
+```
+
+Run the full pre-commit suite before submitting changes. `pyproject.toml` owns Ruff, Bandit, Typos, and Mypy settings; `.pre-commit-config.yaml` wires those tools into local hooks and CI.
 
 ## Architecture (`src/lerobot/`)
 

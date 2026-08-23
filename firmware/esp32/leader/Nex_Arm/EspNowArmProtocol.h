@@ -8,9 +8,9 @@
 #define ARM_JOINT_NUM      6
 
 enum ArmMsgType : uint8_t {
-    ARM_MSG_JOINT_CMD   = 0x01,   
-    ARM_MSG_JOINT_STATE = 0x02,   
-    ARM_MSG_PING        = 0x03,   
+    ARM_MSG_JOINT_CMD   = 0x01,
+    ARM_MSG_JOINT_STATE = 0x02,
+    ARM_MSG_PING        = 0x03,
 };
 
 enum ArmRole : uint8_t {
@@ -19,24 +19,24 @@ enum ArmRole : uint8_t {
 };
 
 typedef struct __attribute__((packed)) {
-    int16_t angle_cdeg;  
-    int16_t reserved;    
-    uint8_t acc;         
+    int16_t angle_cdeg;
+    int16_t reserved;
+    uint8_t acc;
 } ArmJointData_t;
 
 typedef struct __attribute__((packed)) {
-    uint8_t  magic;         
-    uint8_t  version;      
-    uint8_t  msg_type;      
-    uint8_t  role;          
-    uint8_t  seq;           
-    uint8_t  reserved;      
+    uint8_t  magic;
+    uint8_t  version;
+    uint8_t  msg_type;
+    uint8_t  role;
+    uint8_t  seq;
+    uint8_t  reserved;
 
-    uint32_t timestamp_ms;  
+    uint32_t timestamp_ms;
 
-    ArmJointData_t joint[ARM_JOINT_NUM]; 
+    ArmJointData_t joint[ARM_JOINT_NUM];
 
-    uint8_t checksum;       
+    uint8_t checksum;
 } EspNowArmPacket_t;
 
 inline uint8_t arm_calc_checksum(const EspNowArmPacket_t &pkt) {
@@ -54,4 +54,4 @@ inline bool arm_packet_valid(const EspNowArmPacket_t &pkt) {
     return pkt.checksum == arm_calc_checksum(pkt);
 }
 
-#endif 
+#endif

@@ -385,8 +385,8 @@ where = ["src"]
 [tool.ruff]
 target-version = "py312"
 line-length = 110
-exclude = ["tests/artifacts/**/*.safetensors", "*_pb2.py", "*_pb2_grpc.py"]
-
+# Firmware examples target embedded runtimes and use vendor-specific style conventions.
+exclude = ["firmware", "tests/artifacts/**/*.safetensors", "*_pb2.py", "*_pb2_grpc.py"]
 [tool.ruff.lint]
 # E, W: pycodestyle errors and warnings
 # F: PyFlakes
@@ -410,6 +410,7 @@ ignore = [
     "T201", # Print statement found
     "T203", # Pprint statement found
     "B008", # Perform function call in argument defaults
+    "UP042", # Preserve explicit str/Enum bases used throughout the public API
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -436,6 +437,7 @@ docstring-code-format = true
 exclude_dirs = [
     "tests",
     "benchmarks",
+    "firmware",
     "src/lerobot/datasets/push_dataset_to_hub",
 ]
 skips = ["B101", "B311", "B404", "B603", "B615"]
@@ -460,6 +462,11 @@ default.extend-ignore-identifiers-re = [
     "VanderBilt",
     "seperated_timestep",
 ]
+[tool.typos.default.extend-words]
+# Vendor package and folder names used verbatim in documentation.
+Softwares = "Softwares"
+finsh = "finsh"
+
 
 # TODO: Uncomment when ready to use
 # [tool.interrogate]
@@ -490,6 +497,12 @@ follow_imports = "skip"
 # disallow_untyped_defs = true
 # disallow_incomplete_defs = true
 # check_untyped_defs = true
+# OpenCV and PyZMQ ship incomplete inline stubs. Treat them as untyped
+# dependencies so strict checks continue to validate the project boundary.
+[[tool.mypy.overrides]]
+module = ["cv2", "zmq"]
+follow_imports = "skip"
+
 
 [[tool.mypy.overrides]]
 module = "lerobot.*"

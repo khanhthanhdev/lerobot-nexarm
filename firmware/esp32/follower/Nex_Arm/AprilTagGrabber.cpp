@@ -645,7 +645,7 @@ void AprilTagGrabber::update() {
                 if (now - _last_state_time > 1000) {
                     Serial.println("[GRAB] RELEASE");
                     arm.move(S_X, P_Y, P_Z, S_P, 0, C_OPEN, 800);
-                    _currentState = G_STATE_RESET;  
+                    _currentState = G_STATE_RESET;
                     _last_state_time = now;
                 }
             }

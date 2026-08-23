@@ -49,17 +49,17 @@ uint8_t SerialServo_t::unpack()
 				rx_packet.header_1 = uart->read();
 				rx_status = rx_packet.header_1 == FRAME_HEADER_1 ? PACKET_HEADER_2: PACKET_HEADER_1;
 				break;
-			
+
 			case PACKET_HEADER_2:
 				rx_packet.header_2 = uart->read();
-				rx_status = rx_packet.header_2 == FRAME_HEADER_2 ? PACKET_ID: PACKET_HEADER_1;				
+				rx_status = rx_packet.header_2 == FRAME_HEADER_2 ? PACKET_ID: PACKET_HEADER_1;
 				break;
-			
+
 			case PACKET_ID:
 				rx_packet.elements.id = uart->read();
-				rx_status = rx_packet.elements.id <= BROADCAST_ID ? PACKET_DATA_LENGTH: PACKET_HEADER_1;	
+				rx_status = rx_packet.elements.id <= BROADCAST_ID ? PACKET_DATA_LENGTH: PACKET_HEADER_1;
 				break;
-			
+
 			case PACKET_DATA_LENGTH:
 				rx_packet.elements.length = uart->read();
 				rx_status = rx_packet.elements.length <= MAX_ARGS_SIZE + 1  ? PACKET_CMD: PACKET_HEADER_1;
@@ -69,24 +69,24 @@ uint8_t SerialServo_t::unpack()
 				rx_packet.elements.cmd = uart->read();
 				rx_status = rx_packet.elements.cmd <= CMD_SYNC_READ ? PACKET_PARAMETERS: PACKET_HEADER_1;
 				break;
-			
+
 			case PACKET_PARAMETERS:
 				for(uint8_t i = 0; i < rx_packet.elements.length - 2; i++) {
 					rx_packet.elements.args[i] = uart->read();
 				}
 				rx_status = PACKET_CHECKSUM;
 				break;
-			
+
 			case PACKET_CHECKSUM:
 				rx_packet.elements.args[rx_packet.elements.length - 2] = uart->read();
 				check_value = data_check((const uint8_t*)&rx_packet, rx_packet.elements.length + 3);
 				rx_status = rx_packet.elements.args[rx_packet.elements.length - 2] == check_value ? PACKET_FINISH : PACKET_HEADER_1;
 				break;
-			
+
 			default:
 				break;
 		}
-		
+
 		if(rx_status == PACKET_FINISH) {
 			break;
 		}
@@ -108,19 +108,19 @@ uint8_t SerialServo_t::tx_frame_write(uint8_t id, uint8_t cmd, const uint8_t *da
 {
 	uint8_t frame_len =  6 + data_len;  // 6: header1 + header2 + id + length + cmd + check
   	uint8_t packet[frame_len];
-  
+
 	packet[0] = FRAME_HEADER_1;
 	packet[1] = FRAME_HEADER_2;
 	packet[2] = id;
 	packet[3] = 2 + data_len;
 	packet[4] = cmd;
-	
+
 	for(uint8_t i = 0; i < data_len; i++) {
 		packet[5 + i] = data[i];
 	}
-	
+
 	packet[frame_len - 1] = data_check((const uint8_t*)packet, frame_len - 1);
-  
+
 #if DEBUG
   Serial.print("TX:");
   Serial.print(" ");
@@ -158,7 +158,7 @@ ServoStatus_t SerialServo_t::ack()
 
 		if(unpack()) {
 			status.error_bits.bit_rx = 1;
-      
+
 		}
     else {
       status.id = rx_packet.elements.id;
@@ -184,7 +184,7 @@ ServoStatus_t SerialServo_t::ack()
 			Serial.print(" ");
 		}
     Serial.println();
-#endif 
+#endif
 	}
 
 	return status;
@@ -203,7 +203,7 @@ void SerialServo_t::begin(HardwareSerial& uart, uint32_t baudrate, uint8_t tx_pi
 ServoStatus_t SerialServo_t::ping(uint8_t id)
 {
 	ServoStatus_t status;
-	
+
 	status.id = id;
 	status.error_byte = 0;
 	rx_skip = 0;
@@ -223,7 +223,7 @@ ServoStatus_t SerialServo_t::general_write(uint8_t id, uint8_t addr, uint8_t *da
 #if ACK == 1
 	rx_skip = id == 0xfe ? 1 : 0;
 	rx_frame_length = 6;
-#else 
+#else
 	rx_skip = 1;
 #endif
 	status.id = id;
@@ -260,7 +260,7 @@ ServoStatus_t SerialServo_t::general_read(uint8_t id, uint8_t addr, uint8_t *dat
 		status.error_bits.bit_tx = 1;
 		return status;
 	}
-	
+
 	status = ack();
 
 	if(status.error_bits.bit_rx) {
@@ -271,27 +271,27 @@ ServoStatus_t SerialServo_t::general_read(uint8_t id, uint8_t addr, uint8_t *dat
 		status.error_bits.bit_rx = 1;
 		return status;
 	}
-	
+
 	for (uint8_t i = 0; i < data_len; i++) {
 		data[i] = rx_packet.elements.args[i];
 	}
-	
+
 	return status;
 }
 
 ServoStatus_t SerialServo_t::reg_write(uint8_t id, uint8_t addr, uint8_t *data, uint8_t data_len)
 {
 	ServoStatus_t status;
-	
+
 	uint8_t buf[1 + data_len];
-	
+
 #if ACK == 1
 	rx_skip = id == 0xfe ? 1 : 0;
 	rx_frame_length = 6;
-#else 
+#else
 	rx_skip = 1;
 #endif
-	
+
 	status.id = id;
 	status.error_byte = 0;
 	buf[0] = addr;
@@ -311,17 +311,17 @@ ServoStatus_t SerialServo_t::reg_write(uint8_t id, uint8_t addr, uint8_t *data, 
 ServoStatus_t SerialServo_t::reg_action(uint8_t id)
 {
 	ServoStatus_t status;
-	
+
 #if ACK == 1
 	rx_skip = id == 0xfe ? 1 : 0;
 	rx_frame_length = 6;
-#else 
+#else
 	rx_skip = 1;
 #endif
-	
+
 	status.id = id;
 	status.error_byte = 0;
-	
+
 	if(!tx_frame_write(id, CMD_ACTION, NULL, 0)) {
 		status.error_bits.bit_tx = 1;
 		return status;
@@ -337,13 +337,13 @@ ServoStatus_t SerialServo_t::sync_write(uint8_t addr, uint8_t *data, uint8_t dat
 	uint8_t frame_size;
 	uint8_t total_size = data_len + 2;
 	uint8_t buf[total_size];
-	
+
 	buf[0] = addr;
 	buf[1] = parameter_len;
 
 	status.id = BROADCAST_ID;
 	status.error_byte = 0;
-	
+
 	for(uint8_t i = 0; i < data_len; i++) {
 		buf[2 + i] = data[i];
 	}
@@ -354,7 +354,7 @@ ServoStatus_t SerialServo_t::sync_write(uint8_t addr, uint8_t *data, uint8_t dat
 	}
 
 	return status;
-} 
+}
 
 ServoStatus_t SerialServo_t::sync_read(uint8_t addr, uint8_t byte_num, uint8_t *id, uint8_t id_num, uint8_t *data)
 {
@@ -383,7 +383,7 @@ ServoStatus_t SerialServo_t::sync_read(uint8_t addr, uint8_t byte_num, uint8_t *
 		if(status.error_bits.bit_rx) {
 			return status;
 		}
-		
+
 		for(uint8_t j = 0; j < byte_num; j++) {
 			data[i * byte_num + j] = rx_packet.elements.args[j];
 		}
@@ -416,9 +416,9 @@ ServoStatus_t SerialServo_t::cali_pos(uint8_t id)
 ServoStatus_t SerialServo_t::select_mode(uint8_t id, uint8_t mode)
 {
 	uint8_t data;
-	
+
 	data = mode;
-	
+
 	return general_write(id, REG_MODE, &data, 1);
 }
 
@@ -435,7 +435,7 @@ ServoStatus_t SerialServo_t::write_pos_offset(uint8_t id, int16_t offset)
 ServoStatus_t SerialServo_t::write_pos(uint8_t id, int16_t pos)
 {
 	uint16_t data;
-	
+
 	pos = LIMIT(pos, -30719, 30719);
 	data = (uint16_t)MASK_HOST(pos, 15);
 
@@ -445,7 +445,7 @@ ServoStatus_t SerialServo_t::write_pos(uint8_t id, int16_t pos)
 ServoStatus_t SerialServo_t::write_acc(uint8_t id, uint8_t acc)
 {
 	uint8_t data;
-	
+
 	data = LIMIT(acc, 0, 254);
 
 	return general_write(id, REG_ACC, &data, sizeof(data));
@@ -454,10 +454,10 @@ ServoStatus_t SerialServo_t::write_acc(uint8_t id, uint8_t acc)
 ServoStatus_t SerialServo_t::write_speed(uint8_t id, int16_t speed)
 {
 	uint16_t data;
-	
+
 	speed = LIMIT(speed, -3400, 3400);
 	data = (uint16_t)MASK_HOST(speed, 15);
-	
+
 	return general_write(id, REG_GOAL_SPEED_L, (uint8_t *)&data, sizeof(data));
 }
 
@@ -467,11 +467,11 @@ ServoStatus_t SerialServo_t::write_pos_ex(uint8_t id, uint8_t acc, int16_t speed
 	uint8_t	_acc;
 	uint16_t _pos;
 	uint16_t _speed;
-	
+
 	acc = LIMIT(acc, 0, 254);
 	speed = LIMIT(speed, -3400, 3400);
 	pos = LIMIT(pos, -30719, 30719);
-	
+
 	_pos = (uint16_t)MASK_HOST(pos, 15);
 
 	data[0] = acc;
@@ -486,19 +486,19 @@ ServoStatus_t SerialServo_t::write_pos_ex(uint8_t id, uint8_t acc, int16_t speed
 ServoStatus_t SerialServo_t::write_pwm_speed(uint8_t id, int16_t speed)
 {
 	uint16_t data;
-	
+
 	speed = LIMIT(speed, -1000, 1000);
 	data = (uint16_t)MASK_HOST(speed, 10);
-	
+
 	return general_write(id, REG_PWM_SPEED_L, (uint8_t *)&data, sizeof(data));
 }
 
 ServoStatus_t SerialServo_t::write_max_torque(uint8_t id, uint16_t torque)
 {
 	uint16_t data;
-	
+
 	data = LIMIT(torque, 0, 1000);
-	
+
 	return general_write(id, REG_MAX_TORQUE_L, (uint8_t *)&data, sizeof(data));
 }
 
@@ -508,14 +508,14 @@ ServoStatus_t SerialServo_t::write_reg_pos_ex(uint8_t id, uint8_t acc, int16_t s
 	uint8_t	_acc;
 	uint16_t _pos;
 	uint16_t _speed;
-	
+
 	acc = LIMIT(acc, 0, 254);
 	speed = LIMIT(speed, -3400, 3400);
 	pos = LIMIT(pos, -30719, 30719);
-	
+
 	_pos = (uint16_t)MASK_HOST(pos, 15);
 	_speed = (uint16_t)MASK_HOST(speed, 15);
-	
+
 	data[0] = acc;
 	word2bytes(_pos, &data[1], &data[2]);
 	data[3] = 0;
@@ -544,14 +544,14 @@ ServoStatus_t SerialServo_t::sync_write_pos_ex(int16_t (*data)[4], uint8_t id_nu
 		status.error_bits.bit_tx = 1;
 		return status;
 	}
-	
+
 	for (uint8_t i = 0; i < id_num; i++)
 	{
 		id = (uint8_t)data[i][0];
 		acc = (uint8_t)data[i][1];
 		speed = (int16_t)data[i][2];
 		pos = (int16_t)data[i][3];
-		
+
 		acc = LIMIT(acc, 0, 254);
 		speed = LIMIT(speed, -3400, 3400);
 		pos = LIMIT(pos, -30719, 30719);
@@ -566,7 +566,7 @@ ServoStatus_t SerialServo_t::sync_write_pos_ex(int16_t (*data)[4], uint8_t id_nu
 		buf[(i * 8) + 5] = 0;
 		word2bytes(u16_speed, &buf[(i * 8) + 6], &buf[(i * 8) + 7]);
 	}
-	
+
 	return sync_write(REG_ACC, buf, sizeof(buf), 7);
 }
 
@@ -580,26 +580,26 @@ ServoStatus_t SerialServo_t::sync_read_cur_pos_ex(uint8_t *id, uint8_t id_num, i
 	uint16_t u16_pos[buf_size];
 	uint16_t u16_speed[buf_size];
 	uint16_t u16_load[buf_size];
-	
+
 	status = sync_read(REG_PRESENT_POSITION_L, byte_len, id, id_num, read_data);
-	
+
 	if(status.error_bits.bit_tx || status.error_bits.bit_rx) {
 		return status;
 	}
-	
+
 	for(uint8_t i = 0; i < id_num; i++) {
 		u16_pos[i] = bytes2word(&read_data[i * byte_len], &read_data[(i * byte_len) + 1]);
 		u16_speed[i] = bytes2word(&read_data[(i * byte_len) + 2 ], &read_data[(i * byte_len) + 3]);
 		u16_load[i] = bytes2word(&read_data[(i * byte_len) + 4], &read_data[(i * byte_len) + 5]);
-		
-		
+
+
 		data[i][0] = (int16_t)MASK_SERVO(u16_pos[i], 15);
 		data[i][1] = (int16_t)MASK_SERVO(u16_speed[i], 15);
 		data[i][2] = (int16_t)MASK_SERVO(u16_load[i], 10);
 		data[i][3] = (int16_t)read_data[(i * byte_len) + 6];
 		data[i][4] = (int16_t)read_data[(i * byte_len) + 7];
 	}
-	
+
 	return status;
 }
 
@@ -617,7 +617,7 @@ ServoStatus_t SerialServo_t::read_pos_offset(uint8_t id, int16_t *offset)
 
 	_offset = bytes2word(data, data + 1);
 	*offset = (int16_t)MASK_SERVO(_offset, 11);
-		
+
 	return  status;
 }
 
@@ -635,13 +635,13 @@ ServoStatus_t SerialServo_t::read_pos(uint8_t id, int16_t *pos)
 
 	_pos = bytes2word(data, data + 1);
 	*pos = (int16_t)MASK_SERVO(_pos, 15);
-	
+
 	return  status;
 }
 
 ServoStatus_t SerialServo_t::read_speed(uint8_t id, int16_t *speed)
 {
-	ServoStatus_t status;	
+	ServoStatus_t status;
 	uint8_t data[2];
 	uint16_t _speed;
 
@@ -653,14 +653,14 @@ ServoStatus_t SerialServo_t::read_speed(uint8_t id, int16_t *speed)
 
 	_speed = bytes2word(data, data + 1);
 	*speed = (int16_t)MASK_SERVO(_speed, 15);
-		
+
 	return  status;
 }
 
 ServoStatus_t SerialServo_t::read_pos_speed(uint8_t id, int16_t *pos, int16_t *speed)
 {
 
-	ServoStatus_t status;	
+	ServoStatus_t status;
 	uint8_t data[4];
 	uint16_t _pos;
 	uint16_t _speed;
@@ -674,7 +674,7 @@ ServoStatus_t SerialServo_t::read_pos_speed(uint8_t id, int16_t *pos, int16_t *s
 
 	_pos = bytes2word(data, data + 1);
 	*pos = (int16_t)MASK_SERVO(_pos, 15);
-		
+
 	_speed = bytes2word(data + 2, data + 3);
 	*speed = (int16_t)MASK_SERVO(_speed, 15);
 
@@ -683,7 +683,7 @@ ServoStatus_t SerialServo_t::read_pos_speed(uint8_t id, int16_t *pos, int16_t *s
 
 ServoStatus_t SerialServo_t::read_temperture(uint8_t id, uint8_t *temp)
 {
-	ServoStatus_t status;	
+	ServoStatus_t status;
 	uint8_t data[1];
 
 	status = general_read(id, REG_PRESENT_TEMPERATURE, data, 1);
@@ -693,13 +693,13 @@ ServoStatus_t SerialServo_t::read_temperture(uint8_t id, uint8_t *temp)
 	}
 
 	*temp = data[0];
-		
+
 	return  status;
 }
 
 ServoStatus_t SerialServo_t::read_voltage(uint8_t id, uint8_t *vol)
 {
-	ServoStatus_t status;	
+	ServoStatus_t status;
 	uint8_t data[1];
 
 	status = general_read(id, REG_PRESENT_VOLTAGE, data, 1);
@@ -709,13 +709,13 @@ ServoStatus_t SerialServo_t::read_voltage(uint8_t id, uint8_t *vol)
 	}
 
 	*vol = data[0];
-		
+
 	return  status;
 }
 
 ServoStatus_t SerialServo_t::read_current(uint8_t id, uint16_t *cur)
 {
-	ServoStatus_t status;	
+	ServoStatus_t status;
 	uint8_t data[2];
 	uint16_t _cur;
 
@@ -727,13 +727,13 @@ ServoStatus_t SerialServo_t::read_current(uint8_t id, uint16_t *cur)
 
 	_cur = bytes2word(data, data + 1);
 	*cur = _cur;
-		
+
 	return  status;
 }
 
 ServoStatus_t SerialServo_t::read_load(uint8_t id, int16_t *load)
 {
-	ServoStatus_t status;	
+	ServoStatus_t status;
 	uint8_t data[2];
 	int16_t _load;
 
@@ -745,13 +745,13 @@ ServoStatus_t SerialServo_t::read_load(uint8_t id, int16_t *load)
 
 	_load = bytes2word(data, data + 1);
 	*load = (int16_t)MASK_SERVO(_load, 10);
-		
+
 	return  status;
 }
 
 ServoStatus_t SerialServo_t::read_moving_status(uint8_t id, uint8_t *moving_status)
 {
-	ServoStatus_t status;	
+	ServoStatus_t status;
 	uint8_t data;
 
 	status = general_read(id, REG_MOVING_STATUS, &data, sizeof(data));
@@ -761,12 +761,12 @@ ServoStatus_t SerialServo_t::read_moving_status(uint8_t id, uint8_t *moving_stat
 	}
 
 	*moving_status = data;
-		
+
 	return  status;
 }
 
-ServoStatus_t SerialServo_t::read_pos_ex(uint8_t id, 
-                                            int16_t *pos, 
+ServoStatus_t SerialServo_t::read_pos_ex(uint8_t id,
+                                            int16_t *pos,
                                             int16_t *speed,
                                             int16_t *load,
                                             uint8_t *vol,
@@ -776,7 +776,7 @@ ServoStatus_t SerialServo_t::read_pos_ex(uint8_t id,
                                             uint16_t *cur)
 {
 
-	ServoStatus_t _status;	
+	ServoStatus_t _status;
 	uint8_t data[13] = {0};
 	uint16_t _pos;
 	uint16_t _speed;
@@ -792,7 +792,7 @@ ServoStatus_t SerialServo_t::read_pos_ex(uint8_t id,
 
 	_pos = bytes2word(data, data + 1);
 	*pos = (int16_t)MASK_SERVO(_pos, 15);
-		
+
 	_speed = bytes2word(data + 2, data + 3);
 	*speed = (int16_t)MASK_SERVO(_speed, 15);
 

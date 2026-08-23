@@ -14,7 +14,7 @@ void SerialEvent()
     uint8_t buff[(const uint8_t)size] = {0};
 
     serial_port.uart->readBytes(buff, size);
-    
+
     xMessageBufferSend(xReceiveBuffer,
                       buff, // 要发送的数据地址
                       size, // 发送 1 个字节
@@ -33,7 +33,7 @@ void SerialPort_t::begin(HardwareSerial& uart, uint32_t baudrate, uint8_t tx_pin
 }
 
 void SerialPort_t::register_ops_callback(ProtocolSuccessCallback cb)
-{   
+{
     protocol.register_success_callback(cb);
 }
 

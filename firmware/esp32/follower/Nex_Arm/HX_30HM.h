@@ -14,7 +14,7 @@
 
 class SerialServo_t {
 public:
-    HardwareSerial* uart; 
+    HardwareSerial* uart;
 
     void begin(HardwareSerial& uart, uint32_t baudrate, uint8_t tx_pin = SERVO_TX_PIN, uint8_t rx_pin = SERVO_RX_PIN);
     void write_id(uint8_t old_id, uint8_t new_id);

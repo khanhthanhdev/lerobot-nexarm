@@ -17,7 +17,7 @@ enum MotorType {
     MOTOR_WITHOUT_ENCODER = 0,
     MOTOR_TT              = 1,
     MOTOR_N20             = 2,
-    MOTOR_JGB37_520       = 3 
+    MOTOR_JGB37_520       = 3
 };
 
 class Motor_I2C {
@@ -25,11 +25,11 @@ public:
     void begin(TwoWire &wire, uint8_t sda_pin, uint8_t scl_pin, MotorType type = MOTOR_JGB37_520, uint8_t polarity = 0);
 
     void set_speed(int8_t m1, int8_t m2, int8_t m3, int8_t m4);
-    
+
     void set_single_speed(uint8_t index, int8_t speed);
 
     void stop();
-    
+
     void read_encoder(int32_t *enc);
     void read_vol(uint16_t *vol);
 

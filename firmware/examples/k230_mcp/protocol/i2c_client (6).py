@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 K230 I2C Master Communication Client
 (K230 I2C 主机通信客户端)
@@ -149,7 +148,7 @@ def _format_detect_result_for_log(result):
                     seen.add(key)
             parts = []
             for key in preferred + remaining:
-                parts.append("%r: %s" % (key, _format_any(value[key])))
+                parts.append("{!r}: {}".format(key, _format_any(value[key])))
             return '{' + ', '.join(parts) + '}'
         if isinstance(value, list):
             return '[' + ', '.join(_format_any(item) for item in value) + ']'
@@ -229,7 +228,7 @@ def _make_i2c_mcp_result_callback(client, pending_state, auto_reply=True):
             'last_fail_log_ms': None,
         })
         client._log(
-            "检测到MCP工具调用，准备自动模拟返回: tool=%s, result=%s" % (
+            "检测到MCP工具调用，准备自动模拟返回: tool={}, result={}".format(
                 tool_name,
                 _format_value_for_log(reply_text),
             )
@@ -263,7 +262,7 @@ def _flush_pending_mcp_replies(client, pending_state):
     if ok:
         queue.pop(0)
         client._log(
-            "MCP模拟返回已发送: tool=%s, result=%s" % (
+            "MCP模拟返回已发送: tool={}, result={}".format(
                 tool_name,
                 _format_value_for_log(reply_text),
             )
@@ -277,7 +276,7 @@ def _flush_pending_mcp_replies(client, pending_state):
         or time.ticks_diff(now, last_fail_log_ms) >= 1000
     ):
         if err_text:
-            client._log("MCP模拟返回发送异常，稍后重试: tool=%s, err=%s" % (tool_name, err_text))
+            client._log("MCP模拟返回发送异常，稍后重试: tool={}, err={}".format(tool_name, err_text))
         else:
             client._log("MCP模拟返回发送失败，稍后重试: tool=%s" % tool_name)
         item['last_fail_log_ms'] = now
@@ -331,7 +330,7 @@ class I2CClient(K230ClientBase):
         ticks_now = time.ticks_ms()
         mono_ms = time.ticks_diff(ticks_now, self._log_start_ms)
         mono_stamp = "%d.%03d" % (mono_ms // 1000, mono_ms % 1000)
-        print("[%s][I2C] %s" % (mono_stamp, msg))
+        print("[{}][I2C] {}".format(mono_stamp, msg))
 
     def _is_ide_interrupt(self, error):
         error_str = str(error)
@@ -462,7 +461,7 @@ class I2CClient(K230ClientBase):
         try:
             meta = self._read_slot_meta(self.SLOT_HOST)
         except Exception as exc:
-            self._log("Recover host slot skipped reason=%s read_error=%s" % (reason, exc))
+            self._log("Recover host slot skipped reason={} read_error={}".format(reason, exc))
             return False
 
         state = meta.get('state', self.SLOT_STATE_EMPTY)
@@ -580,7 +579,7 @@ class I2CClient(K230ClientBase):
                 recovered = self._recover_stale_host_slot('send_cmd_0x%02X' % func_code)
                 if not recovered or not self._wait_slot_empty(self.SLOT_HOST, timeout_ms=50):
                     self._log(
-                        "Host slot busy, skip cmd=0x%02X slot=%s" % (
+                        "Host slot busy, skip cmd=0x{:02X} slot={}".format(
                             func_code,
                             self._describe_slot(self.SLOT_HOST),
                         )
@@ -854,13 +853,13 @@ def _i2c_command_result_text(self, info):
     if info.get('cmd') is None:
         return '未收到设备命令回包'
 
-    text = 'cmd=0x%02X, code=0x%02X(%s)' % (
+    text = 'cmd=0x{:02X}, code=0x{:02X}({})'.format(
         info['cmd'],
         info['code'],
         info['code_name'],
     )
     if info.get('module') is not None:
-        text += ', module=%s(0x%02X)' % (info['module_name'], info['module'])
+        text += ', module={}(0x{:02X})'.format(info['module_name'], info['module'])
     if info.get('subcode') is not None:
         text += ', sub=0x%04X' % info['subcode']
     if info.get('extra') is not None:
@@ -869,7 +868,7 @@ def _i2c_command_result_text(self, info):
 
 
 def _i2c_print_test_return(self, test_name, actual_result):
-    print('[RETURN] %s: %s' % (test_name, self._format_test_value(actual_result)))
+    print('[RETURN] {}: {}'.format(test_name, self._format_test_value(actual_result)))
 
 
 def _i2c_finish_test(self,
@@ -889,11 +888,11 @@ def _i2c_finish_test(self,
         if actual_result is not _TEST_RESULT_UNSET:
             self._print_test_return(test_name, actual_result)
         for problem in problems:
-            print('[ISSUE] %s: %s' % (test_name, problem))
+            print('[ISSUE] {}: {}'.format(test_name, problem))
     elif actual_result is _TEST_RESULT_UNSET:
         print('[OK] %s' % test_name)
     else:
-        print('[OK] %s: %s' % (test_name, self._format_test_value(actual_result)))
+        print('[OK] {}: {}'.format(test_name, self._format_test_value(actual_result)))
     return summary
 
 
@@ -911,7 +910,7 @@ def _i2c_run_success_test(self, test_name, action, expected_success=True):
     info = self._decode_command_result_bytes()
     if actual_success != expected_success:
         problems.append(
-            '成功状态不符合预期: expected=%s, actual=%s, %s' % (
+            '成功状态不符合预期: expected={}, actual={}, {}'.format(
                 expected_success,
                 actual_success,
                 self._command_result_text(info),
@@ -942,7 +941,7 @@ def _i2c_run_tuple_result_test(self,
     info = self._decode_command_result_bytes()
     if actual_success != expected_success:
         problems.append(
-            '成功状态不符合预期: expected=%s, actual=%s, %s' % (
+            '成功状态不符合预期: expected={}, actual={}, {}'.format(
                 expected_success,
                 actual_success,
                 self._command_result_text(info),
@@ -956,7 +955,7 @@ def _i2c_run_tuple_result_test(self,
         expected_value = normalizer(expected_result) if normalizer else expected_result
         if actual_value != expected_value:
             problems.append(
-                '返回值不符合预期: expected=%s, actual=%s' % (
+                '返回值不符合预期: expected={}, actual={}'.format(
                     self._format_test_value(expected_result),
                     self._format_test_value(actual_result),
                 )
@@ -990,7 +989,7 @@ def _i2c_run_value_result_test(self,
     actual_success = info['success'] if info['success'] is not None else (actual_result is not None)
     if actual_success != expected_success:
         problems.append(
-            '成功状态不符合预期: expected=%s, actual=%s, %s' % (
+            '成功状态不符合预期: expected={}, actual={}, {}'.format(
                 expected_success,
                 actual_success,
                 self._command_result_text(info),
@@ -1004,7 +1003,7 @@ def _i2c_run_value_result_test(self,
         expected_value = normalizer(expected_result) if normalizer else expected_result
         if actual_value != expected_value:
             problems.append(
-                '返回值不符合预期: expected=%s, actual=%s' % (
+                '返回值不符合预期: expected={}, actual={}'.format(
                     self._format_test_value(expected_result),
                     self._format_test_value(actual_result),
                 )
@@ -1091,7 +1090,7 @@ def _i2c_test_request_status(self, expected_success=True, timeout_ms=3000):
 
     if actual_success != expected_success:
         problems.append(
-            '成功状态不符合预期: expected=%s, actual=%s' % (
+            '成功状态不符合预期: expected={}, actual={}'.format(
                 expected_success,
                 actual_success,
             )
@@ -1153,7 +1152,7 @@ def _i2c_test_start_asr(self,
     info = self._decode_command_result_bytes()
     if actual_success != expected_success:
         problems.append(
-            '成功状态不符合预期: expected=%s, actual=%s, %s' % (
+            '成功状态不符合预期: expected={}, actual={}, {}'.format(
                 expected_success,
                 actual_success,
                 self._command_result_text(info),
@@ -1164,7 +1163,7 @@ def _i2c_test_start_asr(self,
 
     if expected_result is not _TEST_RESULT_UNSET and actual_result != expected_result:
         problems.append(
-            '返回值不符合预期: expected=%s, actual=%s' % (
+            '返回值不符合预期: expected={}, actual={}'.format(
                 self._format_test_value(expected_result),
                 self._format_test_value(actual_result),
             )
@@ -1547,7 +1546,7 @@ def _run_example_loop(client,
                         report_count = client.report_serial - trace_state.get('stats_window_report_serial', client.report_serial)
                         response_count = client.response_serial - trace_state.get('stats_window_response_serial', client.response_serial)
                         client._log(
-                            "主机统计: loop=%sHz, rx_frame=%sHz, report=%sHz, rsp=%sHz, detect=%sHz, heartbeat=%sHz, last_frame=%s, last_report=%s, last_rsp=%s, last_detect=%s" % (
+                            "主机统计: loop={}Hz, rx_frame={}Hz, report={}Hz, rsp={}Hz, detect={}Hz, heartbeat={}Hz, last_frame={}, last_report={}, last_rsp={}, last_detect={}".format(
                                 _format_rate_text(trace_state.get('stats_loop_count', 0), stats_elapsed_ms),
                                 _format_rate_text(rx_frame_count, stats_elapsed_ms),
                                 _format_rate_text(report_count, stats_elapsed_ms),
@@ -1605,7 +1604,7 @@ def _run_example_loop(client,
                     and time.ticks_diff(now, stable_since) >= hold_ms
                 ):
                     client._log(
-                        "检测到%s已持续 %.1f 秒，执行一次: %s" % (
+                        "检测到{}已持续 {:.1f} 秒，执行一次: {}".format(
                             detect_trigger_action['subject_name'],
                             hold_ms / 1000.0,
                             detect_trigger_action['action_desc'],
@@ -1777,7 +1776,7 @@ def main():
                 if idle_detect_ms is not None and idle_detect_ms >= 3000:
                     extra = ", idle_detect_ms=%d" % idle_detect_ms
                 client._log(
-                    "心跳摘要: mode=%s, run=%s, ready=%s, busy=%s, result=%s, error=%s%s" % (
+                    "心跳摘要: mode={}, run={}, ready={}, busy={}, result={}, error={}{}".format(
                         heartbeat.get('mode_name'),
                         bool(status.get('run')),
                         bool(status.get('ready')),
@@ -1794,7 +1793,7 @@ def main():
             if result.get('success'):
                 return
             client._log(
-                "命令失败: cmd=0x%02X, code=0x%02X(%s), module=%s(0x%02X), sub=0x%04X, extra=%s" % (
+                "命令失败: cmd=0x{:02X}, code=0x{:02X}({}), module={}(0x{:02X}), sub=0x{:04X}, extra={}".format(
                     result['cmd'],
                     result.get('code', 0),
                     result.get('code_name'),

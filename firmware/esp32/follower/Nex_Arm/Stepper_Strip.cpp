@@ -43,7 +43,7 @@ void Stepper_Strip::read_bytes(uint8_t reg, uint8_t *data, uint8_t len) {
     i2c_bus->beginTransmission(STEPPER_ADDR);
     i2c_bus->write(reg);
     if(i2c_bus->endTransmission() != 0) return;
-    
+
     i2c_bus->requestFrom((uint8_t)STEPPER_ADDR, len);
     for(uint8_t i=0; i<len && i2c_bus->available(); i++) {
         data[i] = i2c_bus->read();

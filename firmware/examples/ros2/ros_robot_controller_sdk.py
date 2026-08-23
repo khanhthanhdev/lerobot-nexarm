@@ -17,7 +17,7 @@ class ESP32Cmd:
     BUZZER_SET = 9
     OLED_SET = 10
     GET_CUR_COORDS = 11
-    OLED_ICON = 12 
+    OLED_ICON = 12
     SET_SINGLE_MOTOR = 13
     STOP_ALL_MOTOR = 14
     SET_MOTOR_SPEED = 15
@@ -35,13 +35,13 @@ class ESP32Cmd:
     SET_PEER_MAC = 36
     ARM_MOVE_INC = 50
     ARM_SERVO_SINGLE = 51
-    
+
     GET_CUR_COORDS = 11      # 返回 24 字节 (6轴坐标 + 6个舵机值)
     ARM_MOVE_INC = 50        # 6轴增量控制
-    ARM_ALL_RESET = 54    
+    ARM_ALL_RESET = 54
     SET_MOVE_ACC = 56
     GET_REAL_JOINT_ANGLES = 65  # 返回 24 字节: 6关节 × (pulse + angle_x10)
-    GET_REAL_TCP_POSE = 66      # 返回 14 字节: X,Y,Z,Yaw,Pitch,Roll,Claw (角度×10)   
+    GET_REAL_TCP_POSE = 66      # 返回 14 字节: X,Y,Z,Yaw,Pitch,Roll,Claw (角度×10)
 
 class ServoCmd:
     READ = 2
@@ -80,14 +80,14 @@ class Board:
         self.port.dtr = False
         self.port.setPort(device)
         self.port.open()
-        time.sleep(3.0) 
-        self.port.reset_input_buffer() 
-        
+        time.sleep(3.0)
+        self.port.reset_input_buffer()
+
         # self.state = PacketState.START1
-        self.state = 0 
+        self.state = 0
         self.data_len = 0
         self.recv_count = 0
-        
+
         self.sys_queue = queue.Queue(maxsize=10)
         self.arm_queue = queue.Queue(maxsize=10)
         self.key_queue = queue.Queue(maxsize=10)
@@ -95,13 +95,13 @@ class Board:
         self.real_joint_queue = queue.Queue(maxsize=10)
         self.real_tcp_queue = queue.Queue(maxsize=10)
         self.servo_read_lock = threading.Lock()
-        
+
         time.sleep(0.1)
         threading.Thread(target=self.recv_task, daemon=True).start()
-        
+
     def set_oled_icon(self, icon_id):
         self.buf_write(0xFF, ESP32Cmd.OLED_ICON, struct.pack('<B', int(icon_id)))
-        
+
     def buf_write(self, target_id, cmd, data=[]):
         length = 2 + len(data)
         buf = [0xFF, 0xFF, target_id, length, cmd] + list(data)
@@ -171,18 +171,18 @@ class Board:
                     pass
             else:
                 time.sleep(0.005)
-    
+
     def set_move_acc(self, acc):
         """
-        【新增】：设置底层 10ms 插补算法的起步加速度 
+        【新增】：设置底层 10ms 插补算法的起步加速度
         :param acc: 加速度值 (0~254，0为最快/无缓冲，数值越大缓冲越平滑)
         """
         acc_val = int(acc)
         if acc_val > 254: acc_val = 254
         if acc_val < 0: acc_val = 0
-        
+
         self.buf_write(0xFF, ESP32Cmd.SET_MOVE_ACC, struct.pack('<B', acc_val))
-        
+
     def get_battery(self):
         if not self.enable_recv: return None
         while not self.sys_queue.empty(): self.sys_queue.get()
@@ -216,7 +216,7 @@ class Board:
         if not self.enable_recv: return None
         while not self.arm_queue.empty(): self.arm_queue.get()
         self.buf_write(0xFF, ESP32Cmd.GET_CUR_COORDS)
-        time.sleep(0.1) 
+        time.sleep(0.1)
         last_coords = None
         while not self.arm_queue.empty():
             data = self.arm_queue.get()
@@ -230,7 +230,7 @@ class Board:
     #     # 格式: pitch(h), x(h), y(h), z(h), roll(h), time(h) -> 共12字节
     #     data = struct.pack("<hhhhhh", pitch_val, int(x), int(y), int(z), int(roll), int(time_ms))
     #     self.buf_write(0xFF, ESP32Cmd.COORDINATE_SET, data)
-        
+
     # def arm_move_inc(self, dx, dy, dz, dpitch, droll=0, time_ms=1000):
     #     """5轴坐标增量控制"""
     #     dpitch_val = int(dpitch * 10)
@@ -242,48 +242,48 @@ class Board:
         # 格式: pitch(h), x(h), y(h), z(h), roll(h), claw(h), time(h) -> 14字节
         data = struct.pack("<hhhhhhh", pitch_val, int(x), int(y), int(z), int(roll), int(claw), int(time_ms))
         self.buf_write(0xFF, ESP32Cmd.COORDINATE_SET, data)
-        
+
     def set_arm_coords(self, x, y, z, pitch, roll=0, claw=0, time_ms=1000, calc_only=False):
         pitch_val = int(pitch * 10)
-        
+
         if calc_only:
             if not self.enable_recv: return None
             while not self.arm_queue.empty(): self.arm_queue.get()
-            
+
             data = struct.pack("<hhhhhh", pitch_val, int(x), int(y), int(z), int(roll), int(claw))
             self.buf_write(0xFF, ESP32Cmd.IKINE_RESULT_GET, data)
-            
+
             try:
                 res_data = self.arm_queue.get(timeout=0.2)
                 if len(res_data) >= 24:
                     pose = struct.unpack('<hhhhhh', bytes(res_data[:12]))
                     servos = struct.unpack('<hhhhhh', bytes(res_data[12:24]))
                     return {
-                        "x": pose[1], "y": pose[2], "z": pose[3], 
+                        "x": pose[1], "y": pose[2], "z": pose[3],
                         "pitch": pose[0]/10.0, "roll": pose[4], "claw": pose[5],
                         "servos": list(servos)
                     }
             except queue.Empty:
                 return None
             return None
-            
+
         else:
             # === 2. 正常运动 ===
             data = struct.pack("<hhhhhhh", pitch_val, int(x), int(y), int(z), int(roll), int(claw), int(time_ms))
             self.buf_write(0xFF, ESP32Cmd.COORDINATE_SET, data)
             return True
-    
+
     def get_fk_coords(self, j1, j2, j3, j4, roll=0, claw=0):
         """正运动学计算：传入4个关节角度(度)及roll/claw，计算目标坐标，不运动"""
         if not self.enable_recv: return None
         # 清空队列防止读到旧数据
         while not self.arm_queue.empty(): self.arm_queue.get()
-        
+
         # AT32 期望 12 字节: j1, j2, j3, j4, roll, claw (关节角为了精度放大10倍)
         p1, p2, p3, p4 = int(j1*10), int(j2*10), int(j3*10), int(j4*10)
         data = struct.pack("<hhhhhh", p1, p2, p3, p4, int(roll), int(claw))
         self.buf_write(0xFF, ESP32Cmd.FKINE_RESULT_GET, data)
-        
+
         try:
             # 等待底层返回结果
             res_data = self.arm_queue.get(timeout=0.2)
@@ -291,14 +291,14 @@ class Board:
                 pose = struct.unpack('<hhhhhh', bytes(res_data[:12]))
                 servos = struct.unpack('<hhhhhh', bytes(res_data[12:24]))
                 return {
-                    "x": pose[1], "y": pose[2], "z": pose[3], 
+                    "x": pose[1], "y": pose[2], "z": pose[3],
                     "pitch": pose[0]/10.0, "roll": pose[4], "claw": pose[5],
                     "servos": list(servos)
                 }
         except queue.Empty:
             return None
         return None
-    
+
     def arm_move_inc(self, dx, dy, dz, dpitch, droll=0, dclaw=0, time_ms=1000):
         dpitch_val = int(dpitch * 10)
         # 格式: dx, dy, dz, dpitch, droll, dclaw, time -> 14字节
@@ -309,7 +309,7 @@ class Board:
         # 对应中位机指令 54
         data = struct.pack("<H", int(time_ms))
         self.buf_write(0xFF, 54, data)
-    
+
     # def get_full_state(self):
     #     """
     #     通过运动学接口读取当前位姿及5个舵机的实时脉冲值
@@ -318,10 +318,10 @@ class Board:
     #     if not self.enable_recv: return None
     #     # 清空队列旧数据
     #     while not self.arm_queue.empty(): self.arm_queue.get()
-        
+
     #     # 发送读取指令 (CMD 11)
     #     self.buf_write(0xFF, ESP32Cmd.GET_CUR_COORDS)
-        
+
     #     try:
     #         # 等待底层返回 20 字节数据
     #         data = self.arm_queue.get(timeout=0.5)
@@ -330,9 +330,9 @@ class Board:
     #             pose = struct.unpack('<hhhhh', bytes(data[:10]))
     #             # 解析后10字节：5个舵机脉冲 (ID 1-5)
     #             servos = struct.unpack('<hhhhh', bytes(data[10:20]))
-                
+
     #             return {
-    #                 "x": pose[0], "y": pose[1], "z": pose[2], 
+    #                 "x": pose[0], "y": pose[1], "z": pose[2],
     #                 "pitch": pose[3]/10.0, "roll": pose[4],
     #                 "servos": list(servos) # [s1, s2, s3, s4, s5]
     #             }
@@ -365,7 +365,7 @@ class Board:
         except queue.Empty:
             return None
         return None
-    
+
     def get_arm_servos(self):
         """专门用于快速获取6个舵机当前脉冲位置的简易函数"""
         res = self.get_full_state()
@@ -423,7 +423,7 @@ class Board:
         except queue.Empty:
             return None
         return None
-    
+
     def arm_move_servo_single(self, servo_id, pos, time_ms=1000):
         data = struct.pack("<BhH", int(servo_id), int(pos), int(time_ms))
         self.buf_write(0xFF, ESP32Cmd.ARM_SERVO_SINGLE, data)
@@ -485,10 +485,10 @@ class Board:
 
     def espnow_set_channel(self, channel):
         self.buf_write(0xFF, ESP32Cmd.SET_ESPNOW_CHANNEL, struct.pack('<B', channel))
-        
+
     def espnow_set_global_acc(self, acc):
         self.buf_write(0xFF, ESP32Cmd.SET_GLOBAL_ACC, struct.pack('<B', acc))
-        
+
     def espnow_sync_ctrl(self, enable):
         self.buf_write(0xFF, ESP32Cmd.ESPNOW_SYNC_CTRL, struct.pack('<B', 1 if enable else 0))
 
@@ -496,7 +496,7 @@ class Board:
 # ================== 综合功能测试套件 ==================
 def run_robot_comprehensive_test(board, servo_id=1):
     print("\n================== 机械臂硬件与运动学综合测试启动 ==================")
-    
+
     # --- 1. 读取基础信息 ---
     print("\n[1] 系统与状态读取测试")
     vol_mv = board.get_battery()
@@ -520,7 +520,7 @@ def run_robot_comprehensive_test(board, servo_id=1):
     print(" -> 增量坐标指令: Z轴上升 30mm, 俯仰角增加 5度，耗时 1500ms ...")
     board.arm_move_inc(dx=0, dy=0, dz=30, dpitch=5, time_ms=1500)
     time.sleep(2.0)
-    
+
     # 获取移动后的新坐标
     coords_new = board.get_arm_coords()
     if coords_new:
@@ -531,19 +531,19 @@ def run_robot_comprehensive_test(board, servo_id=1):
     print(f" -> 控制舵机 {servo_id} 运动到位置 800 (加加速度=50, 速度=1200)...")
     board.bus_servo_set_position(servo_id, position=800, acc=50, speed=1200)
     time.sleep(2.0)
-    
+
     print(f" -> 请求读取舵机 {servo_id} 的实时返回角度...")
     pos = board.bus_servo_read_position(servo_id)
     if pos is not None:
         print(f" -> [成功] 返回的舵机角度: {pos}")
     else:
         print(" -> [警告] 获取舵机角度超时。（注：目前的ESP32固件在C++层面可能未将舵机透传数据推送到USB，SDK端已完美适配并开放该函数）")
-        
+
     # 读取温度和电压
     temp = board.bus_servo_read_temperature(servo_id)
     if temp is not None:
         print(f" -> [成功] 返回的舵机温度: {temp} °C")
-        
+
     # 舵机回中
     board.bus_servo_set_position(servo_id, position=0, acc=100, speed=2500)
     time.sleep(1.0)
@@ -583,7 +583,7 @@ def run_robot_comprehensive_test(board, servo_id=1):
     print(" -> 停止麦轮...")
     board.set_mecanum(0, 0, 0)
     time.sleep(0.5)
-    
+
     print(" -> 履带底盘: 原地转向 (转速 40)...")
     board.set_tank(0, 40)
     time.sleep(1.5)
@@ -595,13 +595,13 @@ def run_robot_comprehensive_test(board, servo_id=1):
 
 
 if __name__ == "__main__":
-    board = Board(device="/dev/rrc") 
+    board = Board(device="/dev/rrc")
     board.enable_reception(True)
-    
+
     print("程序已启动，正在等待串口初始化...")
     time.sleep(1)
     # board.set_move_acc(20)  #
-    
+
     # 用一声蜂鸣声提示准备就绪
     board.set_buzzer(freq=2500, on_time_s=0.2, off_time_s=0.0, repeat=1)
     board.set_arm_coords(x=200, y=0, z=200, pitch=0, time_ms=500)

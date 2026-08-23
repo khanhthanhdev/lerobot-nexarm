@@ -207,7 +207,8 @@ class NexArmFollower(Robot):
                     self.bus.write_positions(positions)
                     time.sleep(0.4)
                 except Exception:
-                    pass
+                    logger.debug("Failed to hold NexArm position before torque-off.", exc_info=True)
+
                 self.bus.set_torque(False)
 
         with contextlib.suppress(Exception):

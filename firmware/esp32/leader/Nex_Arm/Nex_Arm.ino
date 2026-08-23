@@ -15,14 +15,14 @@
 
 typedef struct __attribute__((packed)) {
     uint32_t seq;
-    int16_t pos[6]; 
+    int16_t pos[6];
 } ArmPacket_t;
 
 ArmPacket_t txPacket;
 uint8_t broadcastMac[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-uint8_t idList[6] = {1, 2, 3, 4, 5, 6}; 
+uint8_t idList[6] = {1, 2, 3, 4, 5, 6};
 unsigned long lastSendTime = 0;
-unsigned long lastDebugTime = 0; 
+unsigned long lastDebugTime = 0;
 
 bool isJoystickMode = false;
 float current_x = 200.0;
@@ -120,8 +120,8 @@ void setup() {
     pinMode(JOYSTICK_X_PIN, INPUT);
     pinMode(JOYSTICK_Y_PIN, INPUT);
 
-    servo.begin(Serial1, 1000000, 17, 16); 
-    
+    servo.begin(Serial1, 1000000, 17, 16);
+
     // ESPNow 初始化
     WiFi.mode(WIFI_STA);
     WiFi.disconnect();
@@ -135,7 +135,7 @@ void setup() {
 
     esp_now_peer_info_t peerInfo = {};
     memcpy(peerInfo.peer_addr, broadcastMac, 6);
-    peerInfo.channel = WIFI_CHANNEL;  
+    peerInfo.channel = WIFI_CHANNEL;
     peerInfo.encrypt = false;
     esp_now_add_peer(&peerInfo);
 
@@ -211,7 +211,7 @@ void loop() {
         if (isJoystickMode) {
             int joyX = analogRead(JOYSTICK_X_PIN);
             int joyY = analogRead(JOYSTICK_Y_PIN);
-            
+
             if (abs(joyY - joy_center_y) < 100) {
                 joyY = joy_center_y;
             }
@@ -234,15 +234,15 @@ void loop() {
 
             uint8_t packet[20];
             packet[0] = 0xFF; packet[1] = 0xFF; packet[2] = 0xFF;
-            packet[3] = 0x10; 
-            packet[4] = 0x08; 
-            
+            packet[3] = 0x10;
+            packet[4] = 0x08;
+
             int16_t x = (int16_t)current_x;
             int16_t y = (int16_t)current_y;
             int16_t z = (int16_t)current_z;
-            int16_t pitch = (int16_t)(current_pitch * 10); 
-            int16_t roll = (int16_t)(current_roll * 10);   
-            int16_t claw = 0;  
+            int16_t pitch = (int16_t)(current_pitch * 10);
+            int16_t roll = (int16_t)(current_roll * 10);
+            int16_t claw = 0;
             uint16_t time = 0;
 
             packet[5]  = pitch & 0xFF; packet[6]  = (pitch >> 8) & 0xFF;
@@ -250,12 +250,12 @@ void loop() {
             packet[9]  = y & 0xFF;     packet[10] = (y >> 8) & 0xFF;
             packet[11] = z & 0xFF;     packet[12] = (z >> 8) & 0xFF;
             packet[13] = roll & 0xFF;  packet[14] = (roll >> 8) & 0xFF;
-            packet[15] = claw & 0xFF;  packet[16] = (claw >> 8) & 0xFF; 
-            packet[17] = time & 0xFF;  packet[18] = (time >> 8) & 0xFF; 
-            
+            packet[15] = claw & 0xFF;  packet[16] = (claw >> 8) & 0xFF;
+            packet[17] = time & 0xFF;  packet[18] = (time >> 8) & 0xFF;
+
             uint8_t sum = 0;
             for(int i=2; i<=18; i++) sum += packet[i];
-            packet[19] = ~sum; 
+            packet[19] = ~sum;
 
             esp_now_send(broadcastMac, packet, 20);
 
@@ -263,15 +263,15 @@ void loop() {
              // 示教模式：逐个 ID 读，异常不影响其他舵机
              ArmPacket_t teachPacket;
              teachPacket.seq = currentMillis;
-             
+
              for(int i = 0; i < 6; i++) {
                  int16_t pos = 0;
                  ServoStatus_t status = servo.read_pos(i + 1, &pos);
-                 
+
                  if (status.error_bits.bit_rx == 0 && status.error_bits.bit_tx == 0 && pos != 0) {
                      last_valid_pos[i] = pos;
                  } else if (currentMillis - lastDebugTime > 1000) {
-                     Serial.printf("[WARN] ID%d read fail rx=%d tx=%d pos=%d\n", 
+                     Serial.printf("[WARN] ID%d read fail rx=%d tx=%d pos=%d\n",
                                    i+1, status.error_bits.bit_rx, status.error_bits.bit_tx, pos);
                  }
                  delayMicroseconds(200);
@@ -283,7 +283,7 @@ void loop() {
                      last_valid_pos[3], last_valid_pos[4], last_valid_pos[5]);
                  lastDebugTime = currentMillis;
              }
-             
+
              for(int i = 0; i < 6; i++) {
                  teachPacket.pos[i] = last_valid_pos[i];
              }

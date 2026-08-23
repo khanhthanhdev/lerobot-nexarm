@@ -6,7 +6,7 @@
  * ESP32 直接连 HX 舵机总线（Serial1）
  * USB Serial (Serial) 和 PC 通信，1Mbps
  * 上电关力矩，PC 发命令读位置
- * 
+ *
  * CMD 96: 读 6 个舵机位置 → 返回 12 字节
  * CMD 97: 写 6 个舵机位置（12 字节）
  * CMD 98: torque 控制（1 字节：0=关, 1=开）

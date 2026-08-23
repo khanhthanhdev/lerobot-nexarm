@@ -51,7 +51,7 @@ void CommProtocol_t::parsing(uint8_t *data, uint16_t len) {
                 if(current_byte == FRAME_HEADER_2) parsing_state = PARSING_ID;
                 else parsing_state = PARSING_HEADER_1;
                 break;
-            case PARSING_ID: 
+            case PARSING_ID:
                 rx_packet.elements.id = current_byte;
                 parsing_state = PARSING_DATA_LENGTH;
                 break;
@@ -70,7 +70,7 @@ void CommProtocol_t::parsing(uint8_t *data, uint16_t len) {
                 rx_packet.elements.args[arg_count++] = current_byte;
                 if(arg_count == rx_packet.elements.length - 2) parsing_state = PARSING_CHECKSUM;
                 break;
-            case PARSING_CHECKSUM: 
+            case PARSING_CHECKSUM:
                 uint8_t check = checksum_crc8(rx_packet.data_raw, rx_packet.elements.length + 1);
                 if(check == current_byte) {
                     /* 必须在阻塞型 successCallback（如动作组播放）返回前复位状态，

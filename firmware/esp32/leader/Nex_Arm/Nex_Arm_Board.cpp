@@ -71,11 +71,11 @@ void Bat_t::update()
     if(filter_buf[WINDOWS_SIZE - 1] != 0) {
         for (uint8_t i = 0; i < WINDOWS_SIZE; i++) {
             sum += filter_buf[i];
-        }    
+        }
 
         voltage = sum / WINDOWS_SIZE;
     }
- 
+
     // ESP_LOGI(TAG, "voltage: %d\n", voltage);
 }
 
@@ -111,35 +111,35 @@ void Buzzer_t::update()
     case BUZZER_STAGE_START_NEW_CYCLE:
         if(ticks_on > 0) {
             tone(BUZZER_PIN, freq);
-            if(ticks_off > 0) {  
+            if(ticks_off > 0) {
                 ticks_count = 0;
-                stage = BUZZER_STAGE_WATTING_OFF; 
+                stage = BUZZER_STAGE_WATTING_OFF;
             }
             else {
-                stage = BUZZER_STAGE_IDLE; 
+                stage = BUZZER_STAGE_IDLE;
             }
         }
-        else { 
+        else {
             noTone(BUZZER_PIN);
-            stage = BUZZER_STAGE_IDLE; 
+            stage = BUZZER_STAGE_IDLE;
         }
         break;
-        
+
     case BUZZER_STAGE_WATTING_OFF:
         ticks_count += update_period;
-        if(ticks_count >= ticks_on) { 
+        if(ticks_count >= ticks_on) {
             noTone(BUZZER_PIN);
             stage = BUZZER_STAGE_WATTING_PERIOD_END;
         }
         break;
 
-    case BUZZER_STAGE_WATTING_PERIOD_END: 
+    case BUZZER_STAGE_WATTING_PERIOD_END:
         ticks_count += update_period;
         if(ticks_count >= (ticks_off + ticks_on)) {
             ticks_count -= (ticks_off + ticks_on);
-            if(times == 1) { 
+            if(times == 1) {
                 noTone(BUZZER_PIN);
-                stage = BUZZER_STAGE_IDLE;  
+                stage = BUZZER_STAGE_IDLE;
             }
             else {
                 tone(BUZZER_PIN, freq);
@@ -155,7 +155,7 @@ void Buzzer_t::update()
     default:
         break;
     }
-}    
+}
 
 void Buzzer_t::begin()
 {
@@ -234,7 +234,7 @@ void HW_Board::list_action_group_dir()
   while(file) {
     if(file.isDirectory()) {
       ESP_LOGI("Robot", "DIR:%s\n", file.name());
-    } 
+    }
     else {
       ESP_LOGI("Robot", "FILE:%s SIZE: %d\n", file.name(), file.size());
     }
@@ -257,7 +257,7 @@ void HW_Board::action_group_run(uint8_t id)
   File file = SPIFFS.open("/ActionGroup" + String(id) + ".rob", FILE_READ);
   if(!file) {
     ESP_LOGI("Robot", "Failed to open file for reading\n");
-  }  
+  }
 
   while(file.available()) {
     switch(act_state) {
@@ -270,14 +270,14 @@ void HW_Board::action_group_run(uint8_t id)
         file.read(buf, sizeof(buf));
         control_num = buf[1];
         frame_index = buf[0];
-        move_time = BYTE_TO_HW(buf[3], buf[2]); 
+        move_time = BYTE_TO_HW(buf[3], buf[2]);
         if(id == 0) {
           Serial.printf("$$>%d<$$", frame_index);
         }
         ESP_LOGI("Robot", "id: %d frame_num: %d frame_index: %d control_num: %d move_time: %d\n", id, act_read_frame_num, frame_index, control_num, move_time);
         for(uint8_t i = 0; i < control_num; i++) {
           // servos[i].id = buf[4 + i * 3];
-          // servos[i].duty = BYTE_TO_HW(buf[6 + i * 3], buf[5 + i * 3]); 
+          // servos[i].duty = BYTE_TO_HW(buf[6 + i * 3], buf[5 + i * 3]);
           // ESP_LOGI("Robot", "id: %d duty: %d\n",  servos[i].id, servos[i].duty);
         }
         // servo.multi_set(servos, control_num, move_time);
@@ -292,7 +292,7 @@ void HW_Board::action_group_run(uint8_t id)
 
       default:
         break;
-    }  
+    }
 
     if(act_state == ACT_STOP) {
       break;
@@ -315,7 +315,7 @@ bool HW_Board::action_group_download(uint8_t id, uint8_t *data, size_t length)
 
   if(frame_index > 254) {
     ESP_LOGI("Robot", "Frame index error!\n");
-    return false;    
+    return false;
   }
 
   if(frame_index == 1) {
@@ -367,4 +367,4 @@ bool HW_Board::action_group_erase(uint8_t id)
 void HW_Board::action_group_stop(void)
 {
     act_state = ACT_STOP;
-} 
+}

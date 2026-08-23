@@ -65,7 +65,9 @@ def main():
     )
 
     cmd = [
-        sys.executable, "-m", "lerobot.scripts.lerobot_record",
+        sys.executable,
+        "-m",
+        "lerobot.scripts.lerobot_record",
         "--robot.type=nexarm_follower",
         f"--robot.port={args.follower_port}",
         f"--robot.cameras={cameras_json}",

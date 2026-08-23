@@ -21,6 +21,7 @@ Geometrically, this main chain can be described as a vertical support $L_1$ betw
 Regarding angle definitions, $\theta_2$ represents the angle of $L_2$ relative to the horizontal reference line. The angle $\theta_3$ represents the angle from a reference line parallel to $L_2$ to the link $L_3$ at the offset endpoint. The angle $\theta_4$ represents the angle from the extension direction of $L_3$ to $L_4$. The angle $\alpha$ represents the absolute directional angle of the end link $L_4$ relative to the horizontal reference line.
 
 Based on these definitions, the directional relationships of each link are represented as:
+
 $$
 \mathrm{dir}(L_2)=\theta_2
 $$
@@ -147,6 +148,7 @@ These equations provide the position solution in the side-view working plane. Th
 The aforementioned derivations are based on the side-view working plane, whereas the robotic arm actually operates in three-dimensional space. To obtain the real spatial coordinates of the end-effector, the results from the working plane must be mapped to the three-dimensional coordinate system.
 
 Specifically, the horizontal extension in the working plane is projected onto the spatial coordinate system through the base rotation angle $\theta_1$ to obtain the positions in the $x$ and $y$ directions. The height component in the plane directly corresponds to the $z$ direction in the spatial coordinates. The spatial coordinates are expressed as:
+
 $$
 x = length \cos(-\theta_1)
 $$
@@ -166,8 +168,6 @@ $$
 \rightarrow
 (x,y,z,\alpha)
 $$
-
-
 
 ## 3.2 Inverse Kinematics Introduction
 
@@ -324,6 +324,7 @@ $$
 <img class="common_img" src="../_static/media/chapter_3/section_2/media/image6.png" style="width:600px"/>
 
 The absolute direction of the third link can be written as:
+
 $$
 \theta_2 + \theta_3
 $$
@@ -370,8 +371,6 @@ $$
 
 Angle recovery is required because the law of cosines only directly provides the equivalent geometric relationships. In contrast, the physical robotic arm has the offset correction angle $\delta$ and the end-effector pose constraint $\alpha = \theta_2 + \theta_3 + \theta_4$. Only by combining these constraints can the joint angles in the physical mechanical structure be obtained from the geometric angles in the equivalent triangle to generate executable inverse solutions.
 
-
-
 ## 3.3 Serial Protocol Analysis
 
 A serial protocol is a set of rules followed by devices during data exchange through serial communication. It typically specifies aspects such as data transmission format, data length, functional identification, parameter content, and checksum methods. Devices like microcontrollers, sensors, servo driver boards, and vision modules often use serial protocols to complete command transmission and data feedback.
@@ -382,29 +381,29 @@ This section introduces details regarding the host-device relationship of the Ne
 
 #### 3.3.1.1 NexArm as the Device
 
-1) Receive and parse signals transmitted from the host:
+1. Receive and parse signals transmitted from the host:
 
 Wait for serial signals. If data is received on the serial port, parse the serial data according to the communication protocol to call the corresponding functions based on the data information.
 
-2) Invoke NexArm functions according to the received data:
+2. Invoke NexArm functions according to the received data:
 
 Once the signal is parsed, the corresponding functions of the NexArm device must be called. This includes retrieving the firmware version or controlling the buzzer.
 
-3) Data packaging and feedback:
+3. Data packaging and feedback:
 
 Upon receiving a read command, the corresponding read function is called. The retrieved data is then packaged into a data packet according to the communication protocol and sent to the host device.
 
 #### 3.3.1.2 External Systems as Hosts
 
-1) Command packaging and transmission:
+1. Command packaging and transmission:
 
 The host needs to package control commands and data into data packets according to the communication protocol and send them to the device.
 
-2) Control coordination:
+2. Control coordination:
 
 The host device must coordinate the collaborative operation of the entire system to ensure that communication and operations between the NexArm and other devices are conflict-free to maintain optimal working states.
 
-3) Data reception:
+3. Data reception:
 
 When the host reads the robot status, it must receive the status data transmitted by the NexArm after sending a read command. This step ensures data integrity and correctness, followed by parsing the data packets to extract useful information.
 
@@ -418,53 +417,51 @@ Use a USB data cable to connect the host to the USB serial port on the NexArm co
 
 <img class="common_img" src="../_static/media/chapter_1/section_3/media/image29.png" style="width:600px">
 
-
-
 ### 3.3.3 Data Transmission Format
 
 #### 3.3.3.1 Serial Port Parameters
 
 The default UART serial port data transmission configuration for the NexArm is as follows:
 
-| Parameter | Value |
-| :----: | :-----: |
-| Baud Rate | 1000000 |
-| Data Bits |    8    |
+| Parameter  |  Value  |
+| :--------: | :-----: |
+| Baud Rate  | 1000000 |
+| Data Bits  |    8    |
 | Parity Bit |  None   |
-| Stop Bits |    1    |
+| Stop Bits  |    1    |
 
 #### 3.3.3.2 Data Frame Format
 
 When the NexArm communicates with host devices, a unified data frame format must be followed. Only by transmitting, receiving, and parsing data in accordance with the agreed protocol can both parties correctly identify and process the communication content. Any multi-byte integers, such as 16-bit or 32-bit integers, utilize **little-endian byte order**, placing the least significant byte first.
 
-| Header 1 | Header 2 | Identifier | Data Length | Function Number | Parameter | Checksum |
-| :----: | :-----: | :-----: | :-----: | :-----: | :-----: | :-----: |
-| 0xFF | 0xFF | ID | Length | CMD | Parameter 1 ...Parameter N | Check |
+| Header 1 | Header 2 | Identifier | Data Length | Function Number |         Parameter          | Checksum |
+| :------: | :------: | :--------: | :---------: | :-------------: | :------------------------: | :------: |
+|   0xFF   |   0xFF   |     ID     |   Length    |       CMD       | Parameter 1 ...Parameter N |  Check   |
 
-* **Header:** The reception of two consecutive `0xFF` bytes indicates that a data packet has arrived.
-* **Identifier:** `0xFF` represents system commands processed by the control board. The range from `0x01` to `0x06` represents transparent transmission commands forwarded to specific servos.
-* **Data Length:** Calculated as `2 + number of parameter bytes`, which equals the sum of the CMD byte, parameter bytes, and checksum byte.
-* **Function Number:** Used to indicate the purpose of an information frame.
-* **Parameter:** Represents the data information being transmitted.
-* **Checksum:** Calculated by accumulating bytes starting from the ID to the last parameter, taking the lower 8 bits, and then performing a bitwise NOT operation. The formula is `Sum = ~(ID + Len + CMD + ParameterN) & 0xFF`.
+- **Header:** The reception of two consecutive `0xFF` bytes indicates that a data packet has arrived.
+- **Identifier:** `0xFF` represents system commands processed by the control board. The range from `0x01` to `0x06` represents transparent transmission commands forwarded to specific servos.
+- **Data Length:** Calculated as `2 + number of parameter bytes`, which equals the sum of the CMD byte, parameter bytes, and checksum byte.
+- **Function Number:** Used to indicate the purpose of an information frame.
+- **Parameter:** Represents the data information being transmitted.
+- **Checksum:** Calculated by accumulating bytes starting from the ID to the last parameter, taking the lower 8 bits, and then performing a bitwise NOT operation. The formula is `Sum = ~(ID + Len + CMD + ParameterN) & 0xFF`.
 
 ### 3.3.5 Functional Command Analysis
 
 #### 3.3.5.1 Basic System Commands
 
-1) **Firmware Version Inquiry with function number 0x01:** Used to retrieve the firmware version of the controller.
+1. **Firmware Version Inquiry with function number 0x01:** Used to retrieve the firmware version of the controller.
 
 **Data Sent by Host:**
 
 | Header 1 | Header 2 | Identifier | Data Length | Function Number | Parameter | Checksum |
-| :----: | :-----: | :-----: | :-----: | :-----: | :-----: | :-----: |
-| 0xFF | 0xFF | 0xFF | 0x02 | 0x01 | / | 0xFD |
+| :------: | :------: | :--------: | :---------: | :-------------: | :-------: | :------: |
+|   0xFF   |   0xFF   |    0xFF    |    0x02     |      0x01       |     /     |   0xFD   |
 
 **Data Returned by Device:**
 
-| Header 1 | Header 2 | Identifier | Data Length | Function Number | Parameter | Checksum |
-| :----: | :-----: | :-----: | :-----: | :-----: | :-----: | :-----: |
-| 0xFF | 0xFF | 0xFF | 0x03 | 0x01 | Version number (3byte) | Check |
+| Header 1 | Header 2 | Identifier | Data Length | Function Number |       Parameter        | Checksum |
+| :------: | :------: | :--------: | :---------: | :-------------: | :--------------------: | :------: |
+|   0xFF   |   0xFF   |    0xFF    |    0x03     |      0x01       | Version number (3byte) |  Check   |
 
 Example: Querying the firmware version. If the returned data is `01 00 00`, it indicates version 1.0.0.
 
@@ -472,21 +469,19 @@ Example: Querying the firmware version. If the returned data is `01 00 00`, it i
 FF FF FF 02 01 FD
 ```
 
-
-
-2) **Battery Voltage Inquiry with function number 0x02:** Used to retrieve power voltage data in mV.
+2. **Battery Voltage Inquiry with function number 0x02:** Used to retrieve power voltage data in mV.
 
 **Data Sent by Host:**
 
 | Header 1 | Header 2 | Identifier | Data Length | Function Number | Parameter | Checksum |
-| :----: | :-----: | :-----: | :-----: | :-----: | :-----: | :-----: |
-| 0xFF | 0xFF | 0xFF | 0x02 | 0x02 | / | 0xFC |
+| :------: | :------: | :--------: | :---------: | :-------------: | :-------: | :------: |
+|   0xFF   |   0xFF   |    0xFF    |    0x02     |      0x02       |     /     |   0xFC   |
 
 **Data Returned by Slave:**
 
-| Header 1 | Header 2 | Identifier | Data Length | Function Number | Parameter | Checksum |
-| :----: | :-----: | :-----: | :-----: | :-----: | :-----: | :-----: |
-| 0xFF | 0xFF | 0xFF | 0x04 | 0x02 | Power voltage (2bytes) | Check |
+| Header 1 | Header 2 | Identifier | Data Length | Function Number |       Parameter        | Checksum |
+| :------: | :------: | :--------: | :---------: | :-------------: | :--------------------: | :------: |
+|   0xFF   |   0xFF   |    0xFF    |    0x04     |      0x02       | Power voltage (2bytes) |  Check   |
 
 Example: Querying the battery voltage. If the returned data is `E0 1F`, it represents `0x1FE0`, which equals 8160mV in little-endian mode.
 
@@ -494,16 +489,13 @@ Example: Querying the battery voltage. If the returned data is `E0 1F`, it repre
 FF FF FF 02 02 FC
 ```
 
-
-
-
-3) **Buzzer Control with function number 0x09:** Used to control the buzzer on-time, off-time, cycle count, and sounding frequency.
+3. **Buzzer Control with function number 0x09:** Used to control the buzzer on-time, off-time, cycle count, and sounding frequency.
 
 **Data Sent by Host:**
 
-| Header 1 | Header 2 | Identifier | Data Length | Function Number | Parameter | Checksum |
-| :----: | :-----: | :-----: | :-----: | :-----: | :-----: | :-----: |
-| 0xFF | 0xFF | 0xFF | 0x0E | 0x09 | On-time(4bytes) + Off-time(4bytes)  + Count (2bytes) + Frequency (2bytes) | Check |
+| Header 1 | Header 2 | Identifier | Data Length | Function Number |                                Parameter                                 | Checksum |
+| :------: | :------: | :--------: | :---------: | :-------------: | :----------------------------------------------------------------------: | :------: |
+|   0xFF   |   0xFF   |    0xFF    |    0x0E     |      0x09       | On-time(4bytes) + Off-time(4bytes) + Count (2bytes) + Frequency (2bytes) |  Check   |
 
 Example: Controlling the buzzer to sound for 100ms, pause for 100ms, repeat for 2 cycles, at a frequency of 2000Hz.
 
@@ -513,25 +505,25 @@ FF FF FF 0E 09 64 00 00 00 64 00 00 00 02 00 D0 07 48
 
 #### 3.3.5.2 Coordinate and Kinematics Control Commands
 
-1) **Coordinate Setting with function number 0x08:** Used to transmit the end-effector target coordinates and pose to the robotic arm. The inverse kinematics solution is completed by the underlying system.
+1. **Coordinate Setting with function number 0x08:** Used to transmit the end-effector target coordinates and pose to the robotic arm. The inverse kinematics solution is completed by the underlying system.
 
 **Data Sent by Host:**
 
-| Header 1 | Header 2 | Identifier | Data Length | Function Number | Parameter | Checksum |
-| :----: | :-----: | :-----: | :-----: | :-----: | :-----: | :-----: |
-| 0xFF | 0xFF | 0xFF | 0x10 | 0x08 | Pitch(2bytes) + X(2bytes) + Y(2bytes) + Z(2bytes) + Roll(2bytes) + Claw(2bytes) + Time(2bytes) | Check |
+| Header 1 | Header 2 | Identifier | Data Length | Function Number |                                           Parameter                                            | Checksum |
+| :------: | :------: | :--------: | :---------: | :-------------: | :--------------------------------------------------------------------------------------------: | :------: |
+|   0xFF   |   0xFF   |    0xFF    |    0x10     |      0x08       | Pitch(2bytes) + X(2bytes) + Y(2bytes) + Z(2bytes) + Roll(2bytes) + Claw(2bytes) + Time(2bytes) |  Check   |
 
 The parameters are described as follows:
 
-| Parameter Name | Type | Description |
-| :----: | :----: | :----- |
-| Pitch | int16 | The pitch angle of the end-effector in degrees |
-| X | int16 | The X coordinate of the end-effector in mm |
-| Y | int16 | The Y coordinate of the end-effector in mm |
-| Z | int16 | The Z coordinate of the end-effector in mm |
-| Roll | int16 | The roll angle of the end-effector in degrees |
-| Claw | int16 | The target opening and closing angle of the gripper in degrees |
-| Time | uint16 | The movement duration in ms |
+| Parameter Name |  Type  | Description                                                    |
+| :------------: | :----: | :------------------------------------------------------------- |
+|     Pitch      | int16  | The pitch angle of the end-effector in degrees                 |
+|       X        | int16  | The X coordinate of the end-effector in mm                     |
+|       Y        | int16  | The Y coordinate of the end-effector in mm                     |
+|       Z        | int16  | The Z coordinate of the end-effector in mm                     |
+|      Roll      | int16  | The roll angle of the end-effector in degrees                  |
+|      Claw      | int16  | The target opening and closing angle of the gripper in degrees |
+|      Time      | uint16 | The movement duration in ms                                    |
 
 Example: Controlling the robotic arm to move to the designated position in 1000ms, with parameters `Pitch=0`, `X=200`, `Y=100`, `Z=200`, `Roll=0`, `Claw=0`, and `Time=1000ms`.
 
@@ -539,21 +531,19 @@ Example: Controlling the robotic arm to move to the designated position in 1000m
 FF FF FF 10 08 00 00 C8 00 64 00 C8 00 00 00 00 00 E8 03 09
 ```
 
-
-
-2) **Current Coordinate Inquiry with function number 0x0B:** Used to retrieve the current coordinates of the robotic arm end-effector.
+2. **Current Coordinate Inquiry with function number 0x0B:** Used to retrieve the current coordinates of the robotic arm end-effector.
 
 **Data Sent by Host:**
 
 | Header 1 | Header 2 | Identifier | Data Length | Function Number | Parameter | Checksum |
-| :----: | :-----: | :-----: | :-----: | :-----: | :-----: | :-----: |
-| 0xFF | 0xFF | 0xFF | 0x02 | 0x0B | / | 0xF3 |
+| :------: | :------: | :--------: | :---------: | :-------------: | :-------: | :------: |
+|   0xFF   |   0xFF   |    0xFF    |    0x02     |      0x0B       |     /     |   0xF3   |
 
 **Data Returned by Device:**
 
-| Header 1 | Header 2 | Identifier | Data Length | Function Number | Parameter | Checksum |
-| :----: | :-----: | :-----: | :-----: | :-----: | :-----: | :-----: |
-| 0xFF | 0xFF | 0x5A | 0x08 | 0x0B | X(2bytes) + Y(2bytes) + Z(2bytes) | Check |
+| Header 1 | Header 2 | Identifier | Data Length | Function Number |             Parameter             | Checksum |
+| :------: | :------: | :--------: | :---------: | :-------------: | :-------------------------------: | :------: |
+|   0xFF   |   0xFF   |    0x5A    |    0x08     |      0x0B       | X(2bytes) + Y(2bytes) + Z(2bytes) |  Check   |
 
 Example: Inquiring the current coordinates of the robotic arm.
 
@@ -561,27 +551,25 @@ Example: Inquiring the current coordinates of the robotic arm.
 FF FF FF 02 0B F3
 ```
 
-
-
-3) **Coordinate Increment Control with function number 0x32:** Used to perform relative displacement control based on the current position of the robotic arm, with simultaneous control over the opening and closing increment of the gripper.
+3. **Coordinate Increment Control with function number 0x32:** Used to perform relative displacement control based on the current position of the robotic arm, with simultaneous control over the opening and closing increment of the gripper.
 
 **Data Sent by Host:**
 
-| Header 1 | Header 2 | Identifier | Data Length | Function Number | Parameter | Checksum |
-| :----: | :-----: | :-----: | :-----: | :-----: | :-----: | :-----: |
-| 0xFF | 0xFF | 0xFF | 0x10 | 0x32 | dX(2bytes) + dY(2bytes) + dZ(2bytes) + dPitch(2bytes) + dRoll(2bytes) + dClaw(2bytes) + Time(2bytes) | Check |
+| Header 1 | Header 2 | Identifier | Data Length | Function Number |                                              Parameter                                               | Checksum |
+| :------: | :------: | :--------: | :---------: | :-------------: | :--------------------------------------------------------------------------------------------------: | :------: |
+|   0xFF   |   0xFF   |    0xFF    |    0x10     |      0x32       | dX(2bytes) + dY(2bytes) + dZ(2bytes) + dPitch(2bytes) + dRoll(2bytes) + dClaw(2bytes) + Time(2bytes) |  Check   |
 
 The parameters are described as follows:
 
-| Parameter Name | Type | Description |
-| :----: | :----: | :----- |
-| dX | int16 | The increment along the X-axis in mm |
-| dY | int16 | The increment along the Y-axis in mm |
-| dZ | int16 | The increment along the Z-axis in mm |
-| dPitch | int16 | The pitch angle increment in degrees multiplied by 10 |
-| dRoll | int16 | The roll angle increment in degrees |
-| dClaw | int16 | The gripper opening and closing angle increment in degrees |
-| Time | uint16 | The movement duration in ms |
+| Parameter Name |  Type  | Description                                                |
+| :------------: | :----: | :--------------------------------------------------------- |
+|       dX       | int16  | The increment along the X-axis in mm                       |
+|       dY       | int16  | The increment along the Y-axis in mm                       |
+|       dZ       | int16  | The increment along the Z-axis in mm                       |
+|     dPitch     | int16  | The pitch angle increment in degrees multiplied by 10      |
+|     dRoll      | int16  | The roll angle increment in degrees                        |
+|     dClaw      | int16  | The gripper opening and closing angle increment in degrees |
+|      Time      | uint16 | The movement duration in ms                                |
 
 Example 1: Decreasing only the gripper angle by 20 degrees with a movement duration of 1000ms.
 
@@ -595,23 +583,21 @@ Example 2: Increasing the X-axis by 10mm while opening the gripper by 10 degrees
 FF FF FF 10 32 0A 00 00 00 00 00 00 00 00 00 F6 FF F4 01 CA
 ```
 
-
-
 #### 3.3.5.3 Wireless and System Configuration Commands
 
-1) **ESP-NOW Synchronization Mode Switch with function number 0x21:** Used to control whether the robotic arm enters the real-time synchronization control mode. The mode must first be manually switched to ESP-NOW.
+1. **ESP-NOW Synchronization Mode Switch with function number 0x21:** Used to control whether the robotic arm enters the real-time synchronization control mode. The mode must first be manually switched to ESP-NOW.
 
 **Data Sent by Host:**
 
 | Header 1 | Header 2 | Identifier | Data Length | Function Number | Parameter | Checksum |
-| :----: | :-----: | :-----: | :-----: | :-----: | :-----: | :-----: |
-| 0xFF | 0xFF | 0xFF | 0x03 | 0x21 | switch | Check |
+| :------: | :------: | :--------: | :---------: | :-------------: | :-------: | :------: |
+|   0xFF   |   0xFF   |    0xFF    |    0x03     |      0x21       |  switch   |  Check   |
 
 The parameters are described as follows:
 
-| Parameter Name | Type | Description |
-| :----: | :---: | :---------------------------------- |
-| switch | uint8 | The synchronization control mode switch, where 0x00 disables and 0x01 enables it |
+| Parameter Name | Type  | Description                                                                      |
+| :------------: | :---: | :------------------------------------------------------------------------------- |
+|     switch     | uint8 | The synchronization control mode switch, where 0x00 disables and 0x01 enables it |
 
 Example: Enabling the ESP-NOW synchronization mode.
 
@@ -619,21 +605,19 @@ Example: Enabling the ESP-NOW synchronization mode.
 FF FF FF 03 21 01 DB
 ```
 
-
-
-2) **Set Global Acceleration with function number 0x1F:** Used to configure the global movement acceleration of the robotic arm.
+2. **Set Global Acceleration with function number 0x1F:** Used to configure the global movement acceleration of the robotic arm.
 
 **Data Sent by Host:**
 
-| Header 1 | Header 2 | Identifier | Data Length | Function Number | Parameter | Checksum |
-| :----: | :-----: | :-----: | :-----: | :-----: | :-----: | :-----: |
-| 0xFF | 0xFF | 0xFF | 0x03 | 0x1F | accel(1byte) | Check |
+| Header 1 | Header 2 | Identifier | Data Length | Function Number |  Parameter   | Checksum |
+| :------: | :------: | :--------: | :---------: | :-------------: | :----------: | :------: |
+|   0xFF   |   0xFF   |    0xFF    |    0x03     |      0x1F       | accel(1byte) |  Check   |
 
 The parameters are described as follows:
 
-| Parameter Name | Type | Description |
-| :----: | :---: | :-------------------------- |
-| accel | uint8 | The global acceleration of the robotic arm with a range from 0 to 254 |
+| Parameter Name | Type  | Description                                                           |
+| :------------: | :---: | :-------------------------------------------------------------------- |
+|     accel      | uint8 | The global acceleration of the robotic arm with a range from 0 to 254 |
 
 Example: Setting the global acceleration to 40.
 
@@ -641,21 +625,19 @@ Example: Setting the global acceleration to 40.
 FF FF FF 03 1F 28 B6
 ```
 
-
-
-3) **Set ESP-NOW Channel with function number 0x1E:** Used to configure the wireless communication channel.
+3. **Set ESP-NOW Channel with function number 0x1E:** Used to configure the wireless communication channel.
 
 **Data Sent by Host:**
 
-| Header 1 | Header 2 | Identifier | Data Length | Function Number | Parameter | Checksum |
-| :----: | :-----: | :-----: | :-----: | :-----: | :-----: | :-----: |
-| 0xFF | 0xFF | 0xFF | 0x03 | 0x1E | channel(1byte) | Check |
+| Header 1 | Header 2 | Identifier | Data Length | Function Number |   Parameter    | Checksum |
+| :------: | :------: | :--------: | :---------: | :-------------: | :------------: | :------: |
+|   0xFF   |   0xFF   |    0xFF    |    0x03     |      0x1E       | channel(1byte) |  Check   |
 
 The parameters are described as follows:
 
-| Parameter Name | Type | Description |
-| :-----: | :---: | :----------------------- |
-| channel | uint8 | The wireless communication channel number with a range from 1 to 13 |
+| Parameter Name | Type  | Description                                                         |
+| :------------: | :---: | :------------------------------------------------------------------ |
+|    channel     | uint8 | The wireless communication channel number with a range from 1 to 13 |
 
 Example: Setting the ESP-NOW channel to 6.
 
@@ -663,25 +645,23 @@ Example: Setting the ESP-NOW channel to 6.
 FF FF FF 03 1E 06 D9
 ```
 
-
-
 #### 3.3.5.4 Chassis and Peripheral Control Commands
 
-1) **Mecanum Wheel Control with function number 0x22:** Used to control the forward, backward, lateral translation, and rotation speeds of the chassis.
+1. **Mecanum Wheel Control with function number 0x22:** Used to control the forward, backward, lateral translation, and rotation speeds of the chassis.
 
 **Data Sent by Host:**
 
-| Header 1 | Header 2 | Identifier | Data Length | Function Number | Parameter | Checksum |
-| :----: | :-----: | :-----: | :-----: | :-----: | :-----: | :-----: |
-| 0xFF | 0xFF | 0xFF | 0x05 | 0x22 | Vx(1byte) + Vy(1byte) + Vz(1byte) | Check |
+| Header 1 | Header 2 | Identifier | Data Length | Function Number |             Parameter             | Checksum |
+| :------: | :------: | :--------: | :---------: | :-------------: | :-------------------------------: | :------: |
+|   0xFF   |   0xFF   |    0xFF    |    0x05     |      0x22       | Vx(1byte) + Vy(1byte) + Vz(1byte) |  Check   |
 
 The parameters are described as follows:
 
-| Parameter Name | Type | Description |
-| :----: | :--: | -------------------------------- |
-| Vx | int8 | The forward and backward speed with a range from -100 to 100 |
-| Vy | int8 | The lateral translation speed with a range from -100 to 100 |
-| Vz | int8 | The rotation speed with a range from -100 to 100 |
+| Parameter Name | Type | Description                                                  |
+| :------------: | :--: | ------------------------------------------------------------ |
+|       Vx       | int8 | The forward and backward speed with a range from -100 to 100 |
+|       Vy       | int8 | The lateral translation speed with a range from -100 to 100  |
+|       Vz       | int8 | The rotation speed with a range from -100 to 100             |
 
 Example: Controlling the chassis to operate at a forward speed of 30, a lateral translation of 0, and a rotation of 0.
 
@@ -689,21 +669,19 @@ Example: Controlling the chassis to operate at a forward speed of 30, a lateral 
 FF FF FF 05 22 1E 00 00 BB
 ```
 
-
-
-2) **Stepper Motor Control with function number 0x13:** Used to control the stepper motor to execute a target number of steps.
+2. **Stepper Motor Control with function number 0x13:** Used to control the stepper motor to execute a target number of steps.
 
 **Data Sent by Host:**
 
-| Header 1 | Header 2 | Identifier | Data Length | Function Number | Parameter | Checksum |
-| :----: | :-----: | :-----: | :-----: | :-----: | :-----: | :-----: |
-| 0xFF | 0xFF | 0xFF | 0x06 | 0x13 | step(4bytes) | Check |
+| Header 1 | Header 2 | Identifier | Data Length | Function Number |  Parameter   | Checksum |
+| :------: | :------: | :--------: | :---------: | :-------------: | :----------: | :------: |
+|   0xFF   |   0xFF   |    0xFF    |    0x06     |      0x13       | step(4bytes) |  Check   |
 
 The parameters are described as follows:
 
-| Parameter Name | Type | Description |
-| :----: | :---: | ---------------------------- |
-| step | int32 | The target pulse count where the sign determines the direction |
+| Parameter Name | Type  | Description                                                    |
+| :------------: | :---: | -------------------------------------------------------------- |
+|      step      | int32 | The target pulse count where the sign determines the direction |
 
 Example: Controlling the stepper motor to run for 1000 steps.
 
@@ -711,25 +689,23 @@ Example: Controlling the stepper motor to run for 1000 steps.
 FF FF FF 06 13 E8 03 00 00 FC
 ```
 
-
-
 #### 3.3.5.5 Single Servo Register Control
 
 When the identifier `ID` is between `0x01` and `0x06`, it indicates transparent transmission control is applied to the specified servo.
 
-1) **Servo Torque Control with write register 0x03 and register address 0x28:** Used to control servo power status. Releasing the torque allows the servo to be rotated manually.
+1. **Servo Torque Control with write register 0x03 and register address 0x28:** Used to control servo power status. Releasing the torque allows the servo to be rotated manually.
 
 **Data Sent by Host:**
 
-| Header 1 | Header 2 | Identifier | Data Length | Write Register | Register Address | Parameter | Checksum |
-| :---: | :---: | :----: | :------: | :------: | :--: | :----: | :----: |
-| 0xFF | 0xFF | ID | 0x04 | 0x03 | 0x28 | value(1byte) | Check |
+| Header 1 | Header 2 | Identifier | Data Length | Write Register | Register Address |  Parameter   | Checksum |
+| :------: | :------: | :--------: | :---------: | :------------: | :--------------: | :----------: | :------: |
+|   0xFF   |   0xFF   |     ID     |    0x04     |      0x03      |       0x28       | value(1byte) |  Check   |
 
 The parameters are described as follows:
 
-| Parameter Name | Type | Description |
-| :----: | :---: | :--------------------------------------- |
-| value | uint8 | The torque switch parameter where 0x00 represents release and 0x01 represents lock |
+| Parameter Name | Type  | Description                                                                        |
+| :------------: | :---: | :--------------------------------------------------------------------------------- |
+|     value      | uint8 | The torque switch parameter where 0x00 represents release and 0x01 represents lock |
 
 Example: Controlling servo 1 to enable torque.
 
@@ -737,21 +713,19 @@ Example: Controlling servo 1 to enable torque.
 FF FF 01 04 03 28 01 CE
 ```
 
-
-
-2) **Servo Acceleration Control with write register 0x03 and register address 0x29:** Used to control servo acceleration to adjust the servo acceleration and deceleration profiles.
+2. **Servo Acceleration Control with write register 0x03 and register address 0x29:** Used to control servo acceleration to adjust the servo acceleration and deceleration profiles.
 
 **Data Sent by Host:**
 
-| Header 1 | Header 2 | Identifier | Data Length | Write Register | Register Address | Parameter | Checksum |
-| :---: | :---: | :----: | :------: | :------: | :--------: | :----------: | :----: |
-| 0xFF | 0xFF | ID | 0x04 | 0x03 | 0x29 | accel(1byte) | Check |
+| Header 1 | Header 2 | Identifier | Data Length | Write Register | Register Address |  Parameter   | Checksum |
+| :------: | :------: | :--------: | :---------: | :------------: | :--------------: | :----------: | :------: |
+|   0xFF   |   0xFF   |     ID     |    0x04     |      0x03      |       0x29       | accel(1byte) |  Check   |
 
 The parameters are described as follows:
 
-| Parameter Name | Type | Description |
-| :----: | :---: | :------------------------ |
-| accel | uint8 | The servo acceleration with an adjustment range from 0 to 254 |
+| Parameter Name | Type  | Description                                                   |
+| :------------: | :---: | :------------------------------------------------------------ |
+|     accel      | uint8 | The servo acceleration with an adjustment range from 0 to 254 |
 
 Example: Controlling servo 1 to set the acceleration to 10.
 
@@ -759,22 +733,19 @@ Example: Controlling servo 1 to set the acceleration to 10.
 FF FF 01 04 03 29 0A C4
 ```
 
-
-
-
-3) **Servo Position Control with write register 0x03 and register address 0x2A:** Used to control the servo to rotate to a target position.
+3. **Servo Position Control with write register 0x03 and register address 0x2A:** Used to control the servo to rotate to a target position.
 
 **Data Sent by Host:**
 
-| Header 1 | Header 2 | Identifier | Data Length | Write Register | Register Address | Parameter | Checksum |
-| :---: | :---: | :----: | :------: | :------: | :--------: | :--------: | :----: |
-| 0xFF | 0xFF | ID | 0x05 | 0x03 | 0x2A | pos(2byte) | Check |
+| Header 1 | Header 2 | Identifier | Data Length | Write Register | Register Address | Parameter  | Checksum |
+| :------: | :------: | :--------: | :---------: | :------------: | :--------------: | :--------: | :------: |
+|   0xFF   |   0xFF   |     ID     |    0x05     |      0x03      |       0x2A       | pos(2byte) |  Check   |
 
 The parameters are described as follows:
 
-| Parameter Name | Type | Description |
-| :----: | :----: | :----------------------- |
-| pos | uint16 | The servo position parameter with a range from 0 to 4096 |
+| Parameter Name |  Type  | Description                                              |
+| :------------: | :----: | :------------------------------------------------------- |
+|      pos       | uint16 | The servo position parameter with a range from 0 to 4096 |
 
 Example: Controlling servo 1 to rotate to position 2048.
 
@@ -782,21 +753,19 @@ Example: Controlling servo 1 to rotate to position 2048.
 FF FF 01 05 03 2A 00 08 C4
 ```
 
-
-
-4) **Servo Speed Control with write register 0x03 and register address 0x2E:** Used to control the running steps during servo rotation.
+4. **Servo Speed Control with write register 0x03 and register address 0x2E:** Used to control the running steps during servo rotation.
 
 **Data Sent by Host:**
 
-| Header 1 | Header 2 | Identifier | Data Length | Write Register | Register Address | Parameter | Checksum |
-| :---: | :---: | :----: | :------: | :------: | :--------: | :--------: | :----: |
-| 0xFF | 0xFF | ID | 0x05 | 0x03 | 0x2E | spd(2byte) | Check |
+| Header 1 | Header 2 | Identifier | Data Length | Write Register | Register Address | Parameter  | Checksum |
+| :------: | :------: | :--------: | :---------: | :------------: | :--------------: | :--------: | :------: |
+|   0xFF   |   0xFF   |     ID     |    0x05     |      0x03      |       0x2E       | spd(2byte) |  Check   |
 
 The parameters are described as follows:
 
-| Parameter Name | Type | Description |
-| :----: | :----: | :--------------------------- |
-| spd | uint16 | The number of steps executed per second with a range from 0 to 3400 |
+| Parameter Name |  Type  | Description                                                         |
+| :------------: | :----: | :------------------------------------------------------------------ |
+|      spd       | uint16 | The number of steps executed per second with a range from 0 to 3400 |
 
 Example: Controlling servo 1 to set the speed to 1000.
 
@@ -804,26 +773,23 @@ Example: Controlling servo 1 to set the speed to 1000.
 FF FF 01 05 03 2E E8 03 DD
 ```
 
-
-
-5) **Continuous Register Write Control with write register 0x03 and start address 0x29:**
+5. **Continuous Register Write Control with write register 0x03 and start address 0x29:**
 
 **Data Sent by Host:**
 
-| Header 1 | Header 2 | Identifier | Data Length | Function Number | Parameter | Checksum |
-| :----: | :-----: | :-----: | :-----: | :-----: | :-----: | :-----: |
-| 0xFF | 0xFF | ID | 0x0A | 0x03 | ADDR(1byte) + ACC(1byte) + POS(2bytes) + RES(2bytes) + SPD(2bytes) | Check |
-
+| Header 1 | Header 2 | Identifier | Data Length | Function Number |                             Parameter                              | Checksum |
+| :------: | :------: | :--------: | :---------: | :-------------: | :----------------------------------------------------------------: | :------: |
+|   0xFF   |   0xFF   |     ID     |    0x0A     |      0x03       | ADDR(1byte) + ACC(1byte) + POS(2bytes) + RES(2bytes) + SPD(2bytes) |  Check   |
 
 The parameters are described as follows:
 
-| Parameter Name | Type | Description |
-| :----: | :----: | ------------------------------------ |
-| ADDR | uint8 | The start register address which is fixed to 0x29 |
-| ACC | uint8 | The servo acceleration with an adjustment range from 0 to 254 |
-| POS | uint16 | The servo position parameter with a range from 0 to 4096 |
-| RES | uint16 | The reserved bytes which must be filled with `0x00` spanning 2 bytes |
-| SPD | uint16 | The number of steps executed per second with a range from 0 to 3400 |
+| Parameter Name |  Type  | Description                                                          |
+| :------------: | :----: | -------------------------------------------------------------------- |
+|      ADDR      | uint8  | The start register address which is fixed to 0x29                    |
+|      ACC       | uint8  | The servo acceleration with an adjustment range from 0 to 254        |
+|      POS       | uint16 | The servo position parameter with a range from 0 to 4096             |
+|      RES       | uint16 | The reserved bytes which must be filled with `0x00` spanning 2 bytes |
+|      SPD       | uint16 | The number of steps executed per second with a range from 0 to 3400  |
 
 Example: Controlling servo 1 to rotate to position 2048 with an acceleration of 0 and a speed of 0.
 
@@ -831,17 +797,15 @@ Example: Controlling servo 1 to rotate to position 2048 with an acceleration of 
 FF FF 01 0A 03 29 00 00 08 00 00 00 00 C0
 ```
 
-
-
 #### 3.3.5.6 Action Group Commands
 
-1) **Run Action Group with function number 0x03:** The parameter represents the action group number.
+1. **Run Action Group with function number 0x03:** The parameter represents the action group number.
 
 **Data Sent by Host:**
 
-| Header 1 | Header 2 | Identifier | Data Length | Function Number | Parameter | Checksum |
-| :----: | :-----: | :-----: | :-----: | :-----: | :-----: | :-----: |
-| 0xFF | 0xFF | 0xFF | 0x03 | 0x03 | actions(1byte) | Check |
+| Header 1 | Header 2 | Identifier | Data Length | Function Number |   Parameter    | Checksum |
+| :------: | :------: | :--------: | :---------: | :-------------: | :------------: | :------: |
+|   0xFF   |   0xFF   |    0xFF    |    0x03     |      0x03       | actions(1byte) |  Check   |
 
 The parameters are described as follows:
 | Parameter Name | Type | Description |
@@ -854,15 +818,13 @@ Example: Running action group 1.
 FF FF FF 03 03 01 F9
 ```
 
-
-
-2) **Stop Action Group with function number 0x04:** Used to interrupt the execution of action groups.
+2. **Stop Action Group with function number 0x04:** Used to interrupt the execution of action groups.
 
 **Data Sent by Host:**
 
 | Header 1 | Header 2 | Identifier | Data Length | Function Number | Parameter | Checksum |
-| :----: | :-----: | :-----: | :-----: | :-----: | :-----: | :-----: |
-| 0xFF | 0xFF | 0xFF | 0x02 | 0x04 | / | 0xFA |
+| :------: | :------: | :--------: | :---------: | :-------------: | :-------: | :------: |
+|   0xFF   |   0xFF   |    0xFF    |    0x02     |      0x04       |     /     |   0xFA   |
 
 Example: Stopping the current action group execution.
 
@@ -870,15 +832,13 @@ Example: Stopping the current action group execution.
 FF FF FF 02 04 FA
 ```
 
-
-
-3) **Erase Action Group with function number 0x17:** Used to erase the action group with the specified number.
+3. **Erase Action Group with function number 0x17:** Used to erase the action group with the specified number.
 
 **Data Sent by Host:**
 
-| Header 1 | Header 2 | Identifier | Data Length | Function Number | Parameter | Checksum |
-| :----: | :-----: | :-----: | :-----: | :-----: | :-----: | :-----: |
-| 0xFF | 0xFF | 0xFF | 0x03 | 0x17 | actions(1byte) | Check |
+| Header 1 | Header 2 | Identifier | Data Length | Function Number |   Parameter    | Checksum |
+| :------: | :------: | :--------: | :---------: | :-------------: | :------------: | :------: |
+|   0xFF   |   0xFF   |    0xFF    |    0x03     |      0x17       | actions(1byte) |  Check   |
 
 The parameters are described as follows:
 | Parameter Name | Type | Description |
@@ -890,9 +850,6 @@ Example: Erasing action group 1.
 ```text
 FF FF FF 03 17 01 E5
 ```
-
-
-
 
 #### 3.3.5.7 Checksum Calculation Example
 
@@ -933,8 +890,6 @@ Before executing independent control functions, the corresponding control progra
 5. Click the compile button <img src="../_static/media/chapter_3/section_4/media/image7.png" style="width:50px"/>first, and then click the upload button <img  src="../_static/media/chapter_3/section_4/media/image8.png" style="width:50px"/>. The output box at the bottom of the software, displaying the interface below, indicates that the program has been downloaded successfully:
 
 <img class="common_img" src="../_static/media/chapter_3/section_4/media/image6.png" style="width:700px"/>
-
-
 
 ## 3.5 Control Based on Forward and Inverse Kinematics
 
@@ -1088,8 +1043,6 @@ if (now - last_oled_refresh_ms >= OLED_REFRESH_INTERVAL_MS) {
 }
 ```
 
-
-
 ## 3.6 Coordinates and Servo Reading Based on Forward and Inverse Kinematics
 
 ### 3.6.1 Project Introduction
@@ -1213,8 +1166,6 @@ if (now - last_oled_refresh_ms >= OLED_REFRESH_INTERVAL_MS) {
     );
 }
 ```
-
-
 
 ## 3.7 Speed Planning
 
@@ -1375,8 +1326,6 @@ if (now >= button_enable_ms && arm.board.button.is_clicked(1)) {
 }
 ```
 
-
-
 ## 3.8 Gripper Control
 
 ### 3.8.1 Project Introduction
@@ -1500,8 +1449,6 @@ if (now - last_oled_refresh_ms >= OLED_REFRESH_INTERVAL_MS) {
     );
 }
 ```
-
-
 
 ## 3.9 Fixed-Point Gripping and Transport
 

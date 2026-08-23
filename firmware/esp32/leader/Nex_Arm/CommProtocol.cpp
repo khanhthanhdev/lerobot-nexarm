@@ -33,7 +33,7 @@ void CommProtocol_t::register_error_callback(ProtocolErrorCallback cb)
 uint8_t CommProtocol_t::tx_packet_complete(uint8_t id, uint8_t cmd, uint8_t* data, uint8_t data_len)
 {
 	uint8_t frame_len =  6 + data_len;  // 6: header1 + header2 + id + length + cmd + check
-	
+
     tx_packet.header_1 = FRAME_HEADER_1;
     tx_packet.header_2 = FRAME_HEADER_2;
     tx_packet.elements.id = id;
@@ -43,7 +43,7 @@ uint8_t CommProtocol_t::tx_packet_complete(uint8_t id, uint8_t cmd, uint8_t* dat
 	for(uint8_t i = 0; i < data_len; i++) {
 		tx_packet.elements.args[i] = data[i];
 	}
-	
+
 	tx_packet.elements.args[data_len] = checksum_crc8(tx_packet.data_raw, rx_packet.elements.length + 1);
     return frame_len;
 }
@@ -89,11 +89,11 @@ void CommProtocol_t::parsing(uint8_t *data, uint16_t len)
                     ESP_LOGI(TAG, "E\n");
                     if(errorCallback) {
                         errorCallback();
-                    }  
+                    }
                 }
                 break;
 
-            case PARSING_ID: 
+            case PARSING_ID:
                 rx_packet.elements.id = data[rec_count];
                 parsing_state = PARSING_DATA_LENGTH;
                 ESP_LOGI(TAG, "ID:%d\n", rx_packet.elements.id);
@@ -111,7 +111,7 @@ void CommProtocol_t::parsing(uint8_t *data, uint16_t len)
                     ESP_LOGI(TAG, "E\n");
                     if(errorCallback) {
                         errorCallback();
-                    }  
+                    }
                 }
                 break;
 
@@ -133,10 +133,10 @@ void CommProtocol_t::parsing(uint8_t *data, uint16_t len)
                 if(arg_count == rx_packet.elements.length - 2) {
                     arg_count = 0;
                     parsing_state = PARSING_CHECKSUM;
-                }                    
+                }
                 break;
 
-            case PARSING_CHECKSUM: 
+            case PARSING_CHECKSUM:
                 checksum = checksum_crc8(rx_packet.data_raw, rx_packet.elements.length + 1);
                 ESP_LOGI(TAG, "data: %d, checksum: %d\n", data[rec_count], checksum);
                 ESP_LOGI(TAG, "I: %d\n",i);
@@ -148,7 +148,7 @@ void CommProtocol_t::parsing(uint8_t *data, uint16_t len)
                     rx_packet.elements.args[rx_packet.elements.length - 2] = data[rec_count];
                     if(successCallback) {
                         successCallback(&rx_packet);
-                    }   
+                    }
                     ESP_LOGI(TAG, "ARG:%d\n", rx_packet.elements.args[rx_packet.elements.length - 2]);
                 }
                 parsing_state = PARSING_HEADER_1;
@@ -165,6 +165,6 @@ void CommProtocol_t::parsing(uint8_t *data, uint16_t len)
         ESP_LOGI(TAG, "ERR %d\n", error_state);
         if(errorCallback) {
             errorCallback();
-        }  
+        }
     }
 }

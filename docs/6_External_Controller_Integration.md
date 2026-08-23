@@ -16,7 +16,7 @@ This section demonstrates connecting to the NexArm hotspot using a Python progra
 
 ### 6.1.3 Program Download
 
-* **NexArm Program Download**
+- **NexArm Program Download**
 
 Before executing external controller operations, the corresponding control program must be downloaded to the robotic arm according to the following steps.
 
@@ -40,7 +40,7 @@ Before executing external controller operations, the corresponding control progr
 
 <img class="common_img" src="../_static/media/chapter_3/section_4/media/image6.png" style="width:700px"/>
 
-* **Raspberry Pi Program Download**
+- **Raspberry Pi Program Download**
 
 Upload the **WiFi_Control** folder from the [02 Source Code](https://drive.google.com/drive/folders/1ceR5kBYC8Vb9iD4xWvZ9rEZmPd5lT5Zj?usp=sharing) directory to the Raspberry Pi using a remote connection tool.
 
@@ -65,6 +65,7 @@ Upload the **WiFi_Control** folder from the [02 Source Code](https://drive.googl
 ### 6.1.5 Program Analysis
 
 1. The Wi-Fi hotspot parameters, the robotic arm TCP connection address, and the complete transporting sequence are defined in **wifi_basic_demo.py**. Each item within the `PICK_PLACE_SEQUENCE` array contains seven fields, including `x`, `y`, `z`, `pitch`, `roll`, `claw`, and `duration_ms`.
+
 ```python
 WIFI_SSID = "NexArm"
 WIFI_PASSWORD = "hiwonder"
@@ -309,7 +310,7 @@ This section demonstrates connecting to the NexArm hotspot using a Jetson contro
 
 ### 6.3.3 Program Download
 
-* **NexArm Program Download**
+- **NexArm Program Download**
 
 Before executing external controller operations, the corresponding control program must be downloaded to the robotic arm according to the following steps.
 
@@ -318,7 +319,6 @@ Before executing external controller operations, the corresponding control progr
    <img class="common_img" src="../_static/media/chapter_1/section_1/media/image97.png" style="width:400px">
 
 2. Open the corresponding **.ino** file located in the [1. Tutorials/6. External Controller Integration/02 Source Code/Nex_Arm.zip](https://drive.google.com/drive/folders/1ceR5kBYC8Vb9iD4xWvZ9rEZmPd5lT5Zj?usp=sharing) folder.
-
 
 <img class="common_img" src="../_static/media/chapter_3/section_4/media/image3.png" style="width:300px"/>
 
@@ -334,14 +334,13 @@ Before executing external controller operations, the corresponding control progr
 
 <img class="common_img" src="../_static/media/chapter_3/section_4/media/image6.png" style="width:700px"/>
 
-* **Jetson Program Download**
+- **Jetson Program Download**
 
 Upload the **WiFi_Control** folder from the [02 Source Code](https://drive.google.com/drive/folders/1ceR5kBYC8Vb9iD4xWvZ9rEZmPd5lT5Zj?usp=sharing) directory to the Jetson controller using a remote connection tool.
 
 ### 6.3.4 Program Outcome
 
 1. First, connect the NexArm controller to the Jetson controller using a Type-C cable and execute `sudo ifconfig` in the terminal to find the `eth0` IP address. Connect via a remote connection tool using this wired IP address.
-
 
 <img class="common_img" src="../_static/media/chapter_6/section_1/media/image2.png" style="width:800px"/>
 
@@ -562,4 +561,3 @@ def main():
         print_current_coords(arm, index)
 
 ```
-

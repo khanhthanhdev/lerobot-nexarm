@@ -9,7 +9,7 @@
 #include "CommProtocol.h"
 
 // Nordic UART Service UUIDs
-#define SERVICE_UUID           "0000ffe0-0000-1000-8000-00805f9b34fb" 
+#define SERVICE_UUID           "0000ffe0-0000-1000-8000-00805f9b34fb"
 #define CHARACTERISTIC_UUID_RX "0000ffe1-0000-1000-8000-00805f9b34fb"
 #define CHARACTERISTIC_UUID_TX "0000ffe2-0000-1000-8000-00805f9b34fb"
 

@@ -24,6 +24,7 @@ import logging
 import math
 import os
 import platform
+import shutil
 import subprocess
 import time
 from collections import Counter
@@ -460,9 +461,13 @@ def benchmark_policy(spec: PolicySpec, args: argparse.Namespace) -> dict[str, An
 
 
 def _git_commit() -> str | None:
+    git_executable = shutil.which("git")
+    if git_executable is None:
+        return None
+
     try:
         return subprocess.check_output(
-            ["git", "rev-parse", "HEAD"],
+            [git_executable, "rev-parse", "HEAD"],
             text=True,
             stderr=subprocess.DEVNULL,
         ).strip()

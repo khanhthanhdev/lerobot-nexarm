@@ -28,20 +28,20 @@ has 16 values:
 
 ## Head-to-head
 
-| Aspect | `lerobot_alohamini` | Current `lerobot-nexarm` | Recommendation |
-| --- | --- | --- | --- |
-| Embodiment | Two arms, three-wheel Kiwi base, lift, cameras | One leader and one follower arm, optional cameras | Add a composite embodiment; retain the existing single-arm classes |
-| Arm transport | Two Feetech buses; left bus also owns wheels and lift | One USB serial/ESP32/AT32 path per arm | Use one independent USB serial path per arm |
-| Bimanual structure | AlohaMini implements both buses directly in one large class | The repo already contains `BimanualMixin` and compositional bimanual examples | Follow `BiSOFollower`/`BiSOLeader`, not AlohaMini's monolith |
-| Action names | `arm_left_*`, `arm_right_*`, base velocity, lift height | Unprefixed six-joint action | Use `left_*`, `right_*`, `x.vel`, `y.vel`, `theta.vel`, `lift_axis.height_mm` |
-| Base control | Kiwi inverse kinematics on the robot host, raw wheel velocity on the motor bus | No LeRobot chassis component; vendor firmware contains chassis commands | Add a typed chassis component and keep kinematics above the firmware driver |
-| Lift control | Velocity-mode motor with multi-turn position tracking, homing, soft limits | No lift component | Add a lift interface with absolute height observation, homing, limits, and timeout |
-| Teleoperation | Two leaders plus keyboard merged in custom scripts | Generic LeRobot teleoperate/record with one teleoperator | Add `BiNexArmLeader`; add base/lift input through a composite teleoperator or action processor |
-| PC/robot split | ZMQ client on PC, host process on Raspberry Pi | Arm is directly connected to the LeRobot process | Add a remote boundary only when the robot carries a Pi/Jetson; keep the physical composite behind it |
-| Dataset | One stable schema for arms, body velocity, lift, and cameras | Six arm actions and observations | Define the final schema before recording any production dataset |
-| Safety | Base/lift watchdog, current protection, lift guards; arm watchdog is incomplete | Arm clamping, corrupt-read filtering, controlled torque-off; no command watchdog | Combine both approaches and stop every subsystem on stale commands |
-| Tests | Simulation bridge tests; little physical-controller isolation | Focused protocol and follower lifecycle tests | Preserve NexArm's test style and add hardware-free chassis, lift, composite, and timeout tests |
-| Simulation | ManiSkill/Isaac stack; bridge currently fixed to a 5-DoF arm profile | One-arm MuJoCo model | Build the real 16-D contract first, then make simulation emit that exact contract |
+| Aspect             | `lerobot_alohamini`                                                             | Current `lerobot-nexarm`                                                         | Recommendation                                                                                       |
+| ------------------ | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Embodiment         | Two arms, three-wheel Kiwi base, lift, cameras                                  | One leader and one follower arm, optional cameras                                | Add a composite embodiment; retain the existing single-arm classes                                   |
+| Arm transport      | Two Feetech buses; left bus also owns wheels and lift                           | One USB serial/ESP32/AT32 path per arm                                           | Use one independent USB serial path per arm                                                          |
+| Bimanual structure | AlohaMini implements both buses directly in one large class                     | The repo already contains `BimanualMixin` and compositional bimanual examples    | Follow `BiSOFollower`/`BiSOLeader`, not AlohaMini's monolith                                         |
+| Action names       | `arm_left_*`, `arm_right_*`, base velocity, lift height                         | Unprefixed six-joint action                                                      | Use `left_*`, `right_*`, `x.vel`, `y.vel`, `theta.vel`, `lift_axis.height_mm`                        |
+| Base control       | Kiwi inverse kinematics on the robot host, raw wheel velocity on the motor bus  | No LeRobot chassis component; vendor firmware contains chassis commands          | Add a typed chassis component and keep kinematics above the firmware driver                          |
+| Lift control       | Velocity-mode motor with multi-turn position tracking, homing, soft limits      | No lift component                                                                | Add a lift interface with absolute height observation, homing, limits, and timeout                   |
+| Teleoperation      | Two leaders plus keyboard merged in custom scripts                              | Generic LeRobot teleoperate/record with one teleoperator                         | Add `BiNexArmLeader`; add base/lift input through a composite teleoperator or action processor       |
+| PC/robot split     | ZMQ client on PC, host process on Raspberry Pi                                  | Arm is directly connected to the LeRobot process                                 | Add a remote boundary only when the robot carries a Pi/Jetson; keep the physical composite behind it |
+| Dataset            | One stable schema for arms, body velocity, lift, and cameras                    | Six arm actions and observations                                                 | Define the final schema before recording any production dataset                                      |
+| Safety             | Base/lift watchdog, current protection, lift guards; arm watchdog is incomplete | Arm clamping, corrupt-read filtering, controlled torque-off; no command watchdog | Combine both approaches and stop every subsystem on stale commands                                   |
+| Tests              | Simulation bridge tests; little physical-controller isolation                   | Focused protocol and follower lifecycle tests                                    | Preserve NexArm's test style and add hardware-free chassis, lift, composite, and timeout tests       |
+| Simulation         | ManiSkill/Isaac stack; bridge currently fixed to a 5-DoF arm profile            | One-arm MuJoCo model                                                             | Build the real 16-D contract first, then make simulation emit that exact contract                    |
 
 ## Source anatomy worth learning
 
@@ -131,34 +131,34 @@ was already connected.
 
 ## Dependency matrix
 
-| Component | Status | Local equivalent or gap |
-| --- | --- | --- |
-| Single follower arm | EXISTS | `NexArmFollower` |
-| Single leader arm | EXISTS | `NexArmLeader` |
-| Dual-arm lifecycle | EXISTS | `BimanualMixin` |
-| Dual-arm routing example | EXISTS | `BiSOFollower` and `BiSOLeader` |
-| Arm protocol | EXISTS | `NexArmMotorsBus` |
-| Composite NexArm robot | NEW | Should own both arms, chassis, lift, and cameras |
-| Composite NexArm teleoperator | NEW | Should own both leaders and base/lift input |
-| Chassis protocol | NEW | Separate serial driver and configuration |
-| Kiwi kinematics | NEW | Adapt equations only after geometry is confirmed |
-| Lift protocol/control | NEW | Absolute height, homing, limits, and stop behavior |
-| Whole-robot watchdog | NEW | Must stop arms, base, and lift |
-| Remote robot transport | OPTIONAL | Add after the local composite contract works |
-| Mobile-bimanual tests | NEW | Unit tests plus hardware smoke tests |
-| Mobile-bimanual simulation | NEW | Must match the real action schema and units |
+| Component                     | Status   | Local equivalent or gap                            |
+| ----------------------------- | -------- | -------------------------------------------------- |
+| Single follower arm           | EXISTS   | `NexArmFollower`                                   |
+| Single leader arm             | EXISTS   | `NexArmLeader`                                     |
+| Dual-arm lifecycle            | EXISTS   | `BimanualMixin`                                    |
+| Dual-arm routing example      | EXISTS   | `BiSOFollower` and `BiSOLeader`                    |
+| Arm protocol                  | EXISTS   | `NexArmMotorsBus`                                  |
+| Composite NexArm robot        | NEW      | Should own both arms, chassis, lift, and cameras   |
+| Composite NexArm teleoperator | NEW      | Should own both leaders and base/lift input        |
+| Chassis protocol              | NEW      | Separate serial driver and configuration           |
+| Kiwi kinematics               | NEW      | Adapt equations only after geometry is confirmed   |
+| Lift protocol/control         | NEW      | Absolute height, homing, limits, and stop behavior |
+| Whole-robot watchdog          | NEW      | Must stop arms, base, and lift                     |
+| Remote robot transport        | OPTIONAL | Add after the local composite contract works       |
+| Mobile-bimanual tests         | NEW      | Unit tests plus hardware smoke tests               |
+| Mobile-bimanual simulation    | NEW      | Must match the real action schema and units        |
 
 ## Challenge decisions
 
-| # | Decision | Source answer | Local answer | Risk if wrong | Choice |
-| --- | --- | --- | --- | --- | --- |
-| 1 | Must the robot be remote? | AlohaMini assumes PC plus Raspberry Pi over ZMQ | NexArm currently runs directly over USB | Added latency and failure modes before the hardware works | Make remote transport a wrapper added after local bring-up |
-| 2 | Is the chassis really Kiwi? | Three independently controlled omni wheels | Prior chassis work mentioned an ESP32, L298N, and IMU | Copying the matrix onto different geometry produces unsafe motion | Confirm wheel count, geometry, drivers, and encoders before choosing kinematics |
-| 3 | Where should base traffic go? | Through the left arm's Feetech bus | NexArm arm UART GPIO16/17 is already occupied by the AT32 path | Coupling can interrupt arm control and complicate emergency stops | Give the chassis ESP32 its own host connection |
-| 4 | How is lift position recovered? | Home on startup and track multiple turns in software | No lift hardware contract exists yet | A lost zero can drive into a hard stop | Require limit switch or absolute reference plus guarded homing |
-| 5 | What happens on stale commands? | AlohaMini stops base and lift after one second | NexArm has no command-age watchdog | Arms can retain the last policy target while the platform stops | Add a whole-robot supervisor and firmware-local base timeout |
-| 6 | Are reads synchronized enough? | AlohaMini reads buses sequentially at roughly 30 Hz | Two NexArm reads can each retry up to 150 ms | Dataset state may mix different physical times and miss FPS | Timestamp reads, measure latency, and consider concurrent arm polling |
-| 7 | Should base/lift be learned immediately? | AlohaMini records every dimension together | Current NexArm tasks and datasets are arm-only | Exploration complexity grows sharply and hides basic arm failures | Validate dual-arm fixed-base operation before learning locomotion |
+| #   | Decision                                 | Source answer                                        | Local answer                                                   | Risk if wrong                                                     | Choice                                                                          |
+| --- | ---------------------------------------- | ---------------------------------------------------- | -------------------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| 1   | Must the robot be remote?                | AlohaMini assumes PC plus Raspberry Pi over ZMQ      | NexArm currently runs directly over USB                        | Added latency and failure modes before the hardware works         | Make remote transport a wrapper added after local bring-up                      |
+| 2   | Is the chassis really Kiwi?              | Three independently controlled omni wheels           | Prior chassis work mentioned an ESP32, L298N, and IMU          | Copying the matrix onto different geometry produces unsafe motion | Confirm wheel count, geometry, drivers, and encoders before choosing kinematics |
+| 3   | Where should base traffic go?            | Through the left arm's Feetech bus                   | NexArm arm UART GPIO16/17 is already occupied by the AT32 path | Coupling can interrupt arm control and complicate emergency stops | Give the chassis ESP32 its own host connection                                  |
+| 4   | How is lift position recovered?          | Home on startup and track multiple turns in software | No lift hardware contract exists yet                           | A lost zero can drive into a hard stop                            | Require limit switch or absolute reference plus guarded homing                  |
+| 5   | What happens on stale commands?          | AlohaMini stops base and lift after one second       | NexArm has no command-age watchdog                             | Arms can retain the last policy target while the platform stops   | Add a whole-robot supervisor and firmware-local base timeout                    |
+| 6   | Are reads synchronized enough?           | AlohaMini reads buses sequentially at roughly 30 Hz  | Two NexArm reads can each retry up to 150 ms                   | Dataset state may mix different physical times and miss FPS       | Timestamp reads, measure latency, and consider concurrent arm polling           |
+| 7   | Should base/lift be learned immediately? | AlohaMini records every dimension together           | Current NexArm tasks and datasets are arm-only                 | Exploration complexity grows sharply and hides basic arm failures | Validate dual-arm fixed-base operation before learning locomotion               |
 
 ## Risk
 

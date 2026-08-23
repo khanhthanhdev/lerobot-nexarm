@@ -25,7 +25,7 @@ void SerialPort_t::begin(HardwareSerial& uart, uint32_t baudrate, uint8_t tx_pin
 }
 
 void SerialPort_t::register_ops_callback(ProtocolSuccessCallback cb)
-{   
+{
     protocol.register_success_callback(cb);
 }
 

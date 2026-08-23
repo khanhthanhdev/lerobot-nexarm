@@ -5,7 +5,7 @@ import threading
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
 from std_msgs.msg import Int32
-from std_msgs.msg import UInt16, Empty, UInt8,Float32MultiArray  
+from std_msgs.msg import UInt16, Empty, UInt8,Float32MultiArray
 from std_srvs.srv import Trigger
 from rclpy.callback_groups import ReentrantCallbackGroup
 from ros_robot_controller.ros_robot_controller_sdk import Board
@@ -78,7 +78,7 @@ class RosRobotController(Node):
 
     def set_bus_servo_position(self, msg):
         for i in msg.position:
-            self.board.bus_servo_set_position(i.id, position=i.position, acc=0, speed=0) 
+            self.board.bus_servo_set_position(i.id, position=i.position, acc=0, speed=0)
 
     def _driver_joint_angles_to_public(self, joint_angles):
         public_angles = [float(v) for v in joint_angles]
@@ -94,7 +94,7 @@ class RosRobotController(Node):
 
     def set_single_motor_callback(self, msg):
         self.board.set_single_motor(msg.id, msg.speed)
-        
+
     def get_arm_ik_callback(self, request, response):
         res = self.board.set_arm_coords(
             request.x, request.y, request.z, request.pitch,
@@ -127,7 +127,7 @@ class RosRobotController(Node):
             response.success = False
             self.get_logger().error("FK正解计算失败或超时")
         return response
-        
+
     def set_motors_callback(self, msg):
         self.board.set_motor_speed(msg.speed1, msg.speed2, msg.speed3, msg.speed4)
 
@@ -150,10 +150,10 @@ class RosRobotController(Node):
 
     def set_tank_callback(self, msg):
         self.board.set_tank(msg.speed, msg.turn)
-    
+
     def set_oled_icon_callback(self, msg):
         self.board.set_oled_icon(msg.data)
-        
+
     def set_conveyor_callback(self, msg):
         self.board.set_conveyor(msg.data)
 
@@ -190,7 +190,7 @@ class RosRobotController(Node):
             msg.dclaw,
             msg.time_ms,
         )
-        
+
     # def arm_move_inc_callback(self, msg):
     #     self.board.arm_move_inc(msg.dx, msg.dy, msg.dz, msg.dpitch, msg.droll, msg.time_ms)
 
@@ -203,12 +203,12 @@ class RosRobotController(Node):
         self.board.espnow_set_global_acc(msg.global_acc)
         time.sleep(0.05)
         self.board.espnow_sync_ctrl(msg.sync_enable)
-        
+
     def set_move_acc_callback(self, msg):
         # msg.data 的范围是 0~254
         self.board.set_move_acc(msg.data)
         self.get_logger().info(f"已下发底层插补加速度: {msg.data}")
-        
+
     def bus_servo_ctrl_callback(self, request, response):
         try:
             if request.set_torque:
@@ -304,17 +304,17 @@ class RosRobotController(Node):
     #             battery_data = self.board.get_battery()
     #             if battery_data is not None:
     #                 self.battery_pub.publish(UInt16(data=battery_data))
-            
+
     #         button_data = self.board.get_button()
     #         if button_data is not None:
     #             msg = ButtonState()
     #             msg.id = int(button_data[0])
     #             msg.state = int(button_data[1])
     #             self.button_pub.publish(msg)
-            
+
     #         count += 1
     #         time.sleep(0.05)
-            
+
     #     if rclpy.ok(): rclpy.shutdown()
     def pub_callback(self):
         count = 0

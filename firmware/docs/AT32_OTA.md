@@ -21,20 +21,22 @@ ESP32 (Serial1 GPIO16/17)  <--USART1 1Mbps-->  AT32F421 (PA9/PA10)
 ## 涉及文件
 
 ### ESP32 端
-| 文件 | 说明 |
-|------|------|
-| `Nex_Arm.ino` | 入口，`SET_LOOP_TASK_STACK_SIZE(16384)` 防止栈溢出 |
-| `AT32_OTA.h` | OTA 类声明 |
-| `AT32_OTA.cpp` | OTA 核心逻辑：版本查询、握手、擦除、写入、验证 |
-| `at32_firmware.h` | 由 `bin2c.py` 生成，包含固件二进制数据和版本号 |
+
+| 文件                     | 说明                                                              |
+| ------------------------ | ----------------------------------------------------------------- |
+| `Nex_Arm.ino`            | 入口，`SET_LOOP_TASK_STACK_SIZE(16384)` 防止栈溢出                |
+| `AT32_OTA.h`             | OTA 类声明                                                        |
+| `AT32_OTA.cpp`           | OTA 核心逻辑：版本查询、握手、擦除、写入、验证                    |
+| `at32_firmware.h`        | 由 `bin2c.py` 生成，包含固件二进制数据和版本号                    |
 | `system_task_handle.cpp` | 在 `register_system_task()` 中调用 `AT32_OTA::check_and_update()` |
 
 ### AT32 端
-| 文件 | 说明 |
-|------|------|
-| `bootloader_proj/project/src/main.c` | Bootloader：帧解析、Flash 擦写、跳转 App |
+
+| 文件                                          | 说明                                                                  |
+| --------------------------------------------- | --------------------------------------------------------------------- |
+| `bootloader_proj/project/src/main.c`          | Bootloader：帧解析、Flash 擦写、跳转 App                              |
 | `AT32F421F8P7_nexarm_demo/project/src/main.c` | App：`CMD_FW_QUERY` 回复版本号，`CMD_FIRMWARE_UPDATE` 写 magic 并复位 |
-| `AT32F421F8P7_nexarm_demo/hiwonder/Global.h` | App 版本号定义 `AT32_FW_VERSION_MAJOR/MINOR/PATCH` |
+| `AT32F421F8P7_nexarm_demo/hiwonder/Global.h`  | App 版本号定义 `AT32_FW_VERSION_MAJOR/MINOR/PATCH`                    |
 
 ## Flash 布局
 
@@ -58,13 +60,13 @@ CHECKSUM: ~(ID + LEN + CMD + DATA...) & 0xFF
 
 ## 命令定义
 
-| CMD | 名称 | 方向 | 说明 |
-|-----|------|------|------|
-| 90 | `CMD_FIRMWARE_UPDATE` | ESP32→App | App 写 magic word 到 `0x20003FF0` 并复位 |
-| 91 | `CMD_FW_START` | ESP32→Bootloader | 擦除 App 区（56KB），回复 ACK |
-| 92 | `CMD_FW_DATA` | ESP32→Bootloader | 写入 128 字节数据包，回复 ACK + 校验结果 |
-| 93 | `CMD_FW_END` | ESP32→Bootloader | 升级完成，Bootloader 复位 |
-| 94 | `CMD_FW_QUERY` | ESP32→App/Bootloader | 查询版本。App 回复 `[major, minor, patch]`，Bootloader 回复 `[1]` |
+| CMD | 名称                  | 方向                 | 说明                                                              |
+| --- | --------------------- | -------------------- | ----------------------------------------------------------------- |
+| 90  | `CMD_FIRMWARE_UPDATE` | ESP32→App            | App 写 magic word 到 `0x20003FF0` 并复位                          |
+| 91  | `CMD_FW_START`        | ESP32→Bootloader     | 擦除 App 区（56KB），回复 ACK                                     |
+| 92  | `CMD_FW_DATA`         | ESP32→Bootloader     | 写入 128 字节数据包，回复 ACK + 校验结果                          |
+| 93  | `CMD_FW_END`          | ESP32→Bootloader     | 升级完成，Bootloader 复位                                         |
+| 94  | `CMD_FW_QUERY`        | ESP32→App/Bootloader | 查询版本。App 回复 `[major, minor, patch]`，Bootloader 回复 `[1]` |
 
 ## 升级流程详细时序
 
@@ -108,18 +110,23 @@ ESP32                                    AT32 (App 1.0.1)
 ## 关键设计决策
 
 ### 1. AT32 复位时不操作 OLED
+
 AT32 复位时 USART1 TX 线上可能产生毛刺，如果此时 ESP32 正在操作 I2C（OLED），可能导致 ESP32 崩溃。因此在发送 CMD 90 和 CMD 93 前后不调用 OLED，等 `delay(3000)` AT32 复位完成后再操作。
 
 ### 2. CMD 90 只发一次
+
 之前反复发 CMD 90 导致 AT32 在 App 和 Bootloader 之间反复复位，ESP32 崩溃。改为只发一次 + `delay(3000)` 等待。
 
 ### 3. 栈大小 16KB
+
 `SET_LOOP_TASK_STACK_SIZE(16384)` — OTA 函数 + `register_system_task` 初始化的局部变量总量超过默认 8KB 栈。
 
 ### 4. 数据包 pkt 用 static
+
 `static uint8_t pkt[134]` 避免每次循环在栈上分配 134 字节。
 
 ### 5. Bootloader 写后读回校验
+
 `flash_write_data` 写入后逐字节读回比较，累计 `verify_errors`。
 
 ## 如何更新固件
@@ -136,6 +143,7 @@ AT32 复位时 USART1 TX 线上可能产生毛刺，如果此时 ESP32 正在操
 ## OLED 显示
 
 升级过程中 OLED 显示：
+
 ```
 行1: Now:  1.0.1        (当前版本)
 行2: New:  1.0.2        (目标版本)
@@ -146,6 +154,7 @@ AT32 复位时 USART1 TX 线上可能产生毛刺，如果此时 ESP32 正在操
 ## 串口日志
 
 升级过程中 ESP32 USB Serial 输出：
+
 ```
 [OTA] Start: embedded=1.0.2 size=23608
 [OTA] query: got=1 ver=1.0.1

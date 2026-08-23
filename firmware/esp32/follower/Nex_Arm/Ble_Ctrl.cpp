@@ -56,10 +56,10 @@ void BlePort_t::begin(const char* localName) {
     BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
     pAdvertising->addServiceUUID(SERVICE_UUID);
     pAdvertising->setScanResponse(true);
-    pAdvertising->setMinPreferred(0x06); 
+    pAdvertising->setMinPreferred(0x06);
     pAdvertising->setMinPreferred(0x12);
     BLEDevice::startAdvertising();
-    
+
     protocol.begin();
     Serial.println("BLE Init OK, Advertising...");
 }

@@ -11,7 +11,7 @@
 
 class SerialPort_t {
 public:
-    HardwareSerial* uart; 
+    HardwareSerial* uart;
     CommProtocol_t protocol;
 
     void begin(HardwareSerial& uart, uint32_t baudrate, uint8_t tx_pin = SERIAL_TX_PIN, uint8_t rx_pin = SERIAL_RX_PIN);
@@ -23,6 +23,6 @@ private:
     uint16_t real_msg_rec_size;
 };
 
-extern SerialPort_t serial_port; 
+extern SerialPort_t serial_port;
 
 #endif

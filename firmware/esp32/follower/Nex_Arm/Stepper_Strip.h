@@ -22,7 +22,7 @@ public:
     void reset();
     void set_speed(uint32_t time_us);
     void move(int32_t steps);
-    void set_subdivision(uint8_t div_code); 
+    void set_subdivision(uint8_t div_code);
     uint8_t read_reset_status(); // 读取是否复位完成
 
 private:

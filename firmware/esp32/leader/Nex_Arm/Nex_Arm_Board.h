@@ -48,14 +48,14 @@ public:
 class Buzzer_t {
 public:
     bool allow_change = true;
-    
+
     void begin(void);
     void update(void);
     bool off(void);
     bool on(uint16_t freq = 2000);
-    bool set(uint32_t   on_time, 
+    bool set(uint32_t   on_time,
             uint32_t   off_time,
-            uint16_t   times, 
+            uint16_t   times,
             uint16_t   freq = 2000);
 
 private:
@@ -66,9 +66,9 @@ private:
     uint32_t            ticks_count;
     const uint32_t      update_period = 20;
 
-    enum Stage {BUZZER_STAGE_START_NEW_CYCLE, 
-                BUZZER_STAGE_WATTING_OFF, 
-                BUZZER_STAGE_WATTING_PERIOD_END, 
+    enum Stage {BUZZER_STAGE_START_NEW_CYCLE,
+                BUZZER_STAGE_WATTING_OFF,
+                BUZZER_STAGE_WATTING_PERIOD_END,
                 BUZZER_STAGE_IDLE};
 
     Stage stage = BUZZER_STAGE_IDLE;
@@ -80,7 +80,7 @@ public:
     OLED_t oled;
     Buzzer_t buzzer;
     Button_t button;
-    
+
     enum Act_State {READ_FRAME_NUM, READ_FRAME_DATA, ACT_STOP};
     Act_State act_state = READ_FRAME_NUM;
 
@@ -91,7 +91,7 @@ public:
     void action_group_stop(void);
     bool action_group_download(uint8_t id, uint8_t *data, size_t length);
 
-private:  
+private:
     File file;
     uint8_t act_read_frame_num;
 };

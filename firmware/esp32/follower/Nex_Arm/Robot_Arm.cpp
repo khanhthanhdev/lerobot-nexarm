@@ -5,7 +5,7 @@
 // // void Robot_Arm_t::begin(void)
 // // {
 // //     board.begin();
-    
+
 // //     this->current_pose.x = 0.0f;
 // //     this->current_pose.y = 200.0f;
 // //     this->current_pose.z = 200.0f;
@@ -23,22 +23,22 @@
 // // void Robot_Arm_t::move(float x, float y, float z, float pitch, float roll, float claw, uint32_t duration)
 // // {
 // //     uint8_t buf[12];
-    
-// //     int16_t i_pitch = (int16_t)(pitch * 10.0f); 
+
+// //     int16_t i_pitch = (int16_t)(pitch * 10.0f);
 // //     int16_t i_x = (int16_t)x;
 // //     int16_t i_y = (int16_t)y;
 // //     int16_t i_z = (int16_t)z;
-// //     int16_t i_roll = (int16_t)roll; 
-    
+// //     int16_t i_roll = (int16_t)roll;
+
 // //     uint16_t i_time = (uint16_t)duration;
-    
+
 // //     buf[0] = GET_LOW_BYTE(i_pitch); buf[1] = GET_HIGH_BYTE(i_pitch);
 // //     buf[2] = GET_LOW_BYTE(i_x);     buf[3] = GET_HIGH_BYTE(i_x);
 // //     buf[4] = GET_LOW_BYTE(i_y);     buf[5] = GET_HIGH_BYTE(i_y);
 // //     buf[6] = GET_LOW_BYTE(i_z);     buf[7] = GET_HIGH_BYTE(i_z);
 // //     buf[8] = GET_LOW_BYTE(i_roll);  buf[9] = GET_HIGH_BYTE(i_roll);
 // //     buf[10] = GET_LOW_BYTE(i_time); buf[11] = GET_HIGH_BYTE(i_time);
-    
+
 // //     send_packet(CMD_COORDINATE_SET, buf, 12);
 
 // //     this->current_pose.x = x;
@@ -56,23 +56,23 @@
 // // void Robot_Arm_t::move_inc(float dx, float dy, float dz, float dpitch, float droll, float dclaw, uint32_t duration_ms)
 // // {
 // //     uint8_t buf[12];
-    
+
 // //     int16_t i_dx = (int16_t)dx;
 // //     int16_t i_dy = (int16_t)dy;
 // //     int16_t i_dz = (int16_t)dz;
-// //     int16_t i_dp = (int16_t)(dpitch * 10.0f); 
+// //     int16_t i_dp = (int16_t)(dpitch * 10.0f);
 // //     int16_t i_dr = (int16_t)droll;
-    
+
 // //     // 【修改4】：时间改为无符号 16 位
 // //     uint16_t i_time = (uint16_t)duration_ms;
-    
+
 // //     buf[0] = GET_LOW_BYTE(i_dx); buf[1] = GET_HIGH_BYTE(i_dx);
 // //     buf[2] = GET_LOW_BYTE(i_dy); buf[3] = GET_HIGH_BYTE(i_dy);
 // //     buf[4] = GET_LOW_BYTE(i_dz); buf[5] = GET_HIGH_BYTE(i_dz);
 // //     buf[6] = GET_LOW_BYTE(i_dp); buf[7] = GET_HIGH_BYTE(i_dp);
 // //     buf[8] = GET_LOW_BYTE(i_dr); buf[9] = GET_HIGH_BYTE(i_dr);
 // //     buf[10] = GET_LOW_BYTE(i_time); buf[11] = GET_HIGH_BYTE(i_time);
-    
+
 // //     send_packet(CMD_ARM_MOVE_INC, buf, 12);
 
 // //     this->current_pose.x += dx;
@@ -83,13 +83,13 @@
 // // }
 // // void Robot_Arm_t::move_servo(uint8_t id, int16_t angle, uint16_t time_ms)
 // // {
-    
-// //     int16_t pos = angle; 
-    
-// //     int16_t speed = 1000; 
-// //     if(time_ms > 0) speed = 20000 / time_ms; 
 
-    
+// //     int16_t pos = angle;
+
+// //     int16_t speed = 1000;
+// //     if(time_ms > 0) speed = 20000 / time_ms;
+
+
 // //     servo.write_pos_ex(id, 0, speed, pos);
 // //     update_status();
 // // }
@@ -100,7 +100,7 @@
 // //     int16_t i_x = (int16_t)x;
 // //     int16_t i_y = (int16_t)y;
 // //     int16_t i_z = (int16_t)z;
-    
+
 // //     buf[0] = GET_LOW_BYTE(i_pitch); buf[1] = GET_HIGH_BYTE(i_pitch);
 // //     buf[2] = GET_LOW_BYTE(i_x);     buf[3] = GET_HIGH_BYTE(i_x);
 // //     buf[4] = GET_LOW_BYTE(i_y);     buf[5] = GET_HIGH_BYTE(i_y);
@@ -120,7 +120,7 @@
 // void Robot_Arm_t::begin(void)
 // {
 //     board.begin();
-    
+
 //     this->current_pose.x = 0.0f;
 //     this->current_pose.y = 200.0f;
 //     this->current_pose.z = 200.0f;
@@ -137,15 +137,15 @@
 // void Robot_Arm_t::move(float x, float y, float z, float pitch, float roll, float claw, uint32_t duration)
 // {
 //     uint8_t buf[14]; // 从12扩大到14
-    
-//     int16_t i_pitch = (int16_t)(pitch * 10.0f); 
+
+//     int16_t i_pitch = (int16_t)(pitch * 10.0f);
 //     int16_t i_x = (int16_t)x;
 //     int16_t i_y = (int16_t)y;
 //     int16_t i_z = (int16_t)z;
-//     int16_t i_roll = (int16_t)roll; 
+//     int16_t i_roll = (int16_t)roll;
 //     int16_t i_claw = (int16_t)claw; // 【新增】
 //     uint16_t i_time = (uint16_t)duration;
-    
+
 //     buf[0] = GET_LOW_BYTE(i_pitch); buf[1] = GET_HIGH_BYTE(i_pitch);
 //     buf[2] = GET_LOW_BYTE(i_x);     buf[3] = GET_HIGH_BYTE(i_x);
 //     buf[4] = GET_LOW_BYTE(i_y);     buf[5] = GET_HIGH_BYTE(i_y);
@@ -153,7 +153,7 @@
 //     buf[8] = GET_LOW_BYTE(i_roll);  buf[9] = GET_HIGH_BYTE(i_roll);
 //     buf[10] = GET_LOW_BYTE(i_claw); buf[11] = GET_HIGH_BYTE(i_claw); // 【新增】
 //     buf[12] = GET_LOW_BYTE(i_time); buf[13] = GET_HIGH_BYTE(i_time);
-    
+
 //     send_packet(CMD_COORDINATE_SET, buf, 14); // 长度改为14
 
 //     this->current_pose.x = x;
@@ -172,21 +172,21 @@
 // void Robot_Arm_t::move_inc(float dx, float dy, float dz, float dpitch, float droll, float dclaw, uint32_t duration_ms)
 // {
 //     uint8_t buf[12];
-    
+
 //     int16_t i_dx = (int16_t)dx;
 //     int16_t i_dy = (int16_t)dy;
 //     int16_t i_dz = (int16_t)dz;
-//     int16_t i_dp = (int16_t)(dpitch * 10.0f); 
+//     int16_t i_dp = (int16_t)(dpitch * 10.0f);
 //     int16_t i_dr = (int16_t)droll;
 //     uint16_t i_time = (uint16_t)duration_ms;
-    
+
 //     buf[0] = GET_LOW_BYTE(i_dx); buf[1] = GET_HIGH_BYTE(i_dx);
 //     buf[2] = GET_LOW_BYTE(i_dy); buf[3] = GET_HIGH_BYTE(i_dy);
 //     buf[4] = GET_LOW_BYTE(i_dz); buf[5] = GET_HIGH_BYTE(i_dz);
 //     buf[6] = GET_LOW_BYTE(i_dp); buf[7] = GET_HIGH_BYTE(i_dp);
 //     buf[8] = GET_LOW_BYTE(i_dr); buf[9] = GET_HIGH_BYTE(i_dr);
 //     buf[10] = GET_LOW_BYTE(i_time); buf[11] = GET_HIGH_BYTE(i_time);
-    
+
 //     send_packet(CMD_ARM_MOVE_INC, buf, 12);
 
 //     this->current_pose.x += dx;
@@ -198,9 +198,9 @@
 
 // void Robot_Arm_t::move_servo(uint8_t id, int16_t angle, uint16_t time_ms)
 // {
-//     int16_t pos = angle; 
-//     int16_t speed = 1000; 
-//     if(time_ms > 0) speed = 20000 / time_ms; 
+//     int16_t pos = angle;
+//     int16_t speed = 1000;
+//     if(time_ms > 0) speed = 20000 / time_ms;
 //     servo.write_pos_ex(id, 0, speed, pos);
 //     update_status();
 // }
@@ -212,7 +212,7 @@
 //     int16_t i_x = (int16_t)x;
 //     int16_t i_y = (int16_t)y;
 //     int16_t i_z = (int16_t)z;
-    
+
 //     buf[0] = GET_LOW_BYTE(i_pitch); buf[1] = GET_HIGH_BYTE(i_pitch);
 //     buf[2] = GET_LOW_BYTE(i_x);     buf[3] = GET_HIGH_BYTE(i_x);
 //     buf[4] = GET_LOW_BYTE(i_y);     buf[5] = GET_HIGH_BYTE(i_y);
@@ -250,7 +250,7 @@ void Robot_Arm_t::begin(void)
     // this->current_pose.pitch = 0.0f;
     // this->current_pose.roll = 0.0f;
     // this->current_pose.claw = 0.0f; // 初始化夹爪
-    
+
 }
 
 void Robot_Arm_t::send_packet(uint8_t cmd, uint8_t* data, uint8_t len)
@@ -261,25 +261,25 @@ void Robot_Arm_t::send_packet(uint8_t cmd, uint8_t* data, uint8_t len)
 // // 【修改】绝对运动：打包 14 字节
 // void Robot_Arm_t::move(float x, float y, float z, float pitch, float roll, float claw, uint32_t duration)
 // {
-//     uint8_t buf[14]; 
-    
-//     int16_t i_pitch = (int16_t)(pitch * 10.0f); 
+//     uint8_t buf[14];
+
+//     int16_t i_pitch = (int16_t)(pitch * 10.0f);
 //     int16_t i_x = (int16_t)x;
 //     int16_t i_y = (int16_t)y;
 //     int16_t i_z = (int16_t)z;
-//     int16_t i_roll = (int16_t)roll; 
+//     int16_t i_roll = (int16_t)roll;
 //     int16_t i_claw = (int16_t)claw; // 夹爪
 //     uint16_t i_time = (uint16_t)duration;
-    
+
 //     // 协议顺序：Pitch, X, Y, Z, Roll, Claw, Time
 //     buf[0] = GET_LOW_BYTE(i_pitch); buf[1] = GET_HIGH_BYTE(i_pitch);
 //     buf[2] = GET_LOW_BYTE(i_x);     buf[3] = GET_HIGH_BYTE(i_x);
 //     buf[4] = GET_LOW_BYTE(i_y);     buf[5] = GET_HIGH_BYTE(i_y);
 //     buf[6] = GET_LOW_BYTE(i_z);     buf[7] = GET_HIGH_BYTE(i_z);
 //     buf[8] = GET_LOW_BYTE(i_roll);  buf[9] = GET_HIGH_BYTE(i_roll);
-//     buf[10] = GET_LOW_BYTE(i_claw); buf[11] = GET_HIGH_BYTE(i_claw); 
+//     buf[10] = GET_LOW_BYTE(i_claw); buf[11] = GET_HIGH_BYTE(i_claw);
 //     buf[12] = GET_LOW_BYTE(i_time); buf[13] = GET_HIGH_BYTE(i_time);
-    
+
 //     send_packet(CMD_COORDINATE_SET, buf, 14);
 
 //     // 更新本地状态
@@ -293,24 +293,24 @@ void Robot_Arm_t::send_packet(uint8_t cmd, uint8_t* data, uint8_t len)
 
 void Robot_Arm_t::move(float x, float y, float z, float pitch, float roll, float claw, uint32_t duration, bool calc_only)
 {
-    uint8_t buf[14]; 
-    
-    int16_t i_pitch = (int16_t)(pitch * 10.0f); 
+    uint8_t buf[14];
+
+    int16_t i_pitch = (int16_t)(pitch * 10.0f);
     int16_t i_x = (int16_t)x;
     int16_t i_y = (int16_t)y;
     int16_t i_z = (int16_t)z;
-    int16_t i_roll = (int16_t)roll; 
-    int16_t i_claw = (int16_t)claw; 
+    int16_t i_roll = (int16_t)roll;
+    int16_t i_claw = (int16_t)claw;
     uint16_t i_time = (uint16_t)duration;
-    
+
     buf[0] = GET_LOW_BYTE(i_pitch); buf[1] = GET_HIGH_BYTE(i_pitch);
     buf[2] = GET_LOW_BYTE(i_x);     buf[3] = GET_HIGH_BYTE(i_x);
     buf[4] = GET_LOW_BYTE(i_y);     buf[5] = GET_HIGH_BYTE(i_y);
     buf[6] = GET_LOW_BYTE(i_z);     buf[7] = GET_HIGH_BYTE(i_z);
     buf[8] = GET_LOW_BYTE(i_roll);  buf[9] = GET_HIGH_BYTE(i_roll);
-    buf[10] = GET_LOW_BYTE(i_claw); buf[11] = GET_HIGH_BYTE(i_claw); 
+    buf[10] = GET_LOW_BYTE(i_claw); buf[11] = GET_HIGH_BYTE(i_claw);
     buf[12] = GET_LOW_BYTE(i_time); buf[13] = GET_HIGH_BYTE(i_time);
-    
+
     if (calc_only) {
         send_packet(CMD_IKINE_RESULT_GET, buf, 14);
     } else {
@@ -348,24 +348,24 @@ void Robot_Arm_t::request_fk_calc(float j1, float j2, float j3, float j4, float 
 void Robot_Arm_t::move_inc(float dx, float dy, float dz, float dpitch, float droll, float dclaw, uint32_t duration_ms)
 {
     uint8_t buf[14];
-    
+
     int16_t i_dx = (int16_t)roundf(dx);
     int16_t i_dy = (int16_t)roundf(dy);
     int16_t i_dz = (int16_t)roundf(dz);
-    int16_t i_dp = (int16_t)roundf(dpitch * 10.0f); 
+    int16_t i_dp = (int16_t)roundf(dpitch * 10.0f);
     int16_t i_dr = (int16_t)roundf(droll);
     int16_t i_dc = (int16_t)roundf(dclaw); // 夹爪增量
     uint16_t i_time = (uint16_t)duration_ms;
-    
+
     // 协议顺序：dX, dY, dZ, dPitch, dRoll, dClaw, Time
     buf[0] = GET_LOW_BYTE(i_dx); buf[1] = GET_HIGH_BYTE(i_dx);
     buf[2] = GET_LOW_BYTE(i_dy); buf[3] = GET_HIGH_BYTE(i_dy);
     buf[4] = GET_LOW_BYTE(i_dz); buf[5] = GET_HIGH_BYTE(i_dz);
     buf[6] = GET_LOW_BYTE(i_dp); buf[7] = GET_HIGH_BYTE(i_dp);
     buf[8] = GET_LOW_BYTE(i_dr); buf[9] = GET_HIGH_BYTE(i_dr);
-    buf[10] = GET_LOW_BYTE(i_dc); buf[11] = GET_HIGH_BYTE(i_dc); 
+    buf[10] = GET_LOW_BYTE(i_dc); buf[11] = GET_HIGH_BYTE(i_dc);
     buf[12] = GET_LOW_BYTE(i_time); buf[13] = GET_HIGH_BYTE(i_time);
-    
+
     send_packet(CMD_ARM_MOVE_INC, buf, 14);
 
     // 更新本地状态
@@ -382,9 +382,9 @@ void Robot_Arm_t::update_status(void) {
 }
 
 void Robot_Arm_t::move_servo(uint8_t id, int16_t angle, uint16_t time_ms) {
-    int16_t pos = angle; 
-    int16_t speed = 1000; 
-    if(time_ms > 0) speed = 20000 / time_ms; 
+    int16_t pos = angle;
+    int16_t speed = 1000;
+    if(time_ms > 0) speed = 20000 / time_ms;
     servo.write_pos_ex(id, 0, speed, pos);
     update_status();
 }
@@ -481,5 +481,3 @@ void Robot_Arm_t::send_coord_limits(void) {
 void Robot_Arm_t::request_coord_limits(void) {
     send_packet(CMD_GET_COORD_LIMITS, NULL, 0);
 }
-
-

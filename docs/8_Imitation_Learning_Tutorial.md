@@ -138,7 +138,7 @@ gedit .bashrc
 Locate the `conda initialize` code section and append the command beneath it. Save the changes by pressing **Ctrl + S**, close the editor, and reopen the terminal.
 
 ```bash
-conda config --set auto_activate false 
+conda config --set auto_activate false
 ```
 
 <img src="../_static/media/chapter_8/section_2/image_53.png" class="common_img" style="width:800px;"/>
@@ -329,9 +329,8 @@ The naming convention for each servo from top to bottom is: `gripper`, `wrist_ro
 
 > [!NOTE]
 >
-> * **If a docking station is utilized, the USB connectors of both cameras must not be connected to the same docking station simultaneously.**
->
-> * **The feed from the fixed environmental camera must completely capture the movements of the follower arm.**
+> - **If a docking station is utilized, the USB connectors of both cameras must not be connected to the same docking station simultaneously.**
+> - **The feed from the fixed environmental camera must completely capture the movements of the follower arm.**
 
 ---
 
@@ -394,15 +393,15 @@ python -m lerobot.scripts.lerobot_record --config_path=examples/nexarm/record.ya
 
 Key Parameter Descriptions:
 
-| Parameter        | Default Value          | Description                                                  |
-| ---------------- | ---------------------- | ------------------------------------------------------------ |
-| `repo_id`        | ${HF_USER}/nexarm_pick | Dataset name in Hugging Face Hub format                      |
-| `num_episodes`   | 50                     | Number of recorded episodes                                  |
-| `episode_time_s` | 10                     | Duration of each episode in seconds                          |
-| `reset_time_s`   | 10                     | Waiting time between episodes to reset the scene             |
-| `fps`            | 30                     | Recording frame rate                                         |
+| Parameter        | Default Value          | Description                                                                              |
+| ---------------- | ---------------------- | ---------------------------------------------------------------------------------------- |
+| `repo_id`        | ${HF_USER}/nexarm_pick | Dataset name in Hugging Face Hub format                                                  |
+| `num_episodes`   | 50                     | Number of recorded episodes                                                              |
+| `episode_time_s` | 10                     | Duration of each episode in seconds                                                      |
+| `reset_time_s`   | 10                     | Waiting time between episodes to reset the scene                                         |
+| `fps`            | 30                     | Recording frame rate                                                                     |
 | `push_to_hub`    | true                   | Specifies whether to upload to the Hugging Face Hub; set to `false` for local collection |
-| `display_data`   | false                  | Specifies whether to enable the visualization interface      |
+| `display_data`   | false                  | Specifies whether to enable the visualization interface                                  |
 
 When the prompt shown below appears, data recording has commenced. At this point, the leader arm can be manipulated to control the follower arm to grasp the target object and place it at the destination.
 
@@ -449,8 +448,9 @@ cd .\Desktop\finsh\
 <img src="../_static/media/chapter_8/section_6/image_43.png" class="common_img" style="width:600px;"/>
 
 > [!NOTE]
-> * **Local training is not recommended on computers without a dedicated graphics card.**
-> * **The following steps require a dedicated graphics card to execute.**
+>
+> - **Local training is not recommended on computers without a dedicated graphics card.**
+> - **The following steps require a dedicated graphics card to execute.**
 
 Enter the command to install **cuda11.8** for GPU training, as training solely on a CPU is highly time-consuming.
 

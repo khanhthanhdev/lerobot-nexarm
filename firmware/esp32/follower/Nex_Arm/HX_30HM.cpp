@@ -27,24 +27,24 @@ uint8_t SerialServo_t::tx_frame_write(uint8_t id, uint8_t cmd, const uint8_t *da
 {
 	uint8_t frame_len =  6 + data_len;
   	uint8_t packet[frame_len];
-  
+
 	packet[0] = FRAME_HEADER_1;
 	packet[1] = FRAME_HEADER_2;
 	packet[2] = id;
 	packet[3] = 2 + data_len;
 	packet[4] = cmd;
-	
+
 	for(uint8_t i = 0; i < data_len; i++) {
 		packet[5 + i] = data[i];
 	}
-	
+
 	packet[frame_len - 1] = data_check((const uint8_t*)packet, frame_len - 1);
 	return uart->write(packet, frame_len);
 }
 
 void SerialServo_t::write_pos_ex(uint8_t id, uint8_t acc, int16_t speed, int16_t pos)
 {
-    uint8_t data[8]; 
+    uint8_t data[8];
     uint16_t _pos, _spd;
 
     acc = LIMIT(acc, 0, 254);
@@ -63,14 +63,14 @@ void SerialServo_t::write_pos_ex(uint8_t id, uint8_t acc, int16_t speed, int16_t
     data[6] = (uint8_t)(_spd & 0xFF);  // 46: 速度低位
     data[7] = (uint8_t)(_spd >> 8);    // 47: 速度高位
 
-    tx_frame_write(id, 3, data, 8); 
+    tx_frame_write(id, 3, data, 8);
 }
 uint8_t SerialServo_t::sync_write_pos_speed(uint8_t *ids, int16_t *positions, int16_t speed, uint8_t num) {
     uint8_t args_len = 2 + (num * 8); // Addr + DataLen + (ID + 7 Bytes)*num
     uint8_t buf[args_len];
 
-    buf[0] = 41; 
-    buf[1] = 7;  
+    buf[0] = 41;
+    buf[1] = 7;
 
     for (int i = 0; i < num; i++) {
         uint16_t u16_pos = (uint16_t)MASK_HOST(positions[i], 15);
@@ -124,25 +124,25 @@ void SerialServo_t::write_mode(uint8_t id, uint8_t mode) {
     tx_frame_write(id, CMD_WRITE, data, 2);
 }
 // uint8_t SerialServo_t::sync_write_pos_speed(uint8_t *ids, int16_t *positions, int16_t speed, uint8_t num) {
-//     uint8_t args_len = 2 + (num * 8); 
+//     uint8_t args_len = 2 + (num * 8);
 //     uint8_t buf[args_len];
 
-//     buf[0] = 41; 
-//     buf[1] = 7;  
+//     buf[0] = 41;
+//     buf[1] = 7;
 
 //     for (int i = 0; i < num; i++) {
 //         uint16_t u16_pos = (uint16_t)MASK_HOST(positions[i], 15);
 //         uint16_t u16_spd = (uint16_t)MASK_HOST(speed, 15);
-        
+
 //         uint8_t base = 2 + i * 8;
 //         buf[base]     = ids[i];
-        
-//         buf[base + 1] = 50;             
-        
+
+//         buf[base + 1] = 50;
+
 //         buf[base + 2] = u16_pos & 0xFF;  // 位置低位
 //         buf[base + 3] = u16_pos >> 8;    // 位置高位
-//         buf[base + 4] = 0;               // PWM 低位 
-//         buf[base + 5] = 0;               // PWM 高位 
+//         buf[base + 4] = 0;               // PWM 低位
+//         buf[base + 5] = 0;               // PWM 高位
 //         buf[base + 6] = u16_spd & 0xFF;  // 速度低位
 //         buf[base + 7] = u16_spd >> 8;    // 速度高位
 //     }

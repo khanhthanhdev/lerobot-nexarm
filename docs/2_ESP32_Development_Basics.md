@@ -46,24 +46,24 @@ The main interface of Arduino IDE is shown in the figure below, which can be div
 
 1. **Menu Bar**: Responsible for Arduino IDE related settings.
 
-| **Icon**                                                     | **Function**                                                 |
-| ------------------------------------------------------------ | ------------------------------------------------------------ |
-| <img class="common_img" src="../_static/media/chapter_2/section_1/media/image61.png"  /> | Allows creating or opening project files and configuring interface preferences. |
-| <img class="common_img" src="../_static/media/chapter_2/section_1/media/image62.png"  /> | Provides editing options to perform text editing tasks such as code commenting, indentation, and searching. |
+| **Icon**                                                                                 | **Function**                                                                                                          |
+| ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| <img class="common_img" src="../_static/media/chapter_2/section_1/media/image61.png"  /> | Allows creating or opening project files and configuring interface preferences.                                       |
+| <img class="common_img" src="../_static/media/chapter_2/section_1/media/image62.png"  /> | Provides editing options to perform text editing tasks such as code commenting, indentation, and searching.           |
 | <img class="common_img" src="../_static/media/chapter_2/section_1/media/image63.png"  /> | Provides project options to configure the entire project, including compilation, execution, and adding library files. |
-| <img class="common_img" src="../_static/media/chapter_2/section_1/media/image64.png"  /> | Provides tool options to select the development board and port, and retrieve board information. |
-| <img class="common_img" src="../_static/media/chapter_2/section_1/media/image65.png"  /> | Provides help options to assist with getting started and troubleshooting common issues. |
+| <img class="common_img" src="../_static/media/chapter_2/section_1/media/image64.png"  /> | Provides tool options to select the development board and port, and retrieve board information.                       |
+| <img class="common_img" src="../_static/media/chapter_2/section_1/media/image65.png"  /> | Provides help options to assist with getting started and troubleshooting common issues.                               |
 
 2. **Toolbar**: Project-related tools, including compiling programs, uploading programs, and opening the serial monitor.
 
-| **Icon**                                                     | **Function**                                                 |
-| ------------------------------------------------------------ | ------------------------------------------------------------ |
-| <img class="common_img" src="../_static/media/chapter_2/section_1/media/image13.png"  /> | Verify. Checks if a program is written correctly and compiles the project if there are no errors. |
-| <img class="common_img" src="../_static/media/chapter_2/section_1/media/image14.png"  /> | Upload. Uploads the program to the Arduino controller.       |
-| <img class="common_img" src="../_static/media/chapter_2/section_1/media/image15.png"  /> | Debug. Real-time debugging is supported for some development boards via Arduino IDE. |
-| <img class="common_img" src="../_static/media/chapter_2/section_1/media/image67.png" style="width:250px" /> | Select Board. Allows selecting different development boards for project development. |
-| <img class="common_img" src="../_static/media/chapter_2/section_1/media/image17.png"  /> | Serial Plotter. Plots the data printed to the Arduino serial port into a chart. |
-| <img class="common_img" src="../_static/media/chapter_2/section_1/media/image18.png"  /> | Serial Monitor. Prints serial port information.              |
+| **Icon**                                                                                                    | **Function**                                                                                      |
+| ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| <img class="common_img" src="../_static/media/chapter_2/section_1/media/image13.png"  />                    | Verify. Checks if a program is written correctly and compiles the project if there are no errors. |
+| <img class="common_img" src="../_static/media/chapter_2/section_1/media/image14.png"  />                    | Upload. Uploads the program to the Arduino controller.                                            |
+| <img class="common_img" src="../_static/media/chapter_2/section_1/media/image15.png"  />                    | Debug. Real-time debugging is supported for some development boards via Arduino IDE.              |
+| <img class="common_img" src="../_static/media/chapter_2/section_1/media/image67.png" style="width:250px" /> | Select Board. Allows selecting different development boards for project development.              |
+| <img class="common_img" src="../_static/media/chapter_2/section_1/media/image17.png"  />                    | Serial Plotter. Plots the data printed to the Arduino serial port into a chart.                   |
+| <img class="common_img" src="../_static/media/chapter_2/section_1/media/image18.png"  />                    | Serial Monitor. Prints serial port information.                                                   |
 
 3. **Editor Area**: The area for writing and editing code.
 
@@ -71,13 +71,13 @@ The main interface of Arduino IDE is shown in the figure below, which can be div
 
 5. **Sidebar**: The core of Arduino IDE, responsible for displaying the project folder, code debugging, and library installation.
 
-| **Icon**                                                     | **Function**                         |
-| ------------------------------------------------------------ | -------------------------------- |
-| <img class="common_img" src="../_static/media/chapter_2/section_1/media/image19.png"  /> | Sketchbook. Displays the files of the current project. |
-| <img class="common_img" src="../_static/media/chapter_2/section_1/media/image20.png"  /> | Board Manager. Adds development board toolkits. |
+| **Icon**                                                                                 | **Function**                                            |
+| ---------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| <img class="common_img" src="../_static/media/chapter_2/section_1/media/image19.png"  /> | Sketchbook. Displays the files of the current project.  |
+| <img class="common_img" src="../_static/media/chapter_2/section_1/media/image20.png"  /> | Board Manager. Adds development board toolkits.         |
 | <img class="common_img" src="../_static/media/chapter_2/section_1/media/image21.png"  /> | Library Manager. Adds or removes program library files. |
-| <img class="common_img" src="../_static/media/chapter_2/section_1/media/image22.png"  /> | Debug. Performs real-time debugging of the project. |
-| <img class="common_img" src="../_static/media/chapter_2/section_1/media/image23.png"  /> | Search. Searches or replaces code or variables. |
+| <img class="common_img" src="../_static/media/chapter_2/section_1/media/image22.png"  /> | Debug. Performs real-time debugging of the project.     |
+| <img class="common_img" src="../_static/media/chapter_2/section_1/media/image23.png"  /> | Search. Searches or replaces code or variables.         |
 
 ### 2.1.3 Arduino IDE Interface Settings
 
@@ -135,7 +135,6 @@ Subsequent programs require the official libraries **PS3 Controller Host**, **Mu
 
 <img class="common_img" src="../_static/media/chapter_3/section_4/media/image5.png" style="width:800px"/>
 
-
 5. Click the <img  src="../_static/media/chapter_2/section_3/media/image6.png"   class="inline-icon" /> button to compile the program and verify if there are any syntax errors.
 
 <img class="common_img" src="../_static/media/chapter_2/section_5/media/image33.png" style="width:500px"/>
@@ -164,11 +163,11 @@ NexArm mainly uses two magnetic encoder bus servos, **HX-30HM** and **HX-65HM**.
 
 <img class="common_img" src="../_static/media/chapter_2/section_1/media/image25.png" style="width:200px"/>
 
-* **HX-30HM** is a magnetic encoder bus servo developed by Hiwonder. It integrates the servo drive, motor, and bus signal. It communicates via a half-duplex UART asynchronous serial interface with a communication baud rate of up to 1,000,000 bps, achieving precise control through serial commands. The working voltage range of the servo is 9 to 12.6 V, with a rated voltage of 11.1 V. The unit features a total weight of 52 g and compact dimensions measuring 45.2 x 24.7 x 35 mm. It delivers a rated torque of 30 kg-cm at the nominal 11.1 V, while the rotation speed reaches 0.19 seconds per 60 degrees. Continuous 360-degree rotation is supported with a control resolution of 0.3 degrees, mapping the numerical range of 0 to 4095 directly to a full 0 to 360-degree span. Three operational modes are available, allowing smooth transitions between position control, closed-loop speed control, and open-loop speed control. An integrated magnetic encoder provides real-time angular feedback. Each module features three hardware interfaces, allowing a maximum of 253 units to be daisy-chained along the communication bus for synchronized multi-axis tasks. Safety configurations include non-volatile data storage upon power loss, stall protection, and overheat prevention. The system also delivers continuous telemetry feedback for core metrics, including temperature, voltage, and real-time position.
+- **HX-30HM** is a magnetic encoder bus servo developed by Hiwonder. It integrates the servo drive, motor, and bus signal. It communicates via a half-duplex UART asynchronous serial interface with a communication baud rate of up to 1,000,000 bps, achieving precise control through serial commands. The working voltage range of the servo is 9 to 12.6 V, with a rated voltage of 11.1 V. The unit features a total weight of 52 g and compact dimensions measuring 45.2 x 24.7 x 35 mm. It delivers a rated torque of 30 kg-cm at the nominal 11.1 V, while the rotation speed reaches 0.19 seconds per 60 degrees. Continuous 360-degree rotation is supported with a control resolution of 0.3 degrees, mapping the numerical range of 0 to 4095 directly to a full 0 to 360-degree span. Three operational modes are available, allowing smooth transitions between position control, closed-loop speed control, and open-loop speed control. An integrated magnetic encoder provides real-time angular feedback. Each module features three hardware interfaces, allowing a maximum of 253 units to be daisy-chained along the communication bus for synchronized multi-axis tasks. Safety configurations include non-volatile data storage upon power loss, stall protection, and overheat prevention. The system also delivers continuous telemetry feedback for core metrics, including temperature, voltage, and real-time position.
 
 <img class="common_img" src="../_static/media/chapter_2/section_1/media/image26.png" style="width:200px"/>
 
-* **HX-65HM** is a dual-shaft magnetic encoder smart serial bus servo developed by Hiwonder. It combines a servo driver, motor, and bus communication capabilities into a single housing, utilizing a half-duplex UART asynchronous serial interface at a baud rate of 1,000,000 bps to execute precision control via serial commands. The operating voltage range spans from 9 to 12.6 V with a nominal rating of 11.1 V. The unit features a weight of 143.5 g and compact dimensions measuring 45 x 25 x 70 mm. It delivers a peak torque of up to 65 kg-cm under an operating voltage of 12.6 V, while the actuation speed reaches 0.19 seconds per 60 degrees. Continuous 360-degree rotation capability is supported with a control resolution of 0.3 degrees, mapping the numerical range of 0 to 4095 directly to a full 0 to 360-degree span. Three operational modes are available, allowing smooth transitions between position control, closed-loop speed control, and open-loop speed control. An integrated magnetic encoder provides real-time angular data tracking. A maximum of 253 units can be daisy-chained along the communication bus for synchronized control. Safety configurations include non-volatile data storage upon power loss, thermal cutoffs, and power-down protection. The system also delivers continuous telemetry feedback for multiple operating parameters, including temperature, voltage, position, current, and velocity.
+- **HX-65HM** is a dual-shaft magnetic encoder smart serial bus servo developed by Hiwonder. It combines a servo driver, motor, and bus communication capabilities into a single housing, utilizing a half-duplex UART asynchronous serial interface at a baud rate of 1,000,000 bps to execute precision control via serial commands. The operating voltage range spans from 9 to 12.6 V with a nominal rating of 11.1 V. The unit features a weight of 143.5 g and compact dimensions measuring 45 x 25 x 70 mm. It delivers a peak torque of up to 65 kg-cm under an operating voltage of 12.6 V, while the actuation speed reaches 0.19 seconds per 60 degrees. Continuous 360-degree rotation capability is supported with a control resolution of 0.3 degrees, mapping the numerical range of 0 to 4095 directly to a full 0 to 360-degree span. Three operational modes are available, allowing smooth transitions between position control, closed-loop speed control, and open-loop speed control. An integrated magnetic encoder provides real-time angular data tracking. A maximum of 253 units can be daisy-chained along the communication bus for synchronized control. Safety configurations include non-volatile data storage upon power loss, thermal cutoffs, and power-down protection. The system also delivers continuous telemetry feedback for multiple operating parameters, including temperature, voltage, position, current, and velocity.
 
 ### 2.2.4 Program Upload
 
@@ -321,8 +320,6 @@ void SerialServo_t::tx_frame_write(uint8_t id, uint8_t cmd, uint8_t* data, uint8
 }
 ```
 
-
-
 ## 2.3 Bus Servo Status Reading
 
 ### 2.3.1 Project Introduction
@@ -354,7 +351,6 @@ Locate the folder [Bus Servo Position Reading\busservo_read](https://drive.googl
 After the program starts, it scans the servos on the bus first. If any online servos are scanned, the serial port outputs the current angle and coordinate information of each servo ID in sequence.
 
 <img class="common_img" src="../_static/media/chapter_2/section_1/media/image56.png" style="width:600px"/>
-
 
 ### 2.3.6 Program Analysis
 
@@ -585,7 +581,6 @@ void system_loop_handler(void)
 }
 ```
 
-
 ## 2.4 Synchronous Control of Multiple Bus Servos
 
 ### 2.4.1 Project Introduction
@@ -800,8 +795,6 @@ void SerialServo_t::tx_frame_write(uint8_t id, uint8_t cmd, uint8_t* data, uint8
 }
 ```
 
-
-
 ## 2.5 Button Scanning and Buzzer
 
 ### 2.5.1 Project Introduction
@@ -814,11 +807,11 @@ This experiment triggers different buzzer prompts via two buttons on the NexArm 
 
 ### 2.5.3 Module Description
 
-* **Buzzer**: The model of the buzzer mounted on NexArm is **BUZZ-8530**, which is a common active electromagnetic buzzer. The operating voltage is typically 3 to 5 V, making it compatible with 3.3 V and 5 V microcontroller systems. The buzzer integrates an internal oscillation drive circuit. It automatically emits sound at a fixed frequency when the rated DC voltage is applied to the positive and negative poles, requiring no external drive signals, which makes it extremely simple to use. The operating frequency is generally around 2300 Hz, the no-load current is within approximately 30 mA, and the sound pressure level can reach above 85 dB. This meets the requirements of most application scenarios, such as prompt tones and warning alarms.
+- **Buzzer**: The model of the buzzer mounted on NexArm is **BUZZ-8530**, which is a common active electromagnetic buzzer. The operating voltage is typically 3 to 5 V, making it compatible with 3.3 V and 5 V microcontroller systems. The buzzer integrates an internal oscillation drive circuit. It automatically emits sound at a fixed frequency when the rated DC voltage is applied to the positive and negative poles, requiring no external drive signals, which makes it extremely simple to use. The operating frequency is generally around 2300 Hz, the no-load current is within approximately 30 mA, and the sound pressure level can reach above 85 dB. This meets the requirements of most application scenarios, such as prompt tones and warning alarms.
 
 <img class="common_img" src="../_static/media/chapter_2/section_1/media/image30.png" style="width:600px"/>
 
-* **Buttons**: NexArm is equipped with two tactile buttons directly connected to the GPIO ports of the ESP32 microcontroller. Both buttons use common self-resetting tactile SMD buttons. The corresponding signal is triggered when pressed, and the button automatically springs back when released. The buttons are characterized by a simple structure, long lifespan, and sensitive response, which matches the human-robot interaction design requirements of embedded controllers. The overall button design follows the principle of minimization, simplifying the hardware structure as much as possible while ensuring necessary debugging and control functions.
+- **Buttons**: NexArm is equipped with two tactile buttons directly connected to the GPIO ports of the ESP32 microcontroller. Both buttons use common self-resetting tactile SMD buttons. The corresponding signal is triggered when pressed, and the button automatically springs back when released. The buttons are characterized by a simple structure, long lifespan, and sensitive response, which matches the human-robot interaction design requirements of embedded controllers. The overall button design follows the principle of minimization, simplifying the hardware structure as much as possible while ensuring necessary debugging and control functions.
 
 ### 2.5.4 Program Upload
 
@@ -1008,8 +1001,6 @@ void Buzzer_t::update()
 }
 ```
 
-
-
 ## 2.6 OLED Display
 
 ### 2.6.1 Project Introduction
@@ -1142,8 +1133,6 @@ void OLED_t::show_custom()
     } while (u8g2.nextPage());
 }
 ```
-
-
 
 ## 2.7 FLASH File System Operation
 
@@ -1295,8 +1284,6 @@ void system_loop_handler(void)
     delay(10);
 }
 ```
-
-
 
 ## 2.8 Wi-Fi Programming Operations
 
@@ -1485,8 +1472,6 @@ void system_loop_handler(void)
     delay(2);
 }
 ```
-
-
 
 ## 2.9 ADC Voltage Reading
 

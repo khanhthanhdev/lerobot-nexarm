@@ -3,8 +3,8 @@ static int8_t motor_shadow_speeds[4] = {0, 0, 0, 0};
 void Motor_I2C::begin(TwoWire &wire, uint8_t sda_pin, uint8_t scl_pin, MotorType type, uint8_t polarity)
 {
     i2c_bus = &wire;
-    i2c_bus->begin(sda_pin, scl_pin, 100000); 
-    delay(50); 
+    i2c_bus->begin(sda_pin, scl_pin, 100000);
+    delay(50);
 
     uint8_t type_val = (uint8_t)type;
     write_bytes(MOTOR_TYPE_ADDR, &type_val, 1);
@@ -24,9 +24,9 @@ void Motor_I2C::set_speed(int8_t m1, int8_t m2, int8_t m3, int8_t m4)
 void Motor_I2C::set_single_speed(uint8_t index, int8_t speed)
 {
     if (index < 1 || index > 4) return;
-    
+
     motor_shadow_speeds[index - 1] = speed;
-    
+
     write_bytes(MOTOR_FIXED_SPEED_ADDR, (uint8_t*)motor_shadow_speeds, 4);
 }
 

@@ -14,9 +14,9 @@ enum TimingEvent{
     TIMING_EVENT_BAT_UPDATE,
 };
 
-enum TimingEventPeriod{  
-    BUZZER_UPDATE_PERIOD =          20,  
-    OLED_UPDATE_PERIOD  =           100,  
+enum TimingEventPeriod{
+    BUZZER_UPDATE_PERIOD =          20,
+    OLED_UPDATE_PERIOD  =           100,
     SERVO_STATUS_UPDATE_PERIOD =    200,
     BAT_UPDATE_PERIOD =             200,
 };
@@ -30,7 +30,7 @@ enum StatusEvent{
 };
 
 enum CtrlMode {
-    UART_MODE = 0,  
+    UART_MODE = 0,
     WIFI_MODE,
     BLE_MODE,
     CUSTOM_MODE

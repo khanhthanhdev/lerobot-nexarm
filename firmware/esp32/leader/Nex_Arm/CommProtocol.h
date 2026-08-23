@@ -42,7 +42,7 @@ public:
     void register_error_callback(ProtocolErrorCallback cb);
 
 private:
-    ParsingState parsing_state; 
+    ParsingState parsing_state;
     ProtocolSuccessCallback successCallback;
     ProtocolErrorCallback errorCallback;
 };

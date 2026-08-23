@@ -6,7 +6,7 @@
 
 > [!NOTE]
 >
->**Assembly tutorials for NexArm matching peripherals are available in the link [03 Assembly Videos](https://drive.google.com/drive/folders/1-1ykJr405S0vIeFQv9dn_m7zlzzDg9rA?usp=sharing).**
+> **Assembly tutorials for NexArm matching peripherals are available in the link [03 Assembly Videos](https://drive.google.com/drive/folders/1-1ykJr405S0vIeFQv9dn_m7zlzzDg9rA?usp=sharing).**
 
 1. Connect NexArm to the computer using a Type-C data cable.
 
@@ -90,11 +90,11 @@ This section demonstrates wireless control between a robotic arm and a synchroni
 
 ### 7.3.3 Program Download
 
-* **Robotic Arm Program Download**
+- **Robotic Arm Program Download**
 
 Locate the [02 Source Code](https://drive.google.com/drive/folders/1yTTumKUU5GzvlPNguagFue_B8C64bpLb?usp=sharing) folder in the same directory as this document, and find the program under **Synchronizer Joystick Control\NexArm.zip** for downloading. This program is used to receive ESP-NOW data sent by the synchronizer and control the robotic arm to execute synchronized actions. For specific download steps, refer to [7.1 Program Download Instructions - Must Read](#p7-1).
 
-* **Synchronizer Program Download**
+- **Synchronizer Program Download**
 
 Locate the [02 Source Code](https://drive.google.com/drive/folders/1yTTumKUU5GzvlPNguagFue_B8C64bpLb?usp=sharing) folder in the same directory as this document, and find the program under **Synchronizer Joystick Control\Synchronizer.zip** for downloading. For specific download steps, refer to [7.1 Program Download Instructions - Must Read](#p7-1).
 
@@ -104,9 +104,10 @@ Once both programs are successfully downloaded, the devices enter the same ESP-N
 
 ### 7.3.5 Program Analysis
 
-* **Robotic Arm Analysis**
+- **Robotic Arm Analysis**
 
 1. The robotic arm program first defines the runtime states required for ESP-NOW control, including the protocol parsing object, parameter storage object, current channel, global acceleration, synchronization switch, OLED refresh time, battery refresh time, and the most recent servo feedback time. These variables collectively determine the basic configuration and status cache during wireless synchronization runtime.
+
 ```cpp
 CommProtocol_t at32_protocol;
 Preferences prefs;
@@ -256,7 +257,7 @@ void system_loop_handler(void)
 }
 ```
 
-* **Synchronizer Analysis**
+- **Synchronizer Analysis**
 
 1. The core data structure of the synchronizer program is `ArmPacket_t`, which contains a time sequence number `seq` and 6-channel servo positions `pos[6]`. During each transmission, the program writes the current timestamp into `seq` and the read values of the 6 servos into the `pos[]` array, forming a complete synchronization data packet.
 
@@ -897,11 +898,11 @@ This section demonstrates how to control a robotic arm's coordinates in real tim
 
 ### 7.9.3 Program Download
 
-* **Robotic Arm Program Download**
+- **Robotic Arm Program Download**
 
 Locate the [02 Source Code](https://drive.google.com/drive/folders/1yTTumKUU5GzvlPNguagFue_B8C64bpLb?usp=sharing) folder in the same directory as this document, open the program file under **Synchronizer Joystick Control\NexArm.zip\Nex_Arm**, and download it to the robotic arm controller. For specific download steps, refer to [7.1 Program Download Instructions - Must Read](#p7-1).
 
-* **Synchronizer Program Download**
+- **Synchronizer Program Download**
 
 Locate the [02 Source Code](https://drive.google.com/drive/folders/1yTTumKUU5GzvlPNguagFue_B8C64bpLb?usp=sharing) folder in the same directory as this document, open the program file under **Synchronizer Joystick Control\Synchronizer.zip\Nex_Arm**, and download it to the synchronizer controller. For specific download steps, refer to [7.1 Program Download Instructions - Must Read](#p7-1).
 
@@ -911,7 +912,7 @@ After the respective programs are downloaded to both ends, the devices enter the
 
 ### 7.9.5 Program Analysis
 
-* **Robotic Arm Analysis**
+- **Robotic Arm Analysis**
 
 1. The robotic arm program initially defines the runtime states required for ESP-NOW control reception, which include the current channel, global acceleration, synchronization mode switch, OLED refresh interval, battery refresh interval, and current pose cache. Consequently, upon receiving a coordinate control command, the program can both forward it to the underlying system for execution and synchronously update the local display state.
 
@@ -986,7 +987,7 @@ if (now - last_oled_refresh_ms >= OLED_REFRESH_INTERVAL_MS) {
 }
 ```
 
-* **Synchronizer Analysis**
+- **Synchronizer Analysis**
 
 1. The synchronizer program initially defines the core variables required for joystick control, including the broadcast target MAC address, transmission interval, current target coordinates, joystick center value, and debug output interval. These variables determine the transmission frequency, coordinate range, and joystick calibration results.
 
@@ -1073,4 +1074,3 @@ if (currentMillis - lastDebugTime > 200) {
     Serial.printf("Joy: X=%.1f Y=%.1f Z=%.1f\n", current_x, current_y, current_z);
 }
 ```
-

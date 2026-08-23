@@ -30,7 +30,7 @@ from numpy.typing import NDArray  # type: ignore  # TODO: add type stubs for num
 # Fix MSMF hardware transform compatibility for Windows before importing cv2
 if platform.system() == "Windows" and "OPENCV_VIDEOIO_MSMF_ENABLE_HW_TRANSFORMS" not in os.environ:
     os.environ["OPENCV_VIDEOIO_MSMF_ENABLE_HW_TRANSFORMS"] = "0"
-import cv2  # type: ignore  # TODO: add type stubs for OpenCV
+import cv2 as _cv2  # type: ignore  # TODO: add type stubs for OpenCV
 
 from lerobot.utils.decorators import check_if_already_connected, check_if_not_connected
 from lerobot.utils.errors import DeviceNotConnectedError
@@ -38,6 +38,9 @@ from lerobot.utils.errors import DeviceNotConnectedError
 from ..camera import Camera
 from ..utils import get_cv2_rotation
 from .configuration_opencv import ColorMode, OpenCVCameraConfig
+
+cv2: Any = _cv2
+
 
 # NOTE(Steven): The maximum opencv device index depends on your operating system. For instance,
 # if you have 3 cameras, they should be associated to index 0, 1, and 2. This is the case
@@ -219,7 +222,7 @@ class OpenCVCamera(Camera):
             self._validate_width_and_height()
 
         if self.fps is None:
-            self.fps = self.videocapture.get(cv2.CAP_PROP_FPS)
+            self.fps = int(round(self.videocapture.get(cv2.CAP_PROP_FPS)))
         else:
             self._validate_fps()
 
@@ -245,6 +248,8 @@ class OpenCVCamera(Camera):
 
     def _validate_fourcc(self) -> None:
         """Validates and sets the camera's FOURCC code."""
+        if self.config.fourcc is None:
+            raise ValueError(f"{self} FOURCC is not configured")
 
         fourcc_code = cv2.VideoWriter_fourcc(*self.config.fourcc)
 

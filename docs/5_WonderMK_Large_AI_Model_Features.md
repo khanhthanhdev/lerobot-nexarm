@@ -3,6 +3,7 @@
 <p id ="p5-1"></p>
 
 ## 5.1 WonderMK Image Flashing Steps (Optional)
+
 The WonderMK comes pre-flashed with firmware at the factory. For firmware re-flashing instructions, refer to **1. Quick Start.pdf**, located under the path **[2. Softwares\6. WonderMK K230 Vision Module Manual & Tool\01 K230 Vision Module Manual](https://drive.google.com/drive/folders/1iFLA4B9fQxmBXdpQ2GSa37rS2Mca8WEL?usp=sharing)** within the product documentation.
 
 ## 5.2 Large AI Model Initialization
@@ -66,6 +67,7 @@ The WonderMK comes pre-flashed with firmware at the factory. For firmware re-fla
 <img src="../_static/media/chapter_4/section_1/media2/image16.png"     class="common_img"/>
 
 7. Within the configuration interface, enter **Hi Wonder** for the assistant nickname at location ① to match the wake word supported by the local wake word model. The dialogue language and character voice at location ② can be selected based on requirements. The character introduction at location ③ can use the default template or a custom description. The character introduction provided below is recommended to optimize agent interactions during subsequent feature dialogues.
+
 ```
 
 [Role Definition]
@@ -80,12 +82,13 @@ Execute various tasks and follow instructions accurately.
 - Provide appropriate suggestions and execute actions
 
 ```
+
 <img src="../_static/media/chapter_4/section_1/media2/image17.png"     class="common_img"/>
 
 8. Select **No Memory** for the memory type and **DeepSeek V3.1 (Powerful)** for the language model. Advanced settings allow adjustment of more detailed operating parameters, but default settings are retained here. Click **Save** to complete.
 
->[!note]
->**If the account has not completed developer authentication on the XiaoZhi AI platform, selection is limited to lower-performance models such as XiaoZhi Lite by default. To utilize higher-performance models like Qwen3 235B or DeepSeek V3.1, complete the authentication on the XiaoZhi AI platform according to section [5.2.4 Platform Developer Authentication](#p5-2-4), and then reselect the model here.**
+> [!note]
+> **If the account has not completed developer authentication on the XiaoZhi AI platform, selection is limited to lower-performance models such as XiaoZhi Lite by default. To utilize higher-performance models like Qwen3 235B or DeepSeek V3.1, complete the authentication on the XiaoZhi AI platform according to section [5.2.4 Platform Developer Authentication](#p5-2-4), and then reselect the model here.**
 
 <img src="../_static/media/chapter_4/section_1/media2/image18.png"     class="common_img"/>
 
@@ -97,23 +100,19 @@ Execute various tasks and follow instructions accurately.
 
 <img src="../_static/media/chapter_4/section_1/media2/image20.png"     class="common_img"/>
 
-11) If the binding is successful, a **Device added successfully** prompt appears on the page as shown below. Select the **Open Source** version and click **Start Using**.
+11. If the binding is successful, a **Device added successfully** prompt appears on the page as shown below. Select the **Open Source** version and click **Start Using**.
 
 <img src="../_static/media/chapter_4/section_1/media2/image21.png"     class="common_img"/>
-
-
 
 ### 5.2.3 Device Unbinding
 
 1. If a device ID and binding URL appear normally during the operations in section **[5.2.2 XiaoZhi AI Device Binding](#p5-2-2)**, and the module is successfully bound to the XiaoZhi AI platform, the current role is established as the **primary user** of this module. To return or exchange this module with the manufacturer or transfer the primary user status, follow the **Primary User Unbinding** steps below to unbind the device.
->[!note]
->**If a different operator needs to use a bound WonderMK, the primary user must first perform unbinding before a new binding can occur, otherwis the module remains unavailable.**
+   > [!note]
+   > **If a different operator needs to use a bound WonderMK, the primary user must first perform unbinding before a new binding can occur, otherwise the module remains unavailable.**
 
 <img src="../_static/media/chapter_4/section_2/media/image47.png"  style="width:500px"  class="common_img"/>
 
-
-
-* #### **Primary User Unbinding**
+- #### **Primary User Unbinding**
 
 1. Open any browser and click the [XiaoZhi AI Chatbot](https://xiaozhi.me/) hyperlink for direct access.
 
@@ -139,8 +138,8 @@ Execute various tasks and follow instructions accurately.
 
 1. Click the [Sign up for GitHub · GitHub](https://github.com/signup) hyperlink to access the page. Enter the email address, login password, username, and location details sequentially, and then click **Create account** to submit the registration info.
 
->[!note]
->**Network access to this website may occasionally experience instability or latency depending on regional network conditions, so a stable internet connection is recommended.**
+> [!note]
+> **Network access to this website may occasionally experience instability or latency depending on regional network conditions, so a stable internet connection is recommended.**
 
 <img src="../_static/media/chapter_4/section_2/media/image29.png"  style="width:600px"   class="common_img"/>
 
@@ -158,8 +157,6 @@ Execute various tasks and follow instructions accurately.
 
 <img src="../_static/media/chapter_4/section_2/media/image33.png"  style="width:650px"   class="common_img"/>
 
-
-
 #### 5.2.4.2 XiaoZhi AI Platform Authentication
 
 1. Click the [Developer Authentication](https://xiaozhi.me/developer-auth) hyperlink to access the page. Click the **Bind GitHub Account** icon to start authentication.
@@ -168,8 +165,8 @@ Execute various tasks and follow instructions accurately.
 
 2. Enter the GitHub account credentials at location ① on the page, and then click **Sign in** at location ② to log in.
 
->[!note]
->**If the GitHub account is already linked with a personal Google or Apple account, logging into GitHub is also supported by clicking the corresponding icon and entering those credentials.**
+> [!note]
+> **If the GitHub account is already linked with a personal Google or Apple account, logging into GitHub is also supported by clicking the corresponding icon and entering those credentials.**
 
 <img src="../_static/media/chapter_4/section_2/media/image25.png"     class="common_img"/>
 
@@ -181,38 +178,31 @@ Execute various tasks and follow instructions accurately.
 
 <img src="../_static/media/chapter_4/section_1/media2/image28.png"  style="width:1000px"   class="common_img"/>
 
-
-
 ## 5.3 Scene Understanding
-
 
 The WonderMK module features a built-in high-definition camera that supports capturing real-time frames and analyzing them via a vision large AI model. This integration enables deep interaction between the module and the external environment. This functionality can be experienced through the following steps.
 
->[!note]
->**Before proceeding with this section, ensure that the module has successfully completed network configuration, device binding, and XiaoZhi AI role configuration.**
+> [!note]
+> **Before proceeding with this section, ensure that the module has successfully completed network configuration, device binding, and XiaoZhi AI role configuration.**
 
-1) After powering on the module, open the **AI Model** feature and say the wake word **Hello Hiwonder** to enter the chat interface and activate the module.
+1. After powering on the module, open the **AI Model** feature and say the wake word **Hello Hiwonder** to enter the chat interface and activate the module.
 
 <img src="../_static/media/chapter_4/section_1/media2/image29.png"  style="width:500px"   class="common_img"/>
 
-2) Chat with the WonderMK module using phrases such as: **① Describe what's in front of you** or **② Take a photo to see what is ahead**.
->[!note]
->
->**Spoken commands do not need to strictly match the examples provided above as long as the underlying intent remains identical.**
+2. Chat with the WonderMK module using phrases such as: **① Describe what's in front of you** or **② Take a photo to see what is ahead**.
+   > [!note]
+   >
+   > **Spoken commands do not need to strictly match the examples provided above as long as the underlying intent remains identical.**
 
 <img src="../_static/media/chapter_4/section_1/media2/image30.png"  style="width:500px"   class="common_img"/>
 
+3. Once the module comprehends the command, the module camera activates to capture a real-time image and displays it briefly on the screen. The chat dialog returns the image capture function call, which requires no attention, and subsequently displays and broadcasts the analysis statement generated by the large AI model. Responses are randomly generated by the large AI model module, ensuring only that the underlying meaning remains appropriate.
 
-
-3) Once the module comprehends the command, the module camera activates to capture a real-time image and displays it briefly on the screen. The chat dialog returns the image capture function call, which requires no attention, and subsequently displays and broadcasts the analysis statement generated by the large AI model. Responses are randomly generated by the large AI model module, ensuring only that the underlying meaning remains appropriate.
-
->[!note]
+> [!note]
 >
->**The scene understanding feature does not support continuous real-time observation. It only captures and analyzes a single real-time frame upon receiving a specific command.**
+> **The scene understanding feature does not support continuous real-time observation. It only captures and analyzes a single real-time frame upon receiving a specific command.**
 
 <img src="../_static/media/chapter_4/section_2/media/image49.png"  style="width:500px"   class="common_img"/>
-
-
 
 ## 5.4 Large AI Model Voice Interaction
 
@@ -224,23 +214,20 @@ The WonderMK module features a built-in high-definition camera that supports cap
 
 4) During human-robot interaction, the dialogue can also be actively terminated by providing commands such as: **① Goodbye** or **② Okay, let's stop here**. Upon receipt, the module replies with an appropriate farewell phrase and ends the listening process.
 
->[!note]
->**Spoken commands do not need to strictly match the examples provided above as long as the underlying intent remains identical.**
+> [!note]
+> **Spoken commands do not need to strictly match the examples provided above as long as the underlying intent remains identical.**
 
 5. The WonderMK module supports a voice interruption feature. During module voice playback, such as when the module responds to speech, greets, or says goodbye, short-pressing the right button immediately terminates the current voice playback and switches to listening for the next speech input.
 
->[!note]
->**Short-pressing the right button while the module is not speaking switches the system to expression mode, which requires a new wake word to reactivate.**
+> [!note]
+> **Short-pressing the right button while the module is not speaking switches the system to expression mode, which requires a new wake word to reactivate.**
 
 6. The WonderMK module supports bilingual recognition and speech, including English. The operating language can be switched directly using example expressions such as: **① Can you speak English with me?** or **② Can we communicate in English?**
 
->[!note]
->**Spoken commands do not need to strictly match the examples provided above as long as the underlying intent remains identical.**
-
-
+> [!note]
+> **Spoken commands do not need to strictly match the examples provided above as long as the underlying intent remains identical.**
 
 ## 5.5 Multimodal Large Models: Voice Control
-
 
 ### 5.5.1 Steps for Installing WonderMK on NexArm
 
@@ -252,11 +239,9 @@ The WonderMK module features a built-in high-definition camera that supports cap
 
 <img src="../_static/media/chapter_4/section_2/media/image41.png"  style="width:500px"   class="common_img"/>
 
-
 3. Locate the mounting holes on servo number 5 of the robotic arm.
 
 <img src="../_static/media/chapter_4/section_2/media/image43.png"  style="width:500px"   class="common_img"/>
-
 
 4. Secure the bracket-mounted WonderMK into the corresponding holes using the provided silver round-head Phillips machine screws, and connect the WonderMK to the NexArm controller using the 4-pin cable.
 
@@ -285,51 +270,49 @@ The WonderMK module features a built-in high-definition camera that supports cap
 <img src="../_static/media/chapter_4/section_2/media/image45.png"  style="width:900px"   class="common_img"/>
 
 5. After waking the large AI model via the wake word **Hello Hiwonder**, issue commands such as "Look up", "Nod", or "Shake head" to control the robotic arm to execute the corresponding movements.
->[!note]
->**The large AI model executes actions by identifying keywords, meaning there is no strict or rigid grammar required for voice commands as long as the intent is clear and explicit.**
-
-
+   > [!note]
+   > **The large AI model executes actions by identifying keywords, meaning there is no strict or rigid grammar required for voice commands as long as the intent is clear and explicit.**
 
 ### 5.5.3 Custom MCP Features
 
 #### 5.5.3.1 Factory MCP Command List
 
->[!note]
->**The Model Context Protocol, known as MCP, is a unified and standardized communication protocol that allows large AI models to securely and conveniently invoke various external tools, data, and services, serving as a universal interface between the AI and the external world.**
+> [!note]
+> **The Model Context Protocol, known as MCP, is a unified and standardized communication protocol that allows large AI models to securely and conveniently invoke various external tools, data, and services, serving as a universal interface between the AI and the external world.**
 
 The NexArm supports custom MCP integration, and the following MCP commands are already included in the factory firmware.
 
-| Action Name | English Command | Function Description |
-|:-------:|:-------:|:------:|
-| Look Down | look_down | The robotic arm looks down |
-| Look Up | look_up | The robotic arm looks up |
-| Look Left | look_left | The robotic arm looks left |
-| Look Right | look_right | The robotic arm looks right |
-| Open Gripper | open_claw | The robotic arm opens the gripper |
-| Close Gripper | close_claw | The robotic arm closes the gripper |
-| Raise | go_up | The robotic arm raises its height |
-| Lower | go_down | The robotic arm lowers its height |
-| Reset | reset | The robotic arm returns to the default position |
-| Nod | nod | The robotic arm executes a nodding motion |
-| Shake Head | shake | The robotic arm executes a head-shaking motion |
+|  Action Name  | English Command |              Function Description               |
+| :-----------: | :-------------: | :---------------------------------------------: |
+|   Look Down   |    look_down    |           The robotic arm looks down            |
+|    Look Up    |     look_up     |            The robotic arm looks up             |
+|   Look Left   |    look_left    |           The robotic arm looks left            |
+|  Look Right   |   look_right    |           The robotic arm looks right           |
+| Open Gripper  |    open_claw    |        The robotic arm opens the gripper        |
+| Close Gripper |   close_claw    |       The robotic arm closes the gripper        |
+|     Raise     |      go_up      |        The robotic arm raises its height        |
+|     Lower     |     go_down     |        The robotic arm lowers its height        |
+|     Reset     |      reset      | The robotic arm returns to the default position |
+|      Nod      |       nod       |    The robotic arm executes a nodding motion    |
+|  Shake Head   |      shake      | The robotic arm executes a head-shaking motion  |
 
 #### 5.5.3.2 Steps for Adding New MCP Features
 
 The MCP voice control function is implemented by registering tools within the `setupMCPTools()` function in the **AiLLMControl.cpp** file. Each tool corresponds to a functional type, such as robotic arm control or buzzer control.
 
-* **Modify the Tool Registration Function**
+- **Modify the Tool Registration Function**
 
 1. Open the **AiLLMControl.cpp** file.
 2. Locate the `setupMCPTools()` function.
 3. Add the new tool definition to the array.
 
-* **Action Execution Logic**
+- **Action Execution Logic**
 
 1. Locate the `executeAction()` function.
 2. Add a new conditional statement to handle the new action command.
 3. Implement the specific action execution code.
 
-* **Test the New Feature**
+- **Test the New Feature**
 
 1. Recompile and upload the code.
 2. Restart the device.
@@ -373,7 +356,7 @@ else if (strstr(action, "wave") || strstr(action, "挥手")) {
 ```C++
 p.beginArray(2); // Modify the array size to 2
   // Existing move_arm tool...
-  
+
   // Add new grab tool
   p.beginDict(3);
     p.addString("type");
@@ -491,4 +474,3 @@ bool AiLLMControl::executeGrabAction(const uint8_t* data, uint16_t len) {
     return true;
 }
 ```
-

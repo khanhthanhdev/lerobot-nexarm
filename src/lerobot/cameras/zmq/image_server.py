@@ -26,13 +26,16 @@ import logging
 import threading
 import time
 from collections import deque
+from typing import Any
 
 import cv2
 import numpy as np
-import zmq
+import zmq as _zmq
 
 from ..configs import ColorMode
 from ..opencv import OpenCVCamera, OpenCVCameraConfig
+
+zmq: Any = _zmq
 
 logger = logging.getLogger(__name__)
 

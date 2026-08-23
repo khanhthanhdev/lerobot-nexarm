@@ -1,9 +1,9 @@
 #include "Nex_Arm_Board.h"
 #include "U8g2lib.h"
 #include "Wire.h"
-#include "HX_30HM.h"   
+#include "HX_30HM.h"
 #include "Global.h"
-#include "usb_ctrl.h"  
+#include "usb_ctrl.h"
 #include "Robot_Arm.h"
 #include "system_task_handle.h"
 #include "freertos/FreeRTOS.h"
@@ -32,7 +32,7 @@ bool OLED_t::begin()
     Wire.begin();
     Wire.setClock(400000);
     Wire.beginTransmission(OLED_I2C_ADDR);
-    
+
     if(!Wire.endTransmission()) {
         u8g2.begin();
         return true;
@@ -43,7 +43,7 @@ bool OLED_t::begin()
 void OLED_t::set_custom_text(uint8_t line, String text)
 {
     if(line < 4) {
-        custom_lines[line] = text; 
+        custom_lines[line] = text;
     }
 }
 
@@ -137,7 +137,7 @@ void OLED_t::show_custom()
         u8g2.print(custom_lines[2]);
         u8g2.setCursor(0, 63);
         u8g2.print(custom_lines[3]);
-        
+
     } while (u8g2.nextPage());
 }
 
@@ -148,23 +148,23 @@ void OLED_t::show_status(float x, float y, float z, float pitch, float roll, flo
         u8g2.setFont(u8g2_font_7x14B_tr);
         u8g2.setCursor(0, 12);
         u8g2.print("Arm Status");
-        
+
         u8g2.setFont(u8g2_font_6x10_tr);
         u8g2.setCursor(0, 26);
         u8g2.print("X:"); u8g2.print(x, 0); u8g2.print("mm");
         u8g2.setCursor(64, 26);
         u8g2.print("Y:"); u8g2.print(y, 0); u8g2.print("mm");
-        
+
         u8g2.setCursor(0, 40);
         u8g2.print("Z:"); u8g2.print(z, 0); u8g2.print("mm");
         u8g2.setCursor(64, 40);
         u8g2.print("P:"); u8g2.print(pitch, 1); u8g2.print("d");
-        
+
         u8g2.setCursor(0, 54);
         u8g2.print("R:"); u8g2.print(roll, 0); u8g2.print("d");
         u8g2.setCursor(64, 54);
         u8g2.print("C:"); u8g2.print(claw, 0); u8g2.print("d");
-        
+
     } while (u8g2.nextPage());
 }
 
@@ -183,7 +183,7 @@ void OLED_t::show_espnow_info(uint8_t channel, uint8_t acc, bool is_unicast, Str
 
         u8g2.setCursor(0, 54);
         u8g2.print(mac);
-        
+
     } while (u8g2.nextPage());
 }
 
@@ -201,7 +201,7 @@ void OLED_t::show_wifi_ap_info(String ssid, IPAddress ip)
 
         u8g2.setCursor(0, 58);
         u8g2.print(ip);
-        
+
     } while (u8g2.nextPage());
 }
 
@@ -285,12 +285,12 @@ void Buzzer_t::update()
     case BUZZER_STAGE_IDLE:
         break;
     }
-}    
+}
 
 void Buzzer_t::begin()
 {
     allow_change = true;
-    
+
     this->ticks_on = 0;
     this->ticks_off = 0;
     this->times = 0;
@@ -344,7 +344,7 @@ bool Buzzer_t::set(uint32_t on_time , uint32_t off_time , uint16_t times, uint16
 void HW_Board::begin()
 {
   if(!LittleFS.begin(true)) {
-  } 
+  }
   bat.begin();
   buzzer.begin();
   oled.begin();
@@ -367,8 +367,8 @@ void HW_Board::list_action_group_dir()
 void HW_Board::action_group_run(uint8_t id)
 {
   uint8_t total_frames = 0;
-  const uint8_t FRAME_LEN = 40; 
-  uint8_t buf[40] = {0}; 
+  const uint8_t FRAME_LEN = 40;
+  uint8_t buf[40] = {0};
 
   String fileName = "/ActionGroup" + String(id) + ".rob";
 
@@ -384,8 +384,8 @@ void HW_Board::action_group_run(uint8_t id)
   } else {
       file.close(); return;
   }
-  
-  act_state = READ_FRAME_NUM; 
+
+  act_state = READ_FRAME_NUM;
   int16_t current_pos[6];
   bool has_feedback = sync_arm_feedback(80) && get_last_servo_positions(current_pos);
 
@@ -406,7 +406,7 @@ void HW_Board::action_group_run(uint8_t id)
 
       uint8_t frame_index = buf[0];
       uint8_t servo_num = buf[1];
-      uint16_t move_time = BYTE_TO_HW(buf[3], buf[2]); 
+      uint16_t move_time = BYTE_TO_HW(buf[3], buf[2]);
 
       if(servo_num > 6) {
           servo_num = 6;
@@ -455,7 +455,7 @@ void HW_Board::action_group_run(uint8_t id)
       TickType_t wait_ticks = pdMS_TO_TICKS(move_time);
       while((xTaskGetTickCount() - wait_start) < wait_ticks) {
           vTaskDelay(pdMS_TO_TICKS(5));
-          extern SerialPort_t serial_port; 
+          extern SerialPort_t serial_port;
           serial_port.rec_handler();
           pump_at32_feedback();
           if(act_state == ACT_STOP) break;
@@ -463,9 +463,9 @@ void HW_Board::action_group_run(uint8_t id)
 
       if(frame_index == total_frames) break;
   }
-  
+
   file.close();
-  act_state = READ_FRAME_NUM; 
+  act_state = READ_FRAME_NUM;
 }
 
 bool HW_Board::action_group_download(uint8_t id, uint8_t *data, size_t length)
@@ -474,15 +474,15 @@ bool HW_Board::action_group_download(uint8_t id, uint8_t *data, size_t length)
   size_t len;
   uint8_t frame_index = data[2];
 
-  if(id > 255) return false; 
+  if(id > 255) return false;
   String fileName = "/ActionGroup" + String(id) + ".rob";
-  
+
   if(frame_index == 1) {
     File file = LittleFS.open(fileName, "w");
     if(!file) {
         return false;
     }
-    file.write(data[1]); 
+    file.write(data[1]);
     len = length - 2;
     written = file.write(&data[2], len);
     file.close();

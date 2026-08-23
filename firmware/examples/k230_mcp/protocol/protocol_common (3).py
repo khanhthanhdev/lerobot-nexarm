@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 K230 通信协议公共模块
 
@@ -694,7 +693,7 @@ class UARTFrame:
             FRAME_TYPE_CMD: 'CMD', FRAME_TYPE_RSP: 'RSP',
             FRAME_TYPE_RPT: 'RPT', FRAME_TYPE_ACK: 'ACK'
         }
-        return "UARTFrame(type=%s, seq=%s, txn=%s, func=0x%02X)" % (
+        return "UARTFrame(type={}, seq={}, txn={}, func=0x{:02X})".format(
             type_names.get(self.frame_type, 'UNK'),
             self.sequence,
             self.txn_id,
@@ -1337,7 +1336,7 @@ class K230ClientBase:
             label = labels[idx] if idx < len(labels) else ""
             value_text = self._format_raw_scalar(value)
             if label:
-                parts.append("%s(%s)" % (value_text, label))
+                parts.append("{}({})".format(value_text, label))
             else:
                 parts.append(value_text)
         return "[" + ", ".join(parts) + "]"
@@ -1505,16 +1504,16 @@ class K230ClientBase:
         if allow_empty and value == '':
             return
         if value not in allowed_values:
-            self._add_validation_issue(issues, "%s=%r not in allowed set" % (path, value))
+            self._add_validation_issue(issues, "{}={!r} not in allowed set".format(path, value))
 
     def _validate_int_range(self, value, path, issues, min_value=None, max_value=None):
         if not self._is_int_like(value):
             self._add_validation_issue(issues, "%s should be int" % path)
             return
         if min_value is not None and value < min_value:
-            self._add_validation_issue(issues, "%s=%s < %s" % (path, value, min_value))
+            self._add_validation_issue(issues, "{}={} < {}".format(path, value, min_value))
         if max_value is not None and value > max_value:
-            self._add_validation_issue(issues, "%s=%s > %s" % (path, value, max_value))
+            self._add_validation_issue(issues, "{}={} > {}".format(path, value, max_value))
 
     def _validate_point(self, x, y, path, issues, allow_zero_pair=False,
                         min_x=0, max_x=RESULT_COORD_MAX_X,
@@ -1525,9 +1524,9 @@ class K230ClientBase:
         if allow_zero_pair and x == 0 and y == 0:
             return
         if x < min_x or x > max_x:
-            self._add_validation_issue(issues, "%s.x=%s out of range" % (path, x))
+            self._add_validation_issue(issues, "{}.x={} out of range".format(path, x))
         if y < min_y or y > max_y:
-            self._add_validation_issue(issues, "%s.y=%s out of range" % (path, y))
+            self._add_validation_issue(issues, "{}.y={} out of range".format(path, y))
 
     def _validate_bbox_geometry(self, item, path, issues):
         x = item.get('x')
@@ -1539,9 +1538,9 @@ class K230ClientBase:
         self._validate_int_range(w, path + '.w', issues, 1, RESULT_COORD_MAX_X)
         self._validate_int_range(h, path + '.h', issues, 1, RESULT_COORD_MAX_Y)
         if self._is_int_like(x) and self._is_int_like(w) and (x + w) > RESULT_COORD_MAX_X:
-            self._add_validation_issue(issues, "%s.x+w=%s out of range" % (path, x + w))
+            self._add_validation_issue(issues, "{}.x+w={} out of range".format(path, x + w))
         if self._is_int_like(y) and self._is_int_like(h) and (y + h) > RESULT_COORD_MAX_Y:
-            self._add_validation_issue(issues, "%s.y+h=%s out of range" % (path, y + h))
+            self._add_validation_issue(issues, "{}.y+h={} out of range".format(path, y + h))
 
     def _validate_rotated_rect_geometry(self, item, path, issues):
         cx = item.get('cx')
@@ -1560,7 +1559,7 @@ class K230ClientBase:
             self._add_validation_issue(issues, "%s should be list" % path)
             return
         if len(values) != expected_len:
-            self._add_validation_issue(issues, "%s len=%s expected=%s" % (path, len(values), expected_len))
+            self._add_validation_issue(issues, "{} len={} expected={}".format(path, len(values), expected_len))
             return
         idx = 0
         while idx + 1 < len(values):
@@ -1596,7 +1595,7 @@ class K230ClientBase:
         if mode_name in ('FaceDetection', 'PersonDetection', 'ObjectTrack',
                          'HandDetection', 'LicencePlateDetection'):
             if len(extras) != 0:
-                self._add_validation_issue(issues, "%s len=%s expected=0" % (path, len(extras)))
+                self._add_validation_issue(issues, "{} len={} expected=0".format(path, len(extras)))
             return
 
         if mode_name in ('FaceLandmark', 'FaceMesh'):
@@ -1615,7 +1614,7 @@ class K230ClientBase:
                 self._validate_string_field(pose_values[0], path + '[0]', issues, allow_empty=False)
                 pose_values = pose_values[1:]
             if len(pose_values) != 3:
-                self._add_validation_issue(issues, "%s len=%s expected=3/4" % (path, len(extras)))
+                self._add_validation_issue(issues, "{} len={} expected=3/4".format(path, len(extras)))
                 return
             for idx, value in enumerate(pose_values):
                 self._validate_int_range(value, "%s[%d]" % (path, idx), issues, -180, 180)
@@ -1627,7 +1626,7 @@ class K230ClientBase:
                 self._validate_string_field(gaze_values[0], path + '[0]', issues, allow_empty=False)
                 gaze_values = gaze_values[1:]
             if len(gaze_values) != 4:
-                self._add_validation_issue(issues, "%s len=%s expected=4/5" % (path, len(extras)))
+                self._add_validation_issue(issues, "{} len={} expected=4/5".format(path, len(extras)))
                 return
             self._validate_point(gaze_values[0], gaze_values[1], path + '[0:1]', issues)
             self._validate_point(gaze_values[2], gaze_values[3],
@@ -1641,7 +1640,7 @@ class K230ClientBase:
 
         if mode_name in ('HandGesture', 'HandRecognition'):
             if len(extras) not in (0, 1):
-                self._add_validation_issue(issues, "%s len=%s unexpected" % (path, len(extras)))
+                self._add_validation_issue(issues, "{} len={} unexpected".format(path, len(extras)))
                 return
             if len(extras) == 1:
                 self._validate_enum_string(extras[0], path + '[0]', issues, HAND_GESTURE_LABELS)
@@ -1649,12 +1648,12 @@ class K230ClientBase:
 
         if mode_name == 'FaceParse':
             if len(extras) != 0:
-                self._add_validation_issue(issues, "%s len=%s expected=0" % (path, len(extras)))
+                self._add_validation_issue(issues, "{} len={} expected=0".format(path, len(extras)))
             return
 
         if mode_name == 'SelfLearning':
             if len(extras) != 2:
-                self._add_validation_issue(issues, "%s len=%s expected=2" % (path, len(extras)))
+                self._add_validation_issue(issues, "{} len={} expected=2".format(path, len(extras)))
                 return
             self._validate_string_field(extras[0], path + '[0]', issues, allow_empty=False)
             self._validate_int_range(extras[1], path + '[1]', issues, 0, RESULT_SCORE_MAX)
@@ -1662,7 +1661,7 @@ class K230ClientBase:
 
         if mode_name == 'FalldownDetection':
             if len(extras) != 2:
-                self._add_validation_issue(issues, "%s len=%s expected=2" % (path, len(extras)))
+                self._add_validation_issue(issues, "{} len={} expected=2".format(path, len(extras)))
                 return
             self._validate_int_range(extras[0], path + '[0]', issues, 0, 1)
             self._validate_int_range(extras[1], path + '[1]', issues, 0, RESULT_SCORE_MAX)
@@ -1670,7 +1669,7 @@ class K230ClientBase:
 
         if mode_name == 'GarbageClassification':
             if len(extras) != 2:
-                self._add_validation_issue(issues, "%s len=%s expected=2" % (path, len(extras)))
+                self._add_validation_issue(issues, "{} len={} expected=2".format(path, len(extras)))
                 return
             self._validate_enum_string(extras[0], path + '[0]', issues, GARBAGE_CLASS_LABELS)
             self._validate_int_range(extras[1], path + '[1]', issues, 0, RESULT_SCORE_MAX)
@@ -1678,7 +1677,7 @@ class K230ClientBase:
 
         if mode_name == 'TrafficDetection':
             if len(extras) != 2:
-                self._add_validation_issue(issues, "%s len=%s expected=2" % (path, len(extras)))
+                self._add_validation_issue(issues, "{} len={} expected=2".format(path, len(extras)))
                 return
             self._validate_enum_string(extras[0], path + '[0]', issues, TRAFFIC_LABELS)
             self._validate_int_range(extras[1], path + '[1]', issues, 0, RESULT_SCORE_MAX)
@@ -1692,12 +1691,12 @@ class K230ClientBase:
                 self._validate_string_field(extras[0], path + '[0]', issues, allow_empty=False)
                 self._validate_int_range(extras[1], path + '[1]', issues, 0, RESULT_SCORE_MAX)
                 return
-            self._add_validation_issue(issues, "%s len=%s unexpected for detection bbox" % (path, len(extras)))
+            self._add_validation_issue(issues, "{} len={} unexpected for detection bbox".format(path, len(extras)))
             return
 
         if mode_name == 'ApriltagDiscern':
             if len(extras) not in (1, 2):
-                self._add_validation_issue(issues, "%s len=%s unexpected for ApriltagDiscern" % (path, len(extras)))
+                self._add_validation_issue(issues, "{} len={} unexpected for ApriltagDiscern".format(path, len(extras)))
                 return
             self._validate_string_field(extras[0], path + '[0]', issues, allow_empty=False)
             if len(extras) == 2:
@@ -1706,7 +1705,7 @@ class K230ClientBase:
 
         if mode_name in ('DMCodeDiscern', 'QRCodeDiscern', 'BarCodeDiscern'):
             if len(extras) not in (0, 1):
-                self._add_validation_issue(issues, "%s len=%s unexpected for code bbox" % (path, len(extras)))
+                self._add_validation_issue(issues, "{} len={} unexpected for code bbox".format(path, len(extras)))
                 return
             if len(extras) == 1:
                 self._validate_string_field(extras[0], path + '[0]', issues, allow_empty=False)
@@ -1714,7 +1713,7 @@ class K230ClientBase:
 
         if mode_name in ('HandKeyPointDetection',):
             if len(extras) != 0:
-                self._add_validation_issue(issues, "%s len=%s expected=0" % (path, len(extras)))
+                self._add_validation_issue(issues, "{} len={} expected=0".format(path, len(extras)))
             return
 
     def _validate_center_extras(self, mode_name, extras, path, issues):
@@ -1736,7 +1735,7 @@ class K230ClientBase:
                 self._validate_string_field(pose_values[0], path + '[0]', issues, allow_empty=False)
                 pose_values = pose_values[1:]
             if len(pose_values) != 3:
-                self._add_validation_issue(issues, "%s len=%s expected=3/4" % (path, len(extras)))
+                self._add_validation_issue(issues, "{} len={} expected=3/4".format(path, len(extras)))
                 return
             for idx, value in enumerate(pose_values):
                 self._validate_int_range(value, "%s[%d]" % (path, idx), issues, -180, 180)
@@ -1748,7 +1747,7 @@ class K230ClientBase:
                 self._validate_string_field(gaze_values[0], path + '[0]', issues, allow_empty=False)
                 gaze_values = gaze_values[1:]
             if len(gaze_values) != 2:
-                self._add_validation_issue(issues, "%s len=%s expected=2/3" % (path, len(extras)))
+                self._add_validation_issue(issues, "{} len={} expected=2/3".format(path, len(extras)))
                 return
             self._validate_point(gaze_values[0], gaze_values[1],
                                  path,
@@ -1761,14 +1760,14 @@ class K230ClientBase:
 
         if mode_name in ('HandGesture', 'HandRecognition'):
             if len(extras) != 1:
-                self._add_validation_issue(issues, "%s len=%s expected=1" % (path, len(extras)))
+                self._add_validation_issue(issues, "{} len={} expected=1".format(path, len(extras)))
                 return
             self._validate_enum_string(extras[0], path + '[0]', issues, HAND_GESTURE_LABELS)
             return
 
         if mode_name == 'FaceParse':
             if len(extras) != 0:
-                self._add_validation_issue(issues, "%s len=%s expected=0" % (path, len(extras)))
+                self._add_validation_issue(issues, "{} len={} expected=0".format(path, len(extras)))
             return
 
         if mode_name in ('SingleColorDetection', 'MultiColorDetection',
@@ -1776,7 +1775,7 @@ class K230ClientBase:
                          'ObjectDetection', 'Segmentation', 'CustomDetection',
                          'DMCodeDiscern'):
             if len(extras) not in (0, 1):
-                self._add_validation_issue(issues, "%s len=%s unexpected" % (path, len(extras)))
+                self._add_validation_issue(issues, "{} len={} unexpected".format(path, len(extras)))
                 return
             if len(extras) == 1:
                 self._validate_string_field(extras[0], path + '[0]', issues, allow_empty=False)
@@ -1786,26 +1785,26 @@ class K230ClientBase:
                          'PersonDetection', 'ObjectTrack', 'HandDetection',
                          'HandKeyPointDetection', 'OCRDetection', 'LicencePlateDetection'):
             if len(extras) != 0:
-                self._add_validation_issue(issues, "%s len=%s expected=0" % (path, len(extras)))
+                self._add_validation_issue(issues, "{} len={} expected=0".format(path, len(extras)))
             return
 
         if mode_name == 'GarbageClassification':
             if len(extras) != 1:
-                self._add_validation_issue(issues, "%s len=%s expected=1" % (path, len(extras)))
+                self._add_validation_issue(issues, "{} len={} expected=1".format(path, len(extras)))
                 return
             self._validate_enum_string(extras[0], path + '[0]', issues, GARBAGE_CLASS_LABELS)
             return
 
         if mode_name == 'TrafficDetection':
             if len(extras) != 1:
-                self._add_validation_issue(issues, "%s len=%s expected=1" % (path, len(extras)))
+                self._add_validation_issue(issues, "{} len={} expected=1".format(path, len(extras)))
                 return
             self._validate_enum_string(extras[0], path + '[0]', issues, TRAFFIC_LABELS)
             return
 
         if mode_name == 'ApriltagDiscern':
             if len(extras) not in (1, 2):
-                self._add_validation_issue(issues, "%s len=%s unexpected for ApriltagDiscern" % (path, len(extras)))
+                self._add_validation_issue(issues, "{} len={} unexpected for ApriltagDiscern".format(path, len(extras)))
                 return
             self._validate_string_field(extras[0], path + '[0]', issues, allow_empty=False)
             if len(extras) == 2:
@@ -1814,7 +1813,7 @@ class K230ClientBase:
 
         if mode_name == 'LineDetection':
             if len(extras) != 1:
-                self._add_validation_issue(issues, "%s len=%s expected=1" % (path, len(extras)))
+                self._add_validation_issue(issues, "{} len={} expected=1".format(path, len(extras)))
                 return
             self._validate_int_range(extras[0], path + '[0]', issues,
                                      -RESULT_ANGLE_ABS_MAX, RESULT_ANGLE_ABS_MAX)
@@ -1822,7 +1821,7 @@ class K230ClientBase:
 
         if mode_name == 'FalldownDetection':
             if len(extras) != 2:
-                self._add_validation_issue(issues, "%s len=%s expected=2" % (path, len(extras)))
+                self._add_validation_issue(issues, "{} len={} expected=2".format(path, len(extras)))
                 return
             self._validate_int_range(extras[0], path + '[0]', issues, 0, 1)
             self._validate_int_range(extras[1], path + '[1]', issues, 0, RESULT_SCORE_MAX)
@@ -2058,7 +2057,7 @@ class K230ClientBase:
         if not issues:
             return
         summary = '; '.join(issues)
-        key = "%s|%s|%s" % (mode_name, result_type, summary)
+        key = "{}|{}|{}".format(mode_name, result_type, summary)
         now = self._ticks_ms()
         if key == self._last_validation_key and self._ticks_diff(now, self._last_validation_log_ms) < 1000:
             return
@@ -2155,7 +2154,7 @@ class K230ClientBase:
         if (mode_idx != empty_mode_idx and
                 current_mode_idx not in (None, empty_mode_idx, mode_idx)):
             if not self._set_mode_and_confirm_mode(empty_mode_idx, timeout_ms=5000):
-                self._log("旧应用切空未确认，取消进入新应用: from=%s, to=%s" % (
+                self._log("旧应用切空未确认，取消进入新应用: from={}, to={}".format(
                     APP_INDEX_TO_NAME.get(current_mode_idx, 'Unknown(%s)' % current_mode_idx),
                     APP_INDEX_TO_NAME.get(mode_idx, 'Unknown(%s)' % mode_idx),
                 ))
@@ -2377,9 +2376,9 @@ class K230ClientBase:
 
     def set_face_keypoint_mode(self, enabled):
         """设置人脸关键点模式
-        
+
         启用后只返回五官关键点数据，不进行人脸比对识别
-        
+
         Args:
             enabled: True启用关键点模式，False禁用
         """
@@ -2389,9 +2388,9 @@ class K230ClientBase:
 
     def set_face_detect_only_mode(self, enabled):
         """设置只检测人脸模式
-        
+
         启用后只进行人脸检测，返回多个人脸的xywh坐标，加快检测速度
-        
+
         Args:
             enabled: True启用只检测模式，False禁用
         """
@@ -2722,10 +2721,10 @@ class K230ClientBase:
             try:
                 ivalue = int(value)
             except (TypeError, ValueError):
-                self._log("无效姿态阈值 %s=%s (要求 1-180)" % (key, value))
+                self._log("无效姿态阈值 {}={} (要求 1-180)".format(key, value))
                 return False
             if ivalue < 1 or ivalue > 180:
-                self._log("姿态阈值越界 %s=%s (要求 1-180)" % (key, ivalue))
+                self._log("姿态阈值越界 {}={} (要求 1-180)".format(key, ivalue))
                 return False
             encoded_values[key] = ivalue
 
@@ -3017,7 +3016,7 @@ class K230ClientBase:
                             self.on_llm_result({'text': result_obj})
                     callback_extra = result_obj
                 except Exception as e:
-                    self._log("data_unpack error for cmd 0x%02X: %s" % (cmd, e))
+                    self._log("data_unpack error for cmd 0x{:02X}: {}".format(cmd, e))
 
             elif cmd == CMD_EMPTY_RETURN:
                 result_flag = extra[0] if extra else None
@@ -3119,7 +3118,7 @@ class K230ClientBase:
                     'message': error_msg
                 })
             else:
-                self._log("错误上报: module=%s class=%s sub=0x%04X code=0x%02X(%s), message=%s" % (
+                self._log("错误上报: module={} class={} sub=0x{:04X} code=0x{:02X}({}), message={}".format(
                     module_name or '--',
                     module_class_name,
                     error_subcode,
@@ -3339,13 +3338,13 @@ class K230ClientBase:
             payload_hex = payload.hex()
             if len(payload_hex) > 96:
                 payload_hex = payload_hex[:96] + "..."
-            self._log("Detect OCR parse error: %s payload=%s" % (repr(e), payload_hex))
+            self._log("Detect OCR parse error: {} payload={}".format(repr(e), payload_hex))
             return
 
         try:
             self._emit_detect_result(parsed, raw_values=raw_values)
         except Exception as e:
-            self._log("Detect OCR emit error: %s data=%s" % (repr(e), parsed))
+            self._log("Detect OCR emit error: {} data={}".format(repr(e), parsed))
 
     def _handle_detect_color(self, payload):
         """处理颜色检测结果"""

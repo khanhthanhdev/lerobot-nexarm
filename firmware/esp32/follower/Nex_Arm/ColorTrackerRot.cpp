@@ -557,6 +557,3 @@ void ColorTrackerRot::update() {
             break;
     }
 }
-
-
-

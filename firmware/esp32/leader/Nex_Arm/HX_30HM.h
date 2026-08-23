@@ -34,7 +34,7 @@ extern "C" {
 typedef struct {
 	uint8_t id;                				/**< 舵机ID (Servo ID) */
 	union {
-    
+
 		uint8_t error_byte;      			  /**< 错误状态字节 (Error status byte) */
 		struct {
 			uint8_t bit_voltage : 		1;  /**< 电压错误bit标志 (Voltage error bit flag) */
@@ -89,7 +89,7 @@ typedef struct {
 
 class SerialServo_t {
 public:
-    HardwareSerial* uart; 
+    HardwareSerial* uart;
 
     void begin(HardwareSerial& uart, uint32_t baudrate, uint8_t tx_pin = SERVO_TX_PIN, uint8_t rx_pin = SERVO_RX_PIN);
 
@@ -371,8 +371,8 @@ public:
      */
     ServoStatus_t read_moving_status(uint8_t id, uint8_t *status);
 
-    ServoStatus_t read_pos_ex(uint8_t id, 
-                                                int16_t *pos, 
+    ServoStatus_t read_pos_ex(uint8_t id,
+                                                int16_t *pos,
                                                 int16_t *speed,
                                                 int16_t *load,
                                                 uint8_t *vol,

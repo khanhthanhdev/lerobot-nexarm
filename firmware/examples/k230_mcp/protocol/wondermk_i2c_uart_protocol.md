@@ -80,15 +80,15 @@ I2C 与 UART 共用同一业务协议，差异仅在传输层：
 
 ### 5.1 字节布局
 
-| 字段 | 长度 | 偏移 | 说明 |
-| --- | ---: | ---: | --- |
-| Header | 2 | 0 | 固定 `0xAA 0x55` |
-| Len | 2 | 2 | `Payload` 长度，`uint16`，大端 |
-| Ctrl | 1 | 4 | 帧类型 + 续包标志 + 分包序号 |
-| Func | 1 | 5 | 功能码 |
-| Txn | 1 | 6 | 事务号 |
-| Payload | `Len` | 7 | 负载 |
-| XOR | 1 | `7 + Len` | 校验 |
+| 字段    |  长度 |      偏移 | 说明                           |
+| ------- | ----: | --------: | ------------------------------ |
+| Header  |     2 |         0 | 固定 `0xAA 0x55`               |
+| Len     |     2 |         2 | `Payload` 长度，`uint16`，大端 |
+| Ctrl    |     1 |         4 | 帧类型 + 续包标志 + 分包序号   |
+| Func    |     1 |         5 | 功能码                         |
+| Txn     |     1 |         6 | 事务号                         |
+| Payload | `Len` |         7 | 负载                           |
+| XOR     |     1 | `7 + Len` | 校验                           |
 
 公式：
 
@@ -106,11 +106,11 @@ Frame = AA 55 + Len(2) + Ctrl(1) + Func(1) + Txn(1) + Payload + XOR(1)
 
 ### 5.3 Ctrl 位定义
 
-| 位 | 含义 |
-| --- | --- |
-| bit7..6 | 帧类型 |
-| bit5 | `1` 表示后续仍有分片 |
-| bit4..0 | 分片序号 `0..31` |
+| 位      | 含义                 |
+| ------- | -------------------- |
+| bit7..6 | 帧类型               |
+| bit5    | `1` 表示后续仍有分片 |
+| bit4..0 | 分片序号 `0..31`     |
 
 掩码：
 
@@ -120,12 +120,12 @@ Frame = AA 55 + Len(2) + Ctrl(1) + Func(1) + Txn(1) + Payload + XOR(1)
 
 ### 5.4 帧类型
 
-| 值 | 名称 | 方向 | 说明 |
-| --- | --- | --- | --- |
-| `0x00` | CMD | 主机 -> 从机 | 命令 |
-| `0x40` | RSP | 从机 -> 主机 | 命令响应 |
-| `0x80` | RPT | 从机 -> 主机 | 主动上报 |
-| `0xC0` | ACK | 预留 | 当前未启用 |
+| 值     | 名称 | 方向         | 说明       |
+| ------ | ---- | ------------ | ---------- |
+| `0x00` | CMD  | 主机 -> 从机 | 命令       |
+| `0x40` | RSP  | 从机 -> 主机 | 命令响应   |
+| `0x80` | RPT  | 从机 -> 主机 | 主动上报   |
+| `0xC0` | ACK  | 预留         | 当前未启用 |
 
 ### 5.5 Txn 事务号规则
 
@@ -192,12 +192,12 @@ UART 传输不引入额外包头，直接传输第 5 章定义的完整帧。
 
 I2C 使用固定 `4096` 字节共享窗口，结构如下：
 
-| 区域 | 偏移 | 长度 | 说明 |
-| --- | ---: | ---: | --- |
-| Mailbox Header | `0` | `32` | 固定头 |
-| Host Slot Meta | `16` | `8` | 主机 -> 从机元数据 |
-| Device Slot Meta | `24` | `8` | 从机 -> 主机元数据 |
-| Slot Data Base | `32` | `slot_size * 2` | 两个数据槽 |
+| 区域             | 偏移 |            长度 | 说明               |
+| ---------------- | ---: | --------------: | ------------------ |
+| Mailbox Header   |  `0` |            `32` | 固定头             |
+| Host Slot Meta   | `16` |             `8` | 主机 -> 从机元数据 |
+| Device Slot Meta | `24` |             `8` | 从机 -> 主机元数据 |
+| Slot Data Base   | `32` | `slot_size * 2` | 两个数据槽         |
 
 其中：
 
@@ -216,34 +216,34 @@ mailbox v2 生效前提：
 
 ### 8.3 Mailbox Header
 
-| 偏移 | 长度 | 含义 |
-| --- | ---: | --- |
-| `0..3` | 4 | 固定魔数 `57 4C 4D 32`（`"WLM2"`） |
-| `4` | 1 | mailbox 主版本，当前 `2` |
-| `5` | 1 | mailbox 次版本，当前 `0` |
-| `6..7` | 2 | `slot_size`（大端） |
-| 其它 | - | 保留 |
+| 偏移   | 长度 | 含义                               |
+| ------ | ---: | ---------------------------------- |
+| `0..3` |    4 | 固定魔数 `57 4C 4D 32`（`"WLM2"`） |
+| `4`    |    1 | mailbox 主版本，当前 `2`           |
+| `5`    |    1 | mailbox 次版本，当前 `0`           |
+| `6..7` |    2 | `slot_size`（大端）                |
+| 其它   |    - | 保留                               |
 
 ### 8.4 Slot Meta 结构
 
 每个 slot meta 固定 8 字节：
 
-| 偏移 | 长度 | 含义 |
-| --- | ---: | --- |
-| `0` | 1 | `state` |
-| `1` | 1 | 保留 |
-| `2..3` | 2 | `generation`（大端） |
-| `4..5` | 2 | `frame_len`（大端） |
-| `6` | 1 | `frame_xor` |
-| `7` | 1 | 保留 |
+| 偏移   | 长度 | 含义                 |
+| ------ | ---: | -------------------- |
+| `0`    |    1 | `state`              |
+| `1`    |    1 | 保留                 |
+| `2..3` |    2 | `generation`（大端） |
+| `4..5` |    2 | `frame_len`（大端）  |
+| `6`    |    1 | `frame_xor`          |
+| `7`    |    1 | 保留                 |
 
 ### 8.5 Slot 状态值
 
-| 值 | 名称 | 含义 |
-| --- | --- | --- |
-| `0` | EMPTY | 空槽，可写 |
-| `1` | WRITING | 正在写入 |
-| `2` | READY | 已写完，待读取 |
+| 值  | 名称    | 含义           |
+| --- | ------- | -------------- |
+| `0` | EMPTY   | 空槽，可写     |
+| `1` | WRITING | 正在写入       |
+| `2` | READY   | 已写完，待读取 |
 
 ### 8.6 主机写 Host Slot 流程
 
@@ -278,13 +278,13 @@ mailbox v2 生效前提：
 
 多数命令使用 CompactCodec：
 
-| 类型 | 编码 |
-| --- | --- |
-| `string` | `[len:u8][utf8 bytes...]` |
-| `uint8` | 1 字节 |
-| `uint16` | 大端 2 字节 |
-| `uint32` | 大端 4 字节 |
-| `bbox` | `[center_x:u16][center_y:u16][w:u16][h:u16]` |
+| 类型     | 编码                                         |
+| -------- | -------------------------------------------- |
+| `string` | `[len:u8][utf8 bytes...]`                    |
+| `uint8`  | 1 字节                                       |
+| `uint16` | 大端 2 字节                                  |
+| `uint32` | 大端 4 字节                                  |
+| `bbox`   | `[center_x:u16][center_y:u16][w:u16][h:u16]` |
 
 补充：
 
@@ -329,20 +329,20 @@ mailbox v2 生效前提：
 
 #### 9.4.1 类型标签
 
-| Tag | 含义 | 后续数据 |
-| --- | --- | --- |
-| `0x00` | `null` | 无 |
-| `0x01` | `false` | 无 |
-| `0x02` | `true` | 无 |
-| `0x03` | `int8` | 1 字节（有符号） |
-| `0x04` | `int16` | 2 字节（大端有符号） |
-| `0x05` | `int32` | 4 字节（大端有符号） |
-| `0x06` | `uint8` | 1 字节 |
-| `0x07` | `uint16` | 2 字节（大端） |
-| `0x08` | `uint32` | 4 字节（大端） |
-| `0x09` | `string` | `[len:u16][utf8...]` |
-| `0x0A` | `array` | `[count:u16][item1][item2]...` |
-| `0x0B` | `dict` | `[count:u16][key1][value1]...` |
+| Tag    | 含义     | 后续数据                       |
+| ------ | -------- | ------------------------------ |
+| `0x00` | `null`   | 无                             |
+| `0x01` | `false`  | 无                             |
+| `0x02` | `true`   | 无                             |
+| `0x03` | `int8`   | 1 字节（有符号）               |
+| `0x04` | `int16`  | 2 字节（大端有符号）           |
+| `0x05` | `int32`  | 4 字节（大端有符号）           |
+| `0x06` | `uint8`  | 1 字节                         |
+| `0x07` | `uint16` | 2 字节（大端）                 |
+| `0x08` | `uint32` | 4 字节（大端）                 |
+| `0x09` | `string` | `[len:u16][utf8...]`           |
+| `0x0A` | `array`  | `[count:u16][item1][item2]...` |
+| `0x0B` | `dict`   | `[count:u16][key1][value1]...` |
 
 #### 9.4.2 使用建议
 
@@ -383,12 +383,12 @@ mailbox v2 生效前提：
 
 字段说明：
 
-| 字段 | 长度 | 说明 |
-| --- | ---: | --- |
-| `err_code` | 1 | 主错误码（见第 16 章） |
-| `err_module` | 1 | 错误模块（见第 16 章） |
-| `err_subcode` | 2 | 错误子码，大端 |
-| `extra` | N | 命令附加数据 |
+| 字段          | 长度 | 说明                   |
+| ------------- | ---: | ---------------------- |
+| `err_code`    |    1 | 主错误码（见第 16 章） |
+| `err_module`  |    1 | 错误模块（见第 16 章） |
+| `err_subcode` |    2 | 错误子码，大端         |
+| `extra`       |    N | 命令附加数据           |
 
 常见约定：
 
@@ -453,10 +453,10 @@ mailbox v2 生效前提：
 
 当前常见最终功能码：
 
-| 最终 `func` | 含义 |
-| --- | --- |
-| `0x6D` | `CMD_RESULT_RETURN`（ASR / LLM / VLM / MCP 结果） |
-| `0x6E` | `CMD_EMPTY_RETURN`（Wi-Fi、TTS 完成、部分学习完成） |
+| 最终 `func` | 含义                                                |
+| ----------- | --------------------------------------------------- |
+| `0x6D`      | `CMD_RESULT_RETURN`（ASR / LLM / VLM / MCP 结果）   |
+| `0x6E`      | `CMD_EMPTY_RETURN`（Wi-Fi、TTS 完成、部分学习完成） |
 
 补充约束：
 
@@ -475,13 +475,13 @@ Payload 固定 2 字节：
 
 状态位定义：
 
-| Bit | 值 | 含义 |
-| --- | --- | --- |
-| bit0 | `0x01` | RUN |
+| Bit  | 值     | 含义   |
+| ---- | ------ | ------ |
+| bit0 | `0x01` | RUN    |
 | bit1 | `0x02` | RESULT |
-| bit2 | `0x04` | READY |
-| bit3 | `0x08` | BUSY |
-| bit4 | `0x10` | ERR |
+| bit2 | `0x04` | READY  |
+| bit3 | `0x08` | BUSY   |
+| bit4 | `0x10` | ERR    |
 
 发送策略：
 
@@ -525,18 +525,18 @@ Payload：
 
 ### 12.2 检测结果功能码总览
 
-| Func | 名称 | 类型 |
-| --- | --- | --- |
-| `0x72` | `RPT_DETECT_BBOX` | 矩形框 |
-| `0x73` | `RPT_DETECT_STR` | 字符串 |
-| `0x74` | `RPT_DETECT_OCR` | 四点文本 |
-| `0x75` | `RPT_DETECT_COLOR` | 颜色分组/旋转框 |
-| `0x76` | `RPT_DETECT_LINE` | 巡线 |
-| `0x77` | `RPT_DETECT_KEYPOINT` | 人体关键点 |
-| `0x78` | `RPT_DETECT_HAND_KP` | 手掌关键点 |
-| `0x79` | `RPT_DETECT_CENTER` | 中心点 |
-| `0x7A` | `RPT_DETECT_FACE_KP` | 人脸五点 |
-| `0x7B` | `RPT_DETECT_QUAD` | 四边形 |
+| Func   | 名称                  | 类型            |
+| ------ | --------------------- | --------------- |
+| `0x72` | `RPT_DETECT_BBOX`     | 矩形框          |
+| `0x73` | `RPT_DETECT_STR`      | 字符串          |
+| `0x74` | `RPT_DETECT_OCR`      | 四点文本        |
+| `0x75` | `RPT_DETECT_COLOR`    | 颜色分组/旋转框 |
+| `0x76` | `RPT_DETECT_LINE`     | 巡线            |
+| `0x77` | `RPT_DETECT_KEYPOINT` | 人体关键点      |
+| `0x78` | `RPT_DETECT_HAND_KP`  | 手掌关键点      |
+| `0x79` | `RPT_DETECT_CENTER`   | 中心点          |
+| `0x7A` | `RPT_DETECT_FACE_KP`  | 人脸五点        |
+| `0x7B` | `RPT_DETECT_QUAD`     | 四边形          |
 
 ### 12.3 几何类结果（BBOX / CENTER / QUAD）
 
@@ -559,12 +559,12 @@ count * (
 
 `BBOX extra_item` 类型：
 
-| `type` | 编码 | 语义 |
-| ---: | --- | --- |
-| 1 | `[1][string_u8]` | 字符串 |
-| 2 | `[2][value:s16]` | 定点浮点（实际值=`value/100`） |
-| 3 | `[3][value:s16]` | 整数 |
-| 4 | `[4][list_len:u8][list_len*s16]` | 整数数组 |
+| `type` | 编码                             | 语义                           |
+| -----: | -------------------------------- | ------------------------------ |
+|      1 | `[1][string_u8]`                 | 字符串                         |
+|      2 | `[2][value:s16]`                 | 定点浮点（实际值=`value/100`） |
+|      3 | `[3][value:s16]`                 | 整数                           |
+|      4 | `[4][list_len:u8][list_len*s16]` | 整数数组                       |
 
 `center_x/center_y/w/h` 说明：
 
@@ -575,41 +575,41 @@ count * (
 
 完整模式常见语义：
 
-| 模式/场景 | `extra_count` | `extra` 顺序与含义 |
-| --- | ---: | --- |
-| FaceDetection | 0 | 无 |
-| FaceLandmark / FaceMesh | 10 | 5 点关键点坐标（10 个 `s16`） |
-| FaceRecognition / FaceLiveness | 0 或 2 | 未识别/未命中时无；识别到已知目标时为 `[name:string][score:int]` |
-| FacePose | 3~4 | `[id:string?][pitch:int][yaw:int][roll:int]` |
-| FaceParse | 0 | 无 |
-| EyeGaze | 4~5 | `[id:string?][cx:int][cy:int][tx:int][ty:int]` |
-| PersonDetection | 0 | 无 |
-| HandGesture / HandRecognition | 1 | `[gesture:string]`（固定英文枚举：`ok/fist/five/gun/other/love/one/six/three/thumbUp/yeah/unknown`） |
-| FalldownDetection | 2 | `[fall_flag:int][score:int]`（`fall_flag`：`1=Fall`，`0=NoFall/其他`） |
-| ObjectTrack | 0 | 无 |
-| SelfLearning | 2 | `[name:string][score:int]` |
-| TrafficDetection | 2 | `[label:string][score:int]`（见下方 `TrafficDetection` 标签集合） |
-| QRCodeDiscern / BarCodeDiscern | 1 | `[payload:string]` |
-| HandKeyPointDetection + `CMD_HAND_DETECT_ONLY=1` | 0 | 无 |
-| LicencePlateDetection | 0 | 无文本，仅矩形框 |
-| CustomDetection + `yolo_task=detect` | 2 | `[label:string][score:int]` |
+| 模式/场景                                        | `extra_count` | `extra` 顺序与含义                                                                                   |
+| ------------------------------------------------ | ------------: | ---------------------------------------------------------------------------------------------------- |
+| FaceDetection                                    |             0 | 无                                                                                                   |
+| FaceLandmark / FaceMesh                          |            10 | 5 点关键点坐标（10 个 `s16`）                                                                        |
+| FaceRecognition / FaceLiveness                   |        0 或 2 | 未识别/未命中时无；识别到已知目标时为 `[name:string][score:int]`                                     |
+| FacePose                                         |           3~4 | `[id:string?][pitch:int][yaw:int][roll:int]`                                                         |
+| FaceParse                                        |             0 | 无                                                                                                   |
+| EyeGaze                                          |           4~5 | `[id:string?][cx:int][cy:int][tx:int][ty:int]`                                                       |
+| PersonDetection                                  |             0 | 无                                                                                                   |
+| HandGesture / HandRecognition                    |             1 | `[gesture:string]`（固定英文枚举：`ok/fist/five/gun/other/love/one/six/three/thumbUp/yeah/unknown`） |
+| FalldownDetection                                |             2 | `[fall_flag:int][score:int]`（`fall_flag`：`1=Fall`，`0=NoFall/其他`）                               |
+| ObjectTrack                                      |             0 | 无                                                                                                   |
+| SelfLearning                                     |             2 | `[name:string][score:int]`                                                                           |
+| TrafficDetection                                 |             2 | `[label:string][score:int]`（见下方 `TrafficDetection` 标签集合）                                    |
+| QRCodeDiscern / BarCodeDiscern                   |             1 | `[payload:string]`                                                                                   |
+| HandKeyPointDetection + `CMD_HAND_DETECT_ONLY=1` |             0 | 无                                                                                                   |
+| LicencePlateDetection                            |             0 | 无文本，仅矩形框                                                                                     |
+| CustomDetection + `yolo_task=detect`             |             2 | `[label:string][score:int]`                                                                          |
 
 `HandGesture / HandRecognition` 标签集合（用于 `gesture` 字段）：
 
-| 序号 | 协议标签（固定英文） | 中文语义 |
-| ---: | --- | --- |
-| 0 | ok | OK 手势 |
-| 1 | fist | 握拳 |
-| 2 | five | 五指张开 |
-| 3 | gun | 手枪手势 |
-| 4 | other | 其他手势（手势识别） |
-| 5 | love | 爱心手势 |
-| 6 | one | 数字一 |
-| 7 | six | 数字六 |
-| 8 | three | 数字三 |
-| 9 | thumbUp | 点赞 |
-| 10 | yeah | V 手势 |
-| 11 | unknown | 未识别/不确定 |
+| 序号 | 协议标签（固定英文） | 中文语义             |
+| ---: | -------------------- | -------------------- |
+|    0 | ok                   | OK 手势              |
+|    1 | fist                 | 握拳                 |
+|    2 | five                 | 五指张开             |
+|    3 | gun                  | 手枪手势             |
+|    4 | other                | 其他手势（手势识别） |
+|    5 | love                 | 爱心手势             |
+|    6 | one                  | 数字一               |
+|    7 | six                  | 数字六               |
+|    8 | three                | 数字三               |
+|    9 | thumbUp              | 点赞                 |
+|   10 | yeah                 | V 手势               |
+|   11 | unknown              | 未识别/不确定        |
 
 语言行为：
 
@@ -618,28 +618,28 @@ count * (
 
 `FalldownDetection` 状态集合（用于 `fall_flag` 字段）：
 
-| 字段 | 取值 | 含义 |
-| --- | ---: | --- |
-| `fall_flag` | 1 | 跌倒（`Fall`） |
-| `fall_flag` | 0 | 非跌倒（`NoFall`/其他） |
+| 字段        | 取值 | 含义                    |
+| ----------- | ---: | ----------------------- |
+| `fall_flag` |    1 | 跌倒（`Fall`）          |
+| `fall_flag` |    0 | 非跌倒（`NoFall`/其他） |
 
 `FalldownDetection` 可在同一帧上报多个目标，每个目标各自携带 `[fall_flag][score]`。
 
 `TrafficDetection` 标签集合（用于 `label` 字段）：
 
 | 序号 | 协议标签（固定英文） | 中文语义 |
-| ---: | --- | --- |
-| 0 | red_barrier | 红色路障 |
-| 1 | go_straight | 直行 |
-| 2 | turn_left | 左转 |
-| 3 | turn_right | 右转 |
-| 4 | roundabout | 环岛 |
-| 5 | parking_area | 停车区 |
-| 6 | stop_sign | 停止标志 |
-| 7 | traffic_light_red | 红灯 |
-| 8 | traffic_light_yellow | 黄灯 |
-| 9 | traffic_light_green | 绿灯 |
-| 10 | pedestrian_crossing | 人行横道 |
+| ---: | -------------------- | -------- |
+|    0 | red_barrier          | 红色路障 |
+|    1 | go_straight          | 直行     |
+|    2 | turn_left            | 左转     |
+|    3 | turn_right           | 右转     |
+|    4 | roundabout           | 环岛     |
+|    5 | parking_area         | 停车区   |
+|    6 | stop_sign            | 停止标志 |
+|    7 | traffic_light_red    | 红灯     |
+|    8 | traffic_light_yellow | 黄灯     |
+|    9 | traffic_light_green  | 绿灯     |
+|   10 | pedestrian_crossing  | 人行横道 |
 
 语言行为：
 
@@ -660,33 +660,33 @@ count * (
 
 `CENTER extra_item` 类型：
 
-| `type` | 编码 | 语义 |
-| ---: | --- | --- |
-| 1 | `[1][string_u8]` | 字符串 |
-| 2 | `[2][value:s16]` | 整数 |
-| 3 | `[3][value:s16]` | 定点浮点（实际值=`value/100`） |
+| `type` | 编码             | 语义                           |
+| -----: | ---------------- | ------------------------------ |
+|      1 | `[1][string_u8]` | 字符串                         |
+|      2 | `[2][value:s16]` | 整数                           |
+|      3 | `[3][value:s16]` | 定点浮点（实际值=`value/100`） |
 
 简化模式（以及 `CustomDetection` 配置为 `yolo_task=cls`）常见语义：
 
-| 模式/场景 | `center_x/center_y` 语义 | `extra` 顺序与含义 |
-| --- | --- | --- |
-| FaceDetection / FaceLandmark / FaceMesh | 中心点 | 无 |
-| FaceRecognition / FaceLiveness | 中心点 | 无或 `[name]` |
-| FacePose | 中心点 | `[id?][roll][pitch][yaw]` |
-| FaceParse | 中心点 | 无 |
-| EyeGaze | `x=cx, y=cy` | `[id?][tx][ty]` |
-| PersonDetection / ObjectTrack | 中心点 | 无 |
-| HandGesture / HandRecognition | 中心点 | `[gesture]`（枚举同 `12.3.1`） |
-| FalldownDetection | 中心点 | `[fall_flag][score]`（`fall_flag`：`1=Fall`，`0=NoFall/其他`） |
-| SingleColor / MultiColor / ColorTracking | 色块中心点 | `[color_name]` |
-| LineDetection | `center_x=center_pos, center_y=0` | `[angle]` |
-| OCRDetection / LicencePlateDetection | 目标中心点 | 无文本 |
-| OCRRecognition / LicencePlateRecognition | 目标中心点 | `[text]`（无文本时可仅发送中心点，或按具体模式丢弃本帧） |
-| GarbageClassification | 目标中心点 | `[label]`（枚举同 `12.3.3`） |
-| TrafficDetection | 目标中心点 | `[label]`（枚举同 `12.3.1`） |
-| ApriltagDiscern | 目标中心点 | `[family][tag_id?]`（仅可解析时含 `tag_id`） |
-| DMCodeDiscern | 目标中心点 | `[payload]` |
-| CustomDetection（简化或配置为 `yolo_task=cls`） | 目标中心点 | `[label]` |
+| 模式/场景                                       | `center_x/center_y` 语义          | `extra` 顺序与含义                                             |
+| ----------------------------------------------- | --------------------------------- | -------------------------------------------------------------- |
+| FaceDetection / FaceLandmark / FaceMesh         | 中心点                            | 无                                                             |
+| FaceRecognition / FaceLiveness                  | 中心点                            | 无或 `[name]`                                                  |
+| FacePose                                        | 中心点                            | `[id?][roll][pitch][yaw]`                                      |
+| FaceParse                                       | 中心点                            | 无                                                             |
+| EyeGaze                                         | `x=cx, y=cy`                      | `[id?][tx][ty]`                                                |
+| PersonDetection / ObjectTrack                   | 中心点                            | 无                                                             |
+| HandGesture / HandRecognition                   | 中心点                            | `[gesture]`（枚举同 `12.3.1`）                                 |
+| FalldownDetection                               | 中心点                            | `[fall_flag][score]`（`fall_flag`：`1=Fall`，`0=NoFall/其他`） |
+| SingleColor / MultiColor / ColorTracking        | 色块中心点                        | `[color_name]`                                                 |
+| LineDetection                                   | `center_x=center_pos, center_y=0` | `[angle]`                                                      |
+| OCRDetection / LicencePlateDetection            | 目标中心点                        | 无文本                                                         |
+| OCRRecognition / LicencePlateRecognition        | 目标中心点                        | `[text]`（无文本时可仅发送中心点，或按具体模式丢弃本帧）       |
+| GarbageClassification                           | 目标中心点                        | `[label]`（枚举同 `12.3.3`）                                   |
+| TrafficDetection                                | 目标中心点                        | `[label]`（枚举同 `12.3.1`）                                   |
+| ApriltagDiscern                                 | 目标中心点                        | `[family][tag_id?]`（仅可解析时含 `tag_id`）                   |
+| DMCodeDiscern                                   | 目标中心点                        | `[payload]`                                                    |
+| CustomDetection（简化或配置为 `yolo_task=cls`） | 目标中心点                        | `[label]`                                                      |
 
 #### 12.3.3 `RPT_DETECT_QUAD (0x7B)`
 
@@ -705,30 +705,30 @@ count * (
 
 完整模式常见语义：
 
-| 模式/场景 | `extra_count` | `extra` 顺序与含义 |
-| --- | ---: | --- |
-| GarbageClassification | 2 | `[label:string][score:int]`（见下方 `GarbageClassification` 标签集合） |
-| ApriltagDiscern | 1~2 | `[family:string][tag_id:int?]` |
-| DMCodeDiscern | 1 | `[payload:string]` |
-| OCRDetection | 0 | 无文本，仅四点框 |
-| CustomDetection + `yolo_task=obb` | 2 | `[label:string][score:int]` |
+| 模式/场景                         | `extra_count` | `extra` 顺序与含义                                                     |
+| --------------------------------- | ------------: | ---------------------------------------------------------------------- |
+| GarbageClassification             |             2 | `[label:string][score:int]`（见下方 `GarbageClassification` 标签集合） |
+| ApriltagDiscern                   |           1~2 | `[family:string][tag_id:int?]`                                         |
+| DMCodeDiscern                     |             1 | `[payload:string]`                                                     |
+| OCRDetection                      |             0 | 无文本，仅四点框                                                       |
+| CustomDetection + `yolo_task=obb` |             2 | `[label:string][score:int]`                                            |
 
 `GarbageClassification` 标签集合（用于 `label` 字段）：
 
-| 序号 | 协议标签（固定英文） | 中文语义 |
-| ---: | --- | --- |
-| 0 | BananaPeel | 香蕉皮 |
-| 1 | BrokenBones | 碎骨头 |
-| 2 | CigaretteEnd | 烟头 |
-| 3 | DisposableChopsticks | 一次性筷子 |
-| 4 | Ketchup | 番茄酱 |
-| 5 | Marker | 记号笔 |
-| 6 | OralLiquidBottle | 口服液瓶 |
-| 7 | Plate | 盘子 |
-| 8 | PlasticBottle | 塑料瓶 |
-| 9 | StorageBattery | 蓄电池 |
-| 10 | Toothbrush | 牙刷 |
-| 11 | Umbrella | 雨伞 |
+| 序号 | 协议标签（固定英文） | 中文语义   |
+| ---: | -------------------- | ---------- |
+|    0 | BananaPeel           | 香蕉皮     |
+|    1 | BrokenBones          | 碎骨头     |
+|    2 | CigaretteEnd         | 烟头       |
+|    3 | DisposableChopsticks | 一次性筷子 |
+|    4 | Ketchup              | 番茄酱     |
+|    5 | Marker               | 记号笔     |
+|    6 | OralLiquidBottle     | 口服液瓶   |
+|    7 | Plate                | 盘子       |
+|    8 | PlasticBottle        | 塑料瓶     |
+|    9 | StorageBattery       | 蓄电池     |
+|   10 | Toothbrush           | 牙刷       |
+|   11 | Umbrella             | 雨伞       |
 
 语言行为：
 
@@ -746,12 +746,12 @@ count * (
 
 使用场景：
 
-| 模式/场景 | 载荷形式 |
-| --- | --- |
-| DynamicGesture（完整） | 单字符串 |
-| DynamicGesture（简化） | 字符串列表（`count=1`） |
-| SelfLearning（简化） | 字符串列表（候选名称） |
-| QRCodeDiscern / BarCodeDiscern（简化） | 字符串列表（码文本） |
+| 模式/场景                              | 载荷形式                |
+| -------------------------------------- | ----------------------- |
+| DynamicGesture（完整）                 | 单字符串                |
+| DynamicGesture（简化）                 | 字符串列表（`count=1`） |
+| SelfLearning（简化）                   | 字符串列表（候选名称）  |
+| QRCodeDiscern / BarCodeDiscern（简化） | 字符串列表（码文本）    |
 
 #### 12.4.2 `RPT_DETECT_OCR (0x74)`
 
@@ -767,10 +767,10 @@ count * (
 
 使用场景：
 
-| 模式/场景 | 完整模式 | 简化模式 |
-| --- | --- | --- |
-| OCRRecognition | `0x74` | `0x79`（`extra=text`） |
-| LicencePlateRecognition | `0x74` | `0x79`（`extra=plate_text`） |
+| 模式/场景               | 完整模式 | 简化模式                     |
+| ----------------------- | -------- | ---------------------------- |
+| OCRRecognition          | `0x74`   | `0x79`（`extra=text`）       |
+| LicencePlateRecognition | `0x74`   | `0x79`（`extra=plate_text`） |
 
 说明：
 
@@ -794,11 +794,11 @@ group_count * (
 
 使用场景：
 
-| 模式/场景 | 完整模式（`0x75`） | 简化模式 |
-| --- | --- | --- |
-| SingleColorDetection | 固定 `group_count=1` | `0x79`（`extra=color_name`） |
-| MultiColorDetection | `group_count=有效颜色组数` | `0x79`（`extra=color_name`） |
-| ColorTracking | 固定 `group_count=1`（当前学习名称） | `0x79`（`extra=color_name`） |
+| 模式/场景            | 完整模式（`0x75`）                   | 简化模式                     |
+| -------------------- | ------------------------------------ | ---------------------------- |
+| SingleColorDetection | 固定 `group_count=1`                 | `0x79`（`extra=color_name`） |
+| MultiColorDetection  | `group_count=有效颜色组数`           | `0x79`（`extra=color_name`） |
+| ColorTracking        | 固定 `group_count=1`（当前学习名称） | `0x79`（`extra=color_name`） |
 
 说明：
 
@@ -848,25 +848,25 @@ count * (
 
 34 个 `s16` 表示 17 个 `(x,y)`，顺序（COCO-17）：
 
-| 点序号 | 含义 |
-| --- | --- |
-| 0 | nose |
-| 1 | left_eye |
-| 2 | right_eye |
-| 3 | left_ear |
-| 4 | right_ear |
-| 5 | left_shoulder |
-| 6 | right_shoulder |
-| 7 | left_elbow |
-| 8 | right_elbow |
-| 9 | left_wrist |
-| 10 | right_wrist |
-| 11 | left_hip |
-| 12 | right_hip |
-| 13 | left_knee |
-| 14 | right_knee |
-| 15 | left_ankle |
-| 16 | right_ankle |
+| 点序号 | 含义           |
+| ------ | -------------- |
+| 0      | nose           |
+| 1      | left_eye       |
+| 2      | right_eye      |
+| 3      | left_ear       |
+| 4      | right_ear      |
+| 5      | left_shoulder  |
+| 6      | right_shoulder |
+| 7      | left_elbow     |
+| 8      | right_elbow    |
+| 9      | left_wrist     |
+| 10     | right_wrist    |
+| 11     | left_hip       |
+| 12     | right_hip      |
+| 13     | left_knee      |
+| 14     | right_knee     |
+| 15     | left_ankle     |
+| 16     | right_ankle    |
 
 `PersonKeypointDetect(mode=8)` 忽略 `simple_result`；有关键点结果时上报 `0x77`，无结果时回退上报 `0x72` 空框。
 
@@ -888,29 +888,29 @@ count * (
 
 42 个 `s16` 表示 21 个 `(x,y)`，顺序：
 
-| 点序号 | 含义 |
-| --- | --- |
-| 0 | wrist |
-| 1 | thumb_cmc |
-| 2 | thumb_mcp |
-| 3 | thumb_ip |
-| 4 | thumb_tip |
-| 5 | index_mcp |
-| 6 | index_pip |
-| 7 | index_dip |
-| 8 | index_tip |
-| 9 | middle_mcp |
-| 10 | middle_pip |
-| 11 | middle_dip |
-| 12 | middle_tip |
-| 13 | ring_mcp |
-| 14 | ring_pip |
-| 15 | ring_dip |
-| 16 | ring_tip |
-| 17 | little_mcp |
-| 18 | little_pip |
-| 19 | little_dip |
-| 20 | little_tip |
+| 点序号 | 含义       |
+| ------ | ---------- |
+| 0      | wrist      |
+| 1      | thumb_cmc  |
+| 2      | thumb_mcp  |
+| 3      | thumb_ip   |
+| 4      | thumb_tip  |
+| 5      | index_mcp  |
+| 6      | index_pip  |
+| 7      | index_dip  |
+| 8      | index_tip  |
+| 9      | middle_mcp |
+| 10     | middle_pip |
+| 11     | middle_dip |
+| 12     | middle_tip |
+| 13     | ring_mcp   |
+| 14     | ring_pip   |
+| 15     | ring_dip   |
+| 16     | ring_tip   |
+| 17     | little_mcp |
+| 18     | little_pip |
+| 19     | little_dip |
+| 20     | little_tip |
 
 模式约束：
 
@@ -936,13 +936,13 @@ Payload：
 
 10 个 `s16` 表示 5 个 `(x,y)`，顺序：
 
-| 点序号 | 含义 |
-| --- | --- |
-| 0 | left_eye |
-| 1 | right_eye |
-| 2 | nose |
-| 3 | left_mouth |
-| 4 | right_mouth |
+| 点序号 | 含义        |
+| ------ | ----------- |
+| 0      | left_eye    |
+| 1      | right_eye   |
+| 2      | nose        |
+| 3      | left_mouth  |
+| 4      | right_mouth |
 
 `RPT_DETECT_FACE_KP(0x7A)` 使用上述固定人脸五点结构。
 
@@ -953,44 +953,44 @@ Payload：
 - 完整模式：`simple_result=0`
 - 简化模式：`simple_result=1`
 
-| 模式 | App | 完整模式 | 简化模式 |
-| ---: | --- | --- | --- |
-| 1 | FaceDetection | `0x72` | `0x79` |
-| 2 | FaceLandmark | `0x72`（可带关键点 `extra`） | `0x79` |
-| 3 | FacePose | `0x72` | `0x79` |
-| 4 | FaceRecognition | `0x72` | `0x79` |
-| 5 | FaceParse | `0x72` | `0x79` |
-| 6 | FaceMesh | `0x72`（可带关键点 `extra`） | `0x79` |
-| 7 | PersonDetection | `0x72` | `0x79` |
-| 8 | PersonKeypointDetect | `0x77`（空结果回退 `0x72`） | `0x77`（空结果回退 `0x72`） |
-| 9 | HandDetection | `0x72` | `0x79` |
-| 10 | HandRecognition | `0x72` | `0x79` |
-| 11 | HandKeyPointDetection | `0x78`（空结果回退 `0x72`）或 `0x72`（detect_only） | `0x79` |
-| 12 | HandGesture | `0x72`（手势）或 `0x78`（关键点链路） | `0x79` |
-| 13 | FaceLiveness | `0x72` | `0x79` |
-| 14 | FalldownDetection | `0x72` | `0x79` |
-| 15 | EyeGaze | `0x72` | `0x79` |
-| 16 | ObjectTrack | `0x72` | `0x79` |
-| 17 | GarbageClassification | `0x7B` | `0x79` |
-| 18 | DynamicGesture | `0x73` | `0x73` |
-| 19 | TrafficDetection | `0x72` | `0x79` |
-| 20 | AiLLM_Mode | 无检测 `RPT` | 无检测 `RPT` |
-| 21 | SingleColorDetection | `0x75`（空结果回退 `0x72`） | `0x79` |
-| 22 | MultiColorDetection | `0x75`（空结果回退 `0x72`） | `0x79` |
-| 23 | LineDetection | `0x76`（空结果回退 `0x72`） | `0x79` |
-| 24 | ColorTracking | `0x75`（空结果回退 `0x72`） | `0x79` |
-| 25 | OCRDetection | `0x7B` | `0x79` |
-| 26 | OCRRecognition | `0x74` | `0x79` |
-| 27 | LicencePlateDetection | `0x72` | `0x79` |
-| 28 | LicencePlateRecognition | `0x74`（空结果回退 `0x72`） | `0x79` |
-| 29 | ObjectDetection | 见 `12.8` | 见 `12.8` |
-| 30 | Segmentation | `0x72` 或 `0x79`（取决于 `simple_result`） | `0x79` |
-| 31 | SelfLearning | `0x72` | `0x73` |
-| 32 | ApriltagDiscern | `0x7B` | `0x79` |
-| 33 | DMCodeDiscern | `0x7B` | `0x79` |
-| 34 | QRCodeDiscern | `0x72` | `0x73` |
-| 35 | BarCodeDiscern | `0x72` | `0x73` |
-| 36 | CustomDetection | 见 `12.9` | 见 `12.9` |
+| 模式 | App                     | 完整模式                                            | 简化模式                    |
+| ---: | ----------------------- | --------------------------------------------------- | --------------------------- |
+|    1 | FaceDetection           | `0x72`                                              | `0x79`                      |
+|    2 | FaceLandmark            | `0x72`（可带关键点 `extra`）                        | `0x79`                      |
+|    3 | FacePose                | `0x72`                                              | `0x79`                      |
+|    4 | FaceRecognition         | `0x72`                                              | `0x79`                      |
+|    5 | FaceParse               | `0x72`                                              | `0x79`                      |
+|    6 | FaceMesh                | `0x72`（可带关键点 `extra`）                        | `0x79`                      |
+|    7 | PersonDetection         | `0x72`                                              | `0x79`                      |
+|    8 | PersonKeypointDetect    | `0x77`（空结果回退 `0x72`）                         | `0x77`（空结果回退 `0x72`） |
+|    9 | HandDetection           | `0x72`                                              | `0x79`                      |
+|   10 | HandRecognition         | `0x72`                                              | `0x79`                      |
+|   11 | HandKeyPointDetection   | `0x78`（空结果回退 `0x72`）或 `0x72`（detect_only） | `0x79`                      |
+|   12 | HandGesture             | `0x72`（手势）或 `0x78`（关键点链路）               | `0x79`                      |
+|   13 | FaceLiveness            | `0x72`                                              | `0x79`                      |
+|   14 | FalldownDetection       | `0x72`                                              | `0x79`                      |
+|   15 | EyeGaze                 | `0x72`                                              | `0x79`                      |
+|   16 | ObjectTrack             | `0x72`                                              | `0x79`                      |
+|   17 | GarbageClassification   | `0x7B`                                              | `0x79`                      |
+|   18 | DynamicGesture          | `0x73`                                              | `0x73`                      |
+|   19 | TrafficDetection        | `0x72`                                              | `0x79`                      |
+|   20 | AiLLM_Mode              | 无检测 `RPT`                                        | 无检测 `RPT`                |
+|   21 | SingleColorDetection    | `0x75`（空结果回退 `0x72`）                         | `0x79`                      |
+|   22 | MultiColorDetection     | `0x75`（空结果回退 `0x72`）                         | `0x79`                      |
+|   23 | LineDetection           | `0x76`（空结果回退 `0x72`）                         | `0x79`                      |
+|   24 | ColorTracking           | `0x75`（空结果回退 `0x72`）                         | `0x79`                      |
+|   25 | OCRDetection            | `0x7B`                                              | `0x79`                      |
+|   26 | OCRRecognition          | `0x74`                                              | `0x79`                      |
+|   27 | LicencePlateDetection   | `0x72`                                              | `0x79`                      |
+|   28 | LicencePlateRecognition | `0x74`（空结果回退 `0x72`）                         | `0x79`                      |
+|   29 | ObjectDetection         | 见 `12.8`                                           | 见 `12.8`                   |
+|   30 | Segmentation            | `0x72` 或 `0x79`（取决于 `simple_result`）          | `0x79`                      |
+|   31 | SelfLearning            | `0x72`                                              | `0x73`                      |
+|   32 | ApriltagDiscern         | `0x7B`                                              | `0x79`                      |
+|   33 | DMCodeDiscern           | `0x7B`                                              | `0x79`                      |
+|   34 | QRCodeDiscern           | `0x72`                                              | `0x73`                      |
+|   35 | BarCodeDiscern          | `0x72`                                              | `0x73`                      |
+|   36 | CustomDetection         | 见 `12.9`                                           | 见 `12.9`                   |
 
 补充：上表为正常检测链路；异常分支还可能上报 `0x71`：
 
@@ -1008,10 +1008,10 @@ Payload：
 
 上报格式：
 
-| `simple_result` | 上报码 | Payload 语义 |
-| ---: | --- | --- |
-| `0` | `0x72 RPT_DETECT_BBOX` | `[count] + count * ([center_x][center_y][w][h][extra_count] + [label?] + [score_pct])` |
-| `1` | `0x79 RPT_DETECT_CENTER` | `[count] + count * ([center_x][center_y][extra_count] + [label?])` |
+| `simple_result` | 上报码                   | Payload 语义                                                                           |
+| --------------: | ------------------------ | -------------------------------------------------------------------------------------- |
+|             `0` | `0x72 RPT_DETECT_BBOX`   | `[count] + count * ([center_x][center_y][w][h][extra_count] + [label?] + [score_pct])` |
+|             `1` | `0x79 RPT_DETECT_CENTER` | `[count] + count * ([center_x][center_y][extra_count] + [label?])`                     |
 
 说明：
 
@@ -1022,88 +1022,88 @@ Payload：
 
 `ObjectDetection` 标签集合：
 
-| 序号 | 协议标签 |
-| ---: | --- |
-| 0 | person |
-| 1 | bicycle |
-| 2 | car |
-| 3 | motorcycle |
-| 4 | airplane |
-| 5 | bus |
-| 6 | train |
-| 7 | truck |
-| 8 | boat |
-| 9 | traffic light |
-| 10 | fire hydrant |
-| 11 | stop sign |
-| 12 | parking meter |
-| 13 | bench |
-| 14 | bird |
-| 15 | cat |
-| 16 | dog |
-| 17 | horse |
-| 18 | sheep |
-| 19 | cow |
-| 20 | elephant |
-| 21 | bear |
-| 22 | zebra |
-| 23 | giraffe |
-| 24 | backpack |
-| 25 | umbrella |
-| 26 | handbag |
-| 27 | tie |
-| 28 | suitcase |
-| 29 | frisbee |
-| 30 | skis |
-| 31 | snowboard |
-| 32 | sports ball |
-| 33 | kite |
-| 34 | baseball bat |
-| 35 | baseball glove |
-| 36 | skateboard |
-| 37 | surfboard |
-| 38 | tennis racket |
-| 39 | bottle |
-| 40 | wine glass |
-| 41 | cup |
-| 42 | fork |
-| 43 | knife |
-| 44 | spoon |
-| 45 | bowl |
-| 46 | banana |
-| 47 | apple |
-| 48 | sandwich |
-| 49 | orange |
-| 50 | broccoli |
-| 51 | carrot |
-| 52 | hot dog |
-| 53 | pizza |
-| 54 | donut |
-| 55 | cake |
-| 56 | chair |
-| 57 | couch |
-| 58 | potted plant |
-| 59 | bed |
-| 60 | dining table |
-| 61 | toilet |
-| 62 | tv |
-| 63 | laptop |
-| 64 | mouse |
-| 65 | remote |
-| 66 | keyboard |
-| 67 | cell phone |
-| 68 | microwave |
-| 69 | oven |
-| 70 | toaster |
-| 71 | sink |
-| 72 | refrigerator |
-| 73 | book |
-| 74 | clock |
-| 75 | vase |
-| 76 | scissors |
-| 77 | teddy bear |
-| 78 | hair drier |
-| 79 | toothbrush |
+| 序号 | 协议标签       |
+| ---: | -------------- |
+|    0 | person         |
+|    1 | bicycle        |
+|    2 | car            |
+|    3 | motorcycle     |
+|    4 | airplane       |
+|    5 | bus            |
+|    6 | train          |
+|    7 | truck          |
+|    8 | boat           |
+|    9 | traffic light  |
+|   10 | fire hydrant   |
+|   11 | stop sign      |
+|   12 | parking meter  |
+|   13 | bench          |
+|   14 | bird           |
+|   15 | cat            |
+|   16 | dog            |
+|   17 | horse          |
+|   18 | sheep          |
+|   19 | cow            |
+|   20 | elephant       |
+|   21 | bear           |
+|   22 | zebra          |
+|   23 | giraffe        |
+|   24 | backpack       |
+|   25 | umbrella       |
+|   26 | handbag        |
+|   27 | tie            |
+|   28 | suitcase       |
+|   29 | frisbee        |
+|   30 | skis           |
+|   31 | snowboard      |
+|   32 | sports ball    |
+|   33 | kite           |
+|   34 | baseball bat   |
+|   35 | baseball glove |
+|   36 | skateboard     |
+|   37 | surfboard      |
+|   38 | tennis racket  |
+|   39 | bottle         |
+|   40 | wine glass     |
+|   41 | cup            |
+|   42 | fork           |
+|   43 | knife          |
+|   44 | spoon          |
+|   45 | bowl           |
+|   46 | banana         |
+|   47 | apple          |
+|   48 | sandwich       |
+|   49 | orange         |
+|   50 | broccoli       |
+|   51 | carrot         |
+|   52 | hot dog        |
+|   53 | pizza          |
+|   54 | donut          |
+|   55 | cake           |
+|   56 | chair          |
+|   57 | couch          |
+|   58 | potted plant   |
+|   59 | bed            |
+|   60 | dining table   |
+|   61 | toilet         |
+|   62 | tv             |
+|   63 | laptop         |
+|   64 | mouse          |
+|   65 | remote         |
+|   66 | keyboard       |
+|   67 | cell phone     |
+|   68 | microwave      |
+|   69 | oven           |
+|   70 | toaster        |
+|   71 | sink           |
+|   72 | refrigerator   |
+|   73 | book           |
+|   74 | clock          |
+|   75 | vase           |
+|   76 | scissors       |
+|   77 | teddy bear     |
+|   78 | hair drier     |
+|   79 | toothbrush     |
 
 ### 12.9 `CustomDetection(mode=36)` 自定义识别
 
@@ -1120,19 +1120,19 @@ Payload：
 
 `family` 用于选择 YOLO 输出解码布局：
 
-| family | 可写值 |
-| --- | --- |
-| YOLOv5 | `5` / `v5` / `yolov5` / `yolo5` |
-| YOLOv8 | `8` / `v8` / `yolov8` / `yolo8` |
+| family | 可写值                              |
+| ------ | ----------------------------------- |
+| YOLOv5 | `5` / `v5` / `yolov5` / `yolo5`     |
+| YOLOv8 | `8` / `v8` / `yolov8` / `yolo8`     |
 | YOLO11 | `11` / `v11` / `yolo11` / `yolov11` |
 
 `task` 用于选择结果类型：
 
-| task | 可写值 | 完整模式上报 | 简化模式上报 |
-| --- | --- | --- | --- |
-| 水平框目标检测 | `detect` / `det` | `0x72 RPT_DETECT_BBOX`，extra 为 `[label][score_pct]` | `0x79 RPT_DETECT_CENTER`，extra 为 `[label]` |
-| 旋转框目标检测 | `obb` | `0x7B RPT_DETECT_QUAD`，extra 为 `[label][score_pct]` | `0x79 RPT_DETECT_CENTER`，extra 为 `[label]` |
-| 图像分类 | `cls` / `classify` / `classification` | `0x79 RPT_DETECT_CENTER`，extra 为 `[label]` | `0x79 RPT_DETECT_CENTER`，extra 为 `[label]` |
+| task           | 可写值                                | 完整模式上报                                          | 简化模式上报                                 |
+| -------------- | ------------------------------------- | ----------------------------------------------------- | -------------------------------------------- |
+| 水平框目标检测 | `detect` / `det`                      | `0x72 RPT_DETECT_BBOX`，extra 为 `[label][score_pct]` | `0x79 RPT_DETECT_CENTER`，extra 为 `[label]` |
+| 旋转框目标检测 | `obb`                                 | `0x7B RPT_DETECT_QUAD`，extra 为 `[label][score_pct]` | `0x79 RPT_DETECT_CENTER`，extra 为 `[label]` |
+| 图像分类       | `cls` / `classify` / `classification` | `0x79 RPT_DETECT_CENTER`，extra 为 `[label]`          | `0x79 RPT_DETECT_CENTER`，extra 为 `[label]` |
 
 说明：
 
@@ -1157,7 +1157,7 @@ Payload：
       "family": "yolov8",
       "task": "detect",
       "labels": ["person", "car", "dog"],
-      "conf_thresh": 0.30,
+      "conf_thresh": 0.3,
       "nms_thresh": 0.45,
       "max_results": 20
     },
@@ -1166,8 +1166,8 @@ Payload：
       "family": "yolov8",
       "task": "obb",
       "labels": ["box", "card", "bottle"],
-      "conf_thresh": 0.50,
-      "nms_thresh": 0.60,
+      "conf_thresh": 0.5,
+      "nms_thresh": 0.6,
       "max_results": 20
     },
     {
@@ -1175,7 +1175,7 @@ Payload：
       "family": "yolo11",
       "task": "cls",
       "labels": ["normal", "defect"],
-      "conf_thresh": 0.70,
+      "conf_thresh": 0.7,
       "max_results": 1
     }
   ]
@@ -1184,16 +1184,16 @@ Payload：
 
 字段说明：
 
-| 字段 | 必填 | 说明 |
-| --- | --- | --- |
-| `model` | 是 | 模型文件名或绝对路径；相对写法只能写文件名，不能包含 `/` 或 `\\` |
-| `family` | 否 | 默认 `yolov8`；也可写作 `yolo_family` / `model_family` |
-| `task` | 否 | 默认 `detect`；也可写作 `yolo_task` / `model_task` |
-| `labels` | 是 | 字符串数组，类别顺序必须与模型输出一致 |
-| `conf_thresh` | 否 | 置信度阈值，默认 `0.30`；`cls` 上报阈值不低于 `0.70` |
-| `nms_thresh` | 否 | NMS 阈值，默认 `0.45`；`cls` 不使用该字段 |
-| `max_results` | 否 | 单帧最大结果数，默认 `50`，最大按 `50` 裁剪 |
-| `obb` | 否 | 未填写 `task` 时，`true` 等价于 `task:"obb"` |
+| 字段          | 必填 | 说明                                                             |
+| ------------- | ---- | ---------------------------------------------------------------- |
+| `model`       | 是   | 模型文件名或绝对路径；相对写法只能写文件名，不能包含 `/` 或 `\\` |
+| `family`      | 否   | 默认 `yolov8`；也可写作 `yolo_family` / `model_family`           |
+| `task`        | 否   | 默认 `detect`；也可写作 `yolo_task` / `model_task`               |
+| `labels`      | 是   | 字符串数组，类别顺序必须与模型输出一致                           |
+| `conf_thresh` | 否   | 置信度阈值，默认 `0.30`；`cls` 上报阈值不低于 `0.70`             |
+| `nms_thresh`  | 否   | NMS 阈值，默认 `0.45`；`cls` 不使用该字段                        |
+| `max_results` | 否   | 单帧最大结果数，默认 `50`，最大按 `50` 裁剪                      |
+| `obb`         | 否   | 未填写 `task` 时，`true` 等价于 `task:"obb"`                     |
 
 模型文件查找规则：
 
@@ -1211,92 +1211,92 @@ Payload：
 
 `CMD_SET_MODE` payload 为 `mode_index:u8`：
 
-| 索引 | 名称 |
-| ---: | --- |
-| 0 | Empty |
-| 1 | FaceDetection |
-| 2 | FaceLandmark |
-| 3 | FacePose |
-| 4 | FaceRecognition |
-| 5 | FaceParse |
-| 6 | FaceMesh |
-| 7 | PersonDetection |
-| 8 | PersonKeypointDetect |
-| 9 | HandDetection |
-| 10 | HandRecognition |
-| 11 | HandKeyPointDetection |
-| 12 | HandGesture |
-| 13 | FaceLiveness |
-| 14 | FalldownDetection |
-| 15 | EyeGaze |
-| 16 | ObjectTrack |
-| 17 | GarbageClassification |
-| 18 | DynamicGesture |
-| 19 | TrafficDetection |
-| 20 | AiLLM_Mode |
-| 21 | SingleColorDetection |
-| 22 | MultiColorDetection |
-| 23 | LineDetection |
-| 24 | ColorTracking |
-| 25 | OCRDetection |
-| 26 | OCRRecognition |
-| 27 | LicencePlateDetection |
-| 28 | LicencePlateRecognition |
-| 29 | ObjectDetection |
-| 30 | Segmentation |
-| 31 | SelfLearning |
-| 32 | ApriltagDiscern |
-| 33 | DMCodeDiscern |
-| 34 | QRCodeDiscern |
-| 35 | BarCodeDiscern |
-| 36 | CustomDetection |
+| 索引 | 名称                    |
+| ---: | ----------------------- |
+|    0 | Empty                   |
+|    1 | FaceDetection           |
+|    2 | FaceLandmark            |
+|    3 | FacePose                |
+|    4 | FaceRecognition         |
+|    5 | FaceParse               |
+|    6 | FaceMesh                |
+|    7 | PersonDetection         |
+|    8 | PersonKeypointDetect    |
+|    9 | HandDetection           |
+|   10 | HandRecognition         |
+|   11 | HandKeyPointDetection   |
+|   12 | HandGesture             |
+|   13 | FaceLiveness            |
+|   14 | FalldownDetection       |
+|   15 | EyeGaze                 |
+|   16 | ObjectTrack             |
+|   17 | GarbageClassification   |
+|   18 | DynamicGesture          |
+|   19 | TrafficDetection        |
+|   20 | AiLLM_Mode              |
+|   21 | SingleColorDetection    |
+|   22 | MultiColorDetection     |
+|   23 | LineDetection           |
+|   24 | ColorTracking           |
+|   25 | OCRDetection            |
+|   26 | OCRRecognition          |
+|   27 | LicencePlateDetection   |
+|   28 | LicencePlateRecognition |
+|   29 | ObjectDetection         |
+|   30 | Segmentation            |
+|   31 | SelfLearning            |
+|   32 | ApriltagDiscern         |
+|   33 | DMCodeDiscern           |
+|   34 | QRCodeDiscern           |
+|   35 | BarCodeDiscern          |
+|   36 | CustomDetection         |
 
 ## 14. 功能码规范（CMD）
 
 ### 14.1 系统控制
 
-| Func | 名称 | Payload | 成功 `extra` | 说明 |
-| --- | --- | --- | --- | --- |
-| `0x01` | CMD_SET_MODE | `[mode:u8]` | `01` | 切换模式，不等于自动启动 |
-| `0x02` | CMD_SET_VOLUME | `[volume:u8]` | `01` | 范围 `0..100` |
-| `0x03` | CMD_SET_WIFI | `[ssid:string_u8][password:string_u8]` | `01` | 最终结果见 `0x6E` |
-| `0x04` | CMD_REQUEST_STATUS | 空（建议） | 空 | 附加触发一次状态心跳 |
-| `0x05` | CMD_CLEAR_MEMORY | 空 | `01` | 清结果状态，不改 mode/run |
-| `0x06` | CMD_GET_PROTOCOL_INFO | 空 | 8 字节 | `major, minor, caps, max_frame_len` |
+| Func   | 名称                  | Payload                                | 成功 `extra` | 说明                                |
+| ------ | --------------------- | -------------------------------------- | ------------ | ----------------------------------- |
+| `0x01` | CMD_SET_MODE          | `[mode:u8]`                            | `01`         | 切换模式，不等于自动启动            |
+| `0x02` | CMD_SET_VOLUME        | `[volume:u8]`                          | `01`         | 范围 `0..100`                       |
+| `0x03` | CMD_SET_WIFI          | `[ssid:string_u8][password:string_u8]` | `01`         | 最终结果见 `0x6E`                   |
+| `0x04` | CMD_REQUEST_STATUS    | 空（建议）                             | 空           | 附加触发一次状态心跳                |
+| `0x05` | CMD_CLEAR_MEMORY      | 空                                     | `01`         | 清结果状态，不改 mode/run           |
+| `0x06` | CMD_GET_PROTOCOL_INFO | 空                                     | 8 字节       | `major, minor, caps, max_frame_len` |
 
 ### 14.2 检测参数
 
-| Func | 名称 | Payload | 说明 |
-| --- | --- | --- | --- |
-| `0x10` | CMD_SET_CONF_THRESH | `[threshold:u8]` | `0..100` |
-| `0x11` | CMD_SET_NMS_THRESH | `[threshold:u8]` | `0..100` |
-| `0x12` | CMD_SEG_SET_MASK_THRESH | `[threshold:u8]` | `0..100` |
-| `0x13` | CMD_SET_SIMPLE_RESULT | `[enabled:u8]` | `0/1` |
-| `0x14` | CMD_DISABLE_RUN | `[disable:u8]` | `0=运行, 1=停止` |
+| Func   | 名称                    | Payload          | 说明             |
+| ------ | ----------------------- | ---------------- | ---------------- |
+| `0x10` | CMD_SET_CONF_THRESH     | `[threshold:u8]` | `0..100`         |
+| `0x11` | CMD_SET_NMS_THRESH      | `[threshold:u8]` | `0..100`         |
+| `0x12` | CMD_SEG_SET_MASK_THRESH | `[threshold:u8]` | `0..100`         |
+| `0x13` | CMD_SET_SIMPLE_RESULT   | `[enabled:u8]`   | `0/1`            |
+| `0x14` | CMD_DISABLE_RUN         | `[disable:u8]`   | `0=运行, 1=停止` |
 
 ### 14.3 人脸 / 人体关键点 / 手掌关键点
 
-| Func | 名称 | Payload |
-| --- | --- | --- |
-| `0x20` | CMD_FACE_LEARN | `[name:string_u8]` |
-| `0x21` | CMD_FACE_DELETE | `[name:string_u8]` |
-| `0x22` | CMD_FACE_RENAME | `[old:string_u8][new:string_u8]` |
-| `0x23` | CMD_FACE_SET_RECOG_CONF | `[threshold:u8]` |
-| `0x24` | CMD_FACE_HIGH_PRECISION | `[enabled:u8]` |
-| `0x25` | CMD_FACE_ENABLE_KEYPOINT | `[enabled:u8]` |
-| `0x26` | CMD_FACE_DETECT_ONLY | `[enabled:u8]` |
-| `0x27` | CMD_FACE_ENHANCE_LEARN | `[name:string_u8]` |
-| `0x28` | CMD_FACE_LEARN_AT_POINT | `[x:u32][y:u32][name:string_u8]` |
-| `0x29` | CMD_FACE_SET_POSE_THRESH | `[roll:u8][pitch:u8][yaw:u8]` |
-| `0x2A` | CMD_PERSON_KP_LEARN | `[name:string_u8]` |
-| `0x2B` | CMD_PERSON_KP_DELETE | `[name:string_u8]` |
-| `0x2C` | CMD_PERSON_KP_RENAME | `[old:string_u8][new:string_u8]` |
-| `0x2D` | CMD_PERSON_KP_ENHANCE_LEARN | `[name:string_u8]` |
-| `0x2E` | CMD_HAND_KP_LEARN | `[name:string_u8]` |
-| `0x2F` | CMD_HAND_KP_DELETE | `[name:string_u8]` |
-| `0x30` | CMD_HAND_KP_RENAME | `[old:string_u8][new:string_u8]` |
-| `0x31` | CMD_HAND_KP_ENHANCE_LEARN | `[name:string_u8]` |
-| `0x32` | CMD_HAND_DETECT_ONLY | `[enabled:u8]` |
+| Func   | 名称                        | Payload                          |
+| ------ | --------------------------- | -------------------------------- |
+| `0x20` | CMD_FACE_LEARN              | `[name:string_u8]`               |
+| `0x21` | CMD_FACE_DELETE             | `[name:string_u8]`               |
+| `0x22` | CMD_FACE_RENAME             | `[old:string_u8][new:string_u8]` |
+| `0x23` | CMD_FACE_SET_RECOG_CONF     | `[threshold:u8]`                 |
+| `0x24` | CMD_FACE_HIGH_PRECISION     | `[enabled:u8]`                   |
+| `0x25` | CMD_FACE_ENABLE_KEYPOINT    | `[enabled:u8]`                   |
+| `0x26` | CMD_FACE_DETECT_ONLY        | `[enabled:u8]`                   |
+| `0x27` | CMD_FACE_ENHANCE_LEARN      | `[name:string_u8]`               |
+| `0x28` | CMD_FACE_LEARN_AT_POINT     | `[x:u32][y:u32][name:string_u8]` |
+| `0x29` | CMD_FACE_SET_POSE_THRESH    | `[roll:u8][pitch:u8][yaw:u8]`    |
+| `0x2A` | CMD_PERSON_KP_LEARN         | `[name:string_u8]`               |
+| `0x2B` | CMD_PERSON_KP_DELETE        | `[name:string_u8]`               |
+| `0x2C` | CMD_PERSON_KP_RENAME        | `[old:string_u8][new:string_u8]` |
+| `0x2D` | CMD_PERSON_KP_ENHANCE_LEARN | `[name:string_u8]`               |
+| `0x2E` | CMD_HAND_KP_LEARN           | `[name:string_u8]`               |
+| `0x2F` | CMD_HAND_KP_DELETE          | `[name:string_u8]`               |
+| `0x30` | CMD_HAND_KP_RENAME          | `[old:string_u8][new:string_u8]` |
+| `0x31` | CMD_HAND_KP_ENHANCE_LEARN   | `[name:string_u8]`               |
+| `0x32` | CMD_HAND_DETECT_ONLY        | `[enabled:u8]`                   |
 
 约束与行为：
 
@@ -1312,19 +1312,19 @@ Payload：
 
 ### 14.4 颜色识别 / 颜色学习 / 巡线
 
-| Func | 名称 | Payload |
-| --- | --- | --- |
-| `0x40` | CMD_COLOR_SET_TARGET | `[name:string_u8]` |
-| `0x41` | CMD_COLOR_SET_THRESH | `[count:u8] + count * ([name:string_u8][lab6])` |
-| `0x42` | CMD_COLOR_GET_THRESH | `[name:string_u8]` |
-| `0x43` | CMD_COLOR_SET_FILTER | `[number:u8][min_area:u32][max_area:u32]` |
-| `0x44` | CMD_COLOR_SET_MIN_AREA | `[min_area:u32]` |
-| `0x45` | CMD_MULTI_COLOR_SET_LIST | `[count:u8][name:string_u8]...` |
-| `0x46` | CMD_LINE_SET_ROI | 15 字节 ROI |
-| `0x47` | CMD_COLOR_LEARNING_SET_POINT | `[x:u16][y:u16][name:string_u8]` |
-| `0x48` | CMD_COLOR_LEARNING_SAVE | `[name:string_u8]` |
-| `0x49` | CMD_COLOR_LEARNING_RENAME | `[old:string_u8][new:string_u8]` |
-| `0x4A` | CMD_COLOR_LEARNING_DELETE | `[name:string_u8]` |
+| Func   | 名称                         | Payload                                         |
+| ------ | ---------------------------- | ----------------------------------------------- |
+| `0x40` | CMD_COLOR_SET_TARGET         | `[name:string_u8]`                              |
+| `0x41` | CMD_COLOR_SET_THRESH         | `[count:u8] + count * ([name:string_u8][lab6])` |
+| `0x42` | CMD_COLOR_GET_THRESH         | `[name:string_u8]`                              |
+| `0x43` | CMD_COLOR_SET_FILTER         | `[number:u8][min_area:u32][max_area:u32]`       |
+| `0x44` | CMD_COLOR_SET_MIN_AREA       | `[min_area:u32]`                                |
+| `0x45` | CMD_MULTI_COLOR_SET_LIST     | `[count:u8][name:string_u8]...`                 |
+| `0x46` | CMD_LINE_SET_ROI             | 15 字节 ROI                                     |
+| `0x47` | CMD_COLOR_LEARNING_SET_POINT | `[x:u16][y:u16][name:string_u8]`                |
+| `0x48` | CMD_COLOR_LEARNING_SAVE      | `[name:string_u8]`                              |
+| `0x49` | CMD_COLOR_LEARNING_RENAME    | `[old:string_u8][new:string_u8]`                |
+| `0x4A` | CMD_COLOR_LEARNING_DELETE    | `[name:string_u8]`                              |
 
 `CMD_COLOR_GET_THRESH` 成功时，`RSP extra` 固定返回 6 字节阈值。
 
@@ -1347,32 +1347,32 @@ Payload：
 
 ### 14.5 自学习 / 目标跟踪 / 动态手势 / 自定义模型 / 物体子模式
 
-| Func | 名称 | Payload | 说明 |
-| --- | --- | --- | --- |
-| `0x50` | CMD_NANOTRACK_SET_RECT | `[x:u16][y:u16][w:u16][h:u16]` | `w/h` 约束 `36..240` |
-| `0x51` | CMD_NANOTRACK_STOP | `[stop:u8]` | 停止跟踪 |
-| `0x52` | CMD_GESTURE_SET_FRAME | `[frame:u16]` | `1..120` |
-| `0x53` | CMD_DGESTURE_CTRL | `[action:u8][name?][name2?]` | 动态手势控制 |
-| `0x54` | CMD_DGESTURE_ENHANCE_SAVE | `[name:string_u8]` | 增强保存 |
-| `0x55` | CMD_SELFLEARN_SET_NAME | `[name:string_u8]` | 启动一次自学习采样 |
-| `0x56` | CMD_SELFLEARN_SET_RECT | `[x:u16][y:u16][w:u16][h:u16]` | 最小 `24x24` |
-| `0x57` | CMD_SELFLEARN_SET_FRAME | `[frame:u16]` | `1..120` |
-| `0x58` | CMD_SELFLEARN_SET_FEATURES | `[features:u8]` | `1..16` |
-| `0x59` | CMD_SELFLEARN_DELETE | `[name:string_u8]` | 删除样本 |
-| `0x5A` | CMD_SELFLEARN_RENAME | `[old:string_u8][new:string_u8]` | 重命名样本 |
-| `0x5B` | CMD_OBJECT_SET_MODE | `[mode:u8]` | `0=detect,2=seg` |
-| `0x5C` | CMD_CUSTOM_SET_MODEL | `[model_index:u32]` | `custom_detect_models` 有效条目索引，范围 `0..15` |
+| Func   | 名称                       | Payload                          | 说明                                              |
+| ------ | -------------------------- | -------------------------------- | ------------------------------------------------- |
+| `0x50` | CMD_NANOTRACK_SET_RECT     | `[x:u16][y:u16][w:u16][h:u16]`   | `w/h` 约束 `36..240`                              |
+| `0x51` | CMD_NANOTRACK_STOP         | `[stop:u8]`                      | 停止跟踪                                          |
+| `0x52` | CMD_GESTURE_SET_FRAME      | `[frame:u16]`                    | `1..120`                                          |
+| `0x53` | CMD_DGESTURE_CTRL          | `[action:u8][name?][name2?]`     | 动态手势控制                                      |
+| `0x54` | CMD_DGESTURE_ENHANCE_SAVE  | `[name:string_u8]`               | 增强保存                                          |
+| `0x55` | CMD_SELFLEARN_SET_NAME     | `[name:string_u8]`               | 启动一次自学习采样                                |
+| `0x56` | CMD_SELFLEARN_SET_RECT     | `[x:u16][y:u16][w:u16][h:u16]`   | 最小 `24x24`                                      |
+| `0x57` | CMD_SELFLEARN_SET_FRAME    | `[frame:u16]`                    | `1..120`                                          |
+| `0x58` | CMD_SELFLEARN_SET_FEATURES | `[features:u8]`                  | `1..16`                                           |
+| `0x59` | CMD_SELFLEARN_DELETE       | `[name:string_u8]`               | 删除样本                                          |
+| `0x5A` | CMD_SELFLEARN_RENAME       | `[old:string_u8][new:string_u8]` | 重命名样本                                        |
+| `0x5B` | CMD_OBJECT_SET_MODE        | `[mode:u8]`                      | `0=detect,2=seg`                                  |
+| `0x5C` | CMD_CUSTOM_SET_MODEL       | `[model_index:u32]`              | `custom_detect_models` 有效条目索引，范围 `0..15` |
 
 `CMD_DGESTURE_CTRL action`：
 
-| 值 | 含义 |
-| --- | --- |
-| `1` | RECORD_START |
-| `2` | RECORD_STOP |
-| `3` | SAVE |
-| `4` | DELETE |
-| `5` | RENAME |
-| `6` | SAVE_APPEND |
+| 值  | 含义                    |
+| --- | ----------------------- |
+| `1` | RECORD_START            |
+| `2` | RECORD_STOP             |
+| `3` | SAVE                    |
+| `4` | DELETE                  |
+| `5` | RENAME                  |
+| `6` | SAVE_APPEND             |
 | `7` | SAVE_APPEND_DROP_OLDEST |
 
 约束与行为：
@@ -1386,27 +1386,27 @@ Payload：
 
 ### 14.6 AI / 语音 / MCP / 大模型
 
-| Func | 名称 | Payload |
-| --- | --- | --- |
-| `0x60` | CMD_SET_LLM_KEY | `[string_u8]` |
-| `0x61` | CMD_SET_TTS_VOICE | `[model:string_u8][voice:string_u8]` |
-| `0x62` | CMD_SET_ASR_LANG | `[string_u8]` |
-| `0x63` | CMD_SET_THINKING | `[enabled:u8]` |
-| `0x64` | CMD_SET_SEARCH | `[enabled:u8]` |
-| `0x65` | CMD_SET_START_SILENCE | `[ms:u16]` |
-| `0x66` | CMD_SET_END_SILENCE | `[ms:u16]` |
-| `0x67` | CMD_SET_PROMPT | `[string_u8]` |
-| `0x68` | CMD_ASR | `[start:u8]` |
-| `0x69` | CMD_TTS | `[string_u8]` |
-| `0x6A` | CMD_LLM_CHAT | `[string_u8]` |
-| `0x6B` | CMD_VLM_CHAT | `[string_u8]` |
-| `0x6C` | CMD_SET_MCP_TOOLS | `data_pack(obj)` |
-| `0x6D` | CMD_RESULT_RETURN | `data_pack(obj)` |
-| `0x6F` | CMD_SET_LLM_MODEL | `[string_u8]` |
-| `0x70` | CMD_SET_VLM_MODEL | `[string_u8]` |
-| `0x71` | CMD_SET_LLM_BASE_URL | `[string_u8]` |
-| `0x72` | CMD_SET_VLM_BASE_URL | `[string_u8]` |
-| `0x73` | CMD_SET_SPEECH_URL | `[string_u8]` |
+| Func   | 名称                  | Payload                              |
+| ------ | --------------------- | ------------------------------------ |
+| `0x60` | CMD_SET_LLM_KEY       | `[string_u8]`                        |
+| `0x61` | CMD_SET_TTS_VOICE     | `[model:string_u8][voice:string_u8]` |
+| `0x62` | CMD_SET_ASR_LANG      | `[string_u8]`                        |
+| `0x63` | CMD_SET_THINKING      | `[enabled:u8]`                       |
+| `0x64` | CMD_SET_SEARCH        | `[enabled:u8]`                       |
+| `0x65` | CMD_SET_START_SILENCE | `[ms:u16]`                           |
+| `0x66` | CMD_SET_END_SILENCE   | `[ms:u16]`                           |
+| `0x67` | CMD_SET_PROMPT        | `[string_u8]`                        |
+| `0x68` | CMD_ASR               | `[start:u8]`                         |
+| `0x69` | CMD_TTS               | `[string_u8]`                        |
+| `0x6A` | CMD_LLM_CHAT          | `[string_u8]`                        |
+| `0x6B` | CMD_VLM_CHAT          | `[string_u8]`                        |
+| `0x6C` | CMD_SET_MCP_TOOLS     | `data_pack(obj)`                     |
+| `0x6D` | CMD_RESULT_RETURN     | `data_pack(obj)`                     |
+| `0x6F` | CMD_SET_LLM_MODEL     | `[string_u8]`                        |
+| `0x70` | CMD_SET_VLM_MODEL     | `[string_u8]`                        |
+| `0x71` | CMD_SET_LLM_BASE_URL  | `[string_u8]`                        |
+| `0x72` | CMD_SET_VLM_BASE_URL  | `[string_u8]`                        |
+| `0x73` | CMD_SET_SPEECH_URL    | `[string_u8]`                        |
 
 约束与行为：
 
@@ -1419,13 +1419,13 @@ Payload：
 
 ### 14.7 媒体 / 相机
 
-| Func | 名称 | Payload | 说明 |
-| --- | --- | --- | --- |
-| `0x81` | CMD_MEDIA_CAMERA_SNAPSHOT | 空 | 触发拍照并保存 |
-| `0x82` | CMD_MEDIA_SET_PHOTO_PREFIX | `[prefix:string_u8]` | 允许空字符串 |
-| `0x83` | CMD_MEDIA_DELETE_PHOTO | `[name:string_u8]` | 支持基础名或完整名 |
-| `0x85` | CMD_MEDIA_ENTER_CAMERA_APP | 空 | 切换至媒体相机 app |
-| `0x86` | CMD_MEDIA_SET_PHOTO_START | `[start:u32]` | 设置前缀序号起点 |
+| Func   | 名称                       | Payload              | 说明               |
+| ------ | -------------------------- | -------------------- | ------------------ |
+| `0x81` | CMD_MEDIA_CAMERA_SNAPSHOT  | 空                   | 触发拍照并保存     |
+| `0x82` | CMD_MEDIA_SET_PHOTO_PREFIX | `[prefix:string_u8]` | 允许空字符串       |
+| `0x83` | CMD_MEDIA_DELETE_PHOTO     | `[name:string_u8]`   | 支持基础名或完整名 |
+| `0x85` | CMD_MEDIA_ENTER_CAMERA_APP | 空                   | 切换至媒体相机 app |
+| `0x86` | CMD_MEDIA_SET_PHOTO_START  | `[start:u32]`        | 设置前缀序号起点   |
 
 其他说明：
 
@@ -1443,15 +1443,15 @@ Payload：
 
 当前 capability flags：
 
-| Bit | 值 | 含义 |
-| --- | --- | --- |
-| bit0 | `0x00000001` | 支持 `RSP` 帧 |
-| bit1 | `0x00000002` | I2C mailbox v2 |
-| bit2 | `0x00000004` | 分包重组检查序号 |
-| bit3 | `0x00000008` | 支持 `CMD_GET_PROTOCOL_INFO` |
-| bit4 | `0x00000010` | 心跳不携带命令结果 |
+| Bit  | 值           | 含义                                           |
+| ---- | ------------ | ---------------------------------------------- |
+| bit0 | `0x00000001` | 支持 `RSP` 帧                                  |
+| bit1 | `0x00000002` | I2C mailbox v2                                 |
+| bit2 | `0x00000004` | 分包重组检查序号                               |
+| bit3 | `0x00000008` | 支持 `CMD_GET_PROTOCOL_INFO`                   |
+| bit4 | `0x00000010` | 心跳不携带命令结果                             |
 | bit5 | `0x00000020` | `RSP/RPT_ERROR` 携带 `module+subcode` 错误明细 |
-| bit6 | `0x00000040` | 心跳为 idle-only keepalive（空闲保活） |
+| bit6 | `0x00000040` | 心跳为 idle-only keepalive（空闲保活）         |
 
 ## 16. 错误码
 
@@ -1474,39 +1474,39 @@ Payload：
 
 ### 16.2 主错误码表（err_code）
 
-| 值 | 名称 | 错误类 | 默认模块 | 重试建议 | 典型触发 |
-| --- | --- | --- | --- | --- | --- |
-| `0x00` | `ERR_OK` | `ok` | `none` | 否 | 命令执行成功 |
-| `0x01` | `ERR_UNKNOWN_CMD` | `command` | `command` | 否 | 功能码未实现/不识别 |
-| `0x02` | `ERR_INVALID_MODE` | `command` | `command` | 否 | 当前 `mode` 不支持该命令 |
-| `0x03` | `ERR_INVALID_PARAM` | `command` | `command` | 否 | 参数越界、非法字符串、非法 flags 组合 |
-| `0x04` | `ERR_DATA_LEN` | `command` | `command` | 否 | payload 长度不符、字段不完整 |
-| `0x05` | `ERR_BUSY` | `runtime` | `runtime` | 是 | 异步任务占用中（如语音异步未完成） |
-| `0x06` | `ERR_NOT_READY` | `runtime` | `runtime` | 是 | 系统未就绪、IPC 未连通、服务未准备好 |
-| `0x07` | `ERR_BUFFER_FULL` | `runtime` | `runtime` | 是 | 响应队列/发送窗口/编码缓存满 |
-| `0x08` | `ERR_EXEC_FAIL` | `runtime` | `runtime` | 是 | 业务调用失败（算法/文件/IPC 执行失败） |
-| `0x09` | `ERR_FRAME_INVALID` | `frame` | `protocol` | 是 | 帧头/帧结构非法 |
-| `0x0A` | `ERR_XOR_FAIL` | `frame` | `protocol` | 是 | 帧 XOR 校验失败 |
-| `0x0B` | `ERR_SEQ_MISMATCH` | `frame` | `protocol` | 是 | 分包序号/func/txn 不连续或不匹配 |
-| `0x0C` | `ERR_REASSEMBLE_FAIL` | `frame` | `protocol` | 是 | 分包重组缓存溢出/重组失败 |
-| `0x0D` | `ERR_CALLBACK_FAIL` | `runtime` | `runtime` | 是 | 从机内部命令回调未注册/不可用 |
-| `0x0E` | `ERR_UART_WRITE` | `transport` | `transport` | 是 | UART 写失败 |
-| `0x0F` | `ERR_UART_READ` | `transport` | `transport` | 是 | UART 读失败 |
+| 值     | 名称                  | 错误类      | 默认模块    | 重试建议 | 典型触发                               |
+| ------ | --------------------- | ----------- | ----------- | -------- | -------------------------------------- |
+| `0x00` | `ERR_OK`              | `ok`        | `none`      | 否       | 命令执行成功                           |
+| `0x01` | `ERR_UNKNOWN_CMD`     | `command`   | `command`   | 否       | 功能码未实现/不识别                    |
+| `0x02` | `ERR_INVALID_MODE`    | `command`   | `command`   | 否       | 当前 `mode` 不支持该命令               |
+| `0x03` | `ERR_INVALID_PARAM`   | `command`   | `command`   | 否       | 参数越界、非法字符串、非法 flags 组合  |
+| `0x04` | `ERR_DATA_LEN`        | `command`   | `command`   | 否       | payload 长度不符、字段不完整           |
+| `0x05` | `ERR_BUSY`            | `runtime`   | `runtime`   | 是       | 异步任务占用中（如语音异步未完成）     |
+| `0x06` | `ERR_NOT_READY`       | `runtime`   | `runtime`   | 是       | 系统未就绪、IPC 未连通、服务未准备好   |
+| `0x07` | `ERR_BUFFER_FULL`     | `runtime`   | `runtime`   | 是       | 响应队列/发送窗口/编码缓存满           |
+| `0x08` | `ERR_EXEC_FAIL`       | `runtime`   | `runtime`   | 是       | 业务调用失败（算法/文件/IPC 执行失败） |
+| `0x09` | `ERR_FRAME_INVALID`   | `frame`     | `protocol`  | 是       | 帧头/帧结构非法                        |
+| `0x0A` | `ERR_XOR_FAIL`        | `frame`     | `protocol`  | 是       | 帧 XOR 校验失败                        |
+| `0x0B` | `ERR_SEQ_MISMATCH`    | `frame`     | `protocol`  | 是       | 分包序号/func/txn 不连续或不匹配       |
+| `0x0C` | `ERR_REASSEMBLE_FAIL` | `frame`     | `protocol`  | 是       | 分包重组缓存溢出/重组失败              |
+| `0x0D` | `ERR_CALLBACK_FAIL`   | `runtime`   | `runtime`   | 是       | 从机内部命令回调未注册/不可用          |
+| `0x0E` | `ERR_UART_WRITE`      | `transport` | `transport` | 是       | UART 写失败                            |
+| `0x0F` | `ERR_UART_READ`       | `transport` | `transport` | 是       | UART 读失败                            |
 
 ### 16.3 错误模块表（err_module）
 
-| 值 | 名称 | 说明 |
-| --- | --- | --- |
-| `0x00` | `none` | 成功或未细分 |
-| `0x01` | `protocol` | 协议层、编解码、分包重组 |
-| `0x02` | `transport` | UART/I2C 传输层 |
-| `0x03` | `command` | 命令语义与模式约束 |
-| `0x04` | `runtime` | 系统运行态/启动阶段 |
-| `0x05` | `ipc` | 大小核 IPC、外部服务转发 |
-| `0x06` | `report` | 结果上报构建/发布 |
-| `0x07` | `speech` | 语音/LLM/VLM/MCP 异步链路 |
-| `0x08` | `media` | 相机/相册媒体链路 |
-| `0xFF` | `unknown` | 未知来源（保留） |
+| 值     | 名称        | 说明                      |
+| ------ | ----------- | ------------------------- |
+| `0x00` | `none`      | 成功或未细分              |
+| `0x01` | `protocol`  | 协议层、编解码、分包重组  |
+| `0x02` | `transport` | UART/I2C 传输层           |
+| `0x03` | `command`   | 命令语义与模式约束        |
+| `0x04` | `runtime`   | 系统运行态/启动阶段       |
+| `0x05` | `ipc`       | 大小核 IPC、外部服务转发  |
+| `0x06` | `report`    | 结果上报构建/发布         |
+| `0x07` | `speech`    | 语音/LLM/VLM/MCP 异步链路 |
+| `0x08` | `media`     | 相机/相册媒体链路         |
+| `0xFF` | `unknown`   | 未知来源（保留）          |
 
 ### 16.4 错误子码（err_subcode）规则
 
@@ -1515,19 +1515,19 @@ Payload：
 
 当前已定义专项子码：
 
-| 子码 | 名称 | 说明 |
-| --- | --- | --- |
-| `0x0101` | `WL_MCU_ERR_SUB_CMD_PRE_STARTUP` | 启动门控未打开即收到业务命令 |
+| 子码     | 名称                                     | 说明                             |
+| -------- | ---------------------------------------- | -------------------------------- |
+| `0x0101` | `WL_MCU_ERR_SUB_CMD_PRE_STARTUP`         | 启动门控未打开即收到业务命令     |
 | `0x0102` | `WL_MCU_ERR_SUB_CMD_PROTOCOL_INFO_BUILD` | `CMD_GET_PROTOCOL_INFO` 构建失败 |
-| `0x0103` | `WL_MCU_ERR_SUB_CMD_QUEUE_FULL` | 命令响应队列满 |
-| `0x0201` | `WL_MCU_ERR_SUB_IPC_WIFI_SEND` | Wi-Fi IPC 请求发送失败 |
-| `0x0202` | `WL_MCU_ERR_SUB_IPC_SPEECH_SEND` | 语音 IPC 请求发送失败 |
-| `0x0301` | `WL_MCU_ERR_SUB_ASYNC_TIMEOUT` | 异步命令等待超时 |
-| `0x0401` | `WL_MCU_ERR_SUB_REPORT_OBJTRACK` | 跟踪结果上报失败 |
-| `0x0402` | `WL_MCU_ERR_SUB_REPORT_OCR` | OCR 结果上报失败 |
-| `0x0501` | `WL_MCU_ERR_SUB_UART_CALLBACK_MISSING` | UART 命令回调缺失 |
-| `0x0502` | `WL_MCU_ERR_SUB_I2C_CALLBACK_MISSING` | I2C 命令回调缺失 |
-| `0x0601` | `WL_MCU_ERR_SUB_REASSEMBLE_OVERFLOW` | 重组缓存溢出 |
+| `0x0103` | `WL_MCU_ERR_SUB_CMD_QUEUE_FULL`          | 命令响应队列满                   |
+| `0x0201` | `WL_MCU_ERR_SUB_IPC_WIFI_SEND`           | Wi-Fi IPC 请求发送失败           |
+| `0x0202` | `WL_MCU_ERR_SUB_IPC_SPEECH_SEND`         | 语音 IPC 请求发送失败            |
+| `0x0301` | `WL_MCU_ERR_SUB_ASYNC_TIMEOUT`           | 异步命令等待超时                 |
+| `0x0401` | `WL_MCU_ERR_SUB_REPORT_OBJTRACK`         | 跟踪结果上报失败                 |
+| `0x0402` | `WL_MCU_ERR_SUB_REPORT_OCR`              | OCR 结果上报失败                 |
+| `0x0501` | `WL_MCU_ERR_SUB_UART_CALLBACK_MISSING`   | UART 命令回调缺失                |
+| `0x0502` | `WL_MCU_ERR_SUB_I2C_CALLBACK_MISSING`    | I2C 命令回调缺失                 |
+| `0x0601` | `WL_MCU_ERR_SUB_REASSEMBLE_OVERFLOW`     | 重组缓存溢出                     |
 
 ### 16.5 使用约束
 
@@ -1580,7 +1580,7 @@ Payload：
 - 功能 `disabled -> enabled` 或重新进入 app，会触发下一次重载
 - 同一活跃 session 内重复下发相同启用命令，不保证再次重载
 - 若运行中修
-改了配置文件，需先退出当前 app（或关闭功能）再重新进入
+  改了配置文件，需先退出当前 app（或关闭功能）再重新进入
 
 ## 18. 交互示例
 

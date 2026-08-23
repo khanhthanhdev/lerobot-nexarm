@@ -4,7 +4,7 @@
 #include "Arduino.h"
 #include "PinButton.h"
 #include "FS.h"
-#include "LittleFS.h" 
+#include "LittleFS.h"
 #include "esp_adc_cal.h"
 #include "driver/adc.h"
 #include "Motor_I2C.h"
@@ -12,13 +12,13 @@
 #include "Tank_Chassis.h"
 #include "Conveyor_Belt.h"
 #include "Stepper_Strip.h"
-#include "WiFi.h" 
+#include "WiFi.h"
 
 #define WINDOWS_SIZE 10
 
 class OLED_t {
 public:
-    String custom_lines[4] = {"", "", "", ""}; 
+    String custom_lines[4] = {"", "", "", ""};
     uint8_t current_icon = 0;
 
     bool begin();
@@ -27,8 +27,8 @@ public:
     void show_status(float x, float y, float z, float pitch, float roll, float claw);
 
     void show_espnow_info(uint8_t channel, uint8_t acc, bool is_unicast, String mac);
-    void show_wifi_ap_info(String ssid, IPAddress ip); 
-    
+    void show_wifi_ap_info(String ssid, IPAddress ip);
+
     void set_custom_text(uint8_t line, String text);
     void show_custom();
     void set_icon(uint8_t icon_id);
@@ -70,9 +70,9 @@ private:
     uint32_t ticks_count;
     const uint32_t update_period = 20;
 
-    enum Stage {BUZZER_STAGE_START_NEW_CYCLE, 
-                BUZZER_STAGE_WATTING_OFF, 
-                BUZZER_STAGE_WATTING_PERIOD_END, 
+    enum Stage {BUZZER_STAGE_START_NEW_CYCLE,
+                BUZZER_STAGE_WATTING_OFF,
+                BUZZER_STAGE_WATTING_PERIOD_END,
                 BUZZER_STAGE_IDLE};
 
     Stage stage = BUZZER_STAGE_IDLE;
@@ -85,8 +85,8 @@ public:
     Buzzer_t buzzer;
     Button_t button;
     Motor_I2C motor;
-    Mecanum_Chassis mecanum;     
-    Tank_Chassis tank;  
+    Mecanum_Chassis mecanum;
+    Tank_Chassis tank;
     Conveyor_Belt conveyor;
     Stepper_Strip stepper;
     enum Act_State {READ_FRAME_NUM, READ_FRAME_DATA, ACT_STOP};
@@ -99,7 +99,7 @@ public:
     void action_group_stop(void);
     bool action_group_download(uint8_t id, uint8_t *data, size_t length);
 
-private:  
+private:
     File file;
     uint8_t act_read_frame_num;
 };

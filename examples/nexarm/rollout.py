@@ -37,11 +37,14 @@ def parse_args():
     parser.add_argument("--front-cam", type=int, default=0)
     parser.add_argument("--wrist-cam", type=int, default=1)
     parser.add_argument(
-        "--strategy", default="sentry",
+        "--strategy",
+        default="sentry",
         choices=["base", "sentry", "highlight", "dagger"],
-        help="Rollout strategy (default: sentry)"
+        help="Rollout strategy (default: sentry)",
     )
-    parser.add_argument("--repo-id", default=None, help="Optional: save rollout dataset (e.g. YOUR_HF_USERNAME/eval_nexarm)")
+    parser.add_argument(
+        "--repo-id", default=None, help="Optional: save rollout dataset (e.g. YOUR_HF_USERNAME/eval_nexarm)"
+    )
     parser.add_argument(
         "--rerun-save-path",
         help="Optional .rrd path to save camera frames, observations, and policy actions",
@@ -58,7 +61,9 @@ def main():
     )
 
     cmd = [
-        sys.executable, "-m", "lerobot.scripts.lerobot_rollout",
+        sys.executable,
+        "-m",
+        "lerobot.scripts.lerobot_rollout",
         f"--strategy.type={args.strategy}",
         f"--policy.path={args.policy_path}",
         "--robot.type=nexarm_follower",
