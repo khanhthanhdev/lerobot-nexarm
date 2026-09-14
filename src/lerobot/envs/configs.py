@@ -234,6 +234,68 @@ class PushtEnv(EnvConfig):
         }
 
 
+@EnvConfig.register_subclass("nexarm")
+@dataclass
+class NexArmEnv(EnvConfig):
+    task: str | None = "NexArmPickPlace-v0"
+    fps: int = 30
+    episode_length: int = 400
+    obs_type: str = "pixels_agent_pos"
+    observation_height: int = 480
+    observation_width: int = 640
+    reward_type: str = "dense"
+    render_mode: str = "rgb_array"
+    features: dict[str, PolicyFeature] = field(
+        default_factory=lambda: {
+            ACTION: PolicyFeature(type=FeatureType.ACTION, shape=(6,)),
+        }
+    )
+    features_map: dict[str, str] = field(
+        default_factory=lambda: {
+            ACTION: ACTION,
+            "agent_pos": OBS_STATE,
+            "front": f"{OBS_IMAGE}.front",
+            "wrist": f"{OBS_IMAGE}.wrist",
+            "pixels/front": f"{OBS_IMAGES}.front",
+            "pixels/wrist": f"{OBS_IMAGES}.wrist",
+            "environment_state": OBS_ENV_STATE,
+        }
+    )
+
+    def __post_init__(self):
+        if self.obs_type in ("pixels_agent_pos", "state"):
+            self.features["agent_pos"] = PolicyFeature(type=FeatureType.STATE, shape=(6,))
+        if self.obs_type in ("pixels_agent_pos", "pixels"):
+            self.features["pixels/front"] = PolicyFeature(
+                type=FeatureType.VISUAL, shape=(self.observation_height, self.observation_width, 3)
+            )
+            self.features["pixels/wrist"] = PolicyFeature(
+                type=FeatureType.VISUAL, shape=(self.observation_height, self.observation_width, 3)
+            )
+        if self.obs_type == "state":
+            self.features["environment_state"] = PolicyFeature(type=FeatureType.STATE, shape=(6,))
+
+    @property
+    def package_name(self) -> str:
+        return "lerobot.envs.nexarm"
+
+    @property
+    def gym_id(self) -> str:
+        return self.task or "NexArmPickPlace-v0"
+
+    @property
+    def gym_kwargs(self) -> dict:
+        return {
+            "obs_type": self.obs_type,
+            "render_mode": self.render_mode,
+            "max_episode_steps": self.episode_length,
+            "reward_type": self.reward_type,
+            "observation_height": self.observation_height,
+            "observation_width": self.observation_width,
+            "fps": self.fps,
+        }
+
+
 @dataclass
 class ImagePreprocessingConfig:
     crop_params_dict: dict[str, tuple[int, int, int, int]] | None = None

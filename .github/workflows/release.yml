@@ -25,16 +25,15 @@ env:
   PYTHON_VERSION: "3.12"
 
 jobs:
-  # This job builds the Python package and publishes it to PyPI
-  build-and-publish:
-    name: Build and publish Python distributions
+  # This job builds distributions that subsequent jobs verify and publish.
+  build:
+    name: Build Python distributions
     runs-on: ubuntu-latest
     if: github.repository == 'huggingface/lerobot'
     outputs:
       version: ${{ steps.extract_info.outputs.tag_version }}
     permissions:
-      contents: write
-      id-token: write
+      contents: read
 
     steps:
       - name: Checkout code
@@ -88,39 +87,18 @@ jobs:
 
       - name: Build package
         run: python -m build
-
-      - name: Create GitHub Release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        # zizmor: ignore[template-injection]
-        run: |
-          gh release create ${{ github.ref_name }} \
-            --title "Release ${{ github.ref_name }}" \
-            --generate-notes \
-            --draft=$([[ "${{ github.ref_name }}" == *-* ]] && echo true || echo false) \
-            --prerelease=$([[ "${{ github.ref_name }}" == *-* ]] && echo true || echo false) \
-            ./dist/*
-
-      - name: Publish to TestPyPI for pre-releases
-        # True for tags like 'v0.2.0-rc1'
-        if: startsWith(github.ref, 'refs/tags/v') && contains(github.ref, '-')
-        uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e  # v1.13.0
+      - name: Upload built distributions
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         with:
-          repository-url: https://test.pypi.org/legacy/
-          verbose: true
-          print-hash: true
+          name: python-distributions
+          path: dist/*
+          if-no-files-found: error
 
-      - name: Publish to PyPI
-        if: startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-')
-        uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e  # v1.13.0
-        with:
-          verbose: true
-          print-hash: true
 
   # This job runs end-to-end tests on the release
   test-release:
     name: Test Release
-    needs: [build-and-publish]
+    needs: [build]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -131,6 +109,11 @@ jobs:
         with:
           lfs: true
           persist-credentials: false
+      - name: Download built distributions
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
+        with:
+          name: python-distributions
+          path: dist
       - name: Install apt dependencies
         run: |
           sudo apt-get update && sudo apt-get install -y build-essential \
@@ -144,29 +127,59 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Create uv virtual environment
         run: uv venv
-      - name: Install lerobot release
+      - name: Install built distribution
+        run: |
+          WHEEL="$(echo dist/*.whl)"
+          uv pip install --torch-backend cpu "lerobot[all] @ file://${GITHUB_WORKSPACE}/${WHEEL}"
+      - name: Check lerobot version
+        run: .venv/bin/python -c "import lerobot; print(lerobot.__version__)"
+      - name: Run end-to-end tests
+        run: make test-end-to-end
+
+  publish:
+    name: Publish Verified Distributions
+    needs: [build, test-release]
+    if: >-
+      github.repository == 'huggingface/lerobot' &&
+      needs.build.result == 'success' &&
+      needs.test-release.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - name: Download verified distributions
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
+        with:
+          name: python-distributions
+          path: dist
+      - name: Publish to TestPyPI for pre-releases
+        # True for tags like 'v0.2.0-rc1'
+        if: startsWith(github.ref, 'refs/tags/v') && contains(github.ref, '-')
+        uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e  # v1.13.0
+        with:
+          packages-dir: dist/
+          repository-url: https://test.pypi.org/legacy/
+          verbose: true
+          print-hash: true
+      - name: Publish to PyPI
+        if: startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-')
+        uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e  # v1.13.0
+        with:
+          packages-dir: dist/
+          verbose: true
+          print-hash: true
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         # zizmor: ignore[template-injection]
         run: |
-          VERSION="${{ needs.build-and-publish.outputs.version }}"
-          if [[ "$VERSION" == *-* ]]; then
-            BASE_VERSION="${VERSION%%-*}"
-            echo "Installing pre-release version $BASE_VERSION from TestPyPI..."
-            uv pip install \
-              --torch-backend cpu \
-              --index-url https://test.pypi.org/simple/ \
-              --extra-index-url https://pypi.org/simple \
-              --index-strategy unsafe-best-match \
-               "lerobot[all]==$BASE_VERSION"
-          else
-            echo "Installing release version $VERSION from PyPI..."
-            uv pip install --torch-backend cpu "lerobot[all]==$VERSION"
-          fi
-      - name: Check lerobot version
-        run: uv run python -c "import lerobot; print(lerobot.__version__)"
-
-      - name: Run end-to-end tests
-        run: uv run make test-end-to-end
+          gh release create ${{ github.ref_name }} \
+            --title "Release ${{ github.ref_name }}" \
+            --generate-notes \
+            --draft=$([[ "${{ github.ref_name }}" == *-* ]] && echo true || echo false) \
+            --prerelease=$([[ "${{ github.ref_name }}" == *-* ]] && echo true || echo false) \
+            dist/*
 
 
 # TODO(Steven): Publish draft/pre-release and to test pypi weekly
-# TODO(Steven): Separate build and publish job

@@ -61,8 +61,6 @@ jobs:
   # Each tier installs a different extra and runs the full suite;
   # tests gated behind other extras skip automatically.
   fast-pytest-tests:
-    # Temporarily disabled while the NexArm-specific dependency tiers are repaired.
-    if: ${{ false }}
     name: Fast Pytest Tests
     runs-on: ubuntu-latest
     env:

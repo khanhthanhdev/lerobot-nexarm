@@ -1,6 +1,6 @@
 <?xml version='1.0' encoding='utf-8'?>
 <mujoco model="NexArm Scene">
-  <include file="NexArm-sim.xml" />
+  <include file="nexarm.xml" />
   <statistic center="0 0.2 0.2" extent="0.8" />
   <visual>
     <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0" />

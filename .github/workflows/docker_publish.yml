@@ -29,8 +29,9 @@ on:
 env:
   UV_VERSION: "0.8.0"
   PYTHON_VERSION: "3.12"
-  DOCKER_IMAGE_NAME_CPU: huggingface/lerobot-cpu:latest
-  DOCKER_IMAGE_NAME_GPU: huggingface/lerobot-gpu:latest
+  DOCKER_IMAGE_REPOSITORY_CPU: huggingface/lerobot-cpu
+  DOCKER_IMAGE_REPOSITORY_GPU: huggingface/lerobot-gpu
+  CANDIDATE_TAG: ${{ github.sha }}-${{ github.run_id }}
 
 # Ensures that only the latest commit is built, canceling older runs.
 concurrency:
@@ -45,33 +46,33 @@ jobs:
       group: aws-general-8-plus
     if: github.repository == 'huggingface/lerobot'
     outputs:
-      image_tag: ${{ env.DOCKER_IMAGE_NAME_CPU }}
+      image_tag: ${{ env.DOCKER_IMAGE_REPOSITORY_CPU }}:${{ env.CANDIDATE_TAG }}
     steps:
       - name: Install Git LFS
         run: |
           sudo apt-get update
           sudo apt-get install git-lfs
           git lfs install
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           lfs: true
           persist-credentials: false
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3 # zizmor: ignore[unpinned-uses]
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f  # v3
         with:
           cache-binary: false
       - name: Login to Docker Hub
-        uses: docker/login-action@v3 # zizmor: ignore[unpinned-uses]
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9  # v3
         with:
           username: ${{ secrets.DOCKERHUB_LEROBOT_USERNAME }}
           password: ${{ secrets.DOCKERHUB_LEROBOT_PASSWORD }}
       - name: Build and push Docker image CPU
-        uses: docker/build-push-action@v6 # zizmor: ignore[unpinned-uses]
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8  # v6
         with:
           context: .
           file: ./docker/Dockerfile.user
           push: true
-          tags: ${{ env.DOCKER_IMAGE_NAME_CPU }}
+          tags: ${{ env.DOCKER_IMAGE_REPOSITORY_CPU }}:${{ env.CANDIDATE_TAG }}
 
   # This job builds a GPU image for testing & distribution
   build-docker-gpu:
@@ -80,33 +81,33 @@ jobs:
       group: aws-general-8-plus
     if: github.repository == 'huggingface/lerobot'
     outputs:
-      image_tag: ${{ env.DOCKER_IMAGE_NAME_GPU }}
+      image_tag: ${{ env.DOCKER_IMAGE_REPOSITORY_GPU }}:${{ env.CANDIDATE_TAG }}
     steps:
       - name: Install Git LFS
         run: |
           sudo apt-get update
           sudo apt-get install git-lfs
           git lfs install
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           lfs: true
           persist-credentials: false
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3 # zizmor: ignore[unpinned-uses]
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f  # v3
         with:
           cache-binary: false
       - name: Login to Docker Hub
-        uses: docker/login-action@v3 # zizmor: ignore[unpinned-uses]
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9  # v3
         with:
           username: ${{ secrets.DOCKERHUB_LEROBOT_USERNAME }}
           password: ${{ secrets.DOCKERHUB_LEROBOT_PASSWORD }}
       - name: Build and push Docker image GPU
-        uses: docker/build-push-action@v6 # zizmor: ignore[unpinned-uses]
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8  # v6
         with:
           context: .
           file: ./docker/Dockerfile.internal
           push: true
-          tags: ${{ env.DOCKER_IMAGE_NAME_GPU }}
+          tags: ${{ env.DOCKER_IMAGE_REPOSITORY_GPU }}:${{ env.CANDIDATE_TAG }}
 
   # This job runs the E2E tests + pytest with all extras in the CPU image
   cpu-tests:
@@ -210,3 +211,34 @@ jobs:
 
       - name: Run multi-GPU training tests
         run: pytest -vv tests/training/
+
+  # Publish mutable tags only after every candidate image test has passed.
+  promote-docker-images:
+    name: Promote Verified Docker Images
+    needs: [build-docker-cpu, build-docker-gpu, cpu-tests, gpu-tests, multi-gpu-tests]
+    if: >-
+      github.repository == 'huggingface/lerobot' &&
+      needs.cpu-tests.result == 'success' &&
+      needs.gpu-tests.result == 'success' &&
+      needs.multi-gpu-tests.result == 'success'
+    runs-on:
+      group: aws-general-8-plus
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f  # v3
+        with:
+          cache-binary: false
+      - name: Login to Docker Hub
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9  # v3
+        with:
+          username: ${{ secrets.DOCKERHUB_LEROBOT_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_LEROBOT_PASSWORD }}
+      - name: Promote tested images
+        env:
+          CPU_CANDIDATE: ${{ needs.build-docker-cpu.outputs.image_tag }}
+          GPU_CANDIDATE: ${{ needs.build-docker-gpu.outputs.image_tag }}
+          CPU_REPOSITORY: ${{ env.DOCKER_IMAGE_REPOSITORY_CPU }}
+          GPU_REPOSITORY: ${{ env.DOCKER_IMAGE_REPOSITORY_GPU }}
+        run: |
+          docker buildx imagetools create --tag "$CPU_REPOSITORY:latest" "$CPU_CANDIDATE"
+          docker buildx imagetools create --tag "$GPU_REPOSITORY:latest" "$GPU_CANDIDATE"

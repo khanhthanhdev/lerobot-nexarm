@@ -36,11 +36,11 @@ repos:
       - id: check-yaml
       - id: check-toml
       - id: end-of-file-fixer
-        # Firmware includes vendor sources and binary artifacts; these hooks can
-        # rewrite their bytes without improving the Python project.
-        exclude: ^firmware/
+        # Firmware contains vendor/binary artifacts; MUJOCO_LOG.TXT is generated
+        # at runtime. Neither belongs in automatic whitespace rewrites.
+        exclude: ^(firmware/|MUJOCO_LOG\.TXT$)
       - id: trailing-whitespace
-        exclude: ^firmware/
+        exclude: ^(firmware/|MUJOCO_LOG\.TXT$)
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.14.1

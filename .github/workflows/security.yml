@@ -51,4 +51,5 @@ jobs:
       - name: Secret Scanning
         uses: trufflesecurity/trufflehog@eafb8c5f6a06175141c27f17bcc17941853d0047  # v3.90.0
         with:
-          extra_args: --only-verified
+          # Include unknown detector results so potential leaks receive review.
+          extra_args: --results=verified,unknown
