@@ -188,6 +188,8 @@ sim/*
 !sim/fusion_export/meshes/
 !sim/fusion_export/meshes/*.stl
 !sim/run_export.py
+!sim/test_sim_models.py
+!sim/visualize_rerun.py
 !sim/exporter/
 !sim/exporter/**
 !sim/isaac_lab/

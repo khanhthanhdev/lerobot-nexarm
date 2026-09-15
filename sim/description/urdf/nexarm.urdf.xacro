@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="nexarm">
 
-  <xacro:macro name="nexarm" params="prefix:='' parent:='' *origin attach_cam_mount:=true">
+  <xacro:macro name="nexarm" params="prefix:='' parent:='' *origin attach_cam_mount:=true mesh_dir:='package://nexarm_description/meshes/visual'">
     <!-- Base attachment if parent link is provided -->
     <xacro:if value="${parent != ''}">
       <joint name="${prefix}base_mount_joint" type="fixed">
@@ -25,176 +25,181 @@
     <!-- Base Link -->
     <link name="${prefix}base_link">
       <inertial>
-        <origin xyz="0.000329023 -0.000172763 0.0185956" rpy="0 0 0"/>
-        <mass value="0.78673"/>
-        <inertia ixx="1.382447e-03" ixy="6.069151e-06" ixz="-5.918073e-06" iyy="1.365518e-03" iyz="4.089851e-06" izz="1.472851e-03"/>
+        <origin xyz="1.15052e-05 -0.000135185 0.0185734" rpy="0 0 0"/>
+        <mass value="0.786653"/>
+        <inertia ixx="1.397924e-03" ixy="-4.416572e-07" ixz="-1.795833e-09" iyy="1.440493e-03" iyz="-1.189059e-05" izz="1.872355e-03"/>
       </inertial>
       <visual>
         <origin xyz="-0.539369 -0.0639728 0" rpy="0 0 0"/>
         <geometry>
-          <mesh filename="package://nexarm_description/meshes/visual/base_link.stl" scale="0.001 0.001 0.001"/>
+          <mesh filename="${mesh_dir}/base_link.stl" scale="0.001 0.001 0.001"/>
         </geometry>
         <material name="${prefix}dark_grey"/>
       </visual>
       <collision>
         <origin xyz="-0.539369 -0.0639728 0" rpy="0 0 0"/>
         <geometry>
-          <mesh filename="package://nexarm_description/meshes/visual/base_link.stl" scale="0.001 0.001 0.001"/>
+          <mesh filename="${mesh_dir}/base_link.stl" scale="0.001 0.001 0.001"/>
         </geometry>
       </collision>
     </link>
 
-    <!-- Joint 1: Base to Link 1 -->
+    <!-- Joint 1: Base to Link 1 (Shoulder Pan) -->
     <joint name="${prefix}joint_1_base_to_link_1" type="revolute">
       <parent link="${prefix}base_link"/>
       <child link="${prefix}link_1"/>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <origin xyz="0 0 0.049" rpy="0 0 0"/>
       <axis xyz="0 0 -1"/>
       <limit lower="-2.35619" upper="2.35619" effort="5.0" velocity="3.14"/>
       <dynamics damping="0.2" friction="0.1"/>
     </joint>
 
+    <!-- Link 1 -->
     <link name="${prefix}link_1">
       <inertial>
-        <origin xyz="0.000302061 -0.000508534 0.0715316" rpy="0 0 0"/>
-        <mass value="0.72979"/>
-        <inertia ixx="9.907993e-04" ixy="5.048753e-06" ixz="-1.171802e-05" iyy="7.971261e-04" iyz="1.309009e-05" izz="7.514757e-04"/>
+        <origin xyz="9.61443e-09 -0.000461208 0.0224849" rpy="0 0 0"/>
+        <mass value="0.729808"/>
+        <inertia ixx="5.196346e-04" ixy="-1.550087e-06" ixz="-7.127401e-10" iyy="6.372098e-04" iyz="-5.034255e-06" izz="6.411240e-04"/>
       </inertial>
       <visual>
-        <origin xyz="-0.539369 -0.0639728 0" rpy="0 0 0"/>
+        <origin xyz="-0.539369 -0.0639728 -0.049" rpy="0 0 0"/>
         <geometry>
-          <mesh filename="package://nexarm_description/meshes/visual/link_1.stl" scale="0.001 0.001 0.001"/>
+          <mesh filename="${mesh_dir}/link_1.stl" scale="0.001 0.001 0.001"/>
         </geometry>
         <material name="${prefix}dark_grey"/>
       </visual>
       <collision>
-        <origin xyz="-0.539369 -0.0639728 0" rpy="0 0 0"/>
+        <origin xyz="-0.539369 -0.0639728 -0.049" rpy="0 0 0"/>
         <geometry>
-          <mesh filename="package://nexarm_description/meshes/visual/link_1.stl" scale="0.001 0.001 0.001"/>
+          <mesh filename="${mesh_dir}/link_1.stl" scale="0.001 0.001 0.001"/>
         </geometry>
       </collision>
     </link>
 
-    <!-- Joint 2: Link 1 to Link 2 -->
+    <!-- Joint 2: Link 1 to Link 2 (Shoulder Lift) -->
     <joint name="${prefix}joint_2_link_1_to_link_2" type="revolute">
       <parent link="${prefix}link_1"/>
       <child link="${prefix}link_2"/>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <origin xyz="0.0351 0 0.057445" rpy="0 0 0"/>
       <axis xyz="-1 0 0"/>
-      <limit lower="-1.74533" upper="1.74533" effort="5.0" velocity="3.14"/>
-      <dynamics damping="0.2" friction="0.1"/>
-    </joint>
-
-    <link name="${prefix}link_2">
-      <inertial>
-        <origin xyz="0.00085449 0.0804471 0.188177" rpy="0 0 0"/>
-        <mass value="0.49947"/>
-        <inertia ixx="4.551624e-03" ixy="-1.168755e-05" ixz="2.687315e-05" iyy="3.921381e-03" iyz="-1.666991e-03" izz="1.196652e-03"/>
-      </inertial>
-      <visual>
-        <origin xyz="-0.539369 -0.0639728 0" rpy="0 0 0"/>
-        <geometry>
-          <mesh filename="package://nexarm_description/meshes/visual/link_2.stl" scale="0.001 0.001 0.001"/>
-        </geometry>
-        <material name="${prefix}dark_grey"/>
-      </visual>
-      <collision>
-        <origin xyz="-0.539369 -0.0639728 0" rpy="0 0 0"/>
-        <geometry>
-          <mesh filename="package://nexarm_description/meshes/visual/link_2.stl" scale="0.001 0.001 0.001"/>
-        </geometry>
-      </collision>
-    </link>
-
-    <!-- Joint 3: Link 2 to Link 3 -->
-    <joint name="${prefix}joint_3_link_2_to_link_3" type="revolute">
-      <parent link="${prefix}link_2"/>
-      <child link="${prefix}link_3"/>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <axis xyz="1 0 0"/>
-      <limit lower="-1.74533" upper="1.74533" effort="5.0" velocity="3.14"/>
-      <dynamics damping="0.2" friction="0.1"/>
-    </joint>
-
-    <link name="${prefix}link_3">
-      <inertial>
-        <origin xyz="-0.00120152 0.0693521 0.262103" rpy="0 0 0"/>
-        <mass value="0.50284"/>
-        <inertia ixx="3.109051e-03" ixy="2.399581e-05" ixz="-1.011881e-05" iyy="2.846506e-03" iyz="7.973413e-04" izz="8.058348e-04"/>
-      </inertial>
-      <visual>
-        <origin xyz="-0.539369 -0.0639728 0" rpy="0 0 0"/>
-        <geometry>
-          <mesh filename="package://nexarm_description/meshes/visual/link_3.stl" scale="0.001 0.001 0.001"/>
-        </geometry>
-        <material name="${prefix}dark_grey"/>
-      </visual>
-      <collision>
-        <origin xyz="-0.539369 -0.0639728 0" rpy="0 0 0"/>
-        <geometry>
-          <mesh filename="package://nexarm_description/meshes/visual/link_3.stl" scale="0.001 0.001 0.001"/>
-        </geometry>
-      </collision>
-    </link>
-
-    <!-- Joint 4: Link 3 to Link 4 -->
-    <joint name="${prefix}joint_4_link_3_to_link_4" type="revolute">
-      <parent link="${prefix}link_3"/>
-      <child link="${prefix}link_4"/>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <axis xyz="1 0 0"/>
-      <limit lower="-1.74533" upper="1.74533" effort="5.0" velocity="3.14"/>
-      <dynamics damping="0.2" friction="0.1"/>
-    </joint>
-
-    <link name="${prefix}link_4">
-      <inertial>
-        <origin xyz="-0.00015523 -0.0227189 0.225791" rpy="0 0 0"/>
-        <mass value="0.11506"/>
-        <inertia ixx="7.871783e-05" ixy="6.069001e-08" ixz="-4.015998e-08" iyy="1.314619e-04" iyz="4.254316e-06" izz="1.094553e-04"/>
-      </inertial>
-      <visual>
-        <origin xyz="-0.539369 -0.0639728 0" rpy="0 0 0"/>
-        <geometry>
-          <mesh filename="package://nexarm_description/meshes/visual/link_4.stl" scale="0.001 0.001 0.001"/>
-        </geometry>
-        <material name="${prefix}dark_grey"/>
-      </visual>
-      <collision>
-        <origin xyz="-0.539369 -0.0639728 0" rpy="0 0 0"/>
-        <geometry>
-          <mesh filename="package://nexarm_description/meshes/visual/link_4.stl" scale="0.001 0.001 0.001"/>
-        </geometry>
-      </collision>
-    </link>
-
-    <!-- Joint 5: Link 4 to Link 5 -->
-    <joint name="${prefix}joint_5_link_4_to_link_5" type="revolute">
-      <parent link="${prefix}link_4"/>
-      <child link="${prefix}link_5"/>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <axis xyz="0 -0.040713 -0.999171"/>
       <limit lower="-2.0944" upper="2.0944" effort="5.0" velocity="3.14"/>
       <dynamics damping="0.2" friction="0.1"/>
     </joint>
 
-    <link name="${prefix}link_5">
+    <!-- Link 2 -->
+    <link name="${prefix}link_2">
       <inertial>
-        <origin xyz="-7.46452e-05 -0.061908 0.226248" rpy="0 0 0"/>
-        <mass value="0.08779"/>
-        <inertia ixx="4.238475e-05" ixy="1.378901e-07" ixz="-5.632002e-08" iyy="3.874136e-05" iyz="1.306002e-06" izz="3.415089e-05"/>
+        <origin xyz="-0.03428 0.0804481 0.0817056" rpy="0 0 0"/>
+        <mass value="0.49949"/>
+        <inertia ixx="2.232805e-03" ixy="-6.385181e-12" ixz="-7.231483e-12" iyy="1.283494e-03" iyz="-1.079517e-03" izz="1.184026e-03"/>
       </inertial>
       <visual>
-        <origin xyz="-0.539369 -0.0639728 0" rpy="0 0 0"/>
+        <origin xyz="-0.574469 -0.0639728 -0.106445" rpy="0 0 0"/>
         <geometry>
-          <mesh filename="package://nexarm_description/meshes/visual/link_5.stl" scale="0.001 0.001 0.001"/>
+          <mesh filename="${mesh_dir}/link_2.stl" scale="0.001 0.001 0.001"/>
         </geometry>
         <material name="${prefix}dark_grey"/>
       </visual>
       <collision>
-        <origin xyz="-0.539369 -0.0639728 0" rpy="0 0 0"/>
+        <origin xyz="-0.574469 -0.0639728 -0.106445" rpy="0 0 0"/>
         <geometry>
-          <mesh filename="package://nexarm_description/meshes/visual/link_5.stl" scale="0.001 0.001 0.001"/>
+          <mesh filename="${mesh_dir}/link_2.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+      </collision>
+    </link>
+
+    <!-- Joint 3: Link 2 to Link 3 (Elbow Flex) -->
+    <joint name="${prefix}joint_3_link_2_to_link_3" type="revolute">
+      <parent link="${prefix}link_2"/>
+      <child link="${prefix}link_3"/>
+      <origin xyz="-0.05503 0.132961 0.185239" rpy="0 0 0"/>
+      <axis xyz="1 0 0"/>
+      <limit lower="-2.35619" upper="2.35619" effort="5.0" velocity="3.14"/>
+      <dynamics damping="0.2" friction="0.1"/>
+    </joint>
+
+    <!-- Link 3 -->
+    <link name="${prefix}link_3">
+      <inertial>
+        <origin xyz="0.018748 -0.063648 -0.029599" rpy="0 0 0"/>
+        <mass value="0.502798"/>
+        <inertia ixx="1.486483e-03" ixy="-1.710300e-06" ixz="-6.536557e-07" iyy="3.252812e-04" iyz="-5.481564e-04" izz="1.245735e-03"/>
+      </inertial>
+      <visual>
+        <origin xyz="-0.519439 -0.196934 -0.291684" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="${mesh_dir}/link_3.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="${prefix}dark_grey"/>
+      </visual>
+      <collision>
+        <origin xyz="-0.519439 -0.196934 -0.291684" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="${mesh_dir}/link_3.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+      </collision>
+    </link>
+
+    <!-- Joint 4: Link 3 to Link 4 (Wrist Flex) -->
+    <joint name="${prefix}joint_4_link_3_to_link_4" type="revolute">
+      <parent link="${prefix}link_3"/>
+      <child link="${prefix}link_4"/>
+      <origin xyz="-0.00032 -0.131414 -0.061278" rpy="0 0 0"/>
+      <axis xyz="1 0 0"/>
+      <limit lower="-1.74533" upper="1.74533" effort="5.0" velocity="3.14"/>
+      <dynamics damping="0.2" friction="0.1"/>
+    </joint>
+
+    <!-- Link 4 -->
+    <link name="${prefix}link_4">
+      <inertial>
+        <origin xyz="0.020099 -0.024239 -0.004596" rpy="0 0 0"/>
+        <mass value="0.115069"/>
+        <inertia ixx="3.834434e-05" ixy="3.052933e-07" ixz="-1.846910e-08" iyy="3.793836e-05" iyz="-2.892909e-06" izz="5.093445e-05"/>
+      </inertial>
+      <visual>
+        <origin xyz="-0.519119 -0.06552 -0.230406" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="${mesh_dir}/link_4.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="${prefix}dark_grey"/>
+      </visual>
+      <collision>
+        <origin xyz="-0.519119 -0.06552 -0.230406" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="${mesh_dir}/link_4.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+      </collision>
+    </link>
+
+    <!-- Joint 5: Link 4 to Link 5 (Wrist Roll) -->
+    <joint name="${prefix}joint_5_link_4_to_link_5" type="revolute">
+      <parent link="${prefix}link_4"/>
+      <child link="${prefix}link_5"/>
+      <origin xyz="0.02025 -0.047234 0.000017" rpy="0 0 0"/>
+      <axis xyz="0 -1 0"/>
+      <limit lower="-3.14159" upper="3.14159" effort="5.0" velocity="3.14"/>
+      <dynamics damping="0.2" friction="0.1"/>
+    </joint>
+
+    <!-- Link 5 -->
+    <link name="${prefix}link_5">
+      <inertial>
+        <origin xyz="-0.00006 -0.016152 -0.004198" rpy="0 0 0"/>
+        <mass value="0.0877649"/>
+        <inertia ixx="1.618747e-05" ixy="1.996447e-08" ixz="-7.537660e-08" iyy="1.818535e-05" iyz="-3.821027e-07" izz="1.808885e-05"/>
+      </inertial>
+      <visual>
+        <origin xyz="-0.539369 -0.018286 -0.230423" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="${mesh_dir}/link_5.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="${prefix}dark_grey"/>
+      </visual>
+      <collision>
+        <origin xyz="-0.539369 -0.018286 -0.230423" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="${mesh_dir}/link_5.stl" scale="0.001 0.001 0.001"/>
         </geometry>
       </collision>
     </link>
@@ -208,21 +213,21 @@
 
     <link name="${prefix}link_6_gripper_base">
       <inertial>
-        <origin xyz="-2.64684e-05 -0.0849646 0.230559" rpy="0 0 0"/>
-        <mass value="0.07752"/>
-        <inertia ixx="4.619047e-05" ixy="-1.171001e-07" ixz="5.399998e-09" iyy="6.820875e-05" iyz="-1.332001e-07" izz="4.112108e-05"/>
+        <origin xyz="0 -0.039307 0.000179" rpy="0 0 0"/>
+        <mass value="0.0774927"/>
+        <inertia ixx="8.952498e-06" ixy="1.889152e-11" ixz="5.324807e-15" iyy="9.853330e-05" iyz="7.899955e-08" izz="9.251692e-05"/>
       </inertial>
       <visual>
-        <origin xyz="-0.539369 -0.0639728 0" rpy="0 0 0"/>
+        <origin xyz="-0.539369 -0.018286 -0.230423" rpy="0 0 0"/>
         <geometry>
-          <mesh filename="package://nexarm_description/meshes/visual/link_6_gripper_base.stl" scale="0.001 0.001 0.001"/>
+          <mesh filename="${mesh_dir}/link_6_gripper_base.stl" scale="0.001 0.001 0.001"/>
         </geometry>
         <material name="${prefix}dark_grey"/>
       </visual>
       <collision>
-        <origin xyz="-0.539369 -0.0639728 0" rpy="0 0 0"/>
+        <origin xyz="-0.539369 -0.018286 -0.230423" rpy="0 0 0"/>
         <geometry>
-          <mesh filename="package://nexarm_description/meshes/visual/link_6_gripper_base.stl" scale="0.001 0.001 0.001"/>
+          <mesh filename="${mesh_dir}/link_6_gripper_base.stl" scale="0.001 0.001 0.001"/>
         </geometry>
       </collision>
     </link>
@@ -231,60 +236,29 @@
     <joint name="${prefix}gripper_pinion_joint" type="revolute">
       <parent link="${prefix}link_6_gripper_base"/>
       <child link="${prefix}link_6_pinion_gear"/>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <axis xyz="0 -0.040713 -0.999171"/>
-      <limit lower="-3.14159" upper="3.14159" effort="1.0" velocity="6.28"/>
+      <origin xyz="0 -0.03994 0.000013" rpy="0 0 0"/>
+      <axis xyz="0 0 -1"/>
+      <limit lower="-3.14159" upper="3.14159" effort="5.0" velocity="3.14"/>
       <dynamics damping="0.01" friction="0.01"/>
     </joint>
 
     <link name="${prefix}link_6_pinion_gear">
       <inertial>
-        <origin xyz="7.3486e-05 -0.083722 0.230438" rpy="0 0 0"/>
-        <mass value="0.0081"/>
-        <inertia ixx="8.503387e-07" ixy="-1.520001e-09" ixz="6.940001e-09" iyy="8.868778e-07" iyz="1.319001e-08" izz="1.026417e-06"/>
+        <origin xyz="0 0.001971 0" rpy="0 0 0"/>
+        <mass value="0.00813153"/>
+        <inertia ixx="1.989086e-07" ixy="2.683409e-17" ixz="-2.799538e-16" iyy="3.712279e-07" iyz="8.259525e-12" izz="1.989086e-07"/>
       </inertial>
       <visual>
-        <origin xyz="-0.539369 -0.0639728 0" rpy="0 0 0"/>
+        <origin xyz="-0.539369 0.021654 -0.230436" rpy="0 0 0"/>
         <geometry>
-          <mesh filename="package://nexarm_description/meshes/visual/link_6_pinion_gear.stl" scale="0.001 0.001 0.001"/>
+          <mesh filename="${mesh_dir}/link_6_pinion_gear.stl" scale="0.001 0.001 0.001"/>
         </geometry>
         <material name="${prefix}metal_accent"/>
       </visual>
       <collision>
-        <origin xyz="-0.539369 -0.0639728 0" rpy="0 0 0"/>
+        <origin xyz="-0.539369 0.021654 -0.230436" rpy="0 0 0"/>
         <geometry>
-          <mesh filename="package://nexarm_description/meshes/visual/link_6_pinion_gear.stl" scale="0.001 0.001 0.001"/>
-        </geometry>
-      </collision>
-    </link>
-
-    <!-- Right Jaw -->
-    <joint name="${prefix}right_jaw_slide_joint" type="prismatic">
-      <parent link="${prefix}link_6_gripper_base"/>
-      <child link="${prefix}link_6_right_jaw"/>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <axis xyz="-1 0 0"/>
-      <limit lower="-0.0255" upper="0" effort="10.0" velocity="0.5"/>
-      <dynamics damping="0.05" friction="0.02"/>
-    </joint>
-
-    <link name="${prefix}link_6_right_jaw">
-      <inertial>
-        <origin xyz="0.035341 -0.103348 0.231055" rpy="0 0 0"/>
-        <mass value="0.11142"/>
-        <inertia ixx="3.916892e-05" ixy="2.529898e-06" ixz="7.917999e-07" iyy="7.009477e-05" iyz="4.869002e-07" izz="7.098863e-05"/>
-      </inertial>
-      <visual>
-        <origin xyz="-0.539369 -0.0639728 0" rpy="0 0 0"/>
-        <geometry>
-          <mesh filename="package://nexarm_description/meshes/visual/link_6_right_jaw.stl" scale="0.001 0.001 0.001"/>
-        </geometry>
-        <material name="${prefix}black"/>
-      </visual>
-      <collision>
-        <origin xyz="-0.539369 -0.0639728 0" rpy="0 0 0"/>
-        <geometry>
-          <mesh filename="package://nexarm_description/meshes/visual/link_6_right_jaw.stl" scale="0.001 0.001 0.001"/>
+          <mesh filename="${mesh_dir}/link_6_pinion_gear.stl" scale="0.001 0.001 0.001"/>
         </geometry>
       </collision>
     </link>
@@ -293,30 +267,61 @@
     <joint name="${prefix}left_jaw_slide_joint" type="prismatic">
       <parent link="${prefix}link_6_gripper_base"/>
       <child link="${prefix}link_6_left_jaw"/>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <origin xyz="0 -0.046232 0.000013" rpy="0 0 0"/>
       <axis xyz="-1 0 0"/>
-      <limit lower="-0.0255" upper="0" effort="10.0" velocity="0.5"/>
+      <limit lower="0" upper="0.0255" effort="5.0" velocity="3.14"/>
       <mimic joint="${prefix}right_jaw_slide_joint" multiplier="-1" offset="0"/>
       <dynamics damping="0.05" friction="0.02"/>
     </joint>
 
     <link name="${prefix}link_6_left_jaw">
       <inertial>
-        <origin xyz="-0.035341 -0.103348 0.229819" rpy="0 0 0"/>
-        <mass value="0.11142"/>
-        <inertia ixx="3.916892e-05" ixy="-2.529898e-06" ixz="-7.917999e-07" iyy="7.009477e-05" iyz="4.869002e-07" izz="7.098863e-05"/>
+        <origin xyz="-0.035366 -0.011466 -0.000664" rpy="0 0 0"/>
+        <mass value="0.111423"/>
+        <inertia ixx="2.280424e-05" ixy="1.934228e-06" ixz="7.005901e-07" iyy="1.437507e-05" iyz="1.379282e-06" izz="2.255526e-05"/>
       </inertial>
       <visual>
-        <origin xyz="-0.539369 -0.0639728 0" rpy="0 0 0"/>
+        <origin xyz="-0.539369 0.027946 -0.230436" rpy="0 0 0"/>
         <geometry>
-          <mesh filename="package://nexarm_description/meshes/visual/link_6_left_jaw.stl" scale="0.001 0.001 0.001"/>
+          <mesh filename="${mesh_dir}/link_6_left_jaw.stl" scale="0.001 0.001 0.001"/>
         </geometry>
         <material name="${prefix}black"/>
       </visual>
       <collision>
-        <origin xyz="-0.539369 -0.0639728 0" rpy="0 0 0"/>
+        <origin xyz="-0.539369 0.027946 -0.230436" rpy="0 0 0"/>
         <geometry>
-          <mesh filename="package://nexarm_description/meshes/visual/link_6_left_jaw.stl" scale="0.001 0.001 0.001"/>
+          <mesh filename="${mesh_dir}/link_6_left_jaw.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+      </collision>
+    </link>
+
+    <!-- Right Jaw -->
+    <joint name="${prefix}right_jaw_slide_joint" type="prismatic">
+      <parent link="${prefix}link_6_gripper_base"/>
+      <child link="${prefix}link_6_right_jaw"/>
+      <origin xyz="0 -0.046232 0.000013" rpy="0 0 0"/>
+      <axis xyz="-1 0 0"/>
+      <limit lower="-0.0255" upper="0" effort="5.0" velocity="3.14"/>
+      <dynamics damping="0.05" friction="0.02"/>
+    </joint>
+
+    <link name="${prefix}link_6_right_jaw">
+      <inertial>
+        <origin xyz="0.035365 -0.011466 0.000659" rpy="0 0 0"/>
+        <mass value="0.111423"/>
+        <inertia ixx="2.280476e-05" ixy="-1.934295e-06" ixz="7.017276e-07" iyy="1.437586e-05" iyz="-1.375626e-06" izz="2.255499e-05"/>
+      </inertial>
+      <visual>
+        <origin xyz="-0.539369 0.027946 -0.230436" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="${mesh_dir}/link_6_right_jaw.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="${prefix}black"/>
+      </visual>
+      <collision>
+        <origin xyz="-0.539369 0.027946 -0.230436" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="${mesh_dir}/link_6_right_jaw.stl" scale="0.001 0.001 0.001"/>
         </geometry>
       </collision>
     </link>
@@ -331,21 +336,21 @@
 
       <link name="${prefix}cam_mount">
         <inertial>
-          <origin xyz="-0.00035041 -0.0513366 0.266735" rpy="0 0 0"/>
-          <mass value="0.12874"/>
-          <inertia ixx="1.233519e-04" ixy="3.939001e-08" ixz="-3.951999e-08" iyy="1.314619e-04" iyz="1.325902e-05" izz="1.423912e-04"/>
+          <origin xyz="0.019863 -0.052874 0.036248" rpy="0 0 0"/>
+          <mass value="0.128717"/>
+          <inertia ixx="1.454239e-05" ixy="-1.963752e-07" ixz="2.052574e-08" iyy="6.650790e-05" iyz="8.281130e-07" izz="6.724911e-05"/>
         </inertial>
         <visual>
-          <origin xyz="-0.539369 -0.0639728 0" rpy="0 0 0"/>
+          <origin xyz="-0.519119 -0.06552 -0.230406" rpy="0 0 0"/>
           <geometry>
-            <mesh filename="package://nexarm_description/meshes/visual/cam_mount.stl" scale="0.001 0.001 0.001"/>
+            <mesh filename="${mesh_dir}/cam_mount.stl" scale="0.001 0.001 0.001"/>
           </geometry>
           <material name="${prefix}dark_grey"/>
         </visual>
         <collision>
-          <origin xyz="-0.539369 -0.0639728 0" rpy="0 0 0"/>
+          <origin xyz="-0.519119 -0.06552 -0.230406" rpy="0 0 0"/>
           <geometry>
-            <mesh filename="package://nexarm_description/meshes/visual/cam_mount.stl" scale="0.001 0.001 0.001"/>
+            <mesh filename="${mesh_dir}/cam_mount.stl" scale="0.001 0.001 0.001"/>
           </geometry>
         </collision>
       </link>
@@ -354,7 +359,10 @@
   </xacro:macro>
 
   <!-- Default standalone instantiation -->
-  <xacro:nexarm>
+  <xacro:arg name="mesh_dir" default="package://nexarm_description/meshes/visual"/>
+  <xacro:arg name="attach_cam_mount" default="true"/>
+
+  <xacro:nexarm mesh_dir="$(arg mesh_dir)" attach_cam_mount="$(arg attach_cam_mount)">
     <origin xyz="0 0 0" rpy="0 0 0"/>
   </xacro:nexarm>
 

@@ -95,7 +95,7 @@ JOINT_DEFS = {
         "parent": "link_4",
         "child": "link_5",
         "type": "revolute",
-        "axis": [0.0, -0.040713, -0.999171],
+        "axis": [0.0, -1.0, 0.0],
         "range": [-3.14159265359, 3.14159265359],
         "actuated": True,
         "kp": 100.0,
@@ -128,7 +128,7 @@ JOINT_DEFS = {
         "parent": "link_6_gripper_base",
         "child": "link_6_pinion_gear",
         "type": "revolute",
-        "axis": [0.0, -0.040713, -0.999171],
+        "axis": [0.0, 0.0, -1.0],
         "range": [-3.14159, 3.14159],
         "actuated": False,
         "kp": 100.0,
@@ -701,12 +701,27 @@ def run(_context: str):
         ("cam_mount", "link_4", "joint_4_to_cam_fixed"),
     ]
 
+    link_frames = {
+        "base_link": [model_origin_m[0], model_origin_m[1], 0.0],
+        "link_1": resolved_joint_origins["joint_1_base_to_link_1"],
+        "link_2": resolved_joint_origins["joint_2_link_1_to_link_2"],
+        "link_3": resolved_joint_origins["joint_3_link_2_to_link_3"],
+        "link_4": resolved_joint_origins["joint_4_link_3_to_link_4"],
+        "link_5": resolved_joint_origins["joint_5_link_4_to_link_5"],
+        "link_6_gripper_base": resolved_joint_origins["joint_5_link_4_to_link_5"],
+        "link_6_pinion_gear": resolved_joint_origins["gripper_pinion_joint"],
+        "link_6_left_jaw": resolved_joint_origins["left_jaw_slide_joint"],
+        "link_6_right_jaw": resolved_joint_origins["right_jaw_slide_joint"],
+        "cam_mount": resolved_joint_origins["joint_4_link_3_to_link_4"],
+    }
+
     for lname, pname, jname in urdf_chain:
         link_elem = ET.SubElement(urdf, "link", {"name": lname})
         phys = body_physics[lname]
         com = phys["com"]
         mass = phys["mass"]
         ixx, iyy, izz, ixy, ixz, iyz = phys["inertia"]
+        l_frame = link_frames[lname]
 
         # Inertial
         inertial = ET.SubElement(link_elem, "inertial")
@@ -714,7 +729,7 @@ def run(_context: str):
             inertial,
             "origin",
             {
-                "xyz": f"{com[0] - model_origin_m[0]:.6g} {com[1] - model_origin_m[1]:.6g} {com[2]:.6g}",
+                "xyz": f"{com[0] - l_frame[0]:.6g} {com[1] - l_frame[1]:.6g} {com[2] - l_frame[2]:.6g}",
                 "rpy": "0 0 0",
             },
         )
@@ -735,7 +750,9 @@ def run(_context: str):
         # Visual
         visual = ET.SubElement(link_elem, "visual")
         ET.SubElement(
-            visual, "origin", {"xyz": f"{-model_origin_m[0]:.6g} {-model_origin_m[1]:.6g} 0", "rpy": "0 0 0"}
+            visual,
+            "origin",
+            {"xyz": f"{-l_frame[0]:.6g} {-l_frame[1]:.6g} {-l_frame[2]:.6g}", "rpy": "0 0 0"},
         )
         geom_v = ET.SubElement(visual, "geometry")
         ET.SubElement(
@@ -748,7 +765,7 @@ def run(_context: str):
         ET.SubElement(
             collision,
             "origin",
-            {"xyz": f"{-model_origin_m[0]:.6g} {-model_origin_m[1]:.6g} 0", "rpy": "0 0 0"},
+            {"xyz": f"{-l_frame[0]:.6g} {-l_frame[1]:.6g} {-l_frame[2]:.6g}", "rpy": "0 0 0"},
         )
         geom_c = ET.SubElement(collision, "geometry")
         ET.SubElement(
@@ -761,13 +778,17 @@ def run(_context: str):
             ET.SubElement(joint_elem, "parent", {"link": pname})
             ET.SubElement(joint_elem, "child", {"link": lname})
 
+            p_frame = link_frames[pname]
+            rel_xyz = [l_frame[i] - p_frame[i] for i in range(3)]
+            rel_xyz_str = f"{rel_xyz[0]:.6g} {rel_xyz[1]:.6g} {rel_xyz[2]:.6g}"
+
             if jname.endswith("_fixed"):
                 joint_elem.attrib["type"] = "fixed"
-                ET.SubElement(joint_elem, "origin", {"xyz": "0 0 0", "rpy": "0 0 0"})
+                ET.SubElement(joint_elem, "origin", {"xyz": rel_xyz_str, "rpy": "0 0 0"})
             else:
                 jdef = JOINT_DEFS[jname]
                 joint_elem.attrib["type"] = jdef["type"]
-                ET.SubElement(joint_elem, "origin", {"xyz": "0 0 0", "rpy": "0 0 0"})
+                ET.SubElement(joint_elem, "origin", {"xyz": rel_xyz_str, "rpy": "0 0 0"})
                 ET.SubElement(joint_elem, "axis", {"xyz": _format(jdef["axis"])})
                 rmin, rmax = jdef["range"]
                 ET.SubElement(

@@ -52,8 +52,28 @@ ARM_JOINTS = [
 # exporter prevents a future CAD export from silently reversing the policy
 # contract.
 JOINT_AXIS_OVERRIDES = {
+    "joint_5_link_4_to_link_5": [0.0, -1.0, 0.0],
+    "gripper_pinion_joint": [0.0, 0.0, -1.0],
     "left_jaw_slide_joint": [-1.0, 0.0, 0.0],
     "right_jaw_slide_joint": [-1.0, 0.0, 0.0],
+}
+
+# Calibrated physical joint limits from NexArm specifications:
+# Joint 1: 270 deg (+-135 deg) -> +-2.356194 rad
+# Joint 2: 240 deg (+-120 deg) -> +-2.094395 rad
+# Joint 3: 270 deg (+-135 deg) -> +-2.356194 rad
+# Joint 4: 200 deg (+-100 deg) -> +-1.745329 rad
+# Joint 5: 360 deg (+-180 deg) -> +-3.141593 rad
+# Gripper: 51 mm total opening -> 25.5 mm travel per jaw
+JOINT_RANGE_OVERRIDES = {
+    "joint_1_base_to_link_1": (-2.35619449019, 2.35619449019),
+    "joint_2_link_1_to_link_2": (-2.09439510239, 2.09439510239),
+    "joint_3_link_2_to_link_3": (-2.35619449019, 2.35619449019),
+    "joint_4_link_3_to_link_4": (-1.74532925199, 1.74532925199),
+    "joint_5_link_4_to_link_5": (-3.14159265359, 3.14159265359),
+    "left_jaw_slide_joint": (0.0, 0.0255),
+    "right_jaw_slide_joint": (-0.0255, 0.0),
+    "gripper_pinion_joint": (-3.14159, 3.14159),
 }
 GRIPPER_JOINTS = {
     "left_jaw_slide_joint",
@@ -227,6 +247,9 @@ def _joint_attributes(joint: Any) -> dict[str, str]:
         raise RuntimeError(f"Unsupported movable joint type for {joint.name}: {motion.objectType}")
     if joint.name in JOINT_AXIS_OVERRIDES:
         attributes["axis"] = _format(JOINT_AXIS_OVERRIDES[joint.name])
+    if joint.name in JOINT_RANGE_OVERRIDES:
+        attributes["limited"] = "true"
+        attributes["range"] = _format(JOINT_RANGE_OVERRIDES[joint.name])
     if joint.name in GRIPPER_JOINTS:
         attributes["class"] = "gripper"
     return attributes

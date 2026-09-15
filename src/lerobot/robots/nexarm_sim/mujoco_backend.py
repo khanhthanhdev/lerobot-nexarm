@@ -41,10 +41,10 @@ HOME_POSITIONS: dict[str, float] = dict.fromkeys(JOINT_NAMES[:-1], 2048.0)
 HOME_POSITIONS["gripper"] = 2833.0
 
 
-def resolve_model_path(model_path: Path) -> Path:
+def resolve_model_path(model_path: Path | str) -> Path:
     """Resolve a model path from either the current directory or checkout root."""
 
-    model_path = model_path.expanduser()
+    model_path = Path(model_path).expanduser()
     if model_path.is_absolute():
         resolved = model_path
     elif model_path.exists():

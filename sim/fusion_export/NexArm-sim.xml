@@ -60,7 +60,7 @@
                 <inertial mass="0.115069276319" pos="0.539217680688 0.0412813920651 0.225809894244" fullinertia="3.83443410343e-05 3.79383610335e-05 5.09344471812e-05 3.05293309802e-07 -1.84691031848e-08 -2.89290911723e-06" />
                 <geom type="capsule" fromto="0.51912 0.06552 0.23041 0.53937 0.01829 0.23042" size="0.024" name="link_4_collision_0" class="collision" />
                 <body name="link_5" pos="0 0 0" quat="1 0 0 0">
-                  <joint name="joint_5_link_4_to_link_5" pos="0.539368637629 0.0182856141095 0.23042272303" type="hinge" axis="0 -0.040713 -0.999171" limited="true" range="-3.14159265359 3.14159265359" />
+                  <joint name="joint_5_link_4_to_link_5" pos="0.539368637629 0.0182856141095 0.23042272303" type="hinge" axis="0 -1 0" limited="true" range="-3.14159265359 3.14159265359" />
                   <geom name="link_5_visual" class="visual" mesh="link_5" />
                   <inertial mass="0.0877648761088" pos="0.53930860111 0.00213394409068 0.226224949962" fullinertia="1.61874705361e-05 1.81853505463e-05 1.8088853237e-05 1.99644693948e-08 -7.53766025923e-08 -3.82102661054e-07" />
                   <geom type="capsule" fromto="0.53937 0.01829 0.23042 0.53937 -0.02102 0.23060" size="0.022" name="link_5_collision_0" class="collision" />
@@ -69,7 +69,7 @@
                     <inertial mass="0.0774927385075" pos="0.539368566486 -0.0210206980111 0.230601847154" fullinertia="8.95249808307e-06 9.85333038723e-05 9.25169236852e-05 1.88915153743e-11 5.32480726179e-15 7.89995534844e-08" />
                     <geom type="box" pos="0.53937 -0.02327 0.22519" size="0.052 0.008 0.021" name="link_6_gripper_base_collision_0" class="collision" />
                     <body name="link_6_pinion_gear" pos="0 0 0" quat="1 0 0 0">
-                      <joint name="gripper_pinion_joint" pos="0.539368645759 -0.0216536266505 0.230436163963" type="hinge" axis="0 -0.040713 -0.999171" limited="true" range="-3.14159 3.14159" />
+                      <joint name="gripper_pinion_joint" pos="0.539368645759 -0.0216536266505 0.230436163963" type="hinge" axis="0 0 -1" limited="true" range="-3.14159 3.14159" />
                       <geom name="link_6_pinion_gear_visual" class="visual" mesh="link_6_pinion_gear" />
                       <inertial mass="0.00813153456749" pos="0.539368645877 -0.0196832596798 0.230436258524" fullinertia="1.98908631521e-07 3.71227873183e-07 1.98908631397e-07 2.68340905052e-17 -2.79953837889e-16 8.25952531924e-12" />
                     </body>

@@ -143,3 +143,70 @@ def test_description_scene_xml_loads_and_steps():
     assert model.ncam >= 2, f"Expected at least 2 cameras, got {model.ncam}"
     for _ in range(10):
         mujoco.mj_step(model, data)
+
+
+def test_xacro_compilation_modes():
+    import xacro
+
+    xacro_path = DESCRIPTION_DIR / "urdf" / "nexarm.urdf.xacro"
+    doc_ros = xacro.process_file(str(xacro_path))
+    assert "package://nexarm_description/meshes/visual/base_link.stl" in doc_ros.toxml()
+
+    doc_standalone = xacro.process_file(str(xacro_path), mappings={"mesh_dir": "meshes"})
+    assert "meshes/base_link.stl" in doc_standalone.toxml()
+
+
+def test_xacro_generated_urdf_loads_in_mujoco():
+    import os
+
+    import xacro
+
+    xacro_path = DESCRIPTION_DIR / "urdf" / "nexarm.urdf.xacro"
+    doc_standalone = xacro.process_file(str(xacro_path), mappings={"mesh_dir": "meshes"})
+
+    orig_cwd = os.getcwd()
+    try:
+        os.chdir(xacro_path.parent)
+        model = mujoco.MjModel.from_xml_string(doc_standalone.toxml())
+        data = mujoco.MjData(model)
+        assert model.nq == 8
+        assert model.nv == 8
+        for _ in range(10):
+            mujoco.mj_step(model, data)
+    finally:
+        os.chdir(orig_cwd)
+
+
+def test_urdf_loads_in_rerun_tree():
+    try:
+        import rerun as rr
+    except ImportError:
+        return
+
+    urdf_path = DESCRIPTION_DIR / "urdf" / "nexarm.urdf"
+    tree = rr.urdf.UrdfTree.from_file_path(str(urdf_path))
+    joints = tree.joints()
+    assert len(joints) >= 8
+    assert tree.get_joint_by_name("joint_1_base_to_link_1") is not None
+
+
+def test_description_scene_camera_rendering():
+    import numpy as np
+
+    scene_path = DESCRIPTION_DIR / "mjcf" / "scene.xml"
+    model = mujoco.MjModel.from_xml_path(str(scene_path))
+    data = mujoco.MjData(model)
+
+    renderer = mujoco.Renderer(model, height=120, width=160)
+    try:
+        renderer.update_scene(data, camera="front")
+        img_front = renderer.render()
+        assert img_front.shape == (120, 160, 3)
+        assert img_front.dtype == np.uint8
+
+        renderer.update_scene(data, camera="wrist")
+        img_wrist = renderer.render()
+        assert img_wrist.shape == (120, 160, 3)
+        assert img_wrist.dtype == np.uint8
+    finally:
+        renderer.close()
