@@ -21,9 +21,8 @@ Example:
 
 ```shell
 lerobot-calibrate \
-    --teleop.type=so100_leader \
-    --teleop.port=/dev/tty.usbmodem58760431551 \
-    --teleop.id=blue
+    --teleop.type=nexarm_leader \
+    --teleop.port=/dev/ttyUSB0
 ```
 """
 
@@ -38,34 +37,18 @@ from lerobot.cameras.realsense import RealSenseCameraConfig  # noqa: F401
 from lerobot.robots import (  # noqa: F401
     Robot,
     RobotConfig,
-    bi_openarm_follower,
-    bi_rebot_b601_follower,
-    bi_so_follower,
-    hope_jr,
-    koch_follower,
-    lekiwi,
     make_robot_from_config,
-    omx_follower,
-    openarm_follower,
-    rebot_b601_follower,
-    so_follower,
+    mobile_bi_nexarm_sim,
+    nexarm_follower,
+    nexarm_sim,
 )
 from lerobot.teleoperators import (  # noqa: F401
     Teleoperator,
     TeleoperatorConfig,
-    bi_openarm_leader,
-    bi_openarm_mini,
-    bi_rebot_102_leader,
-    bi_so_leader,
-    homunculus,
-    koch_leader,
+    gamepad,
+    keyboard,
     make_teleoperator_from_config,
-    omx_leader,
-    openarm_leader,
-    openarm_mini,
-    rebot_102_leader,
-    so_leader,
-    unitree_g1,
+    nexarm_leader,
 )
 from lerobot.utils.import_utils import register_third_party_plugins
 from lerobot.utils.utils import init_logging

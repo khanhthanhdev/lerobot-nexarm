@@ -1,29 +1,23 @@
 This file provides guidance to AI agents when working with code in this repository.
 
-> **User-facing help → [`AGENT_GUIDE.md`](./AGENT_GUIDE.md)** (SO-101 setup, recording, picking a policy, training duration, eval — with copy-pasteable commands).
+> **User-facing help → [`AGENT_GUIDE.md`](./AGENT_GUIDE.md)** (NexArm setup, recording, picking a policy, training duration, eval — with copy-pasteable commands).
 
 ## Project Overview
 
-This is the **Hiwonder NexArm** fork of LeRobot — a PyTorch-based library for real-world robotics. It adds NexArm hardware support (motor driver, robot, teleoperator) on top of the upstream LeRobot codebase. It integrates with Hugging Face Hub for model/dataset sharing.
+This is the **Hiwonder NexArm** fork of LeRobot — focused exclusively on the Hiwonder NexArm 6-axis robot platform. Non-NexArm robot formats and motor drivers have been pruned to keep the codebase lean and focused. It integrates with Hugging Face Hub for model/dataset sharing.
 
-**NexArm-specific modules** (added on top of upstream):
+**NexArm-specific modules:**
 
 | Path                                       | What it does                                                                                 |
 | ------------------------------------------ | -------------------------------------------------------------------------------------------- |
 | `src/lerobot/motors/nexarm/`               | CommProtocol UART framing, 6-servo sync read/write, torque, bridge mode (CMD 56/68/96/97/98) |
 | `src/lerobot/robots/nexarm_follower/`      | `NexArmFollowerConfig` + `NexArmFollower` — connect, observe, send_action                    |
+| `src/lerobot/robots/nexarm_sim/`           | `NexArmSimConfig` + `NexArmSim` — single-arm MuJoCo simulation environment                   |
+| `src/lerobot/robots/mobile_bi_nexarm_sim/` | `MobileBiNexArmSimConfig` + `MobileBiNexArmSim` — bimanual mobile robot simulation           |
 | `src/lerobot/teleoperators/nexarm_leader/` | `NexArmLeaderConfig` + `NexArmLeader` — read positions, leader→follower joint mapping        |
+| `src/lerobot/envs/nexarm.py`               | Gym environment for NexArm simulation                                                        |
+| `sim/`                                     | MuJoCo MJCF, URDF description, Isaac Lab configs, meshes, and exporters                      |
 | `examples/nexarm/`                         | Ready-to-run scripts for teleoperate, record, and rollout                                    |
-
-**Modified upstream files:**
-
-| File                                           | Change                                                            |
-| ---------------------------------------------- | ----------------------------------------------------------------- |
-| `src/lerobot/robots/utils.py`                  | Added `nexarm_follower` branch in `make_robot_from_config()`      |
-| `src/lerobot/teleoperators/utils.py`           | Added `nexarm_leader` branch in `make_teleoperator_from_config()` |
-| `pyproject.toml`                               | Added `nexarm` optional dependency group                          |
-| `src/lerobot/cameras/opencv/camera_opencv.py`  | Fixed `stop_event` race condition on Linux                        |
-| `src/lerobot/processor/normalize_processor.py` | Added device/dtype caching to avoid redundant `.to()` calls       |
 
 ## Tech Stack
 

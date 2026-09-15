@@ -19,5 +19,6 @@ from .motors_bus import (
     MotorCalibration,
     MotorNormMode,
 )
+from .nexarm import NexArmMotorsBus
 
-__all__ = ["Motor", "MotorCalibration", "MotorNormMode"]
+__all__ = ["Motor", "MotorCalibration", "MotorNormMode", "NexArmMotorsBus"]

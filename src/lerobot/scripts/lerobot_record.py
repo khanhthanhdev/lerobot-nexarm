@@ -19,20 +19,18 @@ tool — no policy inference.  For deploying trained policies, use
 
 Requires: pip install 'lerobot[core_scripts]'  (includes dataset + hardware + viz extras)
 
-Example:
+Example with NexArm:
 
 ```shell
 lerobot-record \\
-    --robot.type=so100_follower \\
-    --robot.port=/dev/tty.usbmodem58760431541 \\
-    --robot.cameras="{laptop: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30}}" \\
-    --robot.id=black \\
-    --teleop.type=so100_leader \\
-    --teleop.port=/dev/tty.usbmodem58760431551 \\
-    --teleop.id=blue \\
+    --robot.type=nexarm_follower \\
+    --robot.port=/dev/ttyUSB0 \\
+    --robot.cameras="{ front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30}, wrist: {type: opencv, index_or_path: 1, width: 640, height: 480, fps: 30}}" \\
+    --teleop.type=nexarm_leader \\
+    --teleop.port=/dev/ttyUSB1 \\
     --dataset.repo_id=<my_username>/<my_dataset_name> \\
-    --dataset.num_episodes=2 \\
-    --dataset.single_task="Grab the cube" \\
+    --dataset.num_episodes=10 \\
+    --dataset.single_task="Pick and place the yellow cube" \\
     --dataset.streaming_encoding=true \\
     --dataset.encoder_threads=2 \\
     --display_data=true
@@ -41,52 +39,6 @@ lerobot-record \\
 To stream the data to Foxglove instead of Rerun, add ``--display_mode=foxglove`` (then connect the
 Foxglove app to ``ws://127.0.0.1:8765``; override the port with ``--display_port=<port>``).
 
-Example recording with bimanual so100:
-```shell
-lerobot-record \\
-  --robot.type=bi_so_follower \\
-  --robot.left_arm_config.port=/dev/tty.usbmodem5A460822851 \\
-  --robot.right_arm_config.port=/dev/tty.usbmodem5A460814411 \\
-  --robot.id=bimanual_follower \\
-  --robot.left_arm_config.cameras='{
-    wrist: {"type": "opencv", "index_or_path": 1, "width": 640, "height": 480, "fps": 30},
-    top: {"type": "opencv", "index_or_path": 3, "width": 640, "height": 480, "fps": 30},
-  }' --robot.right_arm_config.cameras='{
-    wrist: {"type": "opencv", "index_or_path": 2, "width": 640, "height": 480, "fps": 30},
-    front: {"type": "opencv", "index_or_path": 4, "width": 640, "height": 480, "fps": 30},
-  }' \\
-  --teleop.type=bi_so_leader \\
-  --teleop.left_arm_config.port=/dev/tty.usbmodem5A460852721 \\
-  --teleop.right_arm_config.port=/dev/tty.usbmodem5A460819811 \\
-  --teleop.id=bimanual_leader \\
-  --display_data=true \\
-  --dataset.repo_id=${HF_USER}/bimanual-so-handover-cube \\
-  --dataset.num_episodes=25 \\
-  --dataset.single_task="Grab and handover the red cube to the other arm" \\
-  --dataset.streaming_encoding=true \\
-  --dataset.encoder_threads=2
-```
-
-Example recording with custom video encoding parameters:
-```shell
-lerobot-record \\
-    --robot.type=so100_follower \\
-    --robot.port=/dev/tty.usbmodem58760431541 \\
-    --robot.cameras="{laptop: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30}}" \\
-    --robot.id=black \\
-    --teleop.type=so100_leader \\
-    --teleop.port=/dev/tty.usbmodem58760431551 \\
-    --teleop.id=blue \\
-    --dataset.repo_id=<my_username>/<my_dataset_name> \\
-    --dataset.num_episodes=2 \\
-    --dataset.single_task="Grab the cube" \\
-    --dataset.streaming_encoding=true \\
-    --dataset.encoder_threads=2 \\
-    --dataset.rgb_encoder.vcodec=h264 \\
-    --dataset.rgb_encoder.preset=fast \\
-    --dataset.rgb_encoder.extra_options={"tune": "film", "profile:v": "high", "bf": 2} \\
-    --display_data=true
-```
 """
 
 import logging
@@ -94,9 +46,7 @@ import time
 from dataclasses import asdict, dataclass
 from pprint import pformat
 
-from lerobot.cameras import CameraConfig  # noqa: F401
 from lerobot.cameras.opencv import OpenCVCameraConfig  # noqa: F401
-from lerobot.cameras.reachy2_camera import Reachy2CameraConfig  # noqa: F401
 from lerobot.cameras.realsense import RealSenseCameraConfig  # noqa: F401
 from lerobot.cameras.zmq import ZMQCameraConfig  # noqa: F401
 from lerobot.common.control_utils import sanity_check_dataset_robot_compatibility
@@ -118,41 +68,18 @@ from lerobot.processor import (
 from lerobot.robots import (  # noqa: F401
     Robot,
     RobotConfig,
-    bi_openarm_follower,
-    bi_rebot_b601_follower,
-    bi_so_follower,
-    earthrover_mini_plus,
-    hope_jr,
-    koch_follower,
     make_robot_from_config,
     mobile_bi_nexarm_sim,
     nexarm_follower,
     nexarm_sim,
-    omx_follower,
-    openarm_follower,
-    reachy2,
-    rebot_b601_follower,
-    so_follower,
-    unitree_g1 as unitree_g1_robot,
 )
 from lerobot.teleoperators import (  # noqa: F401
     Teleoperator,
     TeleoperatorConfig,
-    bi_openarm_leader,
-    bi_openarm_mini,
-    bi_rebot_102_leader,
-    bi_so_leader,
-    homunculus,
-    koch_leader,
+    gamepad,
+    keyboard,
     make_teleoperator_from_config,
     nexarm_leader,
-    omx_leader,
-    openarm_leader,
-    openarm_mini,
-    reachy2_teleoperator,
-    rebot_102_leader,
-    so_leader,
-    unitree_g1,
 )
 from lerobot.teleoperators.keyboard import KeyboardTeleop
 from lerobot.utils.constants import ACTION, OBS_STR
@@ -258,27 +185,14 @@ def record_loop(
 
     teleop_arm = teleop_keyboard = None
     if isinstance(teleop, list):
-        teleop_keyboard = next((t for t in teleop if isinstance(t, KeyboardTeleop)), None)
-        teleop_arm = next(
-            (
-                t
-                for t in teleop
-                if isinstance(
-                    t,
-                    (
-                        so_leader.SO100Leader
-                        | so_leader.SO101Leader
-                        | koch_leader.KochLeader
-                        | omx_leader.OmxLeader
-                    ),
-                )
-            ),
-            None,
-        )
+        from lerobot.teleoperators.nexarm_leader import NexArmLeader
 
-        if not (teleop_arm and teleop_keyboard and len(teleop) == 2 and robot.name == "lekiwi_client"):
+        teleop_keyboard = next((t for t in teleop if isinstance(t, KeyboardTeleop)), None)
+        teleop_arm = next((t for t in teleop if isinstance(t, NexArmLeader)), None)
+
+        if not (teleop_arm and teleop_keyboard and len(teleop) == 2):
             raise ValueError(
-                "For multi-teleop, the list must contain exactly one KeyboardTeleop and one arm teleoperator. Currently only supported for LeKiwi robot."
+                "For multi-teleop, the list must contain exactly one KeyboardTeleop and one arm teleoperator."
             )
 
     control_interval = 1 / fps

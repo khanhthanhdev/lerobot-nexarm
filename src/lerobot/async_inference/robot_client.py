@@ -16,15 +16,14 @@
 Example command:
 ```shell
 python src/lerobot/async_inference/robot_client.py \
-    --robot.type=so100_follower \
-    --robot.port=/dev/tty.usbmodem58760431541 \
-    --robot.cameras="{ front: {type: opencv, index_or_path: 0, width: 1920, height: 1080, fps: 30}}" \
-    --robot.id=black \
+    --robot.type=nexarm_follower \
+    --robot.port=/dev/ttyUSB0 \
+    --robot.cameras="{ front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30}}" \
     --task="dummy" \
     --server_address=127.0.0.1:8080 \
     --policy_type=act \
     --pretrained_name_or_path=user/model \
-    --policy_device=mps \
+    --policy_device=cuda \
     --client_device=cpu \
     --actions_per_chunk=50 \
     --chunk_size_threshold=0.5 \
@@ -52,11 +51,10 @@ from lerobot.cameras.realsense import RealSenseCameraConfig  # noqa: F401
 from lerobot.robots import (  # noqa: F401
     Robot,
     RobotConfig,
-    bi_so_follower,
-    koch_follower,
     make_robot_from_config,
-    omx_follower,
-    so_follower,
+    mobile_bi_nexarm_sim,
+    nexarm_follower,
+    nexarm_sim,
 )
 from lerobot.transport import (
     services_pb2,  # type: ignore

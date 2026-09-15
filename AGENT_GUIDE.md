@@ -1,6 +1,6 @@
-# AGENT_GUIDE.md — LeRobot Helper for AI Agents & Users
+# AGENT_GUIDE.md — NexArm LeRobot Helper for AI Agents & Users
 
-This file is a practical, copy-paste-friendly companion for any AI agent (Cursor, Claude, ChatGPT, Codex, etc.) helping a user work with LeRobot. It complements [`AGENTS.md`](./AGENTS.md) (dev/contributor context) with **user-facing guidance**: how to start, what to train, how long, how to record, and how to calibrate an SO-101.
+This file is a practical, copy-paste-friendly companion for any AI agent (Cursor, Claude, ChatGPT, Codex, etc.) helping a user work with Hiwonder NexArm on LeRobot. It complements [`AGENTS.md`](./AGENTS.md) (dev/contributor context) with **user-facing guidance**: how to start, how to teleoperate, how to record, what to train, how long, and how to rollout on the NexArm arm.
 
 ---
 
@@ -8,11 +8,11 @@ This file is a practical, copy-paste-friendly companion for any AI agent (Cursor
 
 Before suggesting any command, an agent MUST ask the user at least these questions and wait for answers:
 
-1. **What's your goal?** (e.g. "teach my SO-101 to fold a cloth", "train a policy on an existing HF dataset", "contribute a PR", "understand the codebase")
+1. **What's your goal?** (e.g. "teach my NexArm to pick and place a block", "train a policy on simulation/real dataset", "contribute a PR", "understand the codebase")
 2. **What hardware do you have?**
-   - Robot: none / SO-100 / SO-101 / Koch / LeKiwi / Reachy / other
-   - Teleop: leader arm / phone / keyboard / gamepad / none
-   - Cameras: how many, resolution, fixed or moving?
+   - Robot: NexArm follower / NexArm simulation (`nexarm_sim`, `mobile_bi_nexarm_sim`)
+   - Teleop: NexArm leader arm / keyboard / gamepad / simulation
+   - Cameras: how many, resolution, USB index (usually `front` and `wrist` at 640x480)
 3. **What machine will you train on?**
    - GPU model + VRAM (e.g. "laptop 3060 6 GB", "RTX 4090 24 GB", "A100 80 GB", "CPU only")
    - OS: macOS / Linux / Windows
@@ -31,8 +31,8 @@ LeRobot = **datasets + policies + envs + robot control**, unified by a small set
 - **`LeRobotDataset`** — episode-aware dataset (video or images + actions + state), loadable from the Hub or disk.
 - **Policies** (`ACT`, `Diffusion`, `SmolVLA`, `π0`, `π0.5`, `Wall-X`, `X-VLA`, `VQ-BeT`, `TD-MPC`, …) — all inherit `PreTrainedPolicy` and can be pushed/pulled from the Hub.
 - **Processors** — small composable transforms between dataset → policy → robot.
-- **Envs** (sim) and **Robots** (real) — same action/observation contract so code swaps cleanly.
-- **CLI** — `lerobot-record`, `lerobot-train`, `lerobot-eval`, `lerobot-teleoperate`, `lerobot-calibrate`, `lerobot-find-port`, `lerobot-setup-motors`, `lerobot-replay`.
+- **Envs** (sim: `nexarm`, etc.) and **Robots** (real: `nexarm_follower`, `nexarm_sim`) — same action/observation contract so code swaps cleanly.
+- **CLI** — `lerobot-record`, `lerobot-train`, `lerobot-eval`, `lerobot-teleoperate`, `lerobot-calibrate`, `lerobot-find-port`, `lerobot-replay`, `lerobot-rollout`.
 
 See [`AGENTS.md`](./AGENTS.md) for repo architecture.
 
@@ -40,33 +40,34 @@ See [`AGENTS.md`](./AGENTS.md) for repo architecture.
 
 ## 3. Quickstart paths (pick one)
 
-### Path A — "I have an SO-101 and want my first trained policy"
+### Path A — "I have a NexArm arm and want my first trained policy"
 
-Go to §4 (SO-101 end-to-end), then §5 (data tips), then §6 (pick a policy — likely **ACT**), then §7 (how long), then §8 (eval).
+Go to §4 (NexArm end-to-end), then §5 (data tips), then §6 (pick a policy — likely **ACT**), then §7 (how long), then §8 (eval).
 
-### Path B — "No hardware, I want to train on an existing dataset"
+### Path B — "No physical arm, I want simulation or training on existing datasets"
 
-Skip §4. Pick a policy in §6, pick a duration in §7, then run `lerobot-train` per §4.9 with a Hub `--dataset.repo_id` and an `--env.type` for eval. Finish with §8.
+Use `nexarm_sim` or simulation scripts in `examples/nexarm/`:
+
+- `python examples/nexarm/demo_gym_env.py`
+- `python examples/nexarm/pick_place_sim.py`
+- `python examples/nexarm/generate_sim_dataset.py`
 
 ### Path C — "I just want to understand the codebase"
 
-Read §2 above, then `AGENTS.md` "Architecture", then open `src/lerobot/policies/act/` and `src/lerobot/datasets/lerobot_dataset.py` as canonical examples.
+Read §2 above, then `AGENTS.md` "Architecture", then open `src/lerobot/motors/nexarm/nexarm.py`, `src/lerobot/robots/nexarm_follower/`, and `src/lerobot/policies/act/`.
 
 ---
 
-## 4. SO-101 end-to-end cheat-sheet
+## 4. NexArm end-to-end cheat-sheet
 
-Full details in [`docs/source/so101.mdx`](./docs/source/so101.mdx) and [`docs/source/il_robots.mdx`](./docs/source/il_robots.mdx). Minimum commands in order. Confirm arms are assembled + powered before issuing.
+Minimum commands in order. Confirm follower (slave) and leader (master) arms are powered and connected via USB.
 
 **4.1 Install**
 
 ```bash
-uv sync --locked --extra feetech            # SO-100/SO-101 motor stack
-# uv sync --locked --extra all               # everything
-# uv sync --locked --extra aloha --extra pusht # specific features
-# uv sync --locked --extra smolvla           # add SmolVLA deps
+uv sync --locked --extra nexarm --extra dev   # NexArm hardware stack + dev tools
 git lfs install && git lfs pull
-uv run hf auth login                        # required to push datasets/policies
+uv run hf auth login                         # required to push datasets/policies
 ```
 
 All repository commands should use `uv run`, which keeps Python and dependencies inside the locked project environment.
@@ -77,91 +78,79 @@ All repository commands should use `uv run`, which keeps Python and dependencies
 lerobot-find-port
 ```
 
-macOS: `/dev/tty.usbmodem...`; Linux: `/dev/ttyACM0` (may need `sudo chmod 666 /dev/ttyACM0`).
+Linux typically assigns `/dev/ttyUSB0` and `/dev/ttyUSB1` (or check `dmesg`). Ensure port permissions (`sudo chmod 666 /dev/ttyUSB*`).
 
-**4.3 Setup motor IDs & baudrate** (one-time, per arm)
+**4.3 Joint layout & hardware architecture**
 
-```bash
-lerobot-setup-motors --robot.type=so101_follower --robot.port=<FOLLOWER_PORT>
-lerobot-setup-motors --teleop.type=so101_leader  --teleop.port=<LEADER_PORT>
-```
+- **6 DOF joints**: `shoulder_pan`, `shoulder_lift`, `elbow_flex`, `wrist_flex`, `wrist_roll`, `gripper`.
+- **Servos**: HX-30HM serial bus servos (0-4095 range, 1 Mbps).
+- **Follower**: Dual-chip (ESP32 + AT32). Automatically enters bridge mode (CMD 68) when connected.
+- **Leader**: Master ESP32 runs with torque disabled (CMD 98) for zero-resistance gravity-defying manipulation.
+- Joint 2 (`shoulder_lift`) is mirrored (`4096 - pos`), Joint 6 (`gripper`) is mapped `[1195, 2833]`.
 
-**4.4 Calibrate** — center all joints, press Enter, sweep each joint through its full range. The `id` is the calibration key — reuse it everywhere.
-
-```bash
-lerobot-calibrate --robot.type=so101_follower --robot.port=<FOLLOWER_PORT> --robot.id=my_follower
-lerobot-calibrate --teleop.type=so101_leader  --teleop.port=<LEADER_PORT>   --teleop.id=my_leader
-```
-
-**4.5 Teleoperate** (sanity check, no recording)
+**4.4 Teleoperate** (sanity check, leader mirrors follower in real-time)
 
 ```bash
 lerobot-teleoperate \
-  --robot.type=so101_follower --robot.port=<FOLLOWER_PORT> --robot.id=my_follower \
-  --teleop.type=so101_leader  --teleop.port=<LEADER_PORT>  --teleop.id=my_leader \
-  --robot.cameras="{ front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30}}" \
+  --robot.type=nexarm_follower --robot.port=<FOLLOWER_PORT> \
+  --teleop.type=nexarm_leader  --teleop.port=<LEADER_PORT> \
+  --robot.cameras="{ front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30}, wrist: {type: opencv, index_or_path: 1, width: 640, height: 480, fps: 30}}" \
   --display_data=true
 ```
 
-> **Feetech timeout / comms error on SO-100 / SO-101?** Before touching software, check the **red motor LEDs** on the daisy chain.
->
-> - **All steady red, gripper → base chain** → wiring OK.
-> - **One or more motors dark / chain stops mid-way** → wiring issue: reseat the 3-pin cables, check the controller-board power supply, and make sure each motor is fully clicked in.
-> - **LEDs blinking** → the motor is in an **error state**: usually overload (forcing a joint past its limit) **or wrong power supply voltage**. SO-100 / SO-101 ship in two variants — a **5 V / 7.4 V** build and a **12 V** build — they are NOT interchangeable. Using a 12 V PSU on a 5 V / 7.4 V arm (or vice-versa) will trip this error; confirm your motor variant before powering up.
->
-> Most "timeout" errors are physical, not code.
+Or run the ready script:
 
-**4.6 Record a dataset** — keys: **→** next, **←** redo, **ESC** finish & upload.
+```bash
+python examples/nexarm/teleoperate.py --robot-port <FOLLOWER_PORT> --leader-port <LEADER_PORT>
+```
+
+**4.5 Record a dataset** — keys: **→** next, **←** redo, **ESC** finish & upload.
 
 ```bash
 HF_USER=$(NO_COLOR=1 hf auth whoami | awk -F': *' 'NR==1 {print $2}')
 
 lerobot-record \
-  --robot.type=so101_follower --robot.port=<FOLLOWER_PORT> --robot.id=my_follower \
-  --teleop.type=so101_leader  --teleop.port=<LEADER_PORT>  --teleop.id=my_leader \
-  --robot.cameras="{ front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30}}" \
-  --dataset.repo_id=${HF_USER}/my_task \
-  --dataset.single_task="<describe the task in one sentence>" \
+  --robot.type=nexarm_follower --robot.port=<FOLLOWER_PORT> \
+  --teleop.type=nexarm_leader  --teleop.port=<LEADER_PORT> \
+  --robot.cameras="{ front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30}, wrist: {type: opencv, index_or_path: 1, width: 640, height: 480, fps: 30}}" \
+  --dataset.repo_id=${HF_USER}/nexarm_cube_pick \
+  --dataset.single_task="Pick the cube and place it into the tray" \
   --dataset.num_episodes=50 \
   --dataset.episode_time_s=30 \
   --dataset.reset_time_s=10 \
   --display_data=true
 ```
 
-**4.7 Visualize** — **always** do this before training. Look for missing frames, camera blur, unreachable targets, inconsistent object positions.
-After upload: https://huggingface.co/spaces/lerobot/visualize_dataset → paste `${HF_USER}/my_task`. Works for **any LeRobot-formatted Hub dataset** — use it to scout other datasets, inspect episode quality, or debug your own data before retraining.
-
-**4.8 Replay an episode** (sanity check)
+**4.6 Replay an episode** (sanity check)
 
 ```bash
-lerobot-replay --robot.type=so101_follower --robot.port=<FOLLOWER_PORT> --robot.id=my_follower \
-  --dataset.repo_id=${HF_USER}/my_task --dataset.episode=0
+lerobot-replay --robot.type=nexarm_follower --robot.port=<FOLLOWER_PORT> \
+  --dataset.repo_id=${HF_USER}/nexarm_cube_pick --dataset.episode=0
 ```
 
-**4.9 Train** (default: ACT — fastest, lowest memory). Apple silicon: `--policy.device=mps`. No local GPU? Add `--job.target=<flavor>` (e.g. `a10g-small`, list them with `hf jobs hardware`) to run on Hugging Face Jobs instead. See §6/§7 for policy and duration.
+**4.7 Train** (default: ACT — fastest, lowest memory).
 
 ```bash
 lerobot-train \
-  --dataset.repo_id=${HF_USER}/my_task \
+  --dataset.repo_id=${HF_USER}/nexarm_cube_pick \
   --policy.type=act \
   --policy.device=cuda \
-  --output_dir=outputs/train/act_my_task \
-  --job_name=act_my_task \
+  --output_dir=outputs/train/act_nexarm \
+  --job_name=act_nexarm \
   --batch_size=8 \
   --wandb.enable=true \
-  --policy.repo_id=${HF_USER}/act_my_task
+  --policy.repo_id=${HF_USER}/act_nexarm
 ```
 
-**4.10 Evaluate on the real robot** — compare success rate to a teleoperated baseline.
+**4.8 Evaluate & Rollout on the real robot**
 
 ```bash
-lerobot-record \
-  --robot.type=so101_follower --robot.port=<FOLLOWER_PORT> --robot.id=my_follower \
-  --robot.cameras="{ front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30}}" \
-  --dataset.repo_id=${HF_USER}/eval_my_task \
-  --dataset.single_task="<same task description as training>" \
-  --dataset.num_episodes=10 \
-  --policy.path=${HF_USER}/act_my_task
+lerobot-rollout \
+  --strategy.type=base \
+  --policy.path=${HF_USER}/act_nexarm \
+  --robot.type=nexarm_follower --robot.port=<FOLLOWER_PORT> \
+  --robot.cameras="{ front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30}, wrist: {type: opencv, index_or_path: 1, width: 640, height: 480, fps: 30}}" \
+  --task="Pick the cube and place it into the tray" --duration=60
 ```
 
 ---

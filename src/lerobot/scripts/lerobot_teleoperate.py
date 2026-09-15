@@ -17,17 +17,15 @@ Simple script to control a robot from teleoperation.
 
 Requires: pip install 'lerobot[hardware]'
 
-Example:
+Example with NexArm:
 
 ```shell
 lerobot-teleoperate \
-    --robot.type=so101_follower \
-    --robot.port=/dev/tty.usbmodem58760431541 \
-    --robot.cameras="{ front: {type: opencv, index_or_path: 0, width: 1920, height: 1080, fps: 30}}" \
-    --robot.id=black \
-    --teleop.type=so101_leader \
-    --teleop.port=/dev/tty.usbmodem58760431551 \
-    --teleop.id=blue \
+    --robot.type=nexarm_follower \
+    --robot.port=/dev/ttyUSB0 \
+    --robot.cameras="{ front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30}, wrist: {type: opencv, index_or_path: 1, width: 640, height: 480, fps: 30}}" \
+    --teleop.type=nexarm_leader \
+    --teleop.port=/dev/ttyUSB1 \
     --display_data=true
 ```
 
@@ -36,35 +34,12 @@ To stream the data to Foxglove instead of Rerun, add ``--display_mode=foxglove``
 
 ```shell
 lerobot-teleoperate \
-    --robot.type=so101_follower \
-    --robot.port=/dev/tty.usbmodem58760431541 \
-    --robot.cameras="{ front: {type: opencv, index_or_path: 0, width: 1920, height: 1080, fps: 30}}" \
-    --robot.id=black \
-    --teleop.type=so101_leader \
-    --teleop.port=/dev/tty.usbmodem58760431551 \
-    --teleop.id=blue \
+    --robot.type=nexarm_follower \
+    --robot.port=/dev/ttyUSB0 \
+    --teleop.type=nexarm_leader \
+    --teleop.port=/dev/ttyUSB1 \
     --display_data=true \
     --display_mode=foxglove
-```
-
-Example teleoperation with bimanual so100:
-
-```shell
-lerobot-teleoperate \
-  --robot.type=bi_so_follower \
-  --robot.left_arm_config.port=/dev/tty.usbmodem5A460822851 \
-  --robot.right_arm_config.port=/dev/tty.usbmodem5A460814411 \
-  --robot.id=bimanual_follower \
-  --robot.left_arm_config.cameras='{
-    wrist: {"type": "opencv", "index_or_path": 1, "width": 640, "height": 480, "fps": 30},
-  }' --robot.right_arm_config.cameras='{
-    wrist: {"type": "opencv", "index_or_path": 2, "width": 640, "height": 480, "fps": 30},
-  }' \
-  --teleop.type=bi_so_leader \
-  --teleop.left_arm_config.port=/dev/tty.usbmodem5A460852721 \
-  --teleop.right_arm_config.port=/dev/tty.usbmodem5A460819811 \
-  --teleop.id=bimanual_leader \
-  --display_data=true
 ```
 
 """
@@ -87,42 +62,18 @@ from lerobot.processor import (
 from lerobot.robots import (  # noqa: F401
     Robot,
     RobotConfig,
-    bi_openarm_follower,
-    bi_rebot_b601_follower,
-    bi_so_follower,
-    earthrover_mini_plus,
-    hope_jr,
-    koch_follower,
     make_robot_from_config,
     mobile_bi_nexarm_sim,
+    nexarm_follower,
     nexarm_sim,
-    omx_follower,
-    openarm_follower,
-    reachy2,
-    rebot_b601_follower,
-    so_follower,
-    unitree_g1 as unitree_g1_robot,
 )
 from lerobot.teleoperators import (  # noqa: F401
     Teleoperator,
     TeleoperatorConfig,
-    bi_openarm_leader,
-    bi_openarm_mini,
-    bi_rebot_102_leader,
-    bi_so_leader,
     gamepad,
-    homunculus,
     keyboard,
-    koch_leader,
     make_teleoperator_from_config,
     nexarm_leader,
-    omx_leader,
-    openarm_leader,
-    openarm_mini,
-    reachy2_teleoperator,
-    rebot_102_leader,
-    so_leader,
-    unitree_g1,
 )
 from lerobot.utils.import_utils import register_third_party_plugins
 from lerobot.utils.robot_utils import precise_sleep

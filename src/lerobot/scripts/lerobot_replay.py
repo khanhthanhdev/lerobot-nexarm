@@ -21,22 +21,10 @@ Examples:
 
 ```shell
 lerobot-replay \
-    --robot.type=so100_follower \
-    --robot.port=/dev/tty.usbmodem58760431541 \
-    --robot.id=black \
+    --robot.type=nexarm_follower \
+    --robot.port=/dev/ttyUSB0 \
     --dataset.repo_id=<USER>/record-test \
     --dataset.episode=0
-```
-
-Example replay with bimanual so100:
-```shell
-lerobot-replay \
-  --robot.type=bi_so_follower \
-  --robot.left_arm_port=/dev/tty.usbmodem5A460851411 \
-  --robot.right_arm_port=/dev/tty.usbmodem5A460812391 \
-  --robot.id=bimanual_follower \
-  --dataset.repo_id=${HF_USER}/bimanual-so100-handover-cube \
-  --dataset.episode=0
 ```
 
 """
@@ -55,21 +43,10 @@ from lerobot.processor import (
 from lerobot.robots import (  # noqa: F401
     Robot,
     RobotConfig,
-    bi_openarm_follower,
-    bi_rebot_b601_follower,
-    bi_so_follower,
-    earthrover_mini_plus,
-    hope_jr,
-    koch_follower,
     make_robot_from_config,
     mobile_bi_nexarm_sim,
+    nexarm_follower,
     nexarm_sim,
-    omx_follower,
-    openarm_follower,
-    reachy2,
-    rebot_b601_follower,
-    so_follower,
-    unitree_g1,
 )
 from lerobot.utils.constants import ACTION
 from lerobot.utils.import_utils import register_third_party_plugins

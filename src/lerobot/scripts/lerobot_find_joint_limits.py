@@ -21,13 +21,11 @@ Example:
 
 ```shell
 lerobot-find-joint-limits \
-  --robot.type=so100_follower \
-  --robot.port=/dev/tty.usbmodem58760432981 \
-  --robot.id=black \
-  --teleop.type=so100_leader \
-  --teleop.port=/dev/tty.usbmodem58760434471 \
-  --teleop.id=blue \
-  --urdf_path=<user>/SO-ARM100-main/Simulation/SO101/so101_new_calib.urdf \
+  --robot.type=nexarm_follower \
+  --robot.port=/dev/ttyUSB0 \
+  --teleop.type=nexarm_leader \
+  --teleop.port=/dev/ttyUSB1 \
+  --urdf_path=sim/description/NexArm-sim.urdf \
   --target_frame_name=gripper \
   --teleop_time_s=30 \
   --warmup_time_s=5 \
@@ -44,30 +42,16 @@ import numpy as np
 from lerobot.model import RobotKinematics
 from lerobot.robots import (  # noqa: F401
     RobotConfig,
-    bi_openarm_follower,
-    bi_rebot_b601_follower,
-    bi_so_follower,
-    koch_follower,
     make_robot_from_config,
-    omx_follower,
-    openarm_follower,
-    rebot_b601_follower,
-    so_follower,
+    mobile_bi_nexarm_sim,
+    nexarm_follower,
+    nexarm_sim,
 )
 from lerobot.teleoperators import (  # noqa: F401
     TeleoperatorConfig,
-    bi_openarm_leader,
-    bi_openarm_mini,
-    bi_rebot_102_leader,
-    bi_so_leader,
     gamepad,
-    koch_leader,
     make_teleoperator_from_config,
-    omx_leader,
-    openarm_leader,
-    openarm_mini,
-    rebot_102_leader,
-    so_leader,
+    nexarm_leader,
 )
 from lerobot.utils.robot_utils import precise_sleep
 

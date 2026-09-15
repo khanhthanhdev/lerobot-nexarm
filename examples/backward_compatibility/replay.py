@@ -19,11 +19,10 @@ Example:
 
 ```shell
 lerobot-replay \
-    --robot.type=so100_follower \
-    --robot.port=/dev/tty.usbmodem58760431541 \
-    --robot.id=black \
+    --robot.type=nexarm_follower \
+    --robot.port=/dev/ttyUSB0 \
     --dataset.repo_id=<USER>/record-test \
-    --dataset.episode=2
+    --dataset.episode=0
 ```
 """
 
@@ -39,9 +38,8 @@ from lerobot.datasets import LeRobotDataset
 from lerobot.robots import (  # noqa: F401
     Robot,
     RobotConfig,
-    koch_follower,
     make_robot_from_config,
-    so_follower,
+    nexarm_follower,
 )
 from lerobot.utils.constants import ACTION
 from lerobot.utils.robot_utils import precise_sleep

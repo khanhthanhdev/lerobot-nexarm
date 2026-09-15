@@ -37,114 +37,67 @@ Usage examples
 ::
 
     # Base mode — quick evaluation with sync inference
-    lerobot-rollout \\
-        --strategy.type=base \\
-        --policy.path=lerobot/act_koch_real \\
-        --robot.type=koch_follower \\
-        --robot.port=/dev/ttyACM0 \\
+    lerobot-rollout \
+        --strategy.type=base \
+        --policy.path=user/act_nexarm_real \
+        --robot.type=nexarm_follower \
+        --robot.port=/dev/ttyUSB0 \
         --task="pick up cube" --duration=30
 
     # Base mode — RTC inference for slow VLAs (Pi0, Pi0.5, SmolVLA)
-    lerobot-rollout \\
-        --strategy.type=base \\
-        --policy.path=lerobot/pi0_base \\
-        --inference.type=rtc \\
-        --inference.rtc.execution_horizon=10 \\
-        --inference.rtc.max_guidance_weight=10.0 \\
-        --robot.type=so100_follower \\
-        --robot.port=/dev/ttyACM0 \\
-        --robot.cameras="{ front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30}}" \\
+    lerobot-rollout \
+        --strategy.type=base \
+        --policy.path=lerobot/smolvla_base \
+        --inference.type=rtc \
+        --inference.rtc.execution_horizon=10 \
+        --inference.rtc.max_guidance_weight=10.0 \
+        --robot.type=nexarm_follower \
+        --robot.port=/dev/ttyUSB0 \
+        --robot.cameras="{ front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30}}" \
         --task="pick up cube" --duration=60
 
     # Sentry mode — continuous recording with periodic upload
-    lerobot-rollout \\
-        --strategy.type=sentry \\
-        --strategy.upload_every_n_episodes=5 \\
-        --policy.path=lerobot/pi0_base \\
-        --inference.type=rtc \\
-        --robot.type=so100_follower \\
-        --robot.port=/dev/ttyACM0 \\
-        --dataset.repo_id=user/rollout_sentry_data \\
+    lerobot-rollout \
+        --strategy.type=sentry \
+        --strategy.upload_every_n_episodes=5 \
+        --policy.path=lerobot/smolvla_base \
+        --inference.type=rtc \
+        --robot.type=nexarm_follower \
+        --robot.port=/dev/ttyUSB0 \
+        --dataset.repo_id=user/rollout_sentry_data \
         --dataset.single_task="patrol" --duration=3600
 
     # Highlight mode — ring buffer, press 's' to save, 'h' to push
-    lerobot-rollout \\
-        --strategy.type=highlight \\
-        --strategy.ring_buffer_seconds=30 \\
-        --policy.path=lerobot/act_koch_real \\
-        --robot.type=koch_follower \\
-        --robot.port=/dev/ttyACM0 \\
-        --dataset.repo_id=user/rollout_highlight_data \\
-        --dataset.single_task="pick up cube"
+    lerobot-rollout \
+        --strategy.type=highlight \
+        --strategy.buffer_size_s=15 \
+        --policy.path=user/my_policy \
+        --robot.type=nexarm_follower \
+        --robot.port=/dev/ttyUSB0 \
+        --dataset.repo_id=user/rollout_highlights
 
-    # DAgger mode — human-in-the-loop corrections only
-    lerobot-rollout \\
-        --strategy.type=dagger \\
-        --strategy.num_episodes=20 \\
-        --policy.path=outputs/pretrain/checkpoints/last/pretrained_model \\
-        --robot.type=bi_openarm_follower \\
-        --teleop.type=openarm_mini \\
-        --dataset.repo_id=user/rollout_hil_data \\
-        --dataset.single_task="Fold the T-shirt"
-
-    # DAgger mode — continuous recording with RTC inference
-    lerobot-rollout \\
-        --strategy.type=dagger \\
-        --strategy.record_autonomous=true \\
-        --strategy.num_episodes=50 \\
-        --inference.type=rtc \\
-        --inference.rtc.execution_horizon=10 \\
-        --policy.path=user/my_pi0_policy \\
-        --robot.type=so100_follower \\
-        --robot.port=/dev/ttyACM0 \\
-        --teleop.type=so101_leader \\
-        --teleop.port=/dev/ttyACM1 \\
-        --dataset.repo_id=user/rollout_dagger_rtc_data \\
+    # DAgger mode — human intervention with teleoperator
+    lerobot-rollout \
+        --strategy.type=dagger \
+        --policy.path=user/my_policy \
+        --robot.type=nexarm_follower \
+        --robot.port=/dev/ttyUSB0 \
+        --teleop.type=nexarm_leader \
+        --teleop.port=/dev/ttyUSB1 \
+        --dataset.repo_id=user/rollout_dagger_data \
         --dataset.single_task="Grasp the block"
 
-    # With Rerun visualization and torch.compile
-    lerobot-rollout \\
-        --strategy.type=base \\
-        --policy.path=lerobot/act_koch_real \\
-        --robot.type=koch_follower \\
-        --robot.port=/dev/ttyACM0 \\
-        --task="pick up cube" --duration=60 \\
-        --display_data=true \\
-        --use_torch_compile=true
-
     # Episodic mode — episode-oriented recording with reset phases
-    lerobot-rollout \\
-        --strategy.type=episodic \\
-        --policy.path=user/my_policy \\
-        --robot.type=so100_follower \\
-        --robot.port=/dev/ttyACM0 \\
-        --teleop.type=so100_leader \\
-        --teleop.port=/dev/ttyACM1 \\
-        --dataset.repo_id=user/rollout_episodic_data \\
-        --dataset.num_episodes=20 \\
+    lerobot-rollout \
+        --strategy.type=episodic \
+        --policy.path=user/my_policy \
+        --robot.type=nexarm_follower \
+        --robot.port=/dev/ttyUSB0 \
+        --teleop.type=nexarm_leader \
+        --teleop.port=/dev/ttyUSB1 \
+        --dataset.repo_id=user/rollout_episodic_data \
+        --dataset.num_episodes=20 \
         --dataset.single_task="Grab the cube"
-
-    # Resume a previous sentry recording session
-    lerobot-rollout \\
-        --strategy.type=sentry \\
-        --policy.path=user/my_policy \\
-        --robot.type=so100_follower \\
-        --robot.port=/dev/ttyACM0 \\
-        --dataset.repo_id=user/rollout_sentry_data \\
-        --dataset.single_task="patrol" \\
-        --resume=true
-
-    # Rollout with custom video encoding parameters
-    lerobot-rollout \\
-        --strategy.type=base \\
-        --policy.path=lerobot/act_koch_real \\
-        --robot.type=koch_follower \\
-        --robot.port=/dev/ttyACM0 \\
-        --task="pick up cube" --duration=60 \\
-        --display_data=true \\
-        --dataset.rgb_encoder.vcodec=h264 \\
-        --dataset.rgb_encoder.preset=fast \\
-        --dataset.rgb_encoder.extra_options={"tune": "film", "profile:v": "high", "bf": 2}
 
     # Stream to Foxglove instead of Rerun:
     # add --display_mode=foxglove, then connect the Foxglove app to ws://127.0.0.1:8765.
@@ -159,40 +112,19 @@ from lerobot.configs import parser
 from lerobot.robots import (  # noqa: F401
     Robot,
     RobotConfig,
-    bi_openarm_follower,
-    bi_rebot_b601_follower,
-    bi_so_follower,
-    earthrover_mini_plus,
-    hope_jr,
-    koch_follower,
+    make_robot_from_config,
     mobile_bi_nexarm_sim,
     nexarm_follower,
     nexarm_sim,
-    omx_follower,
-    openarm_follower,
-    reachy2,
-    rebot_b601_follower,
-    so_follower,
-    unitree_g1 as unitree_g1_robot,
 )
 from lerobot.rollout import RolloutConfig, build_rollout_context, create_strategy
 from lerobot.teleoperators import (  # noqa: F401
     Teleoperator,
     TeleoperatorConfig,
-    bi_openarm_leader,
-    bi_openarm_mini,
-    bi_rebot_102_leader,
-    bi_so_leader,
-    homunculus,
-    koch_leader,
+    gamepad,
+    keyboard,
+    make_teleoperator_from_config,
     nexarm_leader,
-    omx_leader,
-    openarm_leader,
-    openarm_mini,
-    reachy2_teleoperator,
-    rebot_102_leader,
-    so_leader,
-    unitree_g1,
 )
 from lerobot.utils.import_utils import register_third_party_plugins
 from lerobot.utils.process import ProcessSignalHandler

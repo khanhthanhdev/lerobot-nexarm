@@ -23,59 +23,14 @@ from .robot import Robot
 
 
 def make_robot_from_config(config: RobotConfig) -> Robot:
-    # TODO(Steven): Consider just using the make_device_from_device_class for all types
-    if config.type == "koch_follower":
-        from .koch_follower import KochFollower
+    if config.type == "nexarm_follower":
+        from .nexarm_follower import NexArmFollower
 
-        return KochFollower(config)
-    elif config.type == "omx_follower":
-        from .omx_follower import OmxFollower
+        return NexArmFollower(config)
+    elif config.type == "nexarm_sim":
+        from .nexarm_sim import NexArmSim
 
-        return OmxFollower(config)
-    elif config.type == "so100_follower":
-        from .so_follower import SO100Follower
-
-        return SO100Follower(config)
-    elif config.type == "so101_follower":
-        from .so_follower import SO101Follower
-
-        return SO101Follower(config)
-    elif config.type == "lekiwi":
-        from .lekiwi import LeKiwi
-
-        return LeKiwi(config)
-    elif config.type == "hope_jr_hand":
-        from .hope_jr import HopeJrHand
-
-        return HopeJrHand(config)
-    elif config.type == "hope_jr_arm":
-        from .hope_jr import HopeJrArm
-
-        return HopeJrArm(config)
-    elif config.type == "bi_so_follower":
-        from .bi_so_follower import BiSOFollower
-
-        return BiSOFollower(config)
-    elif config.type == "reachy2":
-        from .reachy2 import Reachy2Robot
-
-        return Reachy2Robot(config)
-    elif config.type == "openarm_follower":
-        from .openarm_follower import OpenArmFollower
-
-        return OpenArmFollower(config)
-    elif config.type == "bi_openarm_follower":
-        from .bi_openarm_follower import BiOpenArmFollower
-
-        return BiOpenArmFollower(config)
-    elif config.type == "rebot_b601_follower":
-        from .rebot_b601_follower import RebotB601Follower
-
-        return RebotB601Follower(config)
-    elif config.type == "bi_rebot_b601_follower":
-        from .bi_rebot_b601_follower import BiRebotB601Follower
-
-        return BiRebotB601Follower(config)
+        return NexArmSim(config)
     elif config.type == "mobile_bi_nexarm_sim":
         from .mobile_bi_nexarm_sim import MobileBiNexArmSim
 
