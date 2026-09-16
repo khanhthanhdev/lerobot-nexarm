@@ -142,4 +142,27 @@ def test_config_defaults() -> None:
     assert config.baudrate == 1_000_000
     assert config.disable_torque_on_disconnect is True
     assert (config.motion_acc, config.motion_speed) == (100, 2000)
+    assert config.idle_timeout_s == 20.0
     assert config.cameras == {}
+
+
+def test_idle_torque_protection(follower) -> None:
+    robot, bus = follower
+    robot.config.idle_timeout_s = 0.5
+    connect(robot)
+    bus.reset_mock()
+
+    assert not robot._is_idle_relaxed
+
+    # Simulate idle past timeout
+    robot._last_action_time = robot._last_action_time - 1.0
+
+    robot.get_observation()
+    assert robot._is_idle_relaxed
+    bus.set_torque.assert_called_with(False)
+
+    bus.reset_mock()
+    action = {f"{name}.pos": 2048.0 for name in JOINT_NAMES}
+    robot.send_action(action)
+    assert not robot._is_idle_relaxed
+    bus.set_torque.assert_called_with(True)

@@ -29,6 +29,8 @@ class NexArmSimConfig(RobotConfig):
     camera_height: int = 480
     camera_names: tuple[str, ...] = ("front", "wrist")
     settle_steps: int = 100
+    action_delay_steps: int = 0
+    enable_domain_randomization: bool = False
 
     def __post_init__(self) -> None:
         super().__post_init__()
@@ -38,3 +40,5 @@ class NexArmSimConfig(RobotConfig):
             raise ValueError("camera dimensions must be positive")
         if self.settle_steps < 0:
             raise ValueError("settle_steps cannot be negative")
+        if self.action_delay_steps < 0:
+            raise ValueError("action_delay_steps cannot be negative")

@@ -1,6 +1,8 @@
 # Hiwonder NexArm LeRobot VLA Open-Source 6-Axis Robotic Arm
 
-English | [中文](./README_cn.md)
+English | [中文](./README_cn.md) | **[Run Guide](./RUN_GUIDE.md)**
+
+> 📖 **Looking for ready-to-run instructions? See [`RUN_GUIDE.md`](./RUN_GUIDE.md)** for detailed guides on 6-DOF Cartesian teleoperation, MuJoCo dynamics/kinematics, autonomous vision grasping, and Sim-to-Real calibration.
 
 [NexArm](https://www.hiwonder.com/products/nexarm6-axis) is an open-source, [🤗 LeRobot](https://github.com/huggingface/lerobot)-native robotic arm designed for embodied AI research and rapid validation of imitation and reinforcement learning policies. Its dual‑chip architecture (ESP32 + AT32) enables synchronous leader‑follower teleoperation with millisecond‑level tracking latency, generating clean demonstration data that feeds directly into LeRobot training pipelines.
 

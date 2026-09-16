@@ -178,6 +178,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--model", type=Path, default=Path("sim/fusion_export/scene.xml"))
     parser.add_argument("--task", default=DEFAULT_TASK)
     parser.add_argument("--trace", action="store_true")
+    parser.add_argument(
+        "--domain-randomization",
+        "--dr",
+        action="store_true",
+        help="Enable Visual and Dynamics Domain Randomization per episode",
+    )
+    parser.add_argument(
+        "--action-delay-steps",
+        type=int,
+        default=0,
+        help="Action transport delay in control steps (e.g. 1=33ms, 2=66ms)",
+    )
     parser.add_argument("--no-video", dest="video", action="store_false")
     parser.set_defaults(video=True)
     args = parser.parse_args()
@@ -185,6 +197,8 @@ def parse_args() -> argparse.Namespace:
         parser.error("--episodes and --fps must be positive")
     if args.camera_width <= 0 or args.camera_height <= 0:
         parser.error("camera dimensions must be positive")
+    if args.action_delay_steps < 0:
+        parser.error("--action-delay-steps cannot be negative")
     if args.max_attempts is None:
         args.max_attempts = args.episodes * 3
     if args.max_attempts < args.episodes:
@@ -202,6 +216,8 @@ def main() -> int:
             camera_width=args.camera_width,
             camera_height=args.camera_height,
             settle_steps=0,
+            action_delay_steps=args.action_delay_steps,
+            enable_domain_randomization=args.domain_randomization,
         )
     )
     dataset = _build_dataset(robot, args)

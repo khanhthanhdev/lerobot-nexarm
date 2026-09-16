@@ -74,6 +74,8 @@ class NexArmSim(Robot):
             camera_width=self.config.camera_width,
             camera_height=self.config.camera_height,
             camera_names=self.config.camera_names,
+            action_delay_steps=self.config.action_delay_steps,
+            enable_domain_randomization=self.config.enable_domain_randomization,
         )
         self.configure()
 

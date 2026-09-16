@@ -57,6 +57,8 @@ class NexArmFollower(Robot):
         self.config = config
         self.bus = NexArmMotorsBus(port=config.port, baudrate=config.baudrate)
         self.cameras = make_cameras_from_configs(config.cameras)
+        self._last_action_time: float = time.time()
+        self._is_idle_relaxed: bool = False
 
     @property
     def _motors_ft(self) -> dict[str, type]:
@@ -115,6 +117,8 @@ class NexArmFollower(Robot):
     def configure(self) -> None:
         self.bus.write_motion_params(acc=self.config.motion_acc, speed=self.config.motion_speed)
         self.bus.set_torque(True)
+        self._last_action_time = time.time()
+        self._is_idle_relaxed = False
 
     # Velocity watchdog: warn when a joint jumps more than this per tick.
     _MAX_POS_DELTA = 300
@@ -172,6 +176,20 @@ class NexArmFollower(Robot):
             dt_ms = (time.perf_counter() - start) * 1e3
             logger.debug(f"{self} read {cam_key}: {dt_ms:.1f}ms")
 
+        # Auto-relax idle protection: cut holding torque if no action received within idle_timeout_s
+        if (
+            self.config.idle_timeout_s > 0
+            and not self._is_idle_relaxed
+            and (time.time() - self._last_action_time) > self.config.idle_timeout_s
+        ):
+            logger.info(
+                "NexArm follower idle for >%.1fs — disabling torque to prevent servo overheating.",
+                self.config.idle_timeout_s,
+            )
+            with contextlib.suppress(Exception):
+                self.bus.set_torque(False)
+                self._is_idle_relaxed = True
+
         return obs_dict
 
     @check_if_not_connected
@@ -189,6 +207,14 @@ class NexArmFollower(Robot):
             val = float(action[f"{name}.pos"])
             clamped = max(POSITION_MIN, min(POSITION_MAX, int(round(val))))
             goal.append(clamped)
+
+        self._last_action_time = time.time()
+        if self._is_idle_relaxed:
+            logger.info("NexArm follower received new action — re-enabling servo torque.")
+            with contextlib.suppress(Exception):
+                self.bus.set_torque(True)
+                self._is_idle_relaxed = False
+
         self.bus.write_positions(goal)
         return {f"{name}.pos": float(goal[i]) for i, name in enumerate(JOINT_NAMES)}
 

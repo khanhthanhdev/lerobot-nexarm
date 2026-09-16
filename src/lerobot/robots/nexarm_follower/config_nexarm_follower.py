@@ -36,5 +36,8 @@ class NexArmFollowerConfig(RobotConfig):
     motion_acc: int = 100
     motion_speed: int = 2000
 
+    # Auto-relax idle timeout in seconds (0 to disable). Protects HX-30HM servos from overheating when idle.
+    idle_timeout_s: float = 20.0
+
     # cameras
     cameras: dict[str, CameraConfig] = field(default_factory=dict)

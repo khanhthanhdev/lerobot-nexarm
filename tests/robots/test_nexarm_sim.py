@@ -286,3 +286,54 @@ def test_pick_place_task_reports_two_jaw_grasp(backend: NexArmMujocoBackend) -> 
         backend.step(action)
 
     assert task.status().is_grasped
+
+
+def test_action_delay_buffer() -> None:
+    backend = NexArmMujocoBackend(
+        model_path=MODEL_PATH,
+        fps=30,
+        camera_width=160,
+        camera_height=120,
+        camera_names=("front", "wrist"),
+        action_delay_steps=2,
+    )
+    backend.reset()
+
+    # Create distinct actions
+    action_1 = {f"{name}.pos": HOME_POSITIONS[name] + 100 for name in JOINT_NAMES}
+    action_2 = {f"{name}.pos": HOME_POSITIONS[name] + 200 for name in JOINT_NAMES}
+
+    # Step 1: action_1 sent, but delayed queue pops home action
+    sent_1 = backend.step(action_1)
+    assert sent_1["shoulder_pan.pos"] == HOME_POSITIONS["shoulder_pan"]
+
+    # Step 2: action_2 sent, queue pops home action
+    sent_2 = backend.step(action_2)
+    assert sent_2["shoulder_pan.pos"] == HOME_POSITIONS["shoulder_pan"]
+
+    # Step 3: queue pops action_1
+    sent_3 = backend.step(action_2)
+    assert sent_3["shoulder_pan.pos"] == action_1["shoulder_pan.pos"]
+    backend.close()
+
+
+def test_domain_randomization() -> None:
+    backend = NexArmMujocoBackend(
+        model_path=MODEL_PATH,
+        fps=30,
+        camera_width=160,
+        camera_height=120,
+        camera_names=("front", "wrist"),
+        enable_domain_randomization=True,
+    )
+    backend.reset(rng=np.random.default_rng(123))
+
+    front_cam_id = backend._camera_ids["front"]
+    nominal_cam_pos = backend._nominal_cam_pos["front"]
+    # Camera position should be perturbed
+    assert not np.allclose(backend.model.cam_pos[front_cam_id], nominal_cam_pos)
+
+    # Restoring domain should bring it back
+    backend.reset_domain()
+    assert np.allclose(backend.model.cam_pos[front_cam_id], nominal_cam_pos)
+    backend.close()
