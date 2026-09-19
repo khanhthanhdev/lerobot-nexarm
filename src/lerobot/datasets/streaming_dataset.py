@@ -24,6 +24,7 @@ from datasets import load_dataset
 
 from lerobot.configs import DEFAULT_DEPTH_UNIT, DEPTH_METER_UNIT, DepthEncoderConfig
 from lerobot.utils.constants import HF_LEROBOT_HOME, LOOKAHEAD_BACKTRACKTABLE, LOOKBACK_BACKTRACKTABLE
+from lerobot.utils.import_utils import get_safe_default_video_backend
 
 from .dataset_metadata import CODEBASE_VERSION, LeRobotDatasetMetadata
 from .depth_utils import MM_PER_METRE, dequantize_depth
@@ -38,6 +39,7 @@ from .utils import (
 from .video_utils import (
     VideoDecoderCache,
     decode_video_frames,
+    decode_video_frames_pyav,
     decode_video_frames_torchcodec,
 )
 
@@ -609,13 +611,22 @@ class StreamingLeRobotDataset(torch.utils.data.IterableDataset):
                     output_unit=self._depth_output_unit,
                 )
             else:
-                frames = decode_video_frames_torchcodec(
-                    video_path,
-                    query_ts,
-                    self.tolerance_s,
-                    decoder_cache=self.video_decoder_cache,
-                    return_uint8=self._return_uint8,
-                )
+                backend = get_safe_default_video_backend()
+                if backend == "torchcodec":
+                    frames = decode_video_frames_torchcodec(
+                        video_path,
+                        query_ts,
+                        self.tolerance_s,
+                        decoder_cache=self.video_decoder_cache,
+                        return_uint8=self._return_uint8,
+                    )
+                else:
+                    frames = decode_video_frames_pyav(
+                        video_path,
+                        query_ts,
+                        self.tolerance_s,
+                        return_uint8=self._return_uint8,
+                    )
 
             item[video_key] = frames.squeeze(0) if len(query_ts) == 1 else frames
 

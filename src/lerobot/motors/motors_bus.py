@@ -390,9 +390,12 @@ class SerialMotorsBus(MotorsBusBase):
             return False
 
         first_table = self.model_ctrl_table[self.models[0]]
-        return any(
-            DeepDiff(first_table, get_ctrl_table(self.model_ctrl_table, model)) for model in self.models[1:]
-        )
+        if DeepDiff is not None:
+            return any(
+                DeepDiff(first_table, get_ctrl_table(self.model_ctrl_table, model))
+                for model in self.models[1:]
+            )
+        return any(first_table != get_ctrl_table(self.model_ctrl_table, model) for model in self.models[1:])
 
     @cached_property
     def models(self) -> list[str]:
