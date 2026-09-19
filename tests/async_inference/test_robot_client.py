@@ -257,11 +257,9 @@ def test_robot_client_registers_builtin_robot_types():
     known_choices = RobotConfig.get_known_choices()
 
     expected_robot_types = [
-        "so100_follower",
-        "so101_follower",
-        "koch_follower",
-        "omx_follower",
-        "bi_so_follower",
+        "nexarm_follower",
+        "nexarm_sim",
+        "mobile_bi_nexarm_sim",
     ]
     for robot_type in expected_robot_types:
         assert robot_type in known_choices, (

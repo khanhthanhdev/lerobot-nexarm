@@ -8,6 +8,8 @@ import json
 
 import pytest
 
+pytest.importorskip("datasets", reason="datasets is required (install lerobot[dataset])")
+
 from lerobot.configs import FeatureType, PolicyFeature
 from lerobot.policies.act.configuration_act import ACTConfig
 from lerobot.scripts.lerobot_nexarm_sim_benchmark import (

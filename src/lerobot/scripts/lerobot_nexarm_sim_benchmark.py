@@ -45,7 +45,6 @@ import torch
 from lerobot.configs import FeatureType, PreTrainedConfig
 from lerobot.motors.nexarm.nexarm import JOINT_NAMES
 from lerobot.robots.nexarm_sim import NexArmPickPlaceTask, NexArmSim, NexArmSimConfig
-from lerobot.rollout import BaseStrategyConfig, RolloutConfig, SyncInferenceConfig, build_rollout_context
 from lerobot.utils.constants import ACTION, OBS_STATE, OBS_STR
 from lerobot.utils.feature_utils import build_dataset_frame
 from lerobot.utils.robot_utils import precise_sleep
@@ -367,6 +366,8 @@ def benchmark_policy(spec: PolicySpec, args: argparse.Namespace) -> dict[str, An
         camera_height=args.camera_height,
         camera_width=args.camera_width,
     )
+    from lerobot.rollout import BaseStrategyConfig, RolloutConfig, SyncInferenceConfig, build_rollout_context
+
     rollout_cfg = RolloutConfig(
         robot=NexArmSimConfig(
             id=f"benchmark_{spec.label}",

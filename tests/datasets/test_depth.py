@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pytest
 
+pytest.importorskip("datasets", reason="datasets is required (install lerobot[dataset])")
 pytest.importorskip("av", reason="av is required (install lerobot[dataset])")
 
 import av

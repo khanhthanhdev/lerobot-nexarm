@@ -13,6 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import functools
 import importlib
 import importlib.metadata
 import logging
@@ -69,9 +70,21 @@ def is_package_available(
         return package_exists
 
 
+@functools.cache
+def is_torchcodec_available() -> bool:
+    if not importlib.util.find_spec("torchcodec"):
+        return False
+    try:
+        import torchcodec  # noqa: F401
+
+        return True
+    except Exception:
+        return False
+
+
 def get_safe_default_video_backend():
     logger = logging.getLogger(__name__)
-    if importlib.util.find_spec("torchcodec"):
+    if is_torchcodec_available():
         return "torchcodec"
     else:
         logger.warning(

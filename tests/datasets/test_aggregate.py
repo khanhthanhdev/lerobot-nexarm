@@ -242,7 +242,7 @@ def assert_video_timestamps_within_bounds(aggr_ds):
     """
     try:
         from torchcodec.decoders import VideoDecoder
-    except ImportError:
+    except (ImportError, RuntimeError):
         return
 
     for ep_idx in range(aggr_ds.num_episodes):

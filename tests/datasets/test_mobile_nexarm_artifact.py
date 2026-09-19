@@ -8,6 +8,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+pytest.importorskip("datasets", reason="datasets is required (install lerobot[dataset])")
+
 from lerobot.datasets.mobile_nexarm_artifact import (
     EpisodeArtifactWriter,
     EpisodeMetadata,

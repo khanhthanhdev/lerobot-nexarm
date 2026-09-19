@@ -22,6 +22,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+pytest.importorskip("datasets", reason="datasets is required (install lerobot[dataset])")
 pytest.importorskip("av", reason="av is required (install lerobot[dataset])")
 
 import av  # noqa: E402

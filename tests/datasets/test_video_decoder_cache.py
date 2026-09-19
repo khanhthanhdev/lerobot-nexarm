@@ -26,7 +26,12 @@ from pathlib import Path
 
 import pytest
 
-pytest.importorskip("torchcodec", reason="torchcodec is required (install lerobot[dataset])")
+pytest.importorskip("datasets", reason="datasets is required (install lerobot[dataset])")
+
+try:
+    import torchcodec  # noqa: F401
+except (ImportError, RuntimeError) as e:
+    pytest.skip(f"torchcodec is required (install lerobot[dataset]): {e}", allow_module_level=True)
 
 from lerobot.datasets.video_utils import VideoDecoderCache  # noqa: E402
 

@@ -16,10 +16,13 @@ import hashlib
 import json
 from collections.abc import Callable
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 
-from lerobot.datasets.lerobot_dataset import LeRobotDataset
+if TYPE_CHECKING:
+    from lerobot.datasets.lerobot_dataset import LeRobotDataset
+
 from lerobot.motors.nexarm.nexarm import JOINT_NAMES
 from lerobot.robots.nexarm_sim import NexArmPickPlaceTask, NexArmSim, NexArmSimConfig
 from lerobot.robots.nexarm_sim.mujoco_backend import HOME_POSITIONS, RAW_RANGES, resolve_model_path
@@ -88,10 +91,10 @@ def generate_episode(
     cube = robot.backend.body_position("cube")
     target = robot.backend.body_position("target_zone")
 
-    # Keep the jaw collision boxes off the floor while retaining vertical
-    # overlap with the 20 mm cube.
-    cube_grasp = cube + np.array([0.0, 0.0, 0.015])
-    target_release = target + np.array([0.0, 0.0, 0.012])
+    # Account for gripper_frame site offset relative to the jaw collision
+    # boxes to ensure vertical overlap with the 20 mm cube.
+    cube_grasp = cube + np.array([0.0, 0.0, -0.020])
+    target_release = target + np.array([0.0, 0.0, -0.018])
     stages = (
         (cube_grasp + [0.0, 0.0, 0.12], OPEN_GRIPPER, 16),
         (cube_grasp, OPEN_GRIPPER, 18),
@@ -133,7 +136,7 @@ def generate_episode(
 
     # Hold after release so the task's stability gate can accept the placement.
     hold_action = robot.backend.joint_positions()
-    for _ in range(20):
+    for _ in range(35):
         observation = robot.get_observation() if record_frame is not None else {}
         sent = robot.send_action(hold_action)
         if record_frame is not None:
@@ -147,6 +150,8 @@ def generate_episode(
 
 
 def _build_dataset(robot: NexArmSim, args: argparse.Namespace) -> LeRobotDataset:
+    from lerobot.datasets.lerobot_dataset import LeRobotDataset
+
     features = {
         **hw_to_dataset_features(robot.action_features, ACTION, args.video),
         **hw_to_dataset_features(robot.observation_features, OBS_STR, args.video),
