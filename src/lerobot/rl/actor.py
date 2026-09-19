@@ -87,8 +87,16 @@ from lerobot.cameras import opencv  # noqa: F401
 from lerobot.configs import parser
 from lerobot.policies import make_policy, make_pre_post_processors
 from lerobot.processor import TransitionKey
-from lerobot.robots import so_follower  # noqa: F401
-from lerobot.teleoperators import gamepad, so_leader  # noqa: F401
+from lerobot.robots import (  # noqa: F401
+    mobile_bi_nexarm_sim,
+    nexarm_follower,
+    nexarm_sim,
+)
+from lerobot.teleoperators import (  # noqa: F401
+    gamepad,
+    keyboard,
+    nexarm_leader,
+)
 from lerobot.teleoperators.utils import TeleopEvents
 from lerobot.utils.device_utils import get_safe_torch_device
 from lerobot.utils.process import ProcessSignalHandler

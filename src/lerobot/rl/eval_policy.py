@@ -22,11 +22,14 @@ from lerobot.policies import make_policy
 from lerobot.robots import (  # noqa: F401
     RobotConfig,
     make_robot_from_config,
-    so_follower,
+    mobile_bi_nexarm_sim,
+    nexarm_follower,
+    nexarm_sim,
 )
-from lerobot.teleoperators import (
-    gamepad,  # noqa: F401
-    so_leader,  # noqa: F401
+from lerobot.teleoperators import (  # noqa: F401
+    gamepad,
+    keyboard,
+    nexarm_leader,
 )
 
 from .gym_manipulator import make_robot_env
