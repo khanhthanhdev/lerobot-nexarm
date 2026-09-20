@@ -1,0 +1,114 @@
+<?xml version='1.0' encoding='utf-8'?>
+<mujoco model="NexArm Bowl Stacking Scene">
+  <include file="NexArm-sim.xml" />
+  <statistic center="0 0.2 0.2" extent="0.8" />
+  <visual>
+    <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0" />
+    <rgba haze="0.15 0.25 0.35 1" />
+    <global azimuth="120" elevation="-20" />
+  </visual>
+
+  <default>
+    <default class="bowl_col">
+      <geom mass="0.0035" friction="1.2 0.01 0.001" contype="2" conaffinity="3" group="3" />
+    </default>
+  </default>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="3072" />
+    <texture type="2d" name="groundplane" builtin="checker" mark="edge" rgb1="0.2 0.3 0.4" rgb2="0.1 0.15 0.2" markrgb="0.8 0.8 0.8" width="300" height="300" />
+    <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="5 5" reflectance="0.2" />
+
+    <!-- 3D Meshes for the 3 bowls -->
+    <mesh name="bowl_red" file="bowl_red.stl" scale="0.001 0.001 0.001" />
+    <mesh name="bowl_blue" file="bowl_blue.stl" scale="0.001 0.001 0.001" />
+    <mesh name="bowl_black" file="bowl_black.stl" scale="0.001 0.001 0.001" />
+
+    <!-- Materials with distinct colors -->
+    <material name="mat_bowl_red" rgba="0.88 0.15 0.15 1.0" specular="0.3" shininess="0.5" />
+    <material name="mat_bowl_blue" rgba="0.15 0.35 0.88 1.0" specular="0.3" shininess="0.5" />
+    <material name="mat_bowl_black" rgba="0.12 0.12 0.12 1.0" specular="0.2" shininess="0.4" />
+  </asset>
+
+  <worldbody>
+    <light pos="0 0 3" dir="0 0 -1" directional="true" />
+    <geom name="floor" type="plane" size="1 1 0.05" rgba="0.8 0.8 0.8 1" friction="1 0.005 0.0001" contype="2" conaffinity="2" />
+    <camera name="front" mode="fixed" pos="0.360630977001 -0.613972762847 0.55" xyaxes="0.857493 0.514496 0 -0.240504 0.400841 0.884016" fovy="55" />
+
+    <!-- bowl_red -->
+    <body name="bowl_red" pos="-0.1000 -0.2400 0.0200">
+      <freejoint name="bowl_red_joint" />
+      <!-- Visual CAD mesh -->
+      <geom name="bowl_red_visual" type="mesh" mesh="bowl_red" material="mat_bowl_red" contype="0" conaffinity="0" group="2" />
+      <!-- Concave Collision Proxy -->
+      <geom name="bowl_red_base_col" type="cylinder" size="0.040 0.003" pos="0 0 -0.015" class="bowl_col" />
+      <geom name="bowl_red_wall_0" type="capsule" fromto="0.0420 0.0000 -0.0120 0.0580 0.0000 0.0160" size="0.005" class="bowl_col" />
+      <geom name="bowl_red_wall_1" type="capsule" fromto="0.0297 0.0297 -0.0120 0.0410 0.0410 0.0160" size="0.005" class="bowl_col" />
+      <geom name="bowl_red_wall_2" type="capsule" fromto="0.0000 0.0420 -0.0120 0.0000 0.0580 0.0160" size="0.005" class="bowl_col" />
+      <geom name="bowl_red_wall_3" type="capsule" fromto="-0.0297 0.0297 -0.0120 -0.0410 0.0410 0.0160" size="0.005" class="bowl_col" />
+      <geom name="bowl_red_wall_4" type="capsule" fromto="-0.0420 0.0000 -0.0120 -0.0580 0.0000 0.0160" size="0.005" class="bowl_col" />
+      <geom name="bowl_red_wall_5" type="capsule" fromto="-0.0297 -0.0297 -0.0120 -0.0410 -0.0410 0.0160" size="0.005" class="bowl_col" />
+      <geom name="bowl_red_wall_6" type="capsule" fromto="-0.0000 -0.0420 -0.0120 -0.0000 -0.0580 0.0160" size="0.005" class="bowl_col" />
+      <geom name="bowl_red_wall_7" type="capsule" fromto="0.0297 -0.0297 -0.0120 0.0410 -0.0410 0.0160" size="0.005" class="bowl_col" />
+      <geom name="bowl_red_rim_0" type="capsule" fromto="0.0580 0.0000 0.0160 0.0410 0.0410 0.0160" size="0.004" class="bowl_col" />
+      <geom name="bowl_red_rim_1" type="capsule" fromto="0.0410 0.0410 0.0160 0.0000 0.0580 0.0160" size="0.004" class="bowl_col" />
+      <geom name="bowl_red_rim_2" type="capsule" fromto="0.0000 0.0580 0.0160 -0.0410 0.0410 0.0160" size="0.004" class="bowl_col" />
+      <geom name="bowl_red_rim_3" type="capsule" fromto="-0.0410 0.0410 0.0160 -0.0580 0.0000 0.0160" size="0.004" class="bowl_col" />
+      <geom name="bowl_red_rim_4" type="capsule" fromto="-0.0580 0.0000 0.0160 -0.0410 -0.0410 0.0160" size="0.004" class="bowl_col" />
+      <geom name="bowl_red_rim_5" type="capsule" fromto="-0.0410 -0.0410 0.0160 -0.0000 -0.0580 0.0160" size="0.004" class="bowl_col" />
+      <geom name="bowl_red_rim_6" type="capsule" fromto="-0.0000 -0.0580 0.0160 0.0410 -0.0410 0.0160" size="0.004" class="bowl_col" />
+      <geom name="bowl_red_rim_7" type="capsule" fromto="0.0410 -0.0410 0.0160 0.0580 -0.0000 0.0160" size="0.004" class="bowl_col" />
+    </body>
+
+    <!-- bowl_blue -->
+    <body name="bowl_blue" pos="0.0000 -0.2400 0.0200">
+      <freejoint name="bowl_blue_joint" />
+      <!-- Visual CAD mesh -->
+      <geom name="bowl_blue_visual" type="mesh" mesh="bowl_blue" material="mat_bowl_blue" contype="0" conaffinity="0" group="2" />
+      <!-- Concave Collision Proxy -->
+      <geom name="bowl_blue_base_col" type="cylinder" size="0.040 0.003" pos="0 0 -0.015" class="bowl_col" />
+      <geom name="bowl_blue_wall_0" type="capsule" fromto="0.0420 0.0000 -0.0120 0.0580 0.0000 0.0160" size="0.005" class="bowl_col" />
+      <geom name="bowl_blue_wall_1" type="capsule" fromto="0.0297 0.0297 -0.0120 0.0410 0.0410 0.0160" size="0.005" class="bowl_col" />
+      <geom name="bowl_blue_wall_2" type="capsule" fromto="0.0000 0.0420 -0.0120 0.0000 0.0580 0.0160" size="0.005" class="bowl_col" />
+      <geom name="bowl_blue_wall_3" type="capsule" fromto="-0.0297 0.0297 -0.0120 -0.0410 0.0410 0.0160" size="0.005" class="bowl_col" />
+      <geom name="bowl_blue_wall_4" type="capsule" fromto="-0.0420 0.0000 -0.0120 -0.0580 0.0000 0.0160" size="0.005" class="bowl_col" />
+      <geom name="bowl_blue_wall_5" type="capsule" fromto="-0.0297 -0.0297 -0.0120 -0.0410 -0.0410 0.0160" size="0.005" class="bowl_col" />
+      <geom name="bowl_blue_wall_6" type="capsule" fromto="-0.0000 -0.0420 -0.0120 -0.0000 -0.0580 0.0160" size="0.005" class="bowl_col" />
+      <geom name="bowl_blue_wall_7" type="capsule" fromto="0.0297 -0.0297 -0.0120 0.0410 -0.0410 0.0160" size="0.005" class="bowl_col" />
+      <geom name="bowl_blue_rim_0" type="capsule" fromto="0.0580 0.0000 0.0160 0.0410 0.0410 0.0160" size="0.004" class="bowl_col" />
+      <geom name="bowl_blue_rim_1" type="capsule" fromto="0.0410 0.0410 0.0160 0.0000 0.0580 0.0160" size="0.004" class="bowl_col" />
+      <geom name="bowl_blue_rim_2" type="capsule" fromto="0.0000 0.0580 0.0160 -0.0410 0.0410 0.0160" size="0.004" class="bowl_col" />
+      <geom name="bowl_blue_rim_3" type="capsule" fromto="-0.0410 0.0410 0.0160 -0.0580 0.0000 0.0160" size="0.004" class="bowl_col" />
+      <geom name="bowl_blue_rim_4" type="capsule" fromto="-0.0580 0.0000 0.0160 -0.0410 -0.0410 0.0160" size="0.004" class="bowl_col" />
+      <geom name="bowl_blue_rim_5" type="capsule" fromto="-0.0410 -0.0410 0.0160 -0.0000 -0.0580 0.0160" size="0.004" class="bowl_col" />
+      <geom name="bowl_blue_rim_6" type="capsule" fromto="-0.0000 -0.0580 0.0160 0.0410 -0.0410 0.0160" size="0.004" class="bowl_col" />
+      <geom name="bowl_blue_rim_7" type="capsule" fromto="0.0410 -0.0410 0.0160 0.0580 -0.0000 0.0160" size="0.004" class="bowl_col" />
+    </body>
+
+    <!-- bowl_black -->
+    <body name="bowl_black" pos="0.1000 -0.2400 0.0200">
+      <freejoint name="bowl_black_joint" />
+      <!-- Visual CAD mesh -->
+      <geom name="bowl_black_visual" type="mesh" mesh="bowl_black" material="mat_bowl_black" contype="0" conaffinity="0" group="2" />
+      <!-- Concave Collision Proxy -->
+      <geom name="bowl_black_base_col" type="cylinder" size="0.040 0.003" pos="0 0 -0.015" class="bowl_col" />
+      <geom name="bowl_black_wall_0" type="capsule" fromto="0.0420 0.0000 -0.0120 0.0580 0.0000 0.0160" size="0.005" class="bowl_col" />
+      <geom name="bowl_black_wall_1" type="capsule" fromto="0.0297 0.0297 -0.0120 0.0410 0.0410 0.0160" size="0.005" class="bowl_col" />
+      <geom name="bowl_black_wall_2" type="capsule" fromto="0.0000 0.0420 -0.0120 0.0000 0.0580 0.0160" size="0.005" class="bowl_col" />
+      <geom name="bowl_black_wall_3" type="capsule" fromto="-0.0297 0.0297 -0.0120 -0.0410 0.0410 0.0160" size="0.005" class="bowl_col" />
+      <geom name="bowl_black_wall_4" type="capsule" fromto="-0.0420 0.0000 -0.0120 -0.0580 0.0000 0.0160" size="0.005" class="bowl_col" />
+      <geom name="bowl_black_wall_5" type="capsule" fromto="-0.0297 -0.0297 -0.0120 -0.0410 -0.0410 0.0160" size="0.005" class="bowl_col" />
+      <geom name="bowl_black_wall_6" type="capsule" fromto="-0.0000 -0.0420 -0.0120 -0.0000 -0.0580 0.0160" size="0.005" class="bowl_col" />
+      <geom name="bowl_black_wall_7" type="capsule" fromto="0.0297 -0.0297 -0.0120 0.0410 -0.0410 0.0160" size="0.005" class="bowl_col" />
+      <geom name="bowl_black_rim_0" type="capsule" fromto="0.0580 0.0000 0.0160 0.0410 0.0410 0.0160" size="0.004" class="bowl_col" />
+      <geom name="bowl_black_rim_1" type="capsule" fromto="0.0410 0.0410 0.0160 0.0000 0.0580 0.0160" size="0.004" class="bowl_col" />
+      <geom name="bowl_black_rim_2" type="capsule" fromto="0.0000 0.0580 0.0160 -0.0410 0.0410 0.0160" size="0.004" class="bowl_col" />
+      <geom name="bowl_black_rim_3" type="capsule" fromto="-0.0410 0.0410 0.0160 -0.0580 0.0000 0.0160" size="0.004" class="bowl_col" />
+      <geom name="bowl_black_rim_4" type="capsule" fromto="-0.0580 0.0000 0.0160 -0.0410 -0.0410 0.0160" size="0.004" class="bowl_col" />
+      <geom name="bowl_black_rim_5" type="capsule" fromto="-0.0410 -0.0410 0.0160 -0.0000 -0.0580 0.0160" size="0.004" class="bowl_col" />
+      <geom name="bowl_black_rim_6" type="capsule" fromto="-0.0000 -0.0580 0.0160 0.0410 -0.0410 0.0160" size="0.004" class="bowl_col" />
+      <geom name="bowl_black_rim_7" type="capsule" fromto="0.0410 -0.0410 0.0160 0.0580 -0.0000 0.0160" size="0.004" class="bowl_col" />
+    </body>
+
+  </worldbody>
+</mujoco>
