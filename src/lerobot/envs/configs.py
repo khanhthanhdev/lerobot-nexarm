@@ -241,6 +241,7 @@ class NexArmEnv(EnvConfig):
     fps: int = 30
     episode_length: int = 400
     obs_type: str = "pixels_agent_pos"
+    control_mode: str = "raw"
     observation_height: int = 480
     observation_width: int = 640
     reward_type: str = "dense"
@@ -287,6 +288,7 @@ class NexArmEnv(EnvConfig):
     def gym_kwargs(self) -> dict:
         return {
             "obs_type": self.obs_type,
+            "control_mode": self.control_mode,
             "render_mode": self.render_mode,
             "max_episode_steps": self.episode_length,
             "reward_type": self.reward_type,

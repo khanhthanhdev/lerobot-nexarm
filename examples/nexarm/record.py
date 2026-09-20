@@ -81,8 +81,7 @@ def main():
         "--display_data=true",
     ]
 
-    if args.push_to_hub:
-        cmd.append("--dataset.push_to_hub=true")
+    cmd.append(f"--dataset.push_to_hub={'true' if args.push_to_hub else 'false'}")
     if args.rerun_save_path:
         cmd.append(f"--rerun_save_path={args.rerun_save_path}")
 

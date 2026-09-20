@@ -64,8 +64,23 @@ Minimum commands in order. Confirm follower (slave) and leader (master) arms are
 
 **4.1 Install**
 
+Select the profile matching your workflow:
+
 ```bash
-uv sync --locked --extra nexarm --extra dev   # NexArm hardware stack + dev tools
+# Profile 1: Simulation & Benchmark (no physical robot needed)
+uv sync --locked --extra dev --extra viz
+
+# Profile 2: Hardware Teleoperation & Recording
+uv sync --locked --extra nexarm --extra core_scripts
+
+# Profile 3: Training & Evaluation (ACT baseline included)
+uv sync --locked --extra training --extra evaluation
+# For Diffusion: add --extra diffusion
+# For SmolVLA: add --extra smolvla
+
+# Profile 4: Full Development Stack (everything)
+uv sync --locked --extra all
+
 git lfs install && git lfs pull
 uv run hf auth login                         # required to push datasets/policies
 ```
@@ -75,7 +90,7 @@ All repository commands should use `uv run`, which keeps Python and dependencies
 **4.2 Find USB ports** — run once per arm, unplug when prompted.
 
 ```bash
-lerobot-find-port
+uv run lerobot-find-port
 ```
 
 Linux typically assigns `/dev/ttyUSB0` and `/dev/ttyUSB1` (or check `dmesg`). Ensure port permissions (`sudo chmod 666 /dev/ttyUSB*`).
@@ -91,7 +106,7 @@ Linux typically assigns `/dev/ttyUSB0` and `/dev/ttyUSB1` (or check `dmesg`). En
 **4.4 Teleoperate** (sanity check, leader mirrors follower in real-time)
 
 ```bash
-lerobot-teleoperate \
+uv run lerobot-teleoperate \
   --robot.type=nexarm_follower --robot.port=<FOLLOWER_PORT> \
   --teleop.type=nexarm_leader  --teleop.port=<LEADER_PORT> \
   --robot.cameras="{ front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30}, wrist: {type: opencv, index_or_path: 1, width: 640, height: 480, fps: 30}}" \
@@ -101,7 +116,7 @@ lerobot-teleoperate \
 Or run the ready script:
 
 ```bash
-python examples/nexarm/teleoperate.py --robot-port <FOLLOWER_PORT> --leader-port <LEADER_PORT>
+uv run python examples/nexarm/teleoperate.py --robot-port <FOLLOWER_PORT> --leader-port <LEADER_PORT>
 ```
 
 **4.5 Record a dataset** — keys: **→** next, **←** redo, **ESC** finish & upload.
@@ -109,7 +124,7 @@ python examples/nexarm/teleoperate.py --robot-port <FOLLOWER_PORT> --leader-port
 ```bash
 HF_USER=$(NO_COLOR=1 hf auth whoami | awk -F': *' 'NR==1 {print $2}')
 
-lerobot-record \
+uv run lerobot-record \
   --robot.type=nexarm_follower --robot.port=<FOLLOWER_PORT> \
   --teleop.type=nexarm_leader  --teleop.port=<LEADER_PORT> \
   --robot.cameras="{ front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30}, wrist: {type: opencv, index_or_path: 1, width: 640, height: 480, fps: 30}}" \
@@ -124,30 +139,30 @@ lerobot-record \
 **4.6 Replay an episode** (sanity check)
 
 ```bash
-lerobot-replay --robot.type=nexarm_follower --robot.port=<FOLLOWER_PORT> \
+uv run lerobot-replay --robot.type=nexarm_follower --robot.port=<FOLLOWER_PORT> \
   --dataset.repo_id=${HF_USER}/nexarm_cube_pick --dataset.episode=0
 ```
 
 **4.7 Train** (default: ACT — fastest, lowest memory).
 
 ```bash
-lerobot-train \
+uv run lerobot-train \
   --dataset.repo_id=${HF_USER}/nexarm_cube_pick \
   --policy.type=act \
   --policy.device=cuda \
+  --policy.push_to_hub=false \
   --output_dir=outputs/train/act_nexarm \
   --job_name=act_nexarm \
   --batch_size=8 \
-  --wandb.enable=true \
-  --policy.repo_id=${HF_USER}/act_nexarm
+  --wandb.enable=false
 ```
 
 **4.8 Evaluate & Rollout on the real robot**
 
 ```bash
-lerobot-rollout \
+uv run lerobot-rollout \
   --strategy.type=base \
-  --policy.path=${HF_USER}/act_nexarm \
+  --policy.path=outputs/train/act_nexarm/checkpoints/last/pretrained_model \
   --robot.type=nexarm_follower --robot.port=<FOLLOWER_PORT> \
   --robot.cameras="{ front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30}, wrist: {type: opencv, index_or_path: 1, width: 640, height: 480, fps: 30}}" \
   --task="Pick the cube and place it into the tray" --duration=60
@@ -246,6 +261,17 @@ All policies typically train for **5–10 epochs** (see §7).
 - **80 GB (A100/H100):** → any, with healthy batch. `pi05`, `xvla`, `wall_x` become comfortable.
 - **CPU only:** → don't train here. Use Google Colab (see [`docs/source/notebooks.mdx`](./docs/source/notebooks.mdx)) or a rented GPU.
 
+### 6.3 Policy Compatibility Matrix on NexArm
+
+| Policy group  | Status on NexArm       | Requirements & Compatibility Notes                                                  |
+| ------------- | ---------------------- | ----------------------------------------------------------------------------------- |
+| **ACT**       | **Validated Baseline** | Fully compatible. Standard 2-camera (front + wrist) + 6-DoF raw joint positions.    |
+| **Diffusion** | **Validated Baseline** | Fully compatible. Requires `uv sync --extra diffusion`.                             |
+| **SmolVLA**   | **Validated Baseline** | Compatible VLA. Requires `uv sync --extra smolvla` and `--task` description.        |
+| **TDMPC**     | **Incompatible**       | Rejects 640x480 dual-cam setup (requires square images `H == W` and single camera). |
+| **VQ-BeT**    | **Incompatible**       | Rejects 2-camera setup (`len(image_features) == 1` enforced at config validation).  |
+| **π0 / π0.5** | Experimental           | Requires 20+ GB VRAM or small batch + gradient accumulation.                        |
+
 ---
 
 ## 7. How long should I train?
@@ -285,10 +311,16 @@ Pass the resulting total with `--steps=<N>`; eval at intermediate checkpoints (`
 | `smolvla`      |   4–8 |           30k–80k | Pretrained VLM → converges fast.                                  |
 | `pi0` / `pi05` |   1–4 |           30k–80k | Memory-bound; use gradient accumulation for effective batch ≥ 16! |
 
-### 7.4 Batch size guidance
+### 7.4 Batch size & gradient accumulation
 
 - **Bigger batch is preferable** for stable gradients on teleop data.
-- If GPU memory is the bottleneck, use **gradient accumulation** to raise _effective_ batch without raising peak memory.
+- If GPU memory is the bottleneck, use **gradient accumulation** via `--gradient_accumulation_steps=<N>` to raise _effective_ batch without raising peak memory:
+  ```bash
+  uv run lerobot-train ... \
+    --batch_size=2 \
+    --gradient_accumulation_steps=4
+  ```
+  Effective batch size will be $2 \times 4 = 8$ samples per update step.
 - Scale **learning rate** gently with batch; most LeRobot defaults work fine for a 2–4× batch change.
 
 ### 7.5 Scale LR schedule & checkpoints with `--steps`
@@ -296,7 +328,7 @@ Pass the resulting total with `--steps=<N>`; eval at intermediate checkpoints (`
 LeRobot's default schedulers (e.g. SmolVLA's cosine decay) use `scheduler_decay_steps=30_000`, which is sized for long training runs. When you shorten training (e.g. 5k–10k steps on a small dataset), **scale the scheduler down to match** — otherwise the LR stays near the peak and never decays. Same for checkpoint frequency.
 
 ```bash
-lerobot-train ... \
+uv run lerobot-train ... \
   --steps=5000 \
   --policy.scheduler_decay_steps=5000 \
   --save_freq=5000

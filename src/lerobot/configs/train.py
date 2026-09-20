@@ -99,6 +99,9 @@ class TrainPipelineConfig(HubMixin):
     # Number of workers for the dataloader.
     num_workers: int = 4
     batch_size: int = 8
+    # Number of forward/backward passes to accumulate gradients over before an optimizer step.
+    # Raises effective batch size without requiring additional GPU memory.
+    gradient_accumulation_steps: int = 1
     prefetch_factor: int = 4
     persistent_workers: bool = True
     steps: int = 100_000
@@ -212,6 +215,11 @@ class TrainPipelineConfig(HubMixin):
             self.reward_model.pretrained_path = str(policy_dir)
 
     def validate(self) -> None:
+        if self.gradient_accumulation_steps < 1:
+            raise ValueError(
+                f"gradient_accumulation_steps must be >= 1, got {self.gradient_accumulation_steps}."
+            )
+
         self._resolve_pretrained_from_cli()
 
         if self.policy is None and self.reward_model is None:

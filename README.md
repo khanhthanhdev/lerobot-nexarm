@@ -394,6 +394,7 @@ uv run lerobot-train \
   --dataset.repo_id=local/nexarm_pick \
   --policy.type=act \
   --policy.device=cuda \
+  --policy.push_to_hub=false \
   --output_dir=outputs/train/nexarm_act \
   --job_name=nexarm_act \
   --batch_size=32 \
@@ -421,7 +422,7 @@ Deploy the trained policy on the physical robot. The follower arm executes actio
 uv run python examples/nexarm/rollout.py \
   --follower-port /dev/ttyUSB1 \
   --policy-path outputs/train/nexarm_act/checkpoints/last/pretrained_model \
-  --front-cam 0 --wrist-cam 1 --strategy sentry
+  --front-cam 0 --wrist-cam 1 --strategy base
 ```
 
 ---

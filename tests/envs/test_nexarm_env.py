@@ -158,9 +158,44 @@ def test_nexarm_env_lerobot_factory():
     assert "agent_pos" in obs
     assert obs["agent_pos"].shape == (1, 6)
 
-    action = np.zeros((1, 6), dtype=np.float32)
-    next_obs, reward, term, trunc, step_info = vec_env.step(action)
-    assert "agent_pos" in next_obs
-    assert len(reward) == 1
-
     vec_env.close()
+
+
+def test_nexarm_env_control_modes():
+    from lerobot.motors.nexarm.nexarm import JOINT_NAMES
+    from lerobot.robots.nexarm_sim.mujoco_backend import RAW_RANGES
+
+    # 1. Raw mode (default)
+    env_raw = gym.make("NexArmPickPlace-v0", obs_type="state", control_mode="raw")
+    for i, name in enumerate(JOINT_NAMES):
+        low, high = RAW_RANGES[name]
+        assert env_raw.action_space.low[i] == float(low)
+        assert env_raw.action_space.high[i] == float(high)
+
+    obs_raw, _ = env_raw.reset(seed=42)
+    # Raw agent_pos should be in raw servo units (> 1.0, e.g. around 2048)
+    assert np.all(obs_raw["agent_pos"] >= 0.0)
+    assert np.any(obs_raw["agent_pos"] > 1.0)
+
+    # Step with raw home action (2048)
+    home_action = np.array([2048.0] * 6, dtype=np.float32)
+    next_obs_raw, _, _, _, _ = env_raw.step(home_action)
+    assert np.all(next_obs_raw["agent_pos"] >= 0.0)
+    assert np.any(next_obs_raw["agent_pos"] > 1.0)
+    env_raw.close()
+
+    # 2. Normalized mode
+    env_norm = gym.make("NexArmPickPlace-v0", obs_type="state", control_mode="normalized")
+    assert np.all(env_norm.action_space.low == -1.0)
+    assert np.all(env_norm.action_space.high == 1.0)
+
+    obs_norm, _ = env_norm.reset(seed=42)
+    assert np.all(obs_norm["agent_pos"] >= -1.0)
+    assert np.all(obs_norm["agent_pos"] <= 1.0)
+
+    # Step with 0.0 (normalized center)
+    zero_action = np.zeros(6, dtype=np.float32)
+    next_obs_norm, _, _, _, _ = env_norm.step(zero_action)
+    assert np.all(next_obs_norm["agent_pos"] >= -1.0)
+    assert np.all(next_obs_norm["agent_pos"] <= 1.0)
+    env_norm.close()

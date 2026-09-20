@@ -37,10 +37,12 @@ def main() -> None:
 
     print(f"Initial Info: {info}")
 
-    print("\nExecuting 10 steps with small exploratory actions...")
+    print("\nExecuting 10 steps with small exploratory actions around initial pose...")
     for step_idx in range(1, 11):
-        # Sample small continuous action around zero
-        action = np.random.uniform(-0.1, 0.1, size=env.action_space.shape).astype(np.float32)
+        # Sample small continuous action around current agent position
+        action = obs["agent_pos"] + np.random.uniform(-15.0, 15.0, size=env.action_space.shape).astype(
+            np.float32
+        )
         obs, reward, terminated, truncated, info = env.step(action)
         print(
             f"  Step {step_idx:02d}: reward={reward:.4f}, "

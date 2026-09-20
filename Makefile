@@ -16,10 +16,9 @@
 
 PYTHON_PATH := $(shell which python)
 
-# If uv is installed and a virtual environment exists, use it
-UV_CHECK := $(shell command -v uv)
-ifneq ($(UV_CHECK),)
-	PYTHON_PATH := $(shell .venv/bin/python)
+# If a virtual environment exists, use it
+ifneq ($(wildcard .venv/bin/python),)
+	PYTHON_PATH := $(abspath .venv/bin/python)
 endif
 
 export PATH := $(dir $(PYTHON_PATH)):$(PATH)
@@ -42,6 +41,10 @@ test-end-to-end:
 	${MAKE} DEVICE=$(DEVICE) test-tdmpc-ete-eval
 	${MAKE} DEVICE=$(DEVICE) test-smolvla-ete-train
 	${MAKE} DEVICE=$(DEVICE) test-smolvla-ete-eval
+	${MAKE} DEVICE=$(DEVICE) test-nexarm-ete
+
+test-nexarm-ete:
+	uv run pytest tests/envs/test_nexarm_sim_gym_integration.py -svv
 
 test-act-ete-train:
 	lerobot-train \

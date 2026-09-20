@@ -58,6 +58,7 @@ class NexArmPickPlaceEnv(gym.Env):
         reward_type: Literal["dense", "sparse"] = "dense",
         target_radius_m: float = 0.05,
         success_hold_s: float = 0.5,
+        control_mode: Literal["raw", "normalized"] = "raw",
     ) -> None:
         super().__init__()
         self.obs_type = obs_type
@@ -69,6 +70,7 @@ class NexArmPickPlaceEnv(gym.Env):
         self.reward_type = reward_type
         self.target_radius_m = target_radius_m
         self.success_hold_s = success_hold_s
+        self.control_mode = control_mode
 
         if model_path is not None:
             resolved_path = resolve_model_path(Path(model_path))
@@ -92,22 +94,39 @@ class NexArmPickPlaceEnv(gym.Env):
             timeout_s=float(self.max_episode_steps) / float(self.fps),
         )
 
-        # Action Space: 6 continuous normalized actions in [-1.0, 1.0]
-        # [shoulder_pan, shoulder_lift, elbow_flex, wrist_flex, wrist_roll, gripper]
-        self.action_space = spaces.Box(
-            low=-1.0,
-            high=1.0,
-            shape=(6,),
-            dtype=np.float32,
-        )
-
-        # Observation Space
-        agent_pos_space = spaces.Box(
-            low=-1.0,
-            high=1.0,
-            shape=(6,),
-            dtype=np.float32,
-        )
+        # Action Space & Observation Space bounds
+        if self.control_mode == "raw":
+            raw_low = np.array([RAW_RANGES[name][0] for name in JOINT_NAMES], dtype=np.float32)
+            raw_high = np.array([RAW_RANGES[name][1] for name in JOINT_NAMES], dtype=np.float32)
+            self.action_space = spaces.Box(
+                low=raw_low,
+                high=raw_high,
+                shape=(6,),
+                dtype=np.float32,
+            )
+            agent_pos_space = spaces.Box(
+                low=raw_low,
+                high=raw_high,
+                shape=(6,),
+                dtype=np.float32,
+            )
+        elif self.control_mode == "normalized":
+            self.action_space = spaces.Box(
+                low=-1.0,
+                high=1.0,
+                shape=(6,),
+                dtype=np.float32,
+            )
+            agent_pos_space = spaces.Box(
+                low=-1.0,
+                high=1.0,
+                shape=(6,),
+                dtype=np.float32,
+            )
+        else:
+            raise ValueError(
+                f"Unsupported control_mode: '{self.control_mode}'. Expected 'raw' or 'normalized'."
+            )
         front_img_space = spaces.Box(
             low=0,
             high=255,
@@ -125,6 +144,12 @@ class NexArmPickPlaceEnv(gym.Env):
             self.observation_space = spaces.Dict(
                 {
                     "agent_pos": agent_pos_space,
+                    "pixels": spaces.Dict(
+                        {
+                            "front": front_img_space,
+                            "wrist": wrist_img_space,
+                        }
+                    ),
                     "pixels/front": front_img_space,
                     "pixels/wrist": wrist_img_space,
                 }
@@ -132,6 +157,12 @@ class NexArmPickPlaceEnv(gym.Env):
         elif self.obs_type == "pixels":
             self.observation_space = spaces.Dict(
                 {
+                    "pixels": spaces.Dict(
+                        {
+                            "front": front_img_space,
+                            "wrist": wrist_img_space,
+                        }
+                    ),
                     "pixels/front": front_img_space,
                     "pixels/wrist": wrist_img_space,
                 }
@@ -156,8 +187,11 @@ class NexArmPickPlaceEnv(gym.Env):
         self._viewer: Any | None = None
 
     def _get_agent_pos(self) -> np.ndarray:
-        """Returns normalized joint positions in [-1.0, 1.0]."""
+        """Returns joint positions (raw [0, 4095] or normalized [-1.0, 1.0])."""
         raw_positions = self.backend.joint_positions()
+        if self.control_mode == "raw":
+            return np.array([raw_positions[f"{name}.pos"] for name in JOINT_NAMES], dtype=np.float32)
+
         normalized = np.zeros(6, dtype=np.float32)
         for i, name in enumerate(JOINT_NAMES):
             raw = raw_positions[f"{name}.pos"]
@@ -167,14 +201,17 @@ class NexArmPickPlaceEnv(gym.Env):
             normalized[i] = float(np.clip(val, -1.0, 1.0))
         return normalized
 
-    def _get_obs(self) -> dict[str, np.ndarray]:
-        obs: dict[str, np.ndarray] = {}
+    def _get_obs(self) -> dict[str, Any]:
+        obs: dict[str, Any] = {}
         if self.obs_type in ("pixels_agent_pos", "state"):
             obs["agent_pos"] = self._get_agent_pos()
 
         if self.obs_type in ("pixels_agent_pos", "pixels"):
-            obs["pixels/front"] = self.backend.render("front")
-            obs["pixels/wrist"] = self.backend.render("wrist")
+            front_img = self.backend.render("front")
+            wrist_img = self.backend.render("wrist")
+            obs["pixels"] = {"front": front_img, "wrist": wrist_img}
+            obs["pixels/front"] = front_img
+            obs["pixels/wrist"] = wrist_img
 
         if self.obs_type == "state":
             cube_pos = self.task.cube_position
@@ -185,14 +222,20 @@ class NexArmPickPlaceEnv(gym.Env):
         return obs
 
     def _action_to_raw(self, action: np.ndarray) -> dict[str, float]:
-        """Converts normalized [-1.0, 1.0] action to raw actuator targets."""
-        action = np.clip(action, -1.0, 1.0)
+        """Converts action to raw actuator targets."""
         raw_targets: dict[str, float] = {}
-        for i, name in enumerate(JOINT_NAMES):
-            low, high = RAW_RANGES[name]
-            norm_val = float(action[i])
-            raw_val = low + 0.5 * (norm_val + 1.0) * (high - low)
-            raw_targets[f"{name}.pos"] = float(np.clip(raw_val, low, high))
+        if self.control_mode == "raw":
+            for i, name in enumerate(JOINT_NAMES):
+                low, high = RAW_RANGES[name]
+                raw_val = float(action[i])
+                raw_targets[f"{name}.pos"] = float(np.clip(raw_val, low, high))
+        else:
+            action = np.clip(action, -1.0, 1.0)
+            for i, name in enumerate(JOINT_NAMES):
+                low, high = RAW_RANGES[name]
+                norm_val = float(action[i])
+                raw_val = low + 0.5 * (norm_val + 1.0) * (high - low)
+                raw_targets[f"{name}.pos"] = float(np.clip(raw_val, low, high))
         return raw_targets
 
     def _compute_reward(self, status: Any) -> float:
