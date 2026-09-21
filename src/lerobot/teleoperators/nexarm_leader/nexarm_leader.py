@@ -96,6 +96,14 @@ class NexArmLeader(Teleoperator):
     def get_action(self) -> dict[str, float]:
         leader_pos = self.bus.read_positions()
         follower_pos = map_leader_to_follower(leader_pos)
+        if self.calibration:
+            for i, name in enumerate(JOINT_NAMES):
+                if name in self.calibration:
+                    cal = self.calibration[name]
+                    if cal.drive_mode == 1:
+                        follower_pos[i] = 4096 - follower_pos[i]
+                    offset = cal.homing_offset - 2048
+                    follower_pos[i] = max(POSITION_MIN, min(POSITION_MAX, follower_pos[i] + offset))
         return {f"{name}.pos": float(follower_pos[i]) for i, name in enumerate(JOINT_NAMES)}
 
     @check_if_not_connected

@@ -613,9 +613,9 @@ def run(_context: str):
         {
             "name": "wrist",
             "mode": "fixed",
-            "pos": "0.539 0.015 0.295",
-            "xyaxes": "0 -0.485643 0.874157 1 0 0",
-            "fovy": "70",
+            "pos": "0.53937 -0.022 0.279",
+            "xyaxes": "-1 0 0 0 -0.656059 0.754710",
+            "fovy": "92.2",
         },
     )
     ET.SubElement(
@@ -623,7 +623,7 @@ def run(_context: str):
         "site",
         {
             "name": "gripper_frame",
-            "pos": "0.53937 -0.057 0.23044",
+            "pos": "0.539 -0.09 0.230",
             "size": "0.005",
             "rgba": "0.1 0.8 0.1 1",
         },

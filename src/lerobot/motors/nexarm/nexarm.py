@@ -151,6 +151,8 @@ class NexArmMotorsBus:
             baudrate=self.baudrate,
             timeout=self.timeout,
             write_timeout=self.timeout,
+            dsrdtr=True,
+            rtscts=True,
         )
         time.sleep(0.1)
         self._serial.reset_input_buffer()
