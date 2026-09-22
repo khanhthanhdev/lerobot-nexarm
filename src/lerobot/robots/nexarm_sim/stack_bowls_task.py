@@ -6,13 +6,11 @@ from __future__ import annotations
 
 import itertools
 from dataclasses import dataclass
-from typing import Sequence
 
 import mujoco
 import numpy as np
 
 from .mujoco_backend import NexArmMujocoBackend
-
 
 COLORS = ("red", "blue", "black")
 PERMUTATIONS: list[tuple[str, str, str]] = list(itertools.permutations(COLORS))
@@ -65,18 +63,10 @@ class NexArmStackBowlsTask:
         self.timeout_s = timeout_s
 
         # Cache IDs
-        self._body_ids = {
-            c: self._required_id(mujoco.mjtObj.mjOBJ_BODY, f"bowl_{c}") for c in COLORS
-        }
-        self._joint_ids = {
-            c: self._required_id(mujoco.mjtObj.mjOBJ_JOINT, f"bowl_{c}_joint") for c in COLORS
-        }
-        self._left_jaw_geom_id = self._required_id(
-            mujoco.mjtObj.mjOBJ_GEOM, "link_6_left_jaw_collision_0"
-        )
-        self._right_jaw_geom_id = self._required_id(
-            mujoco.mjtObj.mjOBJ_GEOM, "link_6_right_jaw_collision_0"
-        )
+        self._body_ids = {c: self._required_id(mujoco.mjtObj.mjOBJ_BODY, f"bowl_{c}") for c in COLORS}
+        self._joint_ids = {c: self._required_id(mujoco.mjtObj.mjOBJ_JOINT, f"bowl_{c}_joint") for c in COLORS}
+        self._left_jaw_geom_id = self._required_id(mujoco.mjtObj.mjOBJ_GEOM, "link_6_left_jaw_collision_0")
+        self._right_jaw_geom_id = self._required_id(mujoco.mjtObj.mjOBJ_GEOM, "link_6_right_jaw_collision_0")
 
         self.current_order: tuple[str, str, str] = PERMUTATIONS[0]
         self._start_time: float = 0.0
@@ -151,8 +141,10 @@ class NexArmStackBowlsTask:
         for i in range(self.backend.data.ncon):
             con = self.backend.data.contact[i]
             g1, g2 = con.geom1, con.geom2
-            is_jaw = g1 in (self._left_jaw_geom_id, self._right_jaw_geom_id) or \
-                     g2 in (self._left_jaw_geom_id, self._right_jaw_geom_id)
+            is_jaw = g1 in (self._left_jaw_geom_id, self._right_jaw_geom_id) or g2 in (
+                self._left_jaw_geom_id,
+                self._right_jaw_geom_id,
+            )
             if is_jaw:
                 return False
         return True

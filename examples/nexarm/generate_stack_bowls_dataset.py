@@ -110,7 +110,6 @@ def generate_episode(
         (nest_m_pos + grasp_offset, CLOSED_GRIPPER, 25),
         (nest_m_pos + grasp_offset, OPEN_GRIPPER, 30),
         (nest_m_pos + grasp_offset + [0.0, 0.0, 0.12], OPEN_GRIPPER, 20),
-
         # --- Phase 2: Stack Top onto Middle ---
         (pos_t + grasp_offset + [0.0, 0.0, 0.12], OPEN_GRIPPER, 25),
         (pos_t + grasp_offset, OPEN_GRIPPER, 18),
@@ -219,26 +218,32 @@ def main() -> int:
     try:
         while accepted < args.episodes and attempts < args.max_attempts:
             seed = args.seed_start + attempts
-            current_prompt = ""
 
-            def record_frame(observation: dict[str, object], action: dict[str, float]) -> None:
+            task.reset(seed=seed, settle_steps=25)
+            bottom, middle, top = task.current_order
+            current_prompt = get_task_instruction(bottom, middle, top)
+
+            def record_frame(
+                observation: dict[str, object],
+                action: dict[str, float],
+                prompt: str = current_prompt,
+            ) -> None:
                 observation_frame = build_dataset_frame(dataset.features, observation, prefix=OBS_STR)
                 action_frame = build_dataset_frame(dataset.features, action, prefix=ACTION)
-                dataset.add_frame({**observation_frame, **action_frame, "task": current_prompt})
+                dataset.add_frame({**observation_frame, **action_frame, "task": prompt})
 
-            success, reason, prompt = generate_episode(
+            success, reason, _ = generate_episode(
                 robot,
                 task,
                 seed=seed,
                 record_frame=record_frame,
             )
-            current_prompt = prompt
             attempts += 1
 
             if success:
                 dataset.save_episode()
                 accepted += 1
-                print(f"Accepted episode {accepted}/{args.episodes} (seed={seed}, prompt='{prompt}')")
+                print(f"Accepted episode {accepted}/{args.episodes} (seed={seed}, prompt='{current_prompt}')")
             else:
                 dataset.clear_episode_buffer()
                 print(f"Rejected attempt {attempts} (seed={seed}, reason='{reason}')")

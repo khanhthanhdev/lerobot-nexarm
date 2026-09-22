@@ -18,10 +18,10 @@ from .config_nexarm_sim import NexArmSimConfig
 from .nexarm_sim import NexArmSim
 from .pick_place_task import NexArmPickPlaceStatus, NexArmPickPlaceTask
 from .stack_bowls_task import (
+    PERMUTATIONS,
     NexArmStackBowlsStatus,
     NexArmStackBowlsTask,
     get_task_instruction,
-    PERMUTATIONS,
 )
 
 __all__ = [

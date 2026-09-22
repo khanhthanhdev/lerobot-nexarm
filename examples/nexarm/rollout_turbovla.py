@@ -25,9 +25,7 @@ import os
 import sys
 import time
 from pathlib import Path
-from typing import Mapping
 
-import cv2
 import numpy as np
 import torch
 from PIL import Image
@@ -40,12 +38,30 @@ from lerobot.utils.robot_utils import precise_sleep
 def parse_args():
     parser = argparse.ArgumentParser(description="Run TurboVLA policy on NexArm")
     parser.add_argument("--robot", choices=["sim", "real"], default="sim", help="Robot backend")
-    parser.add_argument("--checkpoint", required=True, type=Path, help="Path to TurboVLA model checkpoint (.pt or .safetensors)")
-    parser.add_argument("--stats-path", type=Path, default=None, help="Path to stats_gr00t.json for unnormalization")
-    parser.add_argument("--turbovla-repo", type=Path, default=Path("/home/25thanh.tk/TurboVLA"), help="Path to TurboVLA repository")
-    parser.add_argument("--task", default="Pick up the red cube, place it in the green target zone, and release it.", help="Language prompt")
+    parser.add_argument(
+        "--checkpoint",
+        required=True,
+        type=Path,
+        help="Path to TurboVLA model checkpoint (.pt or .safetensors)",
+    )
+    parser.add_argument(
+        "--stats-path", type=Path, default=None, help="Path to stats_gr00t.json for unnormalization"
+    )
+    parser.add_argument(
+        "--turbovla-repo",
+        type=Path,
+        default=Path("/home/25thanh.tk/TurboVLA"),
+        help="Path to TurboVLA repository",
+    )
+    parser.add_argument(
+        "--task",
+        default="Pick up the red cube, place it in the green target zone, and release it.",
+        help="Language prompt",
+    )
     parser.add_argument("--fps", type=int, default=30, help="Control loop frequency")
-    parser.add_argument("--open-loop-steps", type=int, default=8, help="Number of steps to execute before re-inferring chunk")
+    parser.add_argument(
+        "--open-loop-steps", type=int, default=8, help="Number of steps to execute before re-inferring chunk"
+    )
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
 
     # Real hardware args
@@ -61,13 +77,15 @@ def parse_args():
 
 
 class TurboVLAPolicyRunner:
-    def __init__(self, checkpoint_path: Path, turbovla_repo: Path, stats_path: Path | None, device: str = "cuda"):
+    def __init__(
+        self, checkpoint_path: Path, turbovla_repo: Path, stats_path: Path | None, device: str = "cuda"
+    ):
         self.device = torch.device(device)
         sys.path.insert(0, str(turbovla_repo))
         sys.path.insert(0, str(turbovla_repo / "third_party" / "starvla_runtime"))
 
-        from turbovla.models import TurboVLAConfig, build_turbovla
         from transformers import AutoImageProcessor
+        from turbovla.models import TurboVLAConfig, build_turbovla
 
         # Default TurboVLA config for NexArm
         config = TurboVLAConfig()
@@ -84,9 +102,10 @@ class TurboVLAPolicyRunner:
         print(f"[INFO] Loading checkpoint from {checkpoint_path}...")
         if checkpoint_path.suffix == ".safetensors":
             from safetensors.torch import load_file
+
             state_dict = load_file(checkpoint_path)
         else:
-            state_dict = torch.load(checkpoint_path, map_location="cpu")
+            state_dict = torch.load(checkpoint_path, map_location="cpu")  # nosec B614
             if isinstance(state_dict, dict) and "model" in state_dict:
                 state_dict = state_dict["model"]
 
@@ -100,14 +119,18 @@ class TurboVLAPolicyRunner:
         self.model.eval()
 
         # Image processor
-        dino_cache = Path(os.path.expanduser("~/.cache/huggingface/hub/models--facebook--dinov3-vitb16-pretrain-lvd1689m/snapshots/3a0fa61ff39414e2d3be4a1d50c7dfbf459aa8b8"))
+        dino_cache = Path(
+            os.path.expanduser(
+                "~/.cache/huggingface/hub/models--facebook--dinov3-vitb16-pretrain-lvd1689m/snapshots/3a0fa61ff39414e2d3be4a1d50c7dfbf459aa8b8"
+            )
+        )
         dino_path = str(dino_cache) if dino_cache.exists() else "facebook/dinov3-vitb16-pretrain-lvd1689m"
         self.image_processor = AutoImageProcessor.from_pretrained(dino_path)
 
         # Normalization stats
         self.stats = None
         if stats_path and stats_path.is_file():
-            with open(stats_path, "r") as f:
+            with open(stats_path) as f:
                 self.stats = json.load(f)
             print(f"[INFO] Loaded normalization stats from {stats_path}")
 
@@ -127,7 +150,9 @@ class TurboVLAPolicyRunner:
         return state
 
     @torch.no_grad()
-    def predict_chunk(self, front_img: np.ndarray, wrist_img: np.ndarray, state_vector: np.ndarray, task: str) -> np.ndarray:
+    def predict_chunk(
+        self, front_img: np.ndarray, wrist_img: np.ndarray, state_vector: np.ndarray, task: str
+    ) -> np.ndarray:
         # Preprocess images
         img_front = Image.fromarray(front_img).resize((224, 224))
         img_wrist = Image.fromarray(wrist_img).resize((224, 224))
@@ -145,8 +170,9 @@ class TurboVLAPolicyRunner:
 
 
 def run_sim(args, runner: TurboVLAPolicyRunner):
-    from lerobot.robots.nexarm_sim import NexArmPickPlaceTask, NexArmSim, NexArmSimConfig
     import mujoco.viewer
+
+    from lerobot.robots.nexarm_sim import NexArmPickPlaceTask, NexArmSim, NexArmSimConfig
 
     config = NexArmSimConfig(
         id="turbovla_rollout",
@@ -193,8 +219,8 @@ def run_sim(args, runner: TurboVLAPolicyRunner):
 
 
 def run_real(args, runner: TurboVLAPolicyRunner):
-    from lerobot.robots.nexarm_follower import NexArmFollower, NexArmFollowerConfig
     from lerobot.cameras.opencv import OpenCVCameraConfig
+    from lerobot.robots.nexarm_follower import NexArmFollower, NexArmFollowerConfig
 
     cameras = {
         "front": OpenCVCameraConfig(index_or_path=args.front_cam, width=640, height=480, fps=args.fps),
