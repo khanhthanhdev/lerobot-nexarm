@@ -96,8 +96,8 @@ class NexArmPickPlaceEnv(gym.Env):
 
         # Action Space & Observation Space bounds
         if self.control_mode == "raw":
-            raw_low = np.array([RAW_RANGES[name][0] for name in JOINT_NAMES], dtype=np.float32)
-            raw_high = np.array([RAW_RANGES[name][1] for name in JOINT_NAMES], dtype=np.float32)
+            raw_low = np.array([min(RAW_RANGES[name]) for name in JOINT_NAMES], dtype=np.float32)
+            raw_high = np.array([max(RAW_RANGES[name]) for name in JOINT_NAMES], dtype=np.float32)
             self.action_space = spaces.Box(
                 low=raw_low,
                 high=raw_high,
@@ -227,15 +227,17 @@ class NexArmPickPlaceEnv(gym.Env):
         if self.control_mode == "raw":
             for i, name in enumerate(JOINT_NAMES):
                 low, high = RAW_RANGES[name]
+                raw_min, raw_max = min(low, high), max(low, high)
                 raw_val = float(action[i])
-                raw_targets[f"{name}.pos"] = float(np.clip(raw_val, low, high))
+                raw_targets[f"{name}.pos"] = float(np.clip(raw_val, raw_min, raw_max))
         else:
             action = np.clip(action, -1.0, 1.0)
             for i, name in enumerate(JOINT_NAMES):
                 low, high = RAW_RANGES[name]
+                raw_min, raw_max = min(low, high), max(low, high)
                 norm_val = float(action[i])
                 raw_val = low + 0.5 * (norm_val + 1.0) * (high - low)
-                raw_targets[f"{name}.pos"] = float(np.clip(raw_val, low, high))
+                raw_targets[f"{name}.pos"] = float(np.clip(raw_val, raw_min, raw_max))
         return raw_targets
 
     def _compute_reward(self, status: Any) -> float:

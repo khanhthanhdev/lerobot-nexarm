@@ -257,7 +257,7 @@ def check_joint_limits_and_axes(xml_path: Path) -> str:
         "joint_3_link_2_to_link_3": (-2.356194, 2.356194),  # 270° (+-135°)
         "joint_4_link_3_to_link_4": (-1.745329, 1.745329),  # 200° (+-100°)
         "joint_5_link_4_to_link_5": (-3.141593, 3.141593),  # 360° (+-180°)
-        "right_jaw_slide_joint": (-0.0255, 0.0),  # 51mm total aperture (stroke 25.5mm)
+        "right_jaw_slide_joint": (0.0, 0.0255),  # 51mm total aperture (stroke 25.5mm)
     }
 
     for j_name, (exp_low, exp_high) in expected_ranges.items():

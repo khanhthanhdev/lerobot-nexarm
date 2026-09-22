@@ -145,7 +145,10 @@ class NexArmMujocoBackend:
         raw_low, raw_high = RAW_RANGES[feature_name]
         raw_position = float(np.clip(raw_position, raw_low, raw_high))
         control_low, control_high = self._control_range(feature_name)
-        ratio = (raw_position - raw_low) / (raw_high - raw_low)
+        if feature_name == "gripper":
+            ratio = (raw_high - raw_position) / (raw_high - raw_low)
+        else:
+            ratio = (raw_position - raw_low) / (raw_high - raw_low)
         return control_low + ratio * (control_high - control_low)
 
     def control_to_raw(self, feature_name: str, control_position: float) -> float:
@@ -153,6 +156,8 @@ class NexArmMujocoBackend:
         control_position = float(np.clip(control_position, control_low, control_high))
         raw_low, raw_high = RAW_RANGES[feature_name]
         ratio = (control_position - control_low) / (control_high - control_low)
+        if feature_name == "gripper":
+            return raw_high - ratio * (raw_high - raw_low)
         return raw_low + ratio * (raw_high - raw_low)
 
     def randomize_domain(self, rng: np.random.Generator | None = None) -> None:

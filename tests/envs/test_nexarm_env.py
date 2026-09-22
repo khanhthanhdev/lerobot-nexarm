@@ -169,8 +169,8 @@ def test_nexarm_env_control_modes():
     env_raw = gym.make("NexArmPickPlace-v0", obs_type="state", control_mode="raw")
     for i, name in enumerate(JOINT_NAMES):
         low, high = RAW_RANGES[name]
-        assert env_raw.action_space.low[i] == float(low)
-        assert env_raw.action_space.high[i] == float(high)
+        assert env_raw.action_space.low[i] == float(min(low, high))
+        assert env_raw.action_space.high[i] == float(max(low, high))
 
     obs_raw, _ = env_raw.reset(seed=42)
     # Raw agent_pos should be in raw servo units (> 1.0, e.g. around 2048)

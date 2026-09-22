@@ -24,15 +24,15 @@ BODY_SPECS = {
     "link_4": ("link_4:1", "link_4.stl"),
     "link_5": ("link_5:1", "link_5.stl"),
     "link_6_gripper_base": (
-        "gripper_base:1",
+        "link_6:1+gripper_base:1",
         "link_6_gripper_base.stl",
     ),
     "link_6_pinion_gear": (
-        "pinion_gear:1",
+        "link_6:1+pinion_gear:1",
         "link_6_pinion_gear.stl",
     ),
-    "link_6_left_jaw": ("left_jaw:1", "link_6_left_jaw.stl"),
-    "link_6_right_jaw": ("right_jaw:1", "link_6_right_jaw.stl"),
+    "link_6_left_jaw": ("link_6:1+left_jaw:1", "link_6_left_jaw.stl"),
+    "link_6_right_jaw": ("link_6:1+right_jaw:1", "link_6_right_jaw.stl"),
     "cam_mount": ("cam_mount:1", "cam_mount.stl"),
 }
 
@@ -177,8 +177,8 @@ COLLISION_SPECS = {
     "link_6_left_jaw": [
         {
             "type": "box",
-            "pos": "0.50559 -0.057 0.23044",
-            "size": "0.027 0.010 0.015",
+            "pos": "0.52715 -0.057 0.23044",
+            "size": "0.0122 0.010 0.015",
             "friction": "3 0.01 0.001",
             "condim": "4",
         },
@@ -186,8 +186,8 @@ COLLISION_SPECS = {
     "link_6_right_jaw": [
         {
             "type": "box",
-            "pos": "0.57314 -0.057 0.23044",
-            "size": "0.027 0.010 0.015",
+            "pos": "0.55159 -0.057 0.23044",
+            "size": "0.0122 0.010 0.015",
             "friction": "3 0.01 0.001",
             "condim": "4",
         },
@@ -202,6 +202,7 @@ EXCLUDED_CONTACTS = [
     ("link_4", "link_5"),
     ("link_4", "cam_mount"),
     ("link_5", "cam_mount"),
+    ("link_6_gripper_base", "cam_mount"),
     ("link_5", "link_6_gripper_base"),
     ("link_6_gripper_base", "link_6_pinion_gear"),
     ("link_6_gripper_base", "link_6_left_jaw"),
@@ -218,12 +219,20 @@ def _point_m(point: adsk.core.Point3D) -> list[float]:
     return [point.x * 0.01, point.y * 0.01, point.z * 0.01]
 
 
-def _inertial_attributes(occurrence: adsk.fusion.Occurrence) -> dict[str, Any]:
+def _inertial_attributes(
+    occurrence: adsk.fusion.Occurrence,
+    t_inv: adsk.core.Matrix3D,
+    r_mat: list[list[float]],
+    r_mat_inv: list[list[float]],
+) -> dict[str, Any]:
     properties = occurrence.physicalProperties
     mass = properties.mass
-    center = properties.centerOfMass
-    x, y, z = center.x, center.y, center.z
+    center = properties.centerOfMass.copy()
+    center.transformBy(t_inv)
+    com = [center.x * 0.01, center.y * 0.01, center.z * 0.01]
 
+    # World coordinate values
+    x, y, z = properties.centerOfMass.x, properties.centerOfMass.y, properties.centerOfMass.z
     (
         succeeded,
         ixx_origin,
@@ -244,10 +253,26 @@ def _inertial_attributes(occurrence: adsk.fusion.Occurrence) -> dict[str, Any]:
     ixz = (ixz_origin + mass * x * z) * 1e-4
     iyz = (iyz_origin + mass * y * z) * 1e-4
 
+    # Rotate inertia tensor into component coordinate frame: I_comp = R_inv @ I_world @ R
+    i_world = [
+        [ixx, -ixy, -ixz],
+        [-ixy, iyy, -iyz],
+        [-ixz, -iyz, izz],
+    ]
+    a_mat = [[sum(r_mat_inv[i][k] * i_world[k][j] for k in range(3)) for j in range(3)] for i in range(3)]
+    i_comp = [[sum(a_mat[i][k] * r_mat[k][j] for k in range(3)) for j in range(3)] for i in range(3)]
+
+    c_ixx = max(1e-9, i_comp[0][0])
+    c_iyy = max(1e-9, i_comp[1][1])
+    c_izz = max(1e-9, i_comp[2][2])
+    c_ixy = -i_comp[0][1]
+    c_ixz = -i_comp[0][2]
+    c_iyz = -i_comp[1][2]
+
     return {
         "mass": mass,
-        "com": [x * 0.01, y * 0.01, z * 0.01],
-        "inertia": (ixx, iyy, izz, ixy, ixz, iyz),
+        "com": com,
+        "inertia": (c_ixx, c_iyy, c_izz, c_ixy, c_ixz, c_iyz),
     }
 
 
@@ -393,7 +418,8 @@ def run(_context: str):
     os.makedirs(ASSETS_DIR, exist_ok=True)
 
     # 1. Map occurrences
-    all_occs = {occ.name: occ for occ in root.allOccurrences}
+    all_occs = {occ.fullPathName: occ for occ in root.allOccurrences}
+    all_occs.update({occ.name: occ for occ in root.allOccurrences})
 
     found_occs = {}
     for body_name, (needle, _filename) in BODY_SPECS.items():
@@ -405,6 +431,23 @@ def run(_context: str):
         if not matched:
             raise RuntimeError(f"Could not find occurrence for {body_name} (needle: '{needle}')")
         found_occs[body_name] = matched
+
+    # Base occurrence transform and inverse to transform root world coordinates to component frame
+    base_occ = found_occs["base_link"]
+    t_base = base_occ.transform
+    t_inv = t_base.copy()
+    t_inv.invert()
+
+    r_mat = [
+        [t_base.getCell(0, 0), t_base.getCell(0, 1), t_base.getCell(0, 2)],
+        [t_base.getCell(1, 0), t_base.getCell(1, 1), t_base.getCell(1, 2)],
+        [t_base.getCell(2, 0), t_base.getCell(2, 1), t_base.getCell(2, 2)],
+    ]
+    r_mat_inv = [
+        [r_mat[0][0], r_mat[1][0], r_mat[2][0]],
+        [r_mat[0][1], r_mat[1][1], r_mat[2][1]],
+        [r_mat[0][2], r_mat[1][2], r_mat[2][2]],
+    ]
 
     # 2. Export STL meshes
     export_mgr = design.exportManager
@@ -433,8 +476,9 @@ def run(_context: str):
 
         exported_meshes.append(filename)
 
-    # 3. Resolve Joint Positions from Fusion 360 geometryTwoTransform
+    # 3. Resolve Joint Positions from Fusion 360 geometry transformed by t_inv
     all_joints = list(root.allJoints)
+    all_as_built = list(root.allAsBuiltJoints)
     resolved_joint_origins = {}
     for joint_id, jdef in JOINT_DEFS.items():
         matched_joint = None
@@ -444,12 +488,29 @@ def run(_context: str):
                 break
         if matched_joint:
             try:
-                t = matched_joint.geometryTwoTransform.translation
-                resolved_joint_origins[joint_id] = [t.x * 0.01, t.y * 0.01, t.z * 0.01]
-            except Exception:  # nosec B110
-                pass
+                pt = matched_joint.geometryOrOriginTwo.origin.copy()
+                pt.transformBy(t_inv)
+                resolved_joint_origins[joint_id] = [pt.x * 0.01, pt.y * 0.01, pt.z * 0.01]
+            except Exception:
+                try:
+                    t = matched_joint.geometryTwoTransform.translation.copy()
+                    t.transformBy(t_inv)
+                    resolved_joint_origins[joint_id] = [t.x * 0.01, t.y * 0.01, t.z * 0.01]
+                except Exception:  # nosec B110
+                    pass
 
-    # Standard fallback coordinates if direct modeling joints lack transform handles
+        if joint_id not in resolved_joint_origins:
+            for ab in all_as_built:
+                if ab.name in jdef["fusion_names"] and ab.geometry and hasattr(ab.geometry, "origin"):
+                    try:
+                        pt = ab.geometry.origin.copy()
+                        pt.transformBy(t_inv)
+                        resolved_joint_origins[joint_id] = [pt.x * 0.01, pt.y * 0.01, pt.z * 0.01]
+                        break
+                    except Exception:  # nosec B110
+                        pass
+
+    # Standard fallback coordinates in component frame
     default_origins = {
         "joint_1_base_to_link_1": [0.539369022999, 0.0639727628473, 0.049],
         "joint_2_link_1_to_link_2": [0.574469022999, 0.0639727628473, 0.106444648759],
@@ -463,14 +524,19 @@ def run(_context: str):
     for k, v in default_origins.items():
         if k not in resolved_joint_origins:
             resolved_joint_origins[k] = v
+        else:
+            # Validate against default origin: if CAD joint is extracted in a non-zero pose, fallback to calibrated zero-pose
+            dist = sum((resolved_joint_origins[k][i] - v[i]) ** 2 for i in range(3)) ** 0.5
+            if dist > 0.02:
+                resolved_joint_origins[k] = v
 
     model_origin_m = list(resolved_joint_origins["joint_1_base_to_link_1"])
     model_origin_m[2] = 0.0
 
-    # 4. Extract Physical Properties for all bodies
+    # 4. Extract Physical Properties for all bodies in component frame
     body_physics = {}
     for body_name, occ in found_occs.items():
-        body_physics[body_name] = _inertial_attributes(occ)
+        body_physics[body_name] = _inertial_attributes(occ, t_inv, r_mat, r_mat_inv)
 
     # 5. Generate MuJoCo MJCF
     mujoco = ET.Element("mujoco", {"model": "NexArm"})
@@ -593,8 +659,8 @@ def run(_context: str):
     _add_mjcf_body(b_grip, "link_6_left_jaw", "left_jaw_slide_joint")
     _add_mjcf_body(b_grip, "link_6_right_jaw", "right_jaw_slide_joint")
 
-    # Camera mount on link 4
-    b_cam = _add_mjcf_body(b_link4, "cam_mount")
+    # Camera mount on link 5 (rotates with wrist roll and gripper)
+    b_cam = _add_mjcf_body(b_link5, "cam_mount")
     ET.SubElement(
         b_cam,
         "camera",
@@ -611,7 +677,7 @@ def run(_context: str):
         "site",
         {
             "name": "gripper_frame",
-            "pos": "0.539 -0.09 0.230",
+            "pos": "0.53937 -0.062 0.2304",
             "size": "0.005",
             "rgba": "0.1 0.8 0.1 1",
         },
@@ -667,6 +733,10 @@ def run(_context: str):
     ET.indent(mujoco, space="  ")
     mjcf_path = os.path.join(OUTPUT_DIR, "NexArm-sim.xml")
     ET.ElementTree(mujoco).write(mjcf_path, encoding="utf-8", xml_declaration=True)
+    # Also write root sim/NexArm-sim.xml to maintain consistency
+    ET.ElementTree(mujoco).write(
+        os.path.join(WSL_BASE, "NexArm-sim.xml"), encoding="utf-8", xml_declaration=True
+    )
     _write_scene(OUTPUT_DIR, model_origin_m)
 
     desc_mjcf_dir = os.path.join(DESCRIPTION_DIR, "mjcf")
@@ -698,7 +768,7 @@ def run(_context: str):
         ("link_6_pinion_gear", "link_6_gripper_base", "gripper_pinion_joint"),
         ("link_6_left_jaw", "link_6_gripper_base", "left_jaw_slide_joint"),
         ("link_6_right_jaw", "link_6_gripper_base", "right_jaw_slide_joint"),
-        ("cam_mount", "link_4", "joint_4_to_cam_fixed"),
+        ("cam_mount", "link_5", "joint_5_to_cam_fixed"),
     ]
 
     link_frames = {
@@ -712,7 +782,7 @@ def run(_context: str):
         "link_6_pinion_gear": resolved_joint_origins["gripper_pinion_joint"],
         "link_6_left_jaw": resolved_joint_origins["left_jaw_slide_joint"],
         "link_6_right_jaw": resolved_joint_origins["right_jaw_slide_joint"],
-        "cam_mount": resolved_joint_origins["joint_4_link_3_to_link_4"],
+        "cam_mount": resolved_joint_origins["joint_5_link_4_to_link_5"],
     }
 
     for lname, pname, jname in urdf_chain:

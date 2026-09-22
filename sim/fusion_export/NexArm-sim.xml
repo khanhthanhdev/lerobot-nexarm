@@ -74,23 +74,23 @@
                     </body>
                     <body name="link_6_left_jaw" pos="0 0 0" quat="1 0 0 0">
                       <joint name="left_jaw_slide_joint" pos="0.539368648301 -0.0279461316442 0.230435863088" type="slide" axis="-1 0 0" limited="true" range="0 0.0255" class="gripper" />
-                      <geom name="link_6_left_jaw_visual" class="visual" mesh="link_6_left_jaw" />
-                      <inertial mass="0.047804" pos="0.504003187095 -0.0394122365348 0.229771944907" fullinertia="9.783824e-06 6.167412e-06 9.677004e-06 8.298524e-07 3.005779e-07 5.917606e-07" />
-                      <geom type="box" pos="0.50559 -0.057 0.23044" size="0.027 0.010 0.015" friction="3 0.01 0.001" condim="4" name="link_6_left_jaw_collision_0" class="collision" />
+                      <geom name="link_6_left_jaw_visual" class="visual" mesh="link_6_left_jaw" pos="0.0254 0 0" />
+                      <inertial mass="0.047804" pos="0.529403 -0.039412 0.229772" fullinertia="9.783824e-06 6.167412e-06 9.677004e-06 8.298524e-07 3.005779e-07 5.917606e-07" />
+                      <geom type="box" pos="0.53099 -0.057 0.23044" size="0.0084 0.010 0.015" friction="3 0.01 0.001" condim="4" name="link_6_left_jaw_collision_0" class="collision" />
                     </body>
                     <body name="link_6_right_jaw" pos="0 0 0" quat="1 0 0 0">
-                      <joint name="right_jaw_slide_joint" pos="0.539368644619 -0.0279461316442 0.230435863088" type="slide" axis="-1 0 0" limited="true" range="-0.0255 0" class="gripper" />
-                      <geom name="link_6_right_jaw_visual" class="visual" mesh="link_6_right_jaw" />
-                      <inertial mass="0.047804" pos="0.574734109829 -0.0394122993228 0.231095115243" fullinertia="9.784050e-06 6.167751e-06 9.676891e-06 -8.298810e-07 3.010660e-07 -5.901924e-07" />
-                      <geom type="box" pos="0.57314 -0.057 0.23044" size="0.027 0.010 0.015" friction="3 0.01 0.001" condim="4" name="link_6_right_jaw_collision_0" class="collision" />
+                      <joint name="right_jaw_slide_joint" pos="0.539368644619 -0.0279461316442 0.230435863088" type="slide" axis="1 0 0" limited="true" range="0 0.0255" class="gripper" />
+                      <geom name="link_6_right_jaw_visual" class="visual" mesh="link_6_right_jaw" pos="-0.0254 0 0" />
+                      <inertial mass="0.047804" pos="0.549334 -0.039412 0.231095" fullinertia="9.784050e-06 6.167751e-06 9.676891e-06 -8.298810e-07 3.010660e-07 -5.901924e-07" />
+                      <geom type="box" pos="0.54774 -0.057 0.23044" size="0.0084 0.010 0.015" friction="3 0.01 0.001" condim="4" name="link_6_right_jaw_collision_0" class="collision" />
                     </body>
                     <site name="gripper_frame" pos="0.539 -0.09 0.230" size="0.005" rgba="0.1 0.8 0.1 1" />
                   </body>
-                </body>
-                <body name="cam_mount" pos="0 0 0" quat="1 0 0 0">
-                  <geom name="cam_mount_visual" class="visual" mesh="cam_mount" />
-                  <inertial mass="0.055224" pos="0.538982070823 0.0126457006521 0.266653601469" fullinertia="6.239200e-06 2.853424e-05 2.885225e-05 -8.425189e-08 8.806271e-09 3.552898e-07" />
-                  <camera name="wrist" mode="fixed" pos="0.53937 -0.022 0.279" xyaxes="-1 0 0 0 -0.656059 0.754710" fovy="92.2" />
+                  <body name="cam_mount" pos="0 0 0" quat="1 0 0 0">
+                    <geom name="cam_mount_visual" class="visual" mesh="cam_mount" />
+                    <inertial mass="0.055224" pos="0.538982070823 0.0126457006521 0.266653601469" fullinertia="6.239200e-06 2.853424e-05 2.885225e-05 -8.425189e-08 8.806271e-09 3.552898e-07" />
+                    <camera name="wrist" mode="fixed" pos="0.53937 -0.022 0.279" xyaxes="-1 0 0 0 -0.656059 0.754710" fovy="92.2" />
+                  </body>
                 </body>
               </body>
             </body>
@@ -114,7 +114,7 @@
     <exclude name="link_6_left_jaw_to_link_6_right_jaw" body1="link_6_left_jaw" body2="link_6_right_jaw" />
   </contact>
   <equality>
-    <joint name="gripper_jaws_opposed_1_to_1" joint1="right_jaw_slide_joint" joint2="left_jaw_slide_joint" polycoef="0 -1 0 0 0" solref="0.002 1" solimp="0.99 0.999 0.0005 0.5 2" />
+    <joint name="gripper_jaws_opposed_1_to_1" joint1="right_jaw_slide_joint" joint2="left_jaw_slide_joint" polycoef="0 1 0 0 0" solref="0.002 1" solimp="0.99 0.999 0.0005 0.5 2" />
   </equality>
   <actuator>
     <position name="joint_1_base_to_link_1_control" class="nexarm" joint="joint_1_base_to_link_1" kp="40" kv="2.0" forcerange="-2.94 2.94" ctrllimited="true" ctrlrange="-2.35619449019 2.35619449019" />
@@ -122,6 +122,6 @@
     <position name="joint_3_link_2_to_link_3_control" class="nexarm" joint="joint_3_link_2_to_link_3" kp="40" kv="2.0" forcerange="-2.94 2.94" ctrllimited="true" ctrlrange="-2.35619449019 2.35619449019" />
     <position name="joint_4_link_3_to_link_4_control" class="nexarm" joint="joint_4_link_3_to_link_4" kp="35" kv="1.5" forcerange="-2.94 2.94" ctrllimited="true" ctrlrange="-1.74532925199 1.74532925199" />
     <position name="joint_5_link_4_to_link_5_control" class="nexarm" joint="joint_5_link_4_to_link_5" kp="20" kv="0.8" forcerange="-1.18 1.18" ctrllimited="true" ctrlrange="-3.14159265359 3.14159265359" />
-    <position name="gripper_control" class="gripper_actuator" joint="right_jaw_slide_joint" kp="300" kv="10.0" forcerange="-50.0 50.0" ctrllimited="true" ctrlrange="-0.0255 0" />
+    <position name="gripper_control" class="gripper_actuator" joint="right_jaw_slide_joint" kp="300" kv="10.0" forcerange="-50.0 50.0" ctrllimited="true" ctrlrange="0 0.0255" />
   </actuator>
 </mujoco>
