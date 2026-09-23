@@ -410,6 +410,29 @@ uv run lerobot-train \
 
 _Note_: If VRAM is limited (< 8 GB), reduce `--batch_size=16` or `--batch_size=8`.
 
+### 4.4b Train TurboVLA (Vision-Language-Action Policy)
+
+Train the real-time 32 Hz Vision-Language-Action model (DINOv3 visual backbone + BERT language encoder + ACT head) on NexArm:
+
+```bash
+# 1. Verify dependencies and download backbones
+uv run python examples/nexarm/setup_turbovla.py --download-backbones
+
+# 2. Train TurboVLA policy on NexArm LeRobot dataset
+uv run python examples/nexarm/train_turbovla.py \
+    --dataset-root outputs/datasets/nexarm_stack_bowls \
+    --output-dir outputs/train/nexarm_turbovla \
+    --batch-size 16 \
+    --max-steps 50000 \
+    --save-steps 5000
+
+# 3. Rollout trained TurboVLA policy in MuJoCo simulation
+uv run python examples/nexarm/rollout_turbovla.py \
+    --robot sim \
+    --checkpoint outputs/train/nexarm_turbovla/final_ema_pytorch_model.pt \
+    --task "Stack the red bowl on the blue bowl and then stack the black bowl on top."
+```
+
 ### 4.5 Deploy & Rollout Trained Policy
 
 Run real-time inference on the physical follower arm (no leader arm required):

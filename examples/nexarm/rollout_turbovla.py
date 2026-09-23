@@ -34,6 +34,8 @@ from PIL import Image
 from lerobot.motors.nexarm.nexarm import JOINT_NAMES
 from lerobot.utils.robot_utils import precise_sleep
 
+DEFAULT_TURBOVLA_DIR = Path(__file__).resolve().parents[2] / "TurboVLA"
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Run TurboVLA policy on NexArm")
@@ -45,12 +47,15 @@ def parse_args():
         help="Path to TurboVLA model checkpoint (.pt or .safetensors)",
     )
     parser.add_argument(
-        "--stats-path", type=Path, default=None, help="Path to stats_gr00t.json for unnormalization"
+        "--stats-path",
+        type=Path,
+        default=None,
+        help="Path to stats_turbovla.json or stats_gr00t.json for unnormalization (auto-detected if in checkpoint dir)",
     )
     parser.add_argument(
         "--turbovla-repo",
         type=Path,
-        default=Path("/home/25thanh.tk/TurboVLA"),
+        default=DEFAULT_TURBOVLA_DIR if DEFAULT_TURBOVLA_DIR.exists() else Path("/home/25thanh.tk/TurboVLA"),
         help="Path to TurboVLA repository",
     )
     parser.add_argument(
@@ -95,6 +100,20 @@ class TurboVLAPolicyRunner:
         config.action.state_dim = 6
         config.action.horizon = 16
 
+        # Check for saved config.json
+        cfg_path = checkpoint_path.parent / "config.json"
+        if cfg_path.is_file():
+            try:
+                with open(cfg_path) as f:
+                    saved_cfg = json.load(f)
+                if "action" in saved_cfg and "horizon" in saved_cfg["action"]:
+                    config.action.horizon = int(saved_cfg["action"]["horizon"])
+                elif "horizon" in saved_cfg:
+                    config.action.horizon = int(saved_cfg["horizon"])
+                print(f"[INFO] Loaded config overrides from {cfg_path} (horizon={config.action.horizon})")
+            except Exception as e:
+                print(f"[WARN] Failed to parse {cfg_path}: {e}")
+
         print(f"[INFO] Building TurboVLA model on {self.device}...")
         self.model = build_turbovla(config).to(self.device)
 
@@ -129,10 +148,20 @@ class TurboVLAPolicyRunner:
 
         # Normalization stats
         self.stats = None
+        if stats_path is None:
+            # Auto-detect in checkpoint directory
+            for candidate_name in ("stats_turbovla.json", "stats_gr00t.json", "stats.json"):
+                cand = checkpoint_path.parent / candidate_name
+                if cand.is_file():
+                    stats_path = cand
+                    break
+
         if stats_path and stats_path.is_file():
             with open(stats_path) as f:
                 self.stats = json.load(f)
             print(f"[INFO] Loaded normalization stats from {stats_path}")
+        else:
+            print("[WARN] No normalization stats loaded! Actions/states will not be normalized.")
 
     def unnormalize_action(self, action: np.ndarray) -> np.ndarray:
         if self.stats and "action" in self.stats:

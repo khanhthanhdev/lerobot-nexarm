@@ -263,14 +263,15 @@ All policies typically train for **5–10 epochs** (see §7).
 
 ### 6.3 Policy Compatibility Matrix on NexArm
 
-| Policy group  | Status on NexArm       | Requirements & Compatibility Notes                                                  |
-| ------------- | ---------------------- | ----------------------------------------------------------------------------------- |
-| **ACT**       | **Validated Baseline** | Fully compatible. Standard 2-camera (front + wrist) + 6-DoF raw joint positions.    |
-| **Diffusion** | **Validated Baseline** | Fully compatible. Requires `uv sync --extra diffusion`.                             |
-| **SmolVLA**   | **Validated Baseline** | Compatible VLA. Requires `uv sync --extra smolvla` and `--task` description.        |
-| **TDMPC**     | **Incompatible**       | Rejects 640x480 dual-cam setup (requires square images `H == W` and single camera). |
-| **VQ-BeT**    | **Incompatible**       | Rejects 2-camera setup (`len(image_features) == 1` enforced at config validation).  |
-| **π0 / π0.5** | Experimental           | Requires 20+ GB VRAM or small batch + gradient accumulation.                        |
+| Policy group  | Status on NexArm       | Requirements & Compatibility Notes                                                   |
+| ------------- | ---------------------- | ------------------------------------------------------------------------------------ |
+| **ACT**       | **Validated Baseline** | Fully compatible. Standard 2-camera (front + wrist) + 6-DoF raw joint positions.     |
+| **TurboVLA**  | **Validated VLA**      | Fully compatible. Real-time 32 Hz VLA with <1GB VRAM. Uses DINOv3 + BERT + ACT head. |
+| **Diffusion** | **Validated Baseline** | Fully compatible. Requires `uv sync --extra diffusion`.                              |
+| **SmolVLA**   | **Validated Baseline** | Compatible VLA. Requires `uv sync --extra smolvla` and `--task` description.         |
+| **TDMPC**     | **Incompatible**       | Rejects 640x480 dual-cam setup (requires square images `H == W` and single camera).  |
+| **VQ-BeT**    | **Incompatible**       | Rejects 2-camera setup (`len(image_features) == 1` enforced at config validation).   |
+| **π0 / π0.5** | Experimental           | Requires 20+ GB VRAM or small batch + gradient accumulation.                         |
 
 ---
 
@@ -307,6 +308,7 @@ Pass the resulting total with `--steps=<N>`; eval at intermediate checkpoints (`
 | Policy         | Batch | Steps (first run) | Notes                                                             |
 | -------------- | ----: | ----------------: | ----------------------------------------------------------------- |
 | `act`          |  8–16 |           30k–80k | Usually converges under 50k for single-task.                      |
+| `turbovla`     |  8–16 |           30k–50k | Lightweight VLA. DINOv3 + BERT; <1GB VRAM at 32 Hz inference.     |
 | `diffusion`    |  8–16 |          80k–150k | Benefits from longer training than ACT.                           |
 | `smolvla`      |   4–8 |           30k–80k | Pretrained VLM → converges fast.                                  |
 | `pi0` / `pi05` |   1–4 |           30k–80k | Memory-bound; use gradient accumulation for effective batch ≥ 16! |
