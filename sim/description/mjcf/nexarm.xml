@@ -1,6 +1,7 @@
 <mujoco model="NexArm">
   <compiler angle="radian" meshdir="meshes" autolimits="true" />
   <option timestep="0.002" integrator="implicitfast" gravity="0 0 -9.81" cone="elliptic" impratio="10" />
+
   <default>
     <default class="nexarm">
       <joint damping="0.08" frictionloss="0.04" armature="0.004" />
@@ -17,9 +18,24 @@
     </default>
     <default class="collision">
       <geom contype="1" conaffinity="3" group="3" rgba="0 0 0 0" friction="1.1 0.01 0.001" />
+      <default class="finger_collision">
+        <geom type="box" contype="1" conaffinity="3" group="3" friction="1.5 0.005 0.0001" condim="4" solimp="2 1 0.01" solref="0.01 1" />
+      </default>
+    </default>
+    <default class="site">
+      <site group="4" size="0.004" rgba="0.2 0.8 0.2 0.8" />
     </default>
   </default>
+
   <asset>
+    <!-- Visual materials for realistic rendering and sim-to-real fidelity -->
+    <material name="black_metal" rgba="0.12 0.12 0.12 1.0" specular="0.4" shininess="0.3" roughness="0.4" />
+    <material name="dark_bracket" rgba="0.20 0.20 0.22 1.0" specular="0.3" shininess="0.2" roughness="0.5" />
+    <material name="aluminum" rgba="0.75 0.75 0.78 1.0" specular="0.6" shininess="0.5" roughness="0.25" />
+    <material name="accent_blue" rgba="0.15 0.45 0.85 1.0" specular="0.5" shininess="0.4" roughness="0.3" />
+    <material name="gripper_jaw" rgba="0.16 0.16 0.16 1.0" specular="0.2" shininess="0.1" roughness="0.6" />
+    <material name="gear_brass" rgba="0.78 0.62 0.25 1.0" specular="0.7" shininess="0.6" roughness="0.3" />
+
     <mesh name="base_link" file="base_link.stl" scale="0.001 0.001 0.001" />
     <mesh name="link_1" file="link_1.stl" scale="0.001 0.001 0.001" />
     <mesh name="link_2" file="link_2.stl" scale="0.001 0.001 0.001" />
@@ -32,62 +48,64 @@
     <mesh name="link_6_right_jaw" file="link_6_right_jaw.stl" scale="0.001 0.001 0.001" />
     <mesh name="cam_mount" file="cam_mount.stl" scale="0.001 0.001 0.001" />
   </asset>
+
   <worldbody>
     <body name="nexarm_mount" pos="-0.539369022999 -0.0639727628473 -0" childclass="nexarm">
       <body name="base_link" pos="0 0 0" quat="1 0 0 0">
-        <geom name="base_link_visual" class="visual" mesh="base_link" />
+        <geom name="base_link_visual" class="visual" mesh="base_link" material="black_metal" />
         <inertial mass="0.337502" pos="0.539380528153 0.0638375777238 0.0185734322388" fullinertia="5.997591e-04 6.180224e-04 8.033067e-04 -1.894866e-07 -7.704760e-10 -5.101483e-06" />
         <geom type="box" pos="0.53937 0.06397 0.030" size="0.050 0.060 0.030" name="base_link_collision_0" class="collision" />
         <body name="link_1" pos="0 0 0" quat="1 0 0 0">
           <joint name="joint_1_base_to_link_1" pos="0.539369022999 0.0639727628473 0.049" type="hinge" axis="0 0 -1" limited="true" range="-2.35619449019 2.35619449019" />
-          <geom name="link_1_visual" class="visual" mesh="link_1" />
+          <geom name="link_1_visual" class="visual" mesh="link_1" material="dark_bracket" />
           <inertial mass="0.313113" pos="0.539369032613 0.0635115547585 0.0714848913258" fullinertia="2.229416e-04 2.733856e-04 2.750649e-04 -6.650423e-07 -3.057907e-10 -2.159873e-06" />
           <geom type="box" pos="0.53937 0.06397 0.076" size="0.044 0.036 0.040" name="link_1_collision_0" class="collision" />
           <body name="link_2" pos="0 0 0" quat="1 0 0 0">
             <joint name="joint_2_link_1_to_link_2" pos="0.574469022999 0.0639727628408 0.106445070665" type="hinge" axis="-1 0 0" limited="true" range="-2.09439510239 2.09439510239" armature="0.008" damping="0.15" frictionloss="0.08" />
-            <geom name="link_2_visual" class="visual" mesh="link_2" />
+            <geom name="link_2_visual" class="visual" mesh="link_2" material="black_metal" />
             <inertial mass="0.214299" pos="0.540189023978 0.144420872296 0.188150680363" fullinertia="9.579524e-04 5.506643e-04 5.079891e-04 -2.739469e-12 -3.102562e-12 -4.631509e-04" />
             <geom type="capsule" fromto="0.57447 0.06397 0.10645 0.51944 0.19693 0.29168" size="0.032" name="link_2_collision_0" class="collision" />
             <body name="link_3" pos="0 0 0" quat="1 0 0 0">
               <joint name="joint_3_link_2_to_link_3" pos="0.519439024469 0.196934090904 0.291683736154" type="hinge" axis="1 0 0" limited="true" range="-2.35619449019 2.35619449019" />
-              <geom name="link_3_visual" class="visual" mesh="link_3" />
+              <geom name="link_3_visual" class="visual" mesh="link_3" material="dark_bracket" />
               <inertial mass="0.215718" pos="0.538186645319 0.133286031864 0.262085143653" fullinertia="6.377540e-04 1.395572e-04 5.344643e-04 -7.337792e-07 -2.804414e-07 -2.351785e-04" />
               <geom type="capsule" fromto="0.51944 0.19693 0.29168 0.51912 0.06552 0.23041" size="0.024" name="link_3_collision_0" class="collision" />
               <body name="link_4" pos="0 0 0" quat="1 0 0 0">
                 <joint name="joint_4_link_3_to_link_4" pos="0.519118832515 0.0655199672431 0.230406053572" type="hinge" axis="1 0 0" limited="true" range="-1.74532925199 1.74532925199" />
-                <geom name="link_4_visual" class="visual" mesh="link_4" />
+                <geom name="link_4_visual" class="visual" mesh="link_4" material="black_metal" />
                 <inertial mass="0.049369" pos="0.539217680688 0.0412813920651 0.225809894244" fullinertia="1.645108e-05 1.627690e-05 2.185268e-05 1.309816e-07 -7.923899e-09 -1.241160e-06" />
                 <geom type="capsule" fromto="0.51912 0.06552 0.23041 0.53937 0.01829 0.23042" size="0.024" name="link_4_collision_0" class="collision" />
                 <body name="link_5" pos="0 0 0" quat="1 0 0 0">
                   <joint name="joint_5_link_4_to_link_5" pos="0.539368637629 0.0182856141095 0.23042272303" type="hinge" axis="0 -1 0" limited="true" range="-3.14159265359 3.14159265359" armature="0.001" damping="0.04" frictionloss="0.02" />
-                  <geom name="link_5_visual" class="visual" mesh="link_5" />
+                  <geom name="link_5_visual" class="visual" mesh="link_5" material="dark_bracket" />
                   <inertial mass="0.037654" pos="0.53930860111 0.00213394409068 0.226224949962" fullinertia="6.944998e-06 7.802159e-06 7.760758e-06 8.565464e-09 -3.233923e-08 -1.639356e-07" />
                   <geom type="capsule" fromto="0.53937 0.01829 0.23042 0.53937 -0.02102 0.23060" size="0.022" name="link_5_collision_0" class="collision" />
                   <body name="link_6_gripper_base" pos="0 0 0" quat="1 0 0 0">
-                    <geom name="link_6_gripper_base_visual" class="visual" mesh="link_6_gripper_base" />
+                    <geom name="link_6_gripper_base_visual" class="visual" mesh="link_6_gripper_base" material="black_metal" />
                     <inertial mass="0.033247" pos="0.539368566486 -0.0210206980111 0.230601847154" fullinertia="3.840939e-06 4.227428e-05 3.969304e-05 8.105129e-12 2.284531e-15 3.389361e-08" />
                     <geom type="box" pos="0.53937 -0.02327 0.22519" size="0.052 0.008 0.021" name="link_6_gripper_base_collision_0" class="collision" />
                     <body name="link_6_pinion_gear" pos="0 0 0" quat="1 0 0 0">
                       <joint name="gripper_pinion_joint" pos="0.539368645759 -0.0216536266505 0.230436163963" type="hinge" axis="0 0 -1" limited="true" range="-3.14159 3.14159" />
-                      <geom name="link_6_pinion_gear_visual" class="visual" mesh="link_6_pinion_gear" />
+                      <geom name="link_6_pinion_gear_visual" class="visual" mesh="link_6_pinion_gear" material="gear_brass" />
                       <inertial mass="0.003489" pos="0.539368645877 -0.0196832596798 0.230436258524" fullinertia="8.533884e-08 1.592699e-07 8.533884e-08 1.151277e-17 -1.201101e-16 3.543629e-12" />
                     </body>
                     <body name="link_6_left_jaw" pos="0 0 0" quat="1 0 0 0">
                       <joint name="left_jaw_slide_joint" pos="0.539368648301 -0.0279461316442 0.230435863088" type="slide" axis="-1 0 0" limited="true" range="0 0.0255" class="gripper" />
-                      <geom name="link_6_left_jaw_visual" class="visual" mesh="link_6_left_jaw" pos="0.0254 0 0" />
+                      <geom name="link_6_left_jaw_visual" class="visual" mesh="link_6_left_jaw" pos="0.0254 0 0" material="gripper_jaw" />
                       <inertial mass="0.047804" pos="0.529403 -0.039412 0.229772" fullinertia="9.783824e-06 6.167412e-06 9.677004e-06 8.298524e-07 3.005779e-07 5.917606e-07" />
-                      <geom type="box" pos="0.53099 -0.057 0.23044" size="0.0084 0.010 0.015" friction="3 0.01 0.001" condim="4" name="link_6_left_jaw_collision_0" class="collision" />
+                      <geom type="box" pos="0.53099 -0.057 0.23044" size="0.0084 0.010 0.015" name="link_6_left_jaw_collision_0" class="finger_collision" />
                     </body>
                     <body name="link_6_right_jaw" pos="0 0 0" quat="1 0 0 0">
                       <joint name="right_jaw_slide_joint" pos="0.539368644619 -0.0279461316442 0.230435863088" type="slide" axis="1 0 0" limited="true" range="0 0.0255" class="gripper" />
-                      <geom name="link_6_right_jaw_visual" class="visual" mesh="link_6_right_jaw" pos="-0.0254 0 0" />
+                      <geom name="link_6_right_jaw_visual" class="visual" mesh="link_6_right_jaw" pos="-0.0254 0 0" material="gripper_jaw" />
                       <inertial mass="0.047804" pos="0.549334 -0.039412 0.231095" fullinertia="9.784050e-06 6.167751e-06 9.676891e-06 -8.298810e-07 3.010660e-07 -5.901924e-07" />
-                      <geom type="box" pos="0.54774 -0.057 0.23044" size="0.0084 0.010 0.015" friction="3 0.01 0.001" condim="4" name="link_6_right_jaw_collision_0" class="collision" />
+                      <geom type="box" pos="0.54774 -0.057 0.23044" size="0.0084 0.010 0.015" name="link_6_right_jaw_collision_0" class="finger_collision" />
                     </body>
-                    <site name="gripper_frame" pos="0.539 -0.09 0.230" size="0.005" rgba="0.1 0.8 0.1 1" />
+                    <site name="gripper_frame" pos="0.539 -0.09 0.230" size="0.005" rgba="0.1 0.8 0.1 1" class="site" />
+                    <site name="pinch_site" pos="0.53937 -0.057 0.23044" size="0.003" rgba="1 0.2 0.2 1" class="site" />
                   </body>
                   <body name="cam_mount" pos="0 0 0" quat="1 0 0 0">
-                    <geom name="cam_mount_visual" class="visual" mesh="cam_mount" />
+                    <geom name="cam_mount_visual" class="visual" mesh="cam_mount" material="accent_blue" />
                     <inertial mass="0.055224" pos="0.538982070823 0.0126457006521 0.266653601469" fullinertia="6.239200e-06 2.853424e-05 2.885225e-05 -8.425189e-08 8.806271e-09 3.552898e-07" />
                     <camera name="wrist" mode="fixed" pos="0.53937 -0.022 0.279" xyaxes="-1 0 0 0 -0.656059 0.754710" fovy="92.2" />
                   </body>
@@ -99,6 +117,7 @@
       </body>
     </body>
   </worldbody>
+
   <contact>
     <exclude name="base_link_to_link_1" body1="base_link" body2="link_1" />
     <exclude name="link_1_to_link_2" body1="link_1" body2="link_2" />
@@ -113,9 +132,11 @@
     <exclude name="link_6_gripper_base_to_link_6_right_jaw" body1="link_6_gripper_base" body2="link_6_right_jaw" />
     <exclude name="link_6_left_jaw_to_link_6_right_jaw" body1="link_6_left_jaw" body2="link_6_right_jaw" />
   </contact>
+
   <equality>
     <joint name="gripper_jaws_opposed_1_to_1" joint1="right_jaw_slide_joint" joint2="left_jaw_slide_joint" polycoef="0 1 0 0 0" solref="0.002 1" solimp="0.99 0.999 0.0005 0.5 2" />
   </equality>
+
   <actuator>
     <position name="joint_1_base_to_link_1_control" class="nexarm" joint="joint_1_base_to_link_1" kp="40" kv="2.0" forcerange="-2.94 2.94" ctrllimited="true" ctrlrange="-2.35619449019 2.35619449019" />
     <position name="joint_2_link_1_to_link_2_control" class="nexarm" joint="joint_2_link_1_to_link_2" kp="80" kv="4.0" forcerange="-6.37 6.37" ctrllimited="true" ctrlrange="-2.09439510239 2.09439510239" />
@@ -124,4 +145,40 @@
     <position name="joint_5_link_4_to_link_5_control" class="nexarm" joint="joint_5_link_4_to_link_5" kp="20" kv="0.8" forcerange="-1.18 1.18" ctrllimited="true" ctrlrange="-3.14159265359 3.14159265359" />
     <position name="gripper_control" class="gripper_actuator" joint="right_jaw_slide_joint" kp="300" kv="10.0" forcerange="-50.0 50.0" ctrllimited="true" ctrlrange="0 0.0255" />
   </actuator>
+
+  <sensor>
+    <jointpos name="shoulder_pan_pos" joint="joint_1_base_to_link_1" />
+    <jointpos name="shoulder_lift_pos" joint="joint_2_link_1_to_link_2" />
+    <jointpos name="elbow_flex_pos" joint="joint_3_link_2_to_link_3" />
+    <jointpos name="wrist_flex_pos" joint="joint_4_link_3_to_link_4" />
+    <jointpos name="wrist_roll_pos" joint="joint_5_link_4_to_link_5" />
+    <jointpos name="gripper_pos" joint="right_jaw_slide_joint" />
+
+    <jointvel name="shoulder_pan_vel" joint="joint_1_base_to_link_1" />
+    <jointvel name="shoulder_lift_vel" joint="joint_2_link_1_to_link_2" />
+    <jointvel name="elbow_flex_vel" joint="joint_3_link_2_to_link_3" />
+    <jointvel name="wrist_flex_vel" joint="joint_4_link_3_to_link_4" />
+    <jointvel name="wrist_roll_vel" joint="joint_5_link_4_to_link_5" />
+    <jointvel name="gripper_vel" joint="right_jaw_slide_joint" />
+
+    <actuatorpos name="shoulder_pan_act_pos" actuator="joint_1_base_to_link_1_control" />
+    <actuatorpos name="shoulder_lift_act_pos" actuator="joint_2_link_1_to_link_2_control" />
+    <actuatorpos name="elbow_flex_act_pos" actuator="joint_3_link_2_to_link_3_control" />
+    <actuatorpos name="wrist_flex_act_pos" actuator="joint_4_link_3_to_link_4_control" />
+    <actuatorpos name="wrist_roll_act_pos" actuator="joint_5_link_4_to_link_5_control" />
+    <actuatorpos name="gripper_act_pos" actuator="gripper_control" />
+
+    <actuatorfrc name="shoulder_pan_force" actuator="joint_1_base_to_link_1_control" />
+    <actuatorfrc name="shoulder_lift_force" actuator="joint_2_link_1_to_link_2_control" />
+    <actuatorfrc name="elbow_flex_force" actuator="joint_3_link_2_to_link_3_control" />
+    <actuatorfrc name="wrist_flex_force" actuator="joint_4_link_3_to_link_4_control" />
+    <actuatorfrc name="wrist_roll_force" actuator="joint_5_link_4_to_link_5_control" />
+    <actuatorfrc name="gripper_force" actuator="gripper_control" />
+  </sensor>
+
+  <keyframe>
+    <key name="home" qpos="0 0 0 0 0 0 0 0" ctrl="0 0 0 0 0 0" />
+    <key name="ready" qpos="0 -0.5236 1.0472 -0.5236 0 0 0 0" ctrl="0 -0.5236 1.0472 -0.5236 0 0" />
+    <key name="open" qpos="0 0 0 0 0 0 0.0255 0.0255" ctrl="0 0 0 0 0 0.0255" />
+  </keyframe>
 </mujoco>
