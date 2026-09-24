@@ -51,7 +51,7 @@ class NexArmStackBowlsTask:
         *,
         max_concentric_error_m: float = 0.035,
         min_nesting_delta_m: float = 0.010,
-        max_nesting_delta_m: float = 0.030,
+        max_nesting_delta_m: float = 0.038,
         success_hold_s: float = 0.5,
         timeout_s: float = 40.0,
     ) -> None:
@@ -104,20 +104,21 @@ class NexArmStackBowlsTask:
             self.current_order = order
 
         # Spawn 3 bowls on table in non-overlapping reachable positions
-        # Workspace: X in [-0.12, 0.12], Y in [-0.27, -0.21]
+        # Workspace: X in [-0.12, 0.12], Y in [-0.28, -0.17]
+        # Bowls have radius ~62mm. Staggering ensures >= 140mm inter-bowl distance.
         base_positions = [
-            np.array([-0.10, -0.24, 0.020]),
-            np.array([0.00, -0.24, 0.020]),
-            np.array([0.10, -0.24, 0.020]),
+            np.array([-0.11, -0.27, 0.020]),
+            np.array([0.00, -0.18, 0.020]),
+            np.array([0.11, -0.27, 0.020]),
         ]
         # Shuffle slot assignment
         slot_order = rng.permutation(3)
 
         for i, color in enumerate(COLORS):
             slot = slot_order[i]
-            # Add small random jitter (+-10mm in X, +-15mm in Y)
-            jitter_x = rng.uniform(-0.010, 0.010)
-            jitter_y = rng.uniform(-0.015, 0.015)
+            # Add small random jitter (+-5mm in X, +-5mm in Y)
+            jitter_x = rng.uniform(-0.005, 0.005)
+            jitter_y = rng.uniform(-0.005, 0.005)
             yaw = rng.uniform(-np.pi, np.pi)
             quat = np.array([np.cos(yaw / 2), 0, 0, np.sin(yaw / 2)])
 

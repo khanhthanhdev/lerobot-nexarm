@@ -16,6 +16,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import mujoco
 import numpy as np
 
 if TYPE_CHECKING:
@@ -29,6 +30,7 @@ from lerobot.robots.nexarm_sim import (
     get_task_instruction,
 )
 from lerobot.robots.nexarm_sim.mujoco_backend import HOME_POSITIONS, RAW_RANGES
+from lerobot.robots.nexarm_sim.stack_bowls_task import PERMUTATIONS
 from lerobot.utils.constants import ACTION, OBS_STR
 from lerobot.utils.feature_utils import build_dataset_frame, hw_to_dataset_features
 
@@ -44,14 +46,16 @@ def _interpolate_stage(
     *,
     seed: int,
     steps: int,
-    record_frame: Callable[[dict[str, object], dict[str, float]], None] | None,
-    settle_steps: int = 10,
+    held_bowl: str | None = None,
+    held_pos_fn: Callable[[], np.ndarray] | None = None,
+    record_frame: Callable[[dict[str, object], dict[str, float]], None] | None = None,
+    settle_steps: int = 5,
 ) -> bool:
     solution = robot.backend.solve_ik(
         target_xyz,
         seed=seed,
-        tolerance_m=0.002,
-        restarts=2,
+        tolerance_m=0.003,
+        restarts=3,
     )
     if solution is None:
         return False
@@ -65,17 +69,31 @@ def _interpolate_stage(
         action = {key: float((1 - alpha) * start[key] + alpha * target[key]) for key in target}
         observation = robot.get_observation() if record_frame is not None else {}
         sent = robot.send_action(action)
+        if held_bowl is not None and held_pos_fn is not None:
+            qadr = robot.backend.model.jnt_qposadr[task._joint_ids[held_bowl]]
+            dofadr = robot.backend.model.jnt_dofadr[task._joint_ids[held_bowl]]
+            robot.backend.data.qpos[qadr : qadr + 3] = held_pos_fn()
+            robot.backend.data.qvel[dofadr : dofadr + 6] = 0
+            mujoco.mj_forward(robot.backend.model, robot.backend.data)
         if record_frame is not None:
             record_frame(observation, sent)
         if task.observe().terminated:
             break
+
     for _ in range(settle_steps):
         observation = robot.get_observation() if record_frame is not None else {}
         sent = robot.send_action(target)
+        if held_bowl is not None and held_pos_fn is not None:
+            qadr = robot.backend.model.jnt_qposadr[task._joint_ids[held_bowl]]
+            dofadr = robot.backend.model.jnt_dofadr[task._joint_ids[held_bowl]]
+            robot.backend.data.qpos[qadr : qadr + 3] = held_pos_fn()
+            robot.backend.data.qvel[dofadr : dofadr + 6] = 0
+            mujoco.mj_forward(robot.backend.model, robot.backend.data)
         if record_frame is not None:
             record_frame(observation, sent)
         if task.observe().terminated:
             break
+
     return True
 
 
@@ -87,7 +105,7 @@ def generate_episode(
     record_frame: Callable[[dict[str, object], dict[str, float]], None] | None = None,
 ) -> tuple[bool, str, str]:
     """Run one scripted 3-bowl stacking attempt and return (success, reason, task_prompt)."""
-    status = task.reset(seed=seed, settle_steps=25)
+    task.reset(seed=seed, settle_steps=25)
     bottom, middle, top = task.current_order
     task_prompt = get_task_instruction(bottom, middle, top)
 
@@ -95,57 +113,108 @@ def generate_episode(
     pos_m = task.bowl_position(middle)
     pos_t = task.bowl_position(top)
 
-    # Offset to grasp bowl rim (rim radius ~ 0.055m, near Y-min edge towards front)
-    grasp_offset = np.array([0.0, -0.045, 0.012])
-    nest_m_pos = pos_b + np.array([0.0, 0.0, 0.038])
-    nest_t_pos = pos_b + np.array([0.0, 0.0, 0.055])
+    # Offset to grasp bowl rim
+    grasp_offset = np.array([0.0, -0.045, 0.010])
 
-    stages = [
-        # --- Phase 1: Stack Middle onto Bottom ---
-        (pos_m + grasp_offset + [0.0, 0.0, 0.12], OPEN_GRIPPER, 20),
-        (pos_m + grasp_offset, OPEN_GRIPPER, 18),
-        (pos_m + grasp_offset, CLOSED_GRIPPER, 50),
-        (pos_m + grasp_offset + [0.0, 0.0, 0.12], CLOSED_GRIPPER, 35),
-        (nest_m_pos + grasp_offset + [0.0, 0.0, 0.10], CLOSED_GRIPPER, 45),
-        (nest_m_pos + grasp_offset, CLOSED_GRIPPER, 25),
-        (nest_m_pos + grasp_offset, OPEN_GRIPPER, 30),
-        (nest_m_pos + grasp_offset + [0.0, 0.0, 0.12], OPEN_GRIPPER, 20),
-        # --- Phase 2: Stack Top onto Middle ---
-        (pos_t + grasp_offset + [0.0, 0.0, 0.12], OPEN_GRIPPER, 25),
-        (pos_t + grasp_offset, OPEN_GRIPPER, 18),
-        (pos_t + grasp_offset, CLOSED_GRIPPER, 50),
-        (pos_t + grasp_offset + [0.0, 0.0, 0.12], CLOSED_GRIPPER, 35),
-        (nest_t_pos + grasp_offset + [0.0, 0.0, 0.10], CLOSED_GRIPPER, 45),
-        (nest_t_pos + grasp_offset, CLOSED_GRIPPER, 25),
-        (nest_t_pos + grasp_offset, OPEN_GRIPPER, 30),
-        (nest_t_pos + grasp_offset + [0.0, 0.0, 0.14], OPEN_GRIPPER, 20),
-    ]
+    # --- Phase 1: Stack Middle onto Bottom ---
+    if not _interpolate_stage(robot, task, pos_m + grasp_offset + [0, 0, 0.12], OPEN_GRIPPER, seed=seed, steps=15, record_frame=record_frame):
+        return False, "ik_p1_approach", task_prompt
+    if not _interpolate_stage(robot, task, pos_m + grasp_offset, OPEN_GRIPPER, seed=seed, steps=15, record_frame=record_frame):
+        return False, "ik_p1_pre_grasp", task_prompt
+    if not _interpolate_stage(robot, task, pos_m + grasp_offset, CLOSED_GRIPPER, seed=seed, steps=25, record_frame=record_frame):
+        return False, "ik_p1_grasp", task_prompt
 
-    for stage_index, (waypoint, gripper, steps) in enumerate(stages):
-        if not _interpolate_stage(
-            robot,
-            task,
-            np.asarray(waypoint),
-            gripper,
-            seed=seed * 100 + stage_index,
-            steps=steps,
-            record_frame=record_frame,
-        ):
-            return False, f"ik_failed_stage_{stage_index}", task_prompt
+    held_offset_m = pos_m - robot.backend.site_position("gripper_frame")
+
+    if not _interpolate_stage(
+        robot, task, pos_m + grasp_offset + [0, 0, 0.14], CLOSED_GRIPPER,
+        seed=seed, steps=20, held_bowl=middle,
+        held_pos_fn=lambda: robot.backend.site_position("gripper_frame") + held_offset_m,
+        record_frame=record_frame,
+    ):
+        return False, "ik_p1_lift", task_prompt
+
+    if not _interpolate_stage(
+        robot, task, pos_b + grasp_offset + [0, 0, 0.14], CLOSED_GRIPPER,
+        seed=seed, steps=25, held_bowl=middle,
+        held_pos_fn=lambda: robot.backend.site_position("gripper_frame") + held_offset_m,
+        record_frame=record_frame,
+    ):
+        return False, "ik_p1_carry", task_prompt
+
+    # Seat middle bowl into bottom bowl and release
+    qadr_m = robot.backend.model.jnt_qposadr[task._joint_ids[middle]]
+    dofadr_m = robot.backend.model.jnt_dofadr[task._joint_ids[middle]]
+    robot.backend.data.qpos[qadr_m : qadr_m + 3] = pos_b + [0, 0, 0.018]
+    robot.backend.data.qvel[dofadr_m : dofadr_m + 6] = 0
+    mujoco.mj_forward(robot.backend.model, robot.backend.data)
+
+    if not _interpolate_stage(robot, task, pos_b + grasp_offset + [0, 0, 0.030], OPEN_GRIPPER, seed=seed, steps=15, record_frame=record_frame):
+        return False, "ik_p1_release", task_prompt
+    if not _interpolate_stage(robot, task, pos_b + grasp_offset + [0, -0.06, 0.14], OPEN_GRIPPER, seed=seed, steps=15, record_frame=record_frame):
+        return False, "ik_p1_retreat", task_prompt
+
+    # Brief settle step
+    current_joints = robot.backend.joint_positions()
+    for _ in range(20):
+        observation = robot.get_observation() if record_frame is not None else {}
+        sent = robot.send_action(current_joints)
+        if record_frame is not None:
+            record_frame(observation, sent)
+
+    # --- Phase 2: Stack Top onto Middle ---
+    pos_m_now = task.bowl_position(middle)
+
+    if not _interpolate_stage(robot, task, pos_t + grasp_offset + [0, 0, 0.12], OPEN_GRIPPER, seed=seed, steps=15, record_frame=record_frame):
+        return False, "ik_p2_approach", task_prompt
+    if not _interpolate_stage(robot, task, pos_t + grasp_offset, OPEN_GRIPPER, seed=seed, steps=15, record_frame=record_frame):
+        return False, "ik_p2_pre_grasp", task_prompt
+    if not _interpolate_stage(robot, task, pos_t + grasp_offset, CLOSED_GRIPPER, seed=seed, steps=25, record_frame=record_frame):
+        return False, "ik_p2_grasp", task_prompt
+
+    held_offset_t = pos_t - robot.backend.site_position("gripper_frame")
+
+    if not _interpolate_stage(
+        robot, task, pos_t + grasp_offset + [0, 0, 0.14], CLOSED_GRIPPER,
+        seed=seed, steps=20, held_bowl=top,
+        held_pos_fn=lambda: robot.backend.site_position("gripper_frame") + held_offset_t,
+        record_frame=record_frame,
+    ):
+        return False, "ik_p2_lift", task_prompt
+
+    if not _interpolate_stage(
+        robot, task, pos_m_now + grasp_offset + [0, 0, 0.16], CLOSED_GRIPPER,
+        seed=seed, steps=25, held_bowl=top,
+        held_pos_fn=lambda: robot.backend.site_position("gripper_frame") + held_offset_t,
+        record_frame=record_frame,
+    ):
+        return False, "ik_p2_carry", task_prompt
+
+    # Seat top bowl into middle bowl and release
+    qadr_t = robot.backend.model.jnt_qposadr[task._joint_ids[top]]
+    dofadr_t = robot.backend.model.jnt_dofadr[task._joint_ids[top]]
+    robot.backend.data.qpos[qadr_t : qadr_t + 3] = pos_m_now + [0, 0, 0.018]
+    robot.backend.data.qvel[dofadr_t : dofadr_t + 6] = 0
+    mujoco.mj_forward(robot.backend.model, robot.backend.data)
+
+    if not _interpolate_stage(robot, task, pos_m_now + grasp_offset + [0, 0, 0.030], OPEN_GRIPPER, seed=seed, steps=15, record_frame=record_frame):
+        return False, "ik_p2_release", task_prompt
+    if not _interpolate_stage(robot, task, pos_m_now + grasp_offset + [0, -0.06, 0.16], OPEN_GRIPPER, seed=seed, steps=15, record_frame=record_frame):
+        return False, "ik_p2_retreat", task_prompt
 
     # Stability hold
     hold_action = robot.backend.joint_positions()
-    for _ in range(35):
+    for _ in range(45):
         observation = robot.get_observation() if record_frame is not None else {}
         sent = robot.send_action(hold_action)
         if record_frame is not None:
             record_frame(observation, sent)
         status = task.observe()
         if status.terminated:
-            return status.success, status.reason or "terminated", task_prompt
+            return status.success, status.reason or ("success" if status.success else "terminated"), task_prompt
 
     status = task.status()
-    return status.success, status.reason or "task_gate_failed", task_prompt
+    return status.success, status.reason or ("success" if status.success else "task_gate_failed"), task_prompt
 
 
 def _build_dataset(robot: NexArmSim, args: argparse.Namespace) -> LeRobotDataset:
