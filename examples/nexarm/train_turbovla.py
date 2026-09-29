@@ -91,6 +91,12 @@ def parse_args():
         help="Hugging Face repo_id or local dataset identifier",
     )
     parser.add_argument(
+        "--cameras",
+        type=str,
+        default=None,
+        help="Comma-separated list of camera keys to use (e.g. 'front,wrist,top'). Auto-detected if None.",
+    )
+    parser.add_argument(
         "--front-cam-key",
         type=str,
         default=None,
@@ -101,6 +107,12 @@ def parse_args():
         type=str,
         default=None,
         help="Key for wrist camera (auto-detected if None)",
+    )
+    parser.add_argument(
+        "--gripper-loss-weight",
+        type=float,
+        default=3.0,
+        help="Loss multiplier for gripper joint (index 5) to penalize soft intermediate grasp predictions",
     )
     parser.add_argument("--horizon", type=int, default=16, help="Action chunk prediction horizon")
     parser.add_argument("--image-size", type=int, default=224, help="Input image dimension (224x224)")
@@ -169,35 +181,53 @@ def parse_args():
 
 
 def resolve_camera_keys(
-    features: dict[str, Any], front_hint: str | None, wrist_hint: str | None
-) -> tuple[str, str]:
-    """Identify front and wrist image keys from dataset features."""
+    features: dict[str, Any],
+    camera_hints: str | list[str] | None = None,
+    front_hint: str | None = None,
+    wrist_hint: str | None = None,
+) -> list[str]:
+    """Identify camera image keys from dataset features."""
     all_keys = list(features.keys())
 
-    def match_key(hint: str | None, candidates: list[str]) -> str | None:
-        if hint and hint in all_keys:
-            return hint
-        for c in candidates:
-            for k in all_keys:
-                if c.lower() in k.lower():
-                    return k
-        return None
+    if isinstance(camera_hints, str):
+        camera_hints = [c.strip() for c in camera_hints.split(",") if c.strip()]
 
-    front_key = match_key(front_hint, ["observation.images.front", "front", "cam_high", "camera_front"])
-    wrist_key = match_key(wrist_hint, ["observation.images.wrist", "wrist", "cam_wrist", "camera_wrist"])
+    if camera_hints:
+        resolved = []
+        for h in camera_hints:
+            if h in all_keys:
+                resolved.append(h)
+            else:
+                for k in all_keys:
+                    if h.lower() in k.lower() and k not in resolved:
+                        resolved.append(k)
+                        break
+        if resolved:
+            return resolved
 
-    if not front_key or not wrist_key:
-        image_keys = [k for k in all_keys if "image" in k or features[k].get("dtype") in ("image", "video")]
-        if len(image_keys) >= 2:
-            front_key = front_key or image_keys[0]
-            wrist_key = wrist_key or image_keys[1]
-        elif len(image_keys) == 1:
-            front_key = front_key or image_keys[0]
-            wrist_key = wrist_key or image_keys[0]
-        else:
-            raise ValueError(f"Could not resolve 2 camera keys from dataset features: {all_keys}")
+    # Legacy hints check
+    if front_hint or wrist_hint:
+        resolved = []
+        for h in (front_hint, wrist_hint):
+            if h and h in all_keys and h not in resolved:
+                resolved.append(h)
+        if len(resolved) == 2:
+            return resolved
 
-    return front_key, wrist_key
+    # Auto-detect standard camera views in preferred order: front, wrist, top
+    resolved = []
+    for pattern in ["front", "wrist", "top", "overhead", "cam"]:
+        for k in all_keys:
+            if pattern in k.lower() and k not in resolved and features[k].get("dtype") in ("image", "video"):
+                resolved.append(k)
+
+    if not resolved:
+        resolved = [k for k in all_keys if "image" in k or features[k].get("dtype") in ("image", "video")]
+
+    if not resolved:
+        raise ValueError(f"Could not resolve camera keys from dataset features: {all_keys}")
+
+    return resolved
 
 
 def compute_or_load_normalization_stats(
@@ -300,6 +330,12 @@ def load_compatible_weights(model: nn.Module, checkpoint_path: Path) -> int:
         if clean_k in target_state:
             if target_state[clean_k].shape == v.shape:
                 matched_state[clean_k] = v
+            elif "view_embedding" in clean_k and target_state[clean_k].shape[-1] == v.shape[-1] and target_state[clean_k].ndim == v.ndim:
+                expanded = target_state[clean_k].clone()
+                min_v = min(target_state[clean_k].shape[1], v.shape[1])
+                expanded[:, :min_v] = v[:, :min_v]
+                matched_state[clean_k] = expanded
+                print(f"[INFO] Adapted {clean_k} from {tuple(v.shape)} to {tuple(target_state[clean_k].shape)} (transferred {min_v} views)")
             else:
                 skipped.append(
                     f"{clean_k} (shape mismatch: {tuple(target_state[clean_k].shape)} vs {tuple(v.shape)})"
@@ -341,15 +377,13 @@ def to_pil(image_val: Any) -> Image.Image:
 class TurboVLANexArmCollator:
     def __init__(
         self,
-        front_key: str,
-        wrist_key: str,
+        camera_keys: list[str],
         stats: dict[str, dict[str, list[float]]],
         image_processor,
         horizon: int = 16,
         dataset_meta=None,
     ) -> None:
-        self.front_key = front_key
-        self.wrist_key = wrist_key
+        self.camera_keys = camera_keys
         self.stats = stats
         self.image_processor = image_processor
         self.horizon = horizon
@@ -362,8 +396,7 @@ class TurboVLANexArmCollator:
 
     def __call__(self, batch: list[dict[str, Any]]) -> dict[str, Any]:
         instructions = []
-        front_imgs = []
-        wrist_imgs = []
+        flat_views = []
         states = []
         actions = []
 
@@ -380,11 +413,9 @@ class TurboVLANexArmCollator:
                 lang = "Complete the robotic manipulation task."
             instructions.append(str(lang))
 
-            # Images
-            f_img = to_pil(item[self.front_key]).resize((224, 224))
-            w_img = to_pil(item[self.wrist_key]).resize((224, 224))
-            front_imgs.append(f_img)
-            wrist_imgs.append(w_img)
+            # Images from all configured cameras
+            for cam_key in self.camera_keys:
+                flat_views.append(to_pil(item[cam_key]).resize((224, 224)))
 
             # State
             raw_state = item.get("observation.state", item.get("state", None))
@@ -413,14 +444,9 @@ class TurboVLANexArmCollator:
             actions.append(norm_action.astype(np.float32))
 
         # Vision preprocessing
-        # Stack views: [B, 2] -> flat list of 2*B PIL images
-        flat_views = []
-        for i in range(len(batch)):
-            flat_views.extend([front_imgs[i], wrist_imgs[i]])
-
         pv = self.image_processor(images=flat_views, return_tensors="pt")["pixel_values"]
-        # Reshape to [B, 2, 3, 224, 224]
-        pv = pv.view(len(batch), 2, *pv.shape[1:])
+        # Reshape to [B, num_views, 3, 224, 224]
+        pv = pv.view(len(batch), len(self.camera_keys), *pv.shape[1:])
 
         return {
             "instructions": instructions,
@@ -484,7 +510,7 @@ def save_checkpoint(
             indent=2,
         )
 
-    print(f"[CHECKPOINT] Saved checkpoint at step {step} -> {output_dir / step_str}*")
+    print(f"\n[CHECKPOINT] Saved checkpoint at step {step} -> {output_dir / step_str}*")
 
 
 def main():
@@ -539,9 +565,14 @@ def main():
         )
 
     # 2. Camera resolution & Normalization statistics
-    front_key, wrist_key = resolve_camera_keys(dataset.features, args.front_cam_key, args.wrist_cam_key)
+    camera_keys = resolve_camera_keys(
+        dataset.features,
+        camera_hints=args.cameras,
+        front_hint=args.front_cam_key,
+        wrist_hint=args.wrist_cam_key,
+    )
     if is_main_process:
-        print(f"  Resolved camera views -> front: '{front_key}', wrist: '{wrist_key}'")
+        print(f"  Resolved {len(camera_keys)} camera views -> {camera_keys}")
 
     stats = compute_or_load_normalization_stats(dataset)
     if is_main_process:
@@ -557,7 +588,7 @@ def main():
         image_processor.size = {"height": args.image_size, "width": args.image_size}
 
     config = TurboVLAConfig()
-    config.vision.num_views = 2
+    config.vision.num_views = len(camera_keys)
     config.vision.image_size = args.image_size
     config.vision.model_name_or_path = args.dinov3_path
     config.text.model_name_or_path = args.bert_path
@@ -638,8 +669,7 @@ def main():
     if is_main_process:
         print("\n[3/5] Setting up DataLoader and Optimizer...")
     collator = TurboVLANexArmCollator(
-        front_key=front_key,
-        wrist_key=wrist_key,
+        camera_keys=camera_keys,
         stats=stats,
         image_processor=image_processor,
         horizon=args.horizon,
@@ -748,11 +778,18 @@ def main():
         ):
             predictions = model(instructions, samples, states)
             if args.loss_type == "mse":
-                loss = F.mse_loss(predictions, targets)
+                raw_diff = (predictions - targets) ** 2
             elif args.loss_type == "smooth_l1":
-                loss = F.smooth_l1_loss(predictions, targets)
+                raw_diff = F.smooth_l1_loss(predictions, targets, reduction="none")
             else:
-                loss = F.l1_loss(predictions, targets)
+                raw_diff = torch.abs(predictions - targets)
+
+            if args.gripper_loss_weight != 1.0 and targets.shape[-1] >= 6:
+                weights = torch.ones(targets.shape[-1], device=device, dtype=targets.dtype)
+                weights[5] = args.gripper_loss_weight
+                loss = (raw_diff * weights.view(1, 1, -1)).mean()
+            else:
+                loss = raw_diff.mean()
 
             if args.grad_accum_steps > 1:
                 loss = loss / args.grad_accum_steps

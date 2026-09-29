@@ -15,7 +15,7 @@
 from __future__ import annotations
 
 from collections import deque
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
 
 import mujoco
@@ -85,6 +85,7 @@ class NexArmMujocoBackend:
         self.enable_domain_randomization = bool(enable_domain_randomization)
         self._action_queue: deque[dict[str, float]] = deque()
         self._renderer: mujoco.Renderer | None = None
+        self.step_callback: Callable[[], None] | None = None
 
         self._joint_ids: dict[str, int] = {}
         self._actuator_ids: dict[str, int] = {}
@@ -290,7 +291,10 @@ class NexArmMujocoBackend:
                 sent = self.set_action(action)
         else:
             sent = None
-        mujoco.mj_step(self.model, self.data, self.steps_per_action)
+        for _ in range(self.steps_per_action):
+            if self.step_callback is not None:
+                self.step_callback()
+            mujoco.mj_step(self.model, self.data)
         return sent
 
     def joint_positions(self) -> dict[str, float]:

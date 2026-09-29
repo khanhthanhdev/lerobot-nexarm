@@ -426,7 +426,41 @@ Single-task grasp-and-place with 50 clean episodes: ACT should reach **> 70% suc
 
 ---
 
-## 9. Further reading & resources
+## 10. Simulation Data Generation, Resuming, & Multi-Camera Setup
+
+### 10.1 Generating & Resuming Datasets (`--resume`)
+
+When generating synthetic demonstration datasets (e.g. for bowl stacking or pick-and-place tasks), avoid overwriting existing data.
+- **Append mode**: Use `--resume` with `LeRobotDataset.resume(...)` to keep previous episodes intact.
+- **Avoid seed collisions**: Track the starting seed with `seed_start = dataset.meta.total_episodes` so newly generated trajectories explore unseen configurations instead of duplicating initial object positions.
+
+```bash
+# Append 100 new episodes without deleting existing data
+MUJOCO_GL=egl PYTHONPATH=src python examples/nexarm/generate_stack_bowls_dataset.py \
+  --root outputs/datasets/nexarm_stack_bowls \
+  --resume \
+  --episodes 100
+```
+
+### 10.2 Kinematics & Rim Grasping for Thin-Walled Objects
+
+For concave or hollow objects like bowls and cups:
+- **Never plunge straight into the cavity**: Grippers should straddle the outer rim radially.
+- **Radial rim straddle angle**: Calculate the vector from bowl center to gripper jaw pad $\mathbf{u}_{rad}$, orienting wrist pitch around $75^\circ$ and roll around $\pm 80^\circ$ relative to the radial approach vector.
+- **Centering jaw pads**: Account for the physical distance between the gripper base site frame and the active rubber jaw contact pads (`JAW_CENTER_OFFSET = [0.0, 0.033, 0.0]`).
+- **Dynamic transit steps**: When moving across large joint angular differences (e.g. $>500$ encoder ticks), scale interpolation steps (`max(steps, ceil(max_delta / 25.0))`) to prevent simulated PD motors from lagging and missing grasp latches.
+
+### 10.3 Multi-Camera Rigging (RealSense D435i Overhead View)
+
+LeRobot datasets support an arbitrary number of camera streams simultaneously.
+For manipulation and stacking tasks, the recommended 3-camera layout consists of:
+1. **`top` / `overhead` (Intel RealSense D435i)**: Mounted directly above the table looking straight down ($Z \approx 0.85$ m). Eliminates line-of-sight occlusions and provides precise $(X, Y)$ concentric alignment. Can record RGB or RGB-D (`use_depth=True`).
+2. **`front`**: Angled overview providing vertical $Z$-height, layer depth, and transit clearance.
+3. **`wrist`**: Gripper-mounted camera (e.g. OAK or mini camera) providing fine-grained finger-to-rim alignment during the final 5 cm of approach.
+
+---
+
+## 11. Further reading & resources
 
 - **Getting started:** [`installation.mdx`](./docs/source/installation.mdx) · [`il_robots.mdx`](./docs/source/il_robots.mdx) · [What makes a good dataset](https://huggingface.co/blog/lerobot-datasets)
 - **Per-policy docs:** browse [`docs/source/*.mdx`](./docs/source/) (policies, hardware, benchmarks, advanced training).

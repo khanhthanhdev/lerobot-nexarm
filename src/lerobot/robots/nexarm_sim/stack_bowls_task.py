@@ -50,7 +50,7 @@ class NexArmStackBowlsTask:
         backend: NexArmMujocoBackend,
         *,
         max_concentric_error_m: float = 0.035,
-        min_nesting_delta_m: float = 0.010,
+        min_nesting_delta_m: float = 0.020,
         max_nesting_delta_m: float = 0.038,
         success_hold_s: float = 0.5,
         timeout_s: float = 40.0,
@@ -65,8 +65,14 @@ class NexArmStackBowlsTask:
         # Cache IDs
         self._body_ids = {c: self._required_id(mujoco.mjtObj.mjOBJ_BODY, f"bowl_{c}") for c in COLORS}
         self._joint_ids = {c: self._required_id(mujoco.mjtObj.mjOBJ_JOINT, f"bowl_{c}_joint") for c in COLORS}
+        self._gripper_frame_site_id = self._required_id(mujoco.mjtObj.mjOBJ_SITE, "gripper_frame")
         self._left_jaw_geom_id = self._required_id(mujoco.mjtObj.mjOBJ_GEOM, "link_6_left_jaw_collision_0")
         self._right_jaw_geom_id = self._required_id(mujoco.mjtObj.mjOBJ_GEOM, "link_6_right_jaw_collision_0")
+
+        self.held_bowl: str | None = None
+        self.held_rel_pos: np.ndarray | None = None
+        self.target_bowl: str | None = None
+        self.backend.step_callback = self._on_physics_step
 
         self.current_order: tuple[str, str, str] = PERMUTATIONS[0]
         self._start_time: float = 0.0
@@ -135,7 +141,47 @@ class NexArmStackBowlsTask:
         self._start_time = float(self.backend.data.time)
         self._hold_start_time = None
         self._failure_reason = None
+        self.held_bowl = None
+        self.held_rel_pos = None
+        self.target_bowl = None
         return self.status()
+
+    def _on_physics_step(self) -> None:
+        """Physical grasp constraint helper for concave thin-walled bowls."""
+        gripper_ctrl = self.backend.control_to_raw(
+            "gripper",
+            float(self.backend.data.ctrl[self.backend._actuator_ids["gripper"]]),
+        )
+        site_id = self._gripper_frame_site_id
+        site_pos = self.backend.data.site_xpos[site_id].copy()
+        site_mat = self.backend.data.site_xmat[site_id].reshape(3, 3).copy()
+
+        if gripper_ctrl > 2400:  # Gripper commanded closed (towards 2833)
+            if self.held_bowl is None:
+                candidate_colors = [self.target_bowl] if self.target_bowl is not None else COLORS
+                closest_c = None
+                closest_dist = 999.0
+                for c in candidate_colors:
+                    bpos = self.bowl_position(c)
+                    d = float(np.linalg.norm(bpos - site_pos))
+                    if d < closest_dist:
+                        closest_dist = d
+                        closest_c = c
+                if closest_dist < 0.120 and closest_c is not None:
+                    self.held_bowl = closest_c
+                    bpos = self.bowl_position(self.held_bowl)
+                    self.held_rel_pos = site_mat.T @ (bpos - site_pos)
+
+            if self.held_bowl is not None:
+                qadr = int(self.backend.model.jnt_qposadr[self._joint_ids[self.held_bowl]])
+                dofadr = int(self.backend.model.jnt_dofadr[self._joint_ids[self.held_bowl]])
+                target_bpos = site_pos + site_mat @ self.held_rel_pos
+                self.backend.data.qpos[qadr : qadr + 3] = target_bpos
+                self.backend.data.qvel[dofadr : dofadr + 6] = 0
+        elif gripper_ctrl < 1600:  # Gripper commanded open (towards 1195)
+            if self.held_bowl is not None:
+                self.held_bowl = None
+                self.held_rel_pos = None
 
     def _is_gripper_disengaged(self) -> bool:
         """Check if gripper jaws are not contacting any bowl."""

@@ -29,52 +29,166 @@ from lerobot.robots.nexarm_sim import (
     NexArmStackBowlsTask,
     get_task_instruction,
 )
-from lerobot.robots.nexarm_sim.mujoco_backend import HOME_POSITIONS, RAW_RANGES
+from lerobot.robots.nexarm_sim.mujoco_backend import HOME_POSITIONS, MUJOCO_JOINTS, RAW_RANGES
 from lerobot.robots.nexarm_sim.stack_bowls_task import PERMUTATIONS
 from lerobot.utils.constants import ACTION, OBS_STR
 from lerobot.utils.feature_utils import build_dataset_frame, hw_to_dataset_features
 
-OPEN_GRIPPER = float(RAW_RANGES["gripper"][0])
-CLOSED_GRIPPER = float(RAW_RANGES["gripper"][1])
+OPEN_GRIPPER = float(RAW_RANGES["gripper"][0])   # 1195.0 (wide open: 67.4mm gap)
+CLOSED_GRIPPER = float(RAW_RANGES["gripper"][1]) # 2833.0 (pinched closed: 16.7mm gap)
+BOWL_RIM_RADIUS = 0.061  # Outer rim radius in meters
+BOWL_RIM_Z_OFFSET = 0.0215  # Height of bowl rim above bowl body center
+JAW_CENTER_OFFSET = np.array([0.0, 0.033, 0.0])  # Jaw collision pad center in gripper_frame
+
+
+def _get_rim_and_unit_vector(bowl_pos: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Compute the radial outward rim point and 2D unit direction from robot base."""
+    u = bowl_pos[:2] / np.linalg.norm(bowl_pos[:2])
+    rim_point = np.array([
+        bowl_pos[0] + BOWL_RIM_RADIUS * u[0],
+        bowl_pos[1] + BOWL_RIM_RADIUS * u[1],
+        bowl_pos[2] + BOWL_RIM_Z_OFFSET,
+    ])
+    return rim_point, u
+
+
+def solve_ik_jaw(
+    backend,
+    target_pos: np.ndarray,
+    u_rad: np.ndarray,
+    pitch_deg: float = 75.0,
+    roll_val_rad: float = np.deg2rad(80),
+    max_iterations: int = 150,
+    tolerance_pos: float = 0.002,
+    tolerance_dir: float = 0.05,
+    restarts: int = 5,
+    seed: int = 0,
+) -> dict[str, float] | None:
+    """Solve IK positioning the jaw collision center with radial rim straddle orientation.
+
+    The gripper pitches downward at `pitch_deg` (with adaptive shallow fallbacks if needed)
+    and rotates `wrist_roll` by ~80 degrees so the jaw closing axis is strictly radial
+    across the thin rim wall.
+    """
+    model = backend.model
+    data = backend.data
+    site_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SITE, "gripper_frame")
+
+    arm4 = ["shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex"]
+    joint_ids = {k: mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, MUJOCO_JOINTS[k]) for k in JOINT_NAMES}
+    qpos_addrs = [int(model.jnt_qposadr[joint_ids[k]]) for k in arm4]
+    dof_addrs = [int(model.jnt_dofadr[joint_ids[k]]) for k in arm4]
+    roll_qpos = int(model.jnt_qposadr[joint_ids["wrist_roll"]])
+
+    target_pos = np.asarray(target_pos, dtype=np.float64)
+    u_rad = np.asarray(u_rad, dtype=np.float64) / np.linalg.norm(u_rad)
+
+    candidate_pitches = [pitch_deg, pitch_deg - 5.0, pitch_deg - 10.0, pitch_deg - 15.0]
+    for p in candidate_pitches:
+        theta = np.deg2rad(p)
+        target_dir = np.array([np.cos(theta) * u_rad[0], np.cos(theta) * u_rad[1], -np.sin(theta)])
+        rng = np.random.default_rng(seed)
+
+        for restart in range(restarts + 1):
+            working = mujoco.MjData(model)
+            working.qpos[:] = data.qpos
+            working.qpos[roll_qpos] = roll_val_rad
+            if restart:
+                for k in arm4:
+                    low, high = model.jnt_range[joint_ids[k]]
+                    working.qpos[model.jnt_qposadr[joint_ids[k]]] = rng.uniform(low * 0.8, high * 0.8)
+
+            for _ in range(max_iterations):
+                mujoco.mj_forward(model, working)
+                site_pos = working.site_xpos[site_id]
+                site_mat = working.site_xmat[site_id].reshape(3, 3)
+                current_jaw = site_pos + site_mat @ JAW_CENTER_OFFSET
+                approach_dir = -site_mat[:, 1]
+                pos_err = target_pos - current_jaw
+                dir_err = np.cross(approach_dir, target_dir)
+
+                if np.linalg.norm(pos_err) < tolerance_pos and np.linalg.norm(dir_err) < tolerance_dir:
+                    sol = {k: backend.control_to_raw(k, working.qpos[model.jnt_qposadr[joint_ids[k]]]) for k in arm4}
+                    sol["wrist_roll"] = backend.control_to_raw("wrist_roll", roll_val_rad)
+                    return sol
+
+                jac_p = np.zeros((3, model.nv), dtype=np.float64)
+                jac_r = np.zeros((3, model.nv), dtype=np.float64)
+                mujoco.mj_jacSite(model, working, jac_p, jac_r, site_id)
+                jac = np.vstack([jac_p[:, dof_addrs], 0.2 * jac_r[:, dof_addrs]])
+                damping = 1e-3
+                err = np.concatenate([pos_err, 0.2 * dir_err])
+                delta = jac.T @ np.linalg.solve(jac @ jac.T + damping * np.eye(6), err)
+                delta = np.clip(delta, -0.15, 0.15)
+                for i, qaddr in enumerate(qpos_addrs):
+                    low, high = model.jnt_range[joint_ids[arm4[i]]]
+                    working.qpos[qaddr] = np.clip(working.qpos[qaddr] + delta[i], low, high)
+
+    return None
+
+
+def solve_ik_held_bowl(
+    robot: NexArmSim,
+    task: NexArmStackBowlsTask,
+    target_bowl_xyz: np.ndarray,
+    u_rad: np.ndarray,
+    pitch_deg: float = 75.0,
+    seed: int = 0,
+) -> dict[str, float] | None:
+    """Iteratively solve IK to position the held bowl center at target_bowl_xyz."""
+    if task.held_rel_pos is None:
+        return None
+
+    site_id = mujoco.mj_name2id(robot.backend.model, mujoco.mjtObj.mjOBJ_SITE, "gripper_frame")
+    target_jaw = target_bowl_xyz.copy()
+
+    for _ in range(6):
+        sol = solve_ik_jaw(robot.backend, target_jaw, u_rad, pitch_deg=pitch_deg, seed=seed)
+        if sol is None:
+            return None
+        working = mujoco.MjData(robot.backend.model)
+        working.qpos[:] = robot.backend.data.qpos
+        for k, v in sol.items():
+            working.qpos[robot.backend.model.jnt_qposadr[robot.backend._joint_ids[k]]] = robot.backend.raw_to_control(k, v)
+        mujoco.mj_forward(robot.backend.model, working)
+        site_pos = working.site_xpos[site_id].copy()
+        site_mat = working.site_xmat[site_id].reshape(3, 3).copy()
+        pred_bowl_pos = site_pos + site_mat @ task.held_rel_pos
+        err = target_bowl_xyz - pred_bowl_pos
+        if np.linalg.norm(err) < 0.002:
+            return sol
+        target_jaw += err
+
+    return sol
 
 
 def _interpolate_stage(
     robot: NexArmSim,
     task: NexArmStackBowlsTask,
-    target_xyz: np.ndarray,
-    gripper: float,
+    solution: dict[str, float],
+    start_gripper: float,
+    target_gripper: float,
     *,
-    seed: int,
     steps: int,
-    held_bowl: str | None = None,
-    held_pos_fn: Callable[[], np.ndarray] | None = None,
+    settle_steps: int = 10,
     record_frame: Callable[[dict[str, object], dict[str, float]], None] | None = None,
-    settle_steps: int = 5,
 ) -> bool:
-    solution = robot.backend.solve_ik(
-        target_xyz,
-        seed=seed,
-        tolerance_m=0.003,
-        restarts=3,
-    )
-    if solution is None:
-        return False
-
+    """Linearly interpolate joints to target solution and hold for settle_steps."""
     start = robot.backend.joint_positions()
     target = {f"{name}.pos": HOME_POSITIONS[name] for name in JOINT_NAMES}
     target.update({f"{name}.pos": value for name, value in solution.items()})
-    target["gripper.pos"] = gripper
+    target["gripper.pos"] = target_gripper
 
-    for alpha in np.linspace(0.0, 1.0, steps, endpoint=True):
+    # Scale steps if large joint travel is required (prevent PD motor lag on long transits)
+    max_delta = max(abs(start[k] - target[k]) for k in target if k != "gripper.pos")
+    min_steps = int(np.ceil(max_delta / 25.0))
+    effective_steps = max(steps, min_steps)
+
+    for alpha in np.linspace(0.0, 1.0, effective_steps, endpoint=True):
         action = {key: float((1 - alpha) * start[key] + alpha * target[key]) for key in target}
+        action["gripper.pos"] = float((1 - alpha) * start_gripper + alpha * target_gripper)
         observation = robot.get_observation() if record_frame is not None else {}
         sent = robot.send_action(action)
-        if held_bowl is not None and held_pos_fn is not None:
-            qadr = robot.backend.model.jnt_qposadr[task._joint_ids[held_bowl]]
-            dofadr = robot.backend.model.jnt_dofadr[task._joint_ids[held_bowl]]
-            robot.backend.data.qpos[qadr : qadr + 3] = held_pos_fn()
-            robot.backend.data.qvel[dofadr : dofadr + 6] = 0
-            mujoco.mj_forward(robot.backend.model, robot.backend.data)
         if record_frame is not None:
             record_frame(observation, sent)
         if task.observe().terminated:
@@ -83,12 +197,6 @@ def _interpolate_stage(
     for _ in range(settle_steps):
         observation = robot.get_observation() if record_frame is not None else {}
         sent = robot.send_action(target)
-        if held_bowl is not None and held_pos_fn is not None:
-            qadr = robot.backend.model.jnt_qposadr[task._joint_ids[held_bowl]]
-            dofadr = robot.backend.model.jnt_dofadr[task._joint_ids[held_bowl]]
-            robot.backend.data.qpos[qadr : qadr + 3] = held_pos_fn()
-            robot.backend.data.qvel[dofadr : dofadr + 6] = 0
-            mujoco.mj_forward(robot.backend.model, robot.backend.data)
         if record_frame is not None:
             record_frame(observation, sent)
         if task.observe().terminated:
@@ -109,102 +217,130 @@ def generate_episode(
     bottom, middle, top = task.current_order
     task_prompt = get_task_instruction(bottom, middle, top)
 
-    pos_b = task.bowl_position(bottom)
-    pos_m = task.bowl_position(middle)
-    pos_t = task.bowl_position(top)
-
-    # Offset to grasp bowl rim
-    grasp_offset = np.array([0.0, -0.045, 0.010])
+    site_id = mujoco.mj_name2id(robot.backend.model, mujoco.mjtObj.mjOBJ_SITE, "gripper_frame")
 
     # --- Phase 1: Stack Middle onto Bottom ---
-    if not _interpolate_stage(robot, task, pos_m + grasp_offset + [0, 0, 0.12], OPEN_GRIPPER, seed=seed, steps=15, record_frame=record_frame):
+    pos_m = task.bowl_position(middle)
+    pos_b = task.bowl_position(bottom)
+    rim_m, u_m = _get_rim_and_unit_vector(pos_m)
+    _, u_b = _get_rim_and_unit_vector(pos_b)
+    task.target_bowl = middle
+
+    # Approach from +0.08m above rim
+    sol = solve_ik_jaw(robot.backend, rim_m + [0, 0, 0.08], u_m, seed=seed)
+    if not sol:
         return False, "ik_p1_approach", task_prompt
-    if not _interpolate_stage(robot, task, pos_m + grasp_offset, OPEN_GRIPPER, seed=seed, steps=15, record_frame=record_frame):
+    _interpolate_stage(robot, task, sol, OPEN_GRIPPER, OPEN_GRIPPER, steps=20, settle_steps=2, record_frame=record_frame)
+
+    # Descend to rim
+    sol = solve_ik_jaw(robot.backend, rim_m, u_m, seed=seed)
+    if not sol:
         return False, "ik_p1_pre_grasp", task_prompt
-    if not _interpolate_stage(robot, task, pos_m + grasp_offset, CLOSED_GRIPPER, seed=seed, steps=25, record_frame=record_frame):
-        return False, "ik_p1_grasp", task_prompt
+    _interpolate_stage(robot, task, sol, OPEN_GRIPPER, OPEN_GRIPPER, steps=15, settle_steps=2, record_frame=record_frame)
 
-    held_offset_m = pos_m - robot.backend.site_position("gripper_frame")
+    # Grasp rim (pinch fingers to straddle rim wall)
+    _interpolate_stage(robot, task, sol, OPEN_GRIPPER, CLOSED_GRIPPER, steps=15, settle_steps=3, record_frame=record_frame)
+    if task.held_bowl is None:
+        return False, "ik_p1_grasp_missed", task_prompt
 
-    if not _interpolate_stage(
-        robot, task, pos_m + grasp_offset + [0, 0, 0.14], CLOSED_GRIPPER,
-        seed=seed, steps=20, held_bowl=middle,
-        held_pos_fn=lambda: robot.backend.site_position("gripper_frame") + held_offset_m,
-        record_frame=record_frame,
-    ):
+    # Lift bowl vertically
+    sol = solve_ik_jaw(robot.backend, rim_m + [0, 0, 0.12], u_m, seed=seed)
+    if not sol:
         return False, "ik_p1_lift", task_prompt
+    _interpolate_stage(robot, task, sol, CLOSED_GRIPPER, CLOSED_GRIPPER, steps=20, settle_steps=2, record_frame=record_frame)
 
-    if not _interpolate_stage(
-        robot, task, pos_b + grasp_offset + [0, 0, 0.14], CLOSED_GRIPPER,
-        seed=seed, steps=25, held_bowl=middle,
-        held_pos_fn=lambda: robot.backend.site_position("gripper_frame") + held_offset_m,
-        record_frame=record_frame,
-    ):
+    # Carry above bottom bowl
+    sol = solve_ik_held_bowl(robot, task, pos_b + [0, 0, 0.12], u_b, seed=seed)
+    if not sol:
         return False, "ik_p1_carry", task_prompt
+    _interpolate_stage(robot, task, sol, CLOSED_GRIPPER, CLOSED_GRIPPER, steps=25, settle_steps=2, record_frame=record_frame)
 
-    # Seat middle bowl into bottom bowl and release
-    qadr_m = robot.backend.model.jnt_qposadr[task._joint_ids[middle]]
-    dofadr_m = robot.backend.model.jnt_dofadr[task._joint_ids[middle]]
-    robot.backend.data.qpos[qadr_m : qadr_m + 3] = pos_b + [0, 0, 0.018]
-    robot.backend.data.qvel[dofadr_m : dofadr_m + 6] = 0
-    mujoco.mj_forward(robot.backend.model, robot.backend.data)
+    # Lower into bottom bowl
+    sol = solve_ik_held_bowl(robot, task, pos_b + [0, 0, 0.035], u_b, seed=seed)
+    if not sol:
+        return False, "ik_p1_lower", task_prompt
+    _interpolate_stage(robot, task, sol, CLOSED_GRIPPER, CLOSED_GRIPPER, steps=15, settle_steps=3, record_frame=record_frame)
 
-    if not _interpolate_stage(robot, task, pos_b + grasp_offset + [0, 0, 0.030], OPEN_GRIPPER, seed=seed, steps=15, record_frame=record_frame):
-        return False, "ik_p1_release", task_prompt
-    if not _interpolate_stage(robot, task, pos_b + grasp_offset + [0, -0.06, 0.14], OPEN_GRIPPER, seed=seed, steps=15, record_frame=record_frame):
+    # Release
+    _interpolate_stage(robot, task, sol, CLOSED_GRIPPER, OPEN_GRIPPER, steps=15, settle_steps=3, record_frame=record_frame)
+
+    # Retreat upward along reverse approach angle
+    site_pos = robot.backend.data.site_xpos[site_id].copy()
+    site_mat = robot.backend.data.site_xmat[site_id].reshape(3, 3).copy()
+    jaw_curr = site_pos + site_mat @ JAW_CENTER_OFFSET
+    sol = solve_ik_jaw(robot.backend, jaw_curr + [0, 0, 0.08], u_b, seed=seed)
+    if not sol:
         return False, "ik_p1_retreat", task_prompt
+    _interpolate_stage(robot, task, sol, OPEN_GRIPPER, OPEN_GRIPPER, steps=15, settle_steps=2, record_frame=record_frame)
 
-    # Brief settle step
+    # Settle between phases
     current_joints = robot.backend.joint_positions()
-    for _ in range(20):
+    for _ in range(5):
         observation = robot.get_observation() if record_frame is not None else {}
         sent = robot.send_action(current_joints)
         if record_frame is not None:
             record_frame(observation, sent)
 
     # --- Phase 2: Stack Top onto Middle ---
+    pos_t = task.bowl_position(top)
     pos_m_now = task.bowl_position(middle)
+    rim_t, u_t = _get_rim_and_unit_vector(pos_t)
+    _, u_m_now = _get_rim_and_unit_vector(pos_m_now)
+    task.target_bowl = top
 
-    if not _interpolate_stage(robot, task, pos_t + grasp_offset + [0, 0, 0.12], OPEN_GRIPPER, seed=seed, steps=15, record_frame=record_frame):
+    # Approach top bowl (transit across table)
+    sol = solve_ik_jaw(robot.backend, rim_t + [0, 0, 0.08], u_t, seed=seed)
+    if not sol:
         return False, "ik_p2_approach", task_prompt
-    if not _interpolate_stage(robot, task, pos_t + grasp_offset, OPEN_GRIPPER, seed=seed, steps=15, record_frame=record_frame):
+    _interpolate_stage(robot, task, sol, OPEN_GRIPPER, OPEN_GRIPPER, steps=25, settle_steps=2, record_frame=record_frame)
+
+    # Descend to rim
+    sol = solve_ik_jaw(robot.backend, rim_t, u_t, seed=seed)
+    if not sol:
         return False, "ik_p2_pre_grasp", task_prompt
-    if not _interpolate_stage(robot, task, pos_t + grasp_offset, CLOSED_GRIPPER, seed=seed, steps=25, record_frame=record_frame):
-        return False, "ik_p2_grasp", task_prompt
+    _interpolate_stage(robot, task, sol, OPEN_GRIPPER, OPEN_GRIPPER, steps=15, settle_steps=2, record_frame=record_frame)
 
-    held_offset_t = pos_t - robot.backend.site_position("gripper_frame")
+    # Grasp rim
+    _interpolate_stage(robot, task, sol, OPEN_GRIPPER, CLOSED_GRIPPER, steps=15, settle_steps=3, record_frame=record_frame)
+    if task.held_bowl is None:
+        return False, "ik_p2_grasp_missed", task_prompt
 
-    if not _interpolate_stage(
-        robot, task, pos_t + grasp_offset + [0, 0, 0.14], CLOSED_GRIPPER,
-        seed=seed, steps=20, held_bowl=top,
-        held_pos_fn=lambda: robot.backend.site_position("gripper_frame") + held_offset_t,
-        record_frame=record_frame,
-    ):
+    # Lift top bowl
+    sol = solve_ik_jaw(robot.backend, rim_t + [0, 0, 0.12], u_t, seed=seed)
+    if not sol:
         return False, "ik_p2_lift", task_prompt
+    _interpolate_stage(robot, task, sol, CLOSED_GRIPPER, CLOSED_GRIPPER, steps=20, settle_steps=2, record_frame=record_frame)
 
-    if not _interpolate_stage(
-        robot, task, pos_m_now + grasp_offset + [0, 0, 0.16], CLOSED_GRIPPER,
-        seed=seed, steps=25, held_bowl=top,
-        held_pos_fn=lambda: robot.backend.site_position("gripper_frame") + held_offset_t,
-        record_frame=record_frame,
-    ):
+    # Carry above middle bowl
+    sol = solve_ik_held_bowl(robot, task, pos_m_now + [0, 0, 0.12], u_m_now, seed=seed)
+    if not sol:
         return False, "ik_p2_carry", task_prompt
+    _interpolate_stage(robot, task, sol, CLOSED_GRIPPER, CLOSED_GRIPPER, steps=25, settle_steps=2, record_frame=record_frame)
 
-    # Seat top bowl into middle bowl and release
-    qadr_t = robot.backend.model.jnt_qposadr[task._joint_ids[top]]
-    dofadr_t = robot.backend.model.jnt_dofadr[task._joint_ids[top]]
-    robot.backend.data.qpos[qadr_t : qadr_t + 3] = pos_m_now + [0, 0, 0.018]
-    robot.backend.data.qvel[dofadr_t : dofadr_t + 6] = 0
-    mujoco.mj_forward(robot.backend.model, robot.backend.data)
+    # Re-measure middle bowl position for sub-millimeter concentric placement
+    pos_m_now = task.bowl_position(middle)
+    sol = solve_ik_held_bowl(robot, task, pos_m_now + [0, 0, 0.035], u_m_now, seed=seed)
+    if not sol:
+        return False, "ik_p2_lower", task_prompt
+    _interpolate_stage(robot, task, sol, CLOSED_GRIPPER, CLOSED_GRIPPER, steps=15, settle_steps=3, record_frame=record_frame)
 
-    if not _interpolate_stage(robot, task, pos_m_now + grasp_offset + [0, 0, 0.030], OPEN_GRIPPER, seed=seed, steps=15, record_frame=record_frame):
-        return False, "ik_p2_release", task_prompt
-    if not _interpolate_stage(robot, task, pos_m_now + grasp_offset + [0, -0.06, 0.16], OPEN_GRIPPER, seed=seed, steps=15, record_frame=record_frame):
+    # Release
+    _interpolate_stage(robot, task, sol, CLOSED_GRIPPER, OPEN_GRIPPER, steps=15, settle_steps=3, record_frame=record_frame)
+
+    # Retreat upward along reverse approach angle
+    site_pos = robot.backend.data.site_xpos[site_id].copy()
+    site_mat = robot.backend.data.site_xmat[site_id].reshape(3, 3).copy()
+    jaw_curr = site_pos + site_mat @ JAW_CENTER_OFFSET
+    sol = solve_ik_jaw(robot.backend, jaw_curr + [0, 0, 0.08], u_m_now, seed=seed)
+    if not sol:
         return False, "ik_p2_retreat", task_prompt
+    _interpolate_stage(robot, task, sol, OPEN_GRIPPER, OPEN_GRIPPER, steps=15, settle_steps=2, record_frame=record_frame)
 
-    # Stability hold
+    task.target_bowl = None
+
+    # Stability hold until success or timeout
     hold_action = robot.backend.joint_positions()
-    for _ in range(45):
+    for _ in range(35):
         observation = robot.get_observation() if record_frame is not None else {}
         sent = robot.send_action(hold_action)
         if record_frame is not None:
@@ -220,6 +356,17 @@ def generate_episode(
 def _build_dataset(robot: NexArmSim, args: argparse.Namespace) -> LeRobotDataset:
     from lerobot.datasets.lerobot_dataset import LeRobotDataset
 
+    if args.resume:
+        print(f"[INFO] Resuming existing dataset at {args.root}...")
+        return LeRobotDataset.resume(
+            repo_id=args.repo_id,
+            root=args.root,
+            streaming_encoding=args.video,
+            encoder_queue_maxsize=240,
+            encoder_threads=4 if args.video else None,
+            image_writer_threads=4 if not args.video else 0,
+        )
+
     features = {
         **hw_to_dataset_features(robot.action_features, ACTION, args.video),
         **hw_to_dataset_features(robot.observation_features, OBS_STR, args.video),
@@ -232,10 +379,108 @@ def _build_dataset(robot: NexArmSim, args: argparse.Namespace) -> LeRobotDataset
         features=features,
         use_videos=args.video,
         streaming_encoding=args.video,
-        encoder_queue_maxsize=120,
-        encoder_threads=2 if args.video else None,
+        encoder_queue_maxsize=240,
+        encoder_threads=4 if args.video else None,
         image_writer_threads=4 if not args.video else 0,
     )
+
+
+def _run_multi_gpu(args: argparse.Namespace, gpu_list: list[str]) -> int:
+    import os
+    import shutil
+    import subprocess
+    import sys
+    from lerobot.datasets.dataset_tools import merge_datasets
+    from lerobot.datasets.lerobot_dataset import LeRobotDataset
+
+    num_workers = len(gpu_list)
+    episodes_per_worker = [args.episodes // num_workers] * num_workers
+    for i in range(args.episodes % num_workers):
+        episodes_per_worker[i] += 1
+
+    temp_shards: list[tuple[str, Path]] = []
+    procs: list[subprocess.Popen] = []
+
+    base_seed = args.seed_start if args.seed_start is not None else 0
+    seed_stride = 10000
+
+    print(
+        f"[INFO] Launching {num_workers} parallel workers on GPUs {gpu_list} to generate "
+        f"{args.episodes} episodes total ({episodes_per_worker} per worker)..."
+    )
+
+    for worker_idx, (gpu_id, worker_eps) in enumerate(zip(gpu_list, episodes_per_worker)):
+        if worker_eps <= 0:
+            continue
+        shard_root = args.root.parent / f"{args.root.name}_shard_gpu{gpu_id}"
+        shard_repo = f"{args.repo_id}_shard_{worker_idx}"
+        shutil.rmtree(shard_root, ignore_errors=True)
+        temp_shards.append((shard_repo, shard_root))
+
+        worker_seed = base_seed + worker_idx * seed_stride
+
+        cmd = [
+            sys.executable,
+            "-u",
+            str(Path(__file__).resolve()),
+            "--repo-id", shard_repo,
+            "--root", str(shard_root),
+            "--episodes", str(worker_eps),
+            "--seed-start", str(worker_seed),
+            "--fps", str(args.fps),
+            "--camera-width", str(args.camera_width),
+            "--camera-height", str(args.camera_height),
+            "--cameras", args.cameras,
+            "--model", str(args.model),
+        ]
+        if args.domain_randomization:
+            cmd.append("--domain-randomization")
+        if not args.video:
+            cmd.append("--no-video")
+
+        env = os.environ.copy()
+        env["PYTHONUNBUFFERED"] = "1"
+        env["MUJOCO_GL"] = "egl"
+        env["MUJOCO_EGL_DEVICE_ID"] = str(gpu_id)
+        env["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
+
+        p = subprocess.Popen(cmd, env=env)
+        procs.append(p)
+
+    failed = False
+    for p in procs:
+        ret = p.wait()
+        if ret != 0:
+            failed = True
+
+    if failed:
+        print("[ERROR] One or more parallel worker processes failed!")
+        return 1
+
+    print(f"[INFO] All workers completed successfully. Merging {len(temp_shards)} shards into {args.root}...")
+    try:
+        shard_datasets = [
+            LeRobotDataset(repo_id, root=shard_root)
+            for repo_id, shard_root in temp_shards
+        ]
+
+        if args.resume and args.root.exists():
+            existing_ds = LeRobotDataset(args.repo_id, root=args.root)
+            all_to_merge = [existing_ds] + shard_datasets
+        else:
+            all_to_merge = shard_datasets
+
+        merge_datasets(
+            all_to_merge,
+            output_repo_id=args.repo_id,
+            output_dir=args.root,
+        )
+        print(f"[INFO] Successfully merged into final dataset at {args.root}")
+    finally:
+        for _, shard_root in temp_shards:
+            shutil.rmtree(shard_root, ignore_errors=True)
+
+    return 0
 
 
 def parse_args() -> argparse.Namespace:
@@ -244,10 +489,32 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--root", type=Path, default=Path("outputs/datasets/nexarm_stack_bowls"))
     parser.add_argument("--episodes", type=int, default=20, help="Number of accepted episodes to write")
     parser.add_argument("--max-attempts", type=int, default=None)
-    parser.add_argument("--seed-start", type=int, default=0)
+    parser.add_argument(
+        "--gpus",
+        type=str,
+        default=None,
+        help="Comma-separated GPU IDs to parallelize across (e.g. '0,7' or '0,1').",
+    )
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Resume/append new episodes to an existing dataset without overwriting or deleting it.",
+    )
+    parser.add_argument(
+        "--seed-start",
+        type=int,
+        default=None,
+        help="Starting random seed. If not specified, starts from 0 (or from existing episode count if --resume).",
+    )
     parser.add_argument("--fps", type=int, default=30)
     parser.add_argument("--camera-width", type=int, default=640)
     parser.add_argument("--camera-height", type=int, default=480)
+    parser.add_argument(
+        "--cameras",
+        type=str,
+        default="front,wrist,top",
+        help="Comma-separated list of cameras (e.g. 'front,wrist,top')",
+    )
     parser.add_argument("--model", type=Path, default=Path("sim/fusion_export/bowl_stack_scene.xml"))
     parser.add_argument(
         "--domain-randomization",
@@ -265,11 +532,19 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
+
+    if args.gpus is not None:
+        gpu_list = [g.strip() for g in args.gpus.split(",") if g.strip()]
+        if len(gpu_list) > 1:
+            return _run_multi_gpu(args, gpu_list)
+
+    cam_names = tuple(c.strip() for c in args.cameras.split(",") if c.strip())
     robot = NexArmSim(
         NexArmSimConfig(
             id="synthetic_bowl_generator",
             model_path=args.model,
             fps=args.fps,
+            camera_names=cam_names,
             camera_width=args.camera_width,
             camera_height=args.camera_height,
             settle_steps=0,
@@ -282,11 +557,19 @@ def main() -> int:
     accepted = 0
     attempts = 0
 
-    print(f"[INFO] Generating {args.episodes} episodes of 3-bowl stacking dataset...")
+    if args.seed_start is None:
+        base_seed = dataset.meta.total_episodes if args.resume else 0
+    else:
+        base_seed = args.seed_start
+
+    print(
+        f"[INFO] Generating {args.episodes} episodes of 3-bowl stacking dataset "
+        f"(resume={args.resume}, starting_seed={base_seed}, total_existing={dataset.meta.total_episodes})..."
+    )
 
     try:
         while accepted < args.episodes and attempts < args.max_attempts:
-            seed = args.seed_start + attempts
+            seed = base_seed + attempts
 
             task.reset(seed=seed, settle_steps=25)
             bottom, middle, top = task.current_order
@@ -312,14 +595,15 @@ def main() -> int:
             if success:
                 dataset.save_episode()
                 accepted += 1
-                print(f"Accepted episode {accepted}/{args.episodes} (seed={seed}, prompt='{current_prompt}')")
+                print(f"Accepted episode {accepted}/{args.episodes} (seed={seed}, prompt='{current_prompt}')", flush=True)
             else:
                 dataset.clear_episode_buffer()
-                print(f"Rejected attempt {attempts} (seed={seed}, reason='{reason}')")
+                print(f"Rejected attempt {attempts} (seed={seed}, reason='{reason}')", flush=True)
     finally:
         robot.disconnect()
+        dataset.finalize()
 
-    print(f"[INFO] Finished: {accepted}/{args.episodes} episodes saved to {args.root}")
+    print(f"[INFO] Finished: {accepted}/{args.episodes} episodes written to {args.root} (total dataset episodes: {dataset.meta.total_episodes})", flush=True)
     return 0 if accepted >= args.episodes else 1
 
 

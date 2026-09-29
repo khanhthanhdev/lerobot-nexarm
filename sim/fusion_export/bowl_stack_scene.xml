@@ -1,4 +1,4 @@
-<?xml version='1.0' encoding='utf-8'?>
+<?xml version="1.0" encoding="utf-8"?>
 <mujoco model="NexArm Bowl Stacking Scene">
   <include file="NexArm-sim.xml" />
   <statistic center="0 0.2 0.2" extent="0.8" />
@@ -10,7 +10,7 @@
 
   <default>
     <default class="bowl_col">
-      <geom mass="0.0035" friction="1.2 0.01 0.001" contype="2" conaffinity="3" group="3" />
+      <geom mass="0.001818" friction="1.2 0.01 0.001" contype="2" conaffinity="3" group="3" />
     </default>
   </default>
 
@@ -34,80 +34,123 @@
     <light pos="0 0 3" dir="0 0 -1" directional="true" />
     <geom name="floor" type="plane" size="1 1 0.05" rgba="0.8 0.8 0.8 1" friction="1 0.005 0.0001" contype="2" conaffinity="2" />
     <camera name="front" mode="fixed" pos="0.360630977001 -0.613972762847 0.55" xyaxes="0.857493 0.514496 0 -0.240504 0.400841 0.884016" fovy="55" />
+    <camera name="top" mode="fixed" pos="0.0 -0.24 0.75" xyaxes="1 0 0 0 1 0" fovy="55" />
 
     <!-- bowl_red -->
     <body name="bowl_red" pos="-0.1000 -0.2400 0.0200">
       <freejoint name="bowl_red_joint" />
-      <!-- Visual CAD mesh -->
       <geom name="bowl_red_visual" type="mesh" mesh="bowl_red" material="mat_bowl_red" contype="0" conaffinity="0" group="2" />
-      <!-- Concave Collision Proxy -->
-      <geom name="bowl_red_base_col" type="cylinder" size="0.040 0.003" pos="0 0 -0.015" class="bowl_col" />
-      <geom name="bowl_red_wall_0" type="capsule" fromto="0.0420 0.0000 -0.0120 0.0580 0.0000 0.0160" size="0.005" class="bowl_col" />
-      <geom name="bowl_red_wall_1" type="capsule" fromto="0.0297 0.0297 -0.0120 0.0410 0.0410 0.0160" size="0.005" class="bowl_col" />
-      <geom name="bowl_red_wall_2" type="capsule" fromto="0.0000 0.0420 -0.0120 0.0000 0.0580 0.0160" size="0.005" class="bowl_col" />
-      <geom name="bowl_red_wall_3" type="capsule" fromto="-0.0297 0.0297 -0.0120 -0.0410 0.0410 0.0160" size="0.005" class="bowl_col" />
-      <geom name="bowl_red_wall_4" type="capsule" fromto="-0.0420 0.0000 -0.0120 -0.0580 0.0000 0.0160" size="0.005" class="bowl_col" />
-      <geom name="bowl_red_wall_5" type="capsule" fromto="-0.0297 -0.0297 -0.0120 -0.0410 -0.0410 0.0160" size="0.005" class="bowl_col" />
-      <geom name="bowl_red_wall_6" type="capsule" fromto="-0.0000 -0.0420 -0.0120 -0.0000 -0.0580 0.0160" size="0.005" class="bowl_col" />
-      <geom name="bowl_red_wall_7" type="capsule" fromto="0.0297 -0.0297 -0.0120 0.0410 -0.0410 0.0160" size="0.005" class="bowl_col" />
-      <geom name="bowl_red_rim_0" type="capsule" fromto="0.0580 0.0000 0.0160 0.0410 0.0410 0.0160" size="0.004" class="bowl_col" />
-      <geom name="bowl_red_rim_1" type="capsule" fromto="0.0410 0.0410 0.0160 0.0000 0.0580 0.0160" size="0.004" class="bowl_col" />
-      <geom name="bowl_red_rim_2" type="capsule" fromto="0.0000 0.0580 0.0160 -0.0410 0.0410 0.0160" size="0.004" class="bowl_col" />
-      <geom name="bowl_red_rim_3" type="capsule" fromto="-0.0410 0.0410 0.0160 -0.0580 0.0000 0.0160" size="0.004" class="bowl_col" />
-      <geom name="bowl_red_rim_4" type="capsule" fromto="-0.0580 0.0000 0.0160 -0.0410 -0.0410 0.0160" size="0.004" class="bowl_col" />
-      <geom name="bowl_red_rim_5" type="capsule" fromto="-0.0410 -0.0410 0.0160 -0.0000 -0.0580 0.0160" size="0.004" class="bowl_col" />
-      <geom name="bowl_red_rim_6" type="capsule" fromto="-0.0000 -0.0580 0.0160 0.0410 -0.0410 0.0160" size="0.004" class="bowl_col" />
-      <geom name="bowl_red_rim_7" type="capsule" fromto="0.0410 -0.0410 0.0160 0.0580 -0.0000 0.0160" size="0.004" class="bowl_col" />
+      <geom name="bowl_red_base_col" type="cylinder" size="0.046 0.002" pos="0 0 -0.0168" class="bowl_col" />
+      <geom name="bowl_red_wall_0" type="capsule" fromto="0.04800 0.00000 -0.01400 0.06100 0.00000 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_red_wall_1" type="capsule" fromto="0.04708 0.00936 -0.01400 0.05983 0.01190 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_red_wall_2" type="capsule" fromto="0.04435 0.01837 -0.01400 0.05636 0.02334 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_red_wall_3" type="capsule" fromto="0.03991 0.02667 -0.01400 0.05072 0.03389 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_red_wall_4" type="capsule" fromto="0.03394 0.03394 -0.01400 0.04313 0.04313 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_red_wall_5" type="capsule" fromto="0.02667 0.03991 -0.01400 0.03389 0.05072 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_red_wall_6" type="capsule" fromto="0.01837 0.04435 -0.01400 0.02334 0.05636 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_red_wall_7" type="capsule" fromto="0.00936 0.04708 -0.01400 0.01190 0.05983 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_red_wall_8" type="capsule" fromto="0.00000 0.04800 -0.01400 0.00000 0.06100 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_red_wall_9" type="capsule" fromto="-0.00936 0.04708 -0.01400 -0.01190 0.05983 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_red_wall_10" type="capsule" fromto="-0.01837 0.04435 -0.01400 -0.02334 0.05636 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_red_wall_11" type="capsule" fromto="-0.02667 0.03991 -0.01400 -0.03389 0.05072 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_red_wall_12" type="capsule" fromto="-0.03394 0.03394 -0.01400 -0.04313 0.04313 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_red_wall_13" type="capsule" fromto="-0.03991 0.02667 -0.01400 -0.05072 0.03389 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_red_wall_14" type="capsule" fromto="-0.04435 0.01837 -0.01400 -0.05636 0.02334 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_red_wall_15" type="capsule" fromto="-0.04708 0.00936 -0.01400 -0.05983 0.01190 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_red_wall_16" type="capsule" fromto="-0.04800 0.00000 -0.01400 -0.06100 0.00000 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_red_wall_17" type="capsule" fromto="-0.04708 -0.00936 -0.01400 -0.05983 -0.01190 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_red_wall_18" type="capsule" fromto="-0.04435 -0.01837 -0.01400 -0.05636 -0.02334 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_red_wall_19" type="capsule" fromto="-0.03991 -0.02667 -0.01400 -0.05072 -0.03389 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_red_wall_20" type="capsule" fromto="-0.03394 -0.03394 -0.01400 -0.04313 -0.04313 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_red_wall_21" type="capsule" fromto="-0.02667 -0.03991 -0.01400 -0.03389 -0.05072 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_red_wall_22" type="capsule" fromto="-0.01837 -0.04435 -0.01400 -0.02334 -0.05636 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_red_wall_23" type="capsule" fromto="-0.00936 -0.04708 -0.01400 -0.01190 -0.05983 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_red_wall_24" type="capsule" fromto="-0.00000 -0.04800 -0.01400 -0.00000 -0.06100 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_red_wall_25" type="capsule" fromto="0.00936 -0.04708 -0.01400 0.01190 -0.05983 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_red_wall_26" type="capsule" fromto="0.01837 -0.04435 -0.01400 0.02334 -0.05636 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_red_wall_27" type="capsule" fromto="0.02667 -0.03991 -0.01400 0.03389 -0.05072 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_red_wall_28" type="capsule" fromto="0.03394 -0.03394 -0.01400 0.04313 -0.04313 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_red_wall_29" type="capsule" fromto="0.03991 -0.02667 -0.01400 0.05072 -0.03389 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_red_wall_30" type="capsule" fromto="0.04435 -0.01837 -0.01400 0.05636 -0.02334 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_red_wall_31" type="capsule" fromto="0.04708 -0.00936 -0.01400 0.05983 -0.01190 0.01600" size="0.00550" class="bowl_col" />
     </body>
 
     <!-- bowl_blue -->
     <body name="bowl_blue" pos="0.0000 -0.2400 0.0200">
       <freejoint name="bowl_blue_joint" />
-      <!-- Visual CAD mesh -->
       <geom name="bowl_blue_visual" type="mesh" mesh="bowl_blue" material="mat_bowl_blue" contype="0" conaffinity="0" group="2" />
-      <!-- Concave Collision Proxy -->
-      <geom name="bowl_blue_base_col" type="cylinder" size="0.040 0.003" pos="0 0 -0.015" class="bowl_col" />
-      <geom name="bowl_blue_wall_0" type="capsule" fromto="0.0420 0.0000 -0.0120 0.0580 0.0000 0.0160" size="0.005" class="bowl_col" />
-      <geom name="bowl_blue_wall_1" type="capsule" fromto="0.0297 0.0297 -0.0120 0.0410 0.0410 0.0160" size="0.005" class="bowl_col" />
-      <geom name="bowl_blue_wall_2" type="capsule" fromto="0.0000 0.0420 -0.0120 0.0000 0.0580 0.0160" size="0.005" class="bowl_col" />
-      <geom name="bowl_blue_wall_3" type="capsule" fromto="-0.0297 0.0297 -0.0120 -0.0410 0.0410 0.0160" size="0.005" class="bowl_col" />
-      <geom name="bowl_blue_wall_4" type="capsule" fromto="-0.0420 0.0000 -0.0120 -0.0580 0.0000 0.0160" size="0.005" class="bowl_col" />
-      <geom name="bowl_blue_wall_5" type="capsule" fromto="-0.0297 -0.0297 -0.0120 -0.0410 -0.0410 0.0160" size="0.005" class="bowl_col" />
-      <geom name="bowl_blue_wall_6" type="capsule" fromto="-0.0000 -0.0420 -0.0120 -0.0000 -0.0580 0.0160" size="0.005" class="bowl_col" />
-      <geom name="bowl_blue_wall_7" type="capsule" fromto="0.0297 -0.0297 -0.0120 0.0410 -0.0410 0.0160" size="0.005" class="bowl_col" />
-      <geom name="bowl_blue_rim_0" type="capsule" fromto="0.0580 0.0000 0.0160 0.0410 0.0410 0.0160" size="0.004" class="bowl_col" />
-      <geom name="bowl_blue_rim_1" type="capsule" fromto="0.0410 0.0410 0.0160 0.0000 0.0580 0.0160" size="0.004" class="bowl_col" />
-      <geom name="bowl_blue_rim_2" type="capsule" fromto="0.0000 0.0580 0.0160 -0.0410 0.0410 0.0160" size="0.004" class="bowl_col" />
-      <geom name="bowl_blue_rim_3" type="capsule" fromto="-0.0410 0.0410 0.0160 -0.0580 0.0000 0.0160" size="0.004" class="bowl_col" />
-      <geom name="bowl_blue_rim_4" type="capsule" fromto="-0.0580 0.0000 0.0160 -0.0410 -0.0410 0.0160" size="0.004" class="bowl_col" />
-      <geom name="bowl_blue_rim_5" type="capsule" fromto="-0.0410 -0.0410 0.0160 -0.0000 -0.0580 0.0160" size="0.004" class="bowl_col" />
-      <geom name="bowl_blue_rim_6" type="capsule" fromto="-0.0000 -0.0580 0.0160 0.0410 -0.0410 0.0160" size="0.004" class="bowl_col" />
-      <geom name="bowl_blue_rim_7" type="capsule" fromto="0.0410 -0.0410 0.0160 0.0580 -0.0000 0.0160" size="0.004" class="bowl_col" />
+      <geom name="bowl_blue_base_col" type="cylinder" size="0.046 0.002" pos="0 0 -0.0168" class="bowl_col" />
+      <geom name="bowl_blue_wall_0" type="capsule" fromto="0.04800 0.00000 -0.01400 0.06100 0.00000 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_blue_wall_1" type="capsule" fromto="0.04708 0.00936 -0.01400 0.05983 0.01190 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_blue_wall_2" type="capsule" fromto="0.04435 0.01837 -0.01400 0.05636 0.02334 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_blue_wall_3" type="capsule" fromto="0.03991 0.02667 -0.01400 0.05072 0.03389 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_blue_wall_4" type="capsule" fromto="0.03394 0.03394 -0.01400 0.04313 0.04313 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_blue_wall_5" type="capsule" fromto="0.02667 0.03991 -0.01400 0.03389 0.05072 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_blue_wall_6" type="capsule" fromto="0.01837 0.04435 -0.01400 0.02334 0.05636 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_blue_wall_7" type="capsule" fromto="0.00936 0.04708 -0.01400 0.01190 0.05983 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_blue_wall_8" type="capsule" fromto="0.00000 0.04800 -0.01400 0.00000 0.06100 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_blue_wall_9" type="capsule" fromto="-0.00936 0.04708 -0.01400 -0.01190 0.05983 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_blue_wall_10" type="capsule" fromto="-0.01837 0.04435 -0.01400 -0.02334 0.05636 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_blue_wall_11" type="capsule" fromto="-0.02667 0.03991 -0.01400 -0.03389 0.05072 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_blue_wall_12" type="capsule" fromto="-0.03394 0.03394 -0.01400 -0.04313 0.04313 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_blue_wall_13" type="capsule" fromto="-0.03991 0.02667 -0.01400 -0.05072 0.03389 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_blue_wall_14" type="capsule" fromto="-0.04435 0.01837 -0.01400 -0.05636 0.02334 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_blue_wall_15" type="capsule" fromto="-0.04708 0.00936 -0.01400 -0.05983 0.01190 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_blue_wall_16" type="capsule" fromto="-0.04800 0.00000 -0.01400 -0.06100 0.00000 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_blue_wall_17" type="capsule" fromto="-0.04708 -0.00936 -0.01400 -0.05983 -0.01190 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_blue_wall_18" type="capsule" fromto="-0.04435 -0.01837 -0.01400 -0.05636 -0.02334 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_blue_wall_19" type="capsule" fromto="-0.03991 -0.02667 -0.01400 -0.05072 -0.03389 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_blue_wall_20" type="capsule" fromto="-0.03394 -0.03394 -0.01400 -0.04313 -0.04313 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_blue_wall_21" type="capsule" fromto="-0.02667 -0.03991 -0.01400 -0.03389 -0.05072 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_blue_wall_22" type="capsule" fromto="-0.01837 -0.04435 -0.01400 -0.02334 -0.05636 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_blue_wall_23" type="capsule" fromto="-0.00936 -0.04708 -0.01400 -0.01190 -0.05983 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_blue_wall_24" type="capsule" fromto="-0.00000 -0.04800 -0.01400 -0.00000 -0.06100 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_blue_wall_25" type="capsule" fromto="0.00936 -0.04708 -0.01400 0.01190 -0.05983 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_blue_wall_26" type="capsule" fromto="0.01837 -0.04435 -0.01400 0.02334 -0.05636 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_blue_wall_27" type="capsule" fromto="0.02667 -0.03991 -0.01400 0.03389 -0.05072 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_blue_wall_28" type="capsule" fromto="0.03394 -0.03394 -0.01400 0.04313 -0.04313 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_blue_wall_29" type="capsule" fromto="0.03991 -0.02667 -0.01400 0.05072 -0.03389 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_blue_wall_30" type="capsule" fromto="0.04435 -0.01837 -0.01400 0.05636 -0.02334 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_blue_wall_31" type="capsule" fromto="0.04708 -0.00936 -0.01400 0.05983 -0.01190 0.01600" size="0.00550" class="bowl_col" />
     </body>
 
     <!-- bowl_black -->
     <body name="bowl_black" pos="0.1000 -0.2400 0.0200">
       <freejoint name="bowl_black_joint" />
-      <!-- Visual CAD mesh -->
       <geom name="bowl_black_visual" type="mesh" mesh="bowl_black" material="mat_bowl_black" contype="0" conaffinity="0" group="2" />
-      <!-- Concave Collision Proxy -->
-      <geom name="bowl_black_base_col" type="cylinder" size="0.040 0.003" pos="0 0 -0.015" class="bowl_col" />
-      <geom name="bowl_black_wall_0" type="capsule" fromto="0.0420 0.0000 -0.0120 0.0580 0.0000 0.0160" size="0.005" class="bowl_col" />
-      <geom name="bowl_black_wall_1" type="capsule" fromto="0.0297 0.0297 -0.0120 0.0410 0.0410 0.0160" size="0.005" class="bowl_col" />
-      <geom name="bowl_black_wall_2" type="capsule" fromto="0.0000 0.0420 -0.0120 0.0000 0.0580 0.0160" size="0.005" class="bowl_col" />
-      <geom name="bowl_black_wall_3" type="capsule" fromto="-0.0297 0.0297 -0.0120 -0.0410 0.0410 0.0160" size="0.005" class="bowl_col" />
-      <geom name="bowl_black_wall_4" type="capsule" fromto="-0.0420 0.0000 -0.0120 -0.0580 0.0000 0.0160" size="0.005" class="bowl_col" />
-      <geom name="bowl_black_wall_5" type="capsule" fromto="-0.0297 -0.0297 -0.0120 -0.0410 -0.0410 0.0160" size="0.005" class="bowl_col" />
-      <geom name="bowl_black_wall_6" type="capsule" fromto="-0.0000 -0.0420 -0.0120 -0.0000 -0.0580 0.0160" size="0.005" class="bowl_col" />
-      <geom name="bowl_black_wall_7" type="capsule" fromto="0.0297 -0.0297 -0.0120 0.0410 -0.0410 0.0160" size="0.005" class="bowl_col" />
-      <geom name="bowl_black_rim_0" type="capsule" fromto="0.0580 0.0000 0.0160 0.0410 0.0410 0.0160" size="0.004" class="bowl_col" />
-      <geom name="bowl_black_rim_1" type="capsule" fromto="0.0410 0.0410 0.0160 0.0000 0.0580 0.0160" size="0.004" class="bowl_col" />
-      <geom name="bowl_black_rim_2" type="capsule" fromto="0.0000 0.0580 0.0160 -0.0410 0.0410 0.0160" size="0.004" class="bowl_col" />
-      <geom name="bowl_black_rim_3" type="capsule" fromto="-0.0410 0.0410 0.0160 -0.0580 0.0000 0.0160" size="0.004" class="bowl_col" />
-      <geom name="bowl_black_rim_4" type="capsule" fromto="-0.0580 0.0000 0.0160 -0.0410 -0.0410 0.0160" size="0.004" class="bowl_col" />
-      <geom name="bowl_black_rim_5" type="capsule" fromto="-0.0410 -0.0410 0.0160 -0.0000 -0.0580 0.0160" size="0.004" class="bowl_col" />
-      <geom name="bowl_black_rim_6" type="capsule" fromto="-0.0000 -0.0580 0.0160 0.0410 -0.0410 0.0160" size="0.004" class="bowl_col" />
-      <geom name="bowl_black_rim_7" type="capsule" fromto="0.0410 -0.0410 0.0160 0.0580 -0.0000 0.0160" size="0.004" class="bowl_col" />
+      <geom name="bowl_black_base_col" type="cylinder" size="0.046 0.002" pos="0 0 -0.0168" class="bowl_col" />
+      <geom name="bowl_black_wall_0" type="capsule" fromto="0.04800 0.00000 -0.01400 0.06100 0.00000 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_black_wall_1" type="capsule" fromto="0.04708 0.00936 -0.01400 0.05983 0.01190 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_black_wall_2" type="capsule" fromto="0.04435 0.01837 -0.01400 0.05636 0.02334 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_black_wall_3" type="capsule" fromto="0.03991 0.02667 -0.01400 0.05072 0.03389 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_black_wall_4" type="capsule" fromto="0.03394 0.03394 -0.01400 0.04313 0.04313 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_black_wall_5" type="capsule" fromto="0.02667 0.03991 -0.01400 0.03389 0.05072 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_black_wall_6" type="capsule" fromto="0.01837 0.04435 -0.01400 0.02334 0.05636 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_black_wall_7" type="capsule" fromto="0.00936 0.04708 -0.01400 0.01190 0.05983 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_black_wall_8" type="capsule" fromto="0.00000 0.04800 -0.01400 0.00000 0.06100 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_black_wall_9" type="capsule" fromto="-0.00936 0.04708 -0.01400 -0.01190 0.05983 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_black_wall_10" type="capsule" fromto="-0.01837 0.04435 -0.01400 -0.02334 0.05636 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_black_wall_11" type="capsule" fromto="-0.02667 0.03991 -0.01400 -0.03389 0.05072 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_black_wall_12" type="capsule" fromto="-0.03394 0.03394 -0.01400 -0.04313 0.04313 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_black_wall_13" type="capsule" fromto="-0.03991 0.02667 -0.01400 -0.05072 0.03389 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_black_wall_14" type="capsule" fromto="-0.04435 0.01837 -0.01400 -0.05636 0.02334 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_black_wall_15" type="capsule" fromto="-0.04708 0.00936 -0.01400 -0.05983 0.01190 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_black_wall_16" type="capsule" fromto="-0.04800 0.00000 -0.01400 -0.06100 0.00000 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_black_wall_17" type="capsule" fromto="-0.04708 -0.00936 -0.01400 -0.05983 -0.01190 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_black_wall_18" type="capsule" fromto="-0.04435 -0.01837 -0.01400 -0.05636 -0.02334 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_black_wall_19" type="capsule" fromto="-0.03991 -0.02667 -0.01400 -0.05072 -0.03389 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_black_wall_20" type="capsule" fromto="-0.03394 -0.03394 -0.01400 -0.04313 -0.04313 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_black_wall_21" type="capsule" fromto="-0.02667 -0.03991 -0.01400 -0.03389 -0.05072 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_black_wall_22" type="capsule" fromto="-0.01837 -0.04435 -0.01400 -0.02334 -0.05636 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_black_wall_23" type="capsule" fromto="-0.00936 -0.04708 -0.01400 -0.01190 -0.05983 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_black_wall_24" type="capsule" fromto="-0.00000 -0.04800 -0.01400 -0.00000 -0.06100 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_black_wall_25" type="capsule" fromto="0.00936 -0.04708 -0.01400 0.01190 -0.05983 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_black_wall_26" type="capsule" fromto="0.01837 -0.04435 -0.01400 0.02334 -0.05636 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_black_wall_27" type="capsule" fromto="0.02667 -0.03991 -0.01400 0.03389 -0.05072 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_black_wall_28" type="capsule" fromto="0.03394 -0.03394 -0.01400 0.04313 -0.04313 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_black_wall_29" type="capsule" fromto="0.03991 -0.02667 -0.01400 0.05072 -0.03389 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_black_wall_30" type="capsule" fromto="0.04435 -0.01837 -0.01400 0.05636 -0.02334 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_black_wall_31" type="capsule" fromto="0.04708 -0.00936 -0.01400 0.05983 -0.01190 0.01600" size="0.00550" class="bowl_col" />
     </body>
 
   </worldbody>
