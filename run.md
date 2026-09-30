@@ -6,38 +6,48 @@ This guide provides copy-pasteable instructions for setting up, running, and dev
 
 ## Table of Contents
 
-1. [Prerequisites & Environment Setup](#1-prerequisites--environment-setup)
-   - [Install `uv` & Clone](#install-uv--clone)
-   - [Dependency Profiles (Choose Your Extra)](#dependency-profiles-choose-your-extra)
-   - [Git LFS & Hugging Face Authentication](#git-lfs--hugging-face-authentication)
-   - [Linux Serial Permissions](#linux-serial-permissions)
-2. [Quickstart Path A: Simulation (Zero Hardware Needed)](#2-quickstart-path-a-simulation-zero-hardware-needed)
-   - [2.1 Interactive MuJoCo Physics Viewer](#21-interactive-mujoco-physics-viewer)
-   - [2.2 6-DOF Cartesian Keyboard Teleoperation](#22-6-dof-cartesian-keyboard-teleoperation)
-   - [2.3 Interactive Pick-and-Place Task](#23-interactive-pick-and-place-task)
-   - [2.4 Gymnasium RL Environment Demo](#24-gymnasium-rl-environment-demo)
-   - [2.5 Sim Dataset Generation with Domain Randomization](#25-sim-dataset-generation-with-domain-randomization)
-   - [2.6 Rerun 3D Simulation Showcase](#26-rerun-3d-simulation-showcase)
-3. [Quickstart Path B: Physical Hardware Setup & Teleoperation](#3-quickstart-path-b-physical-hardware-setup--teleoperation)
-   - [3.1 Hardware Wiring & Power Checklist](#31-hardware-wiring--power-checklist)
-   - [3.2 Find Serial Ports](#32-find-serial-ports)
-   - [3.3 Find & Verify USB Cameras](#33-find--verify-usb-cameras)
-   - [3.4 Real-Time Leader-Follower Teleoperation](#34-real-time-leader-follower-teleoperation)
-   - [3.5 6-DOF Cartesian Hardware Teleoperation](#35-6-dof-cartesian-hardware-teleoperation)
-   - [3.6 Autonomous Vision-Guided Grasping](#36-autonomous-vision-guided-grasping)
-   - [3.7 Sim-to-Real Pre-Flight Camera Alignment](#37-sim-to-real-pre-flight-camera-alignment)
-4. [Imitation Learning Pipeline: Record -> Train -> Rollout](#4-imitation-learning-pipeline-record---train---rollout)
-   - [4.1 Record Demonstrations](#41-record-demonstrations)
-   - [4.2 Inspect & Visualize Dataset](#42-inspect--visualize-dataset)
-   - [4.3 Replay Demonstrations on Hardware](#43-replay-demonstrations-on-hardware)
-   - [4.4 Train a Policy (ACT / Diffusion)](#44-train-a-policy-act--diffusion)
-   - [4.5 Deploy & Rollout Trained Policy](#45-deploy--rollout-trained-policy)
-5. [Python API: Kinematics, Dynamics & Hardware Control](#5-python-api-kinematics-dynamics--hardware-control)
-   - [5.1 C-Accelerated Kinematics & Dynamics](#51-c-accelerated-kinematics--dynamics)
-   - [5.2 Direct Motor Bus Access](#52-direct-motor-bus-access)
-   - [5.3 Hardware Protections (Idle Torque Timeout)](#53-hardware-protections-idle-torque-timeout)
-6. [Testing & Quality Assurance](#6-testing--quality-assurance)
-7. [Troubleshooting & FAQs](#7-troubleshooting--faqs)
+- [NexArm Run Guide: Simulation, Hardware, Teleoperation, Training \& Sim2Real](#nexarm-run-guide-simulation-hardware-teleoperation-training--sim2real)
+  - [Table of Contents](#table-of-contents)
+  - [1. Prerequisites \& Environment Setup](#1-prerequisites--environment-setup)
+    - [Install `uv` \& Clone](#install-uv--clone)
+    - [Dependency Profiles (Choose Your Extra)](#dependency-profiles-choose-your-extra)
+    - [Git LFS \& Hugging Face Authentication](#git-lfs--hugging-face-authentication)
+    - [Linux Serial Permissions](#linux-serial-permissions)
+  - [2. Quickstart Path A: Simulation (Zero Hardware Needed)](#2-quickstart-path-a-simulation-zero-hardware-needed)
+    - [2.1 Interactive MuJoCo Physics Viewer](#21-interactive-mujoco-physics-viewer)
+    - [2.2 6-DOF Cartesian Keyboard Teleoperation](#22-6-dof-cartesian-keyboard-teleoperation)
+    - [2.3 Interactive Pick-and-Place Task](#23-interactive-pick-and-place-task)
+    - [2.4 Gymnasium RL Environment Demo](#24-gymnasium-rl-environment-demo)
+    - [2.5 Sim Dataset Generation with Domain Randomization](#25-sim-dataset-generation-with-domain-randomization)
+    - [2.6 Rerun 3D Simulation Showcase](#26-rerun-3d-simulation-showcase)
+  - [3. Quickstart Path B: Physical Hardware Setup \& Teleoperation](#3-quickstart-path-b-physical-hardware-setup--teleoperation)
+    - [3.1 Hardware Wiring \& Power Checklist](#31-hardware-wiring--power-checklist)
+    - [3.2 Find Serial Ports](#32-find-serial-ports)
+    - [3.3 Find \& Verify USB Cameras](#33-find--verify-usb-cameras)
+    - [3.4 Real-Time Leader-Follower Teleoperation](#34-real-time-leader-follower-teleoperation)
+    - [3.5 6-DOF Cartesian Hardware Teleoperation](#35-6-dof-cartesian-hardware-teleoperation)
+    - [3.6 Autonomous Vision-Guided Grasping](#36-autonomous-vision-guided-grasping)
+    - [3.7 Sim-to-Real Pre-Flight Camera Alignment](#37-sim-to-real-pre-flight-camera-alignment)
+  - [4. Imitation Learning Pipeline: Record -\> Train -\> Rollout](#4-imitation-learning-pipeline-record---train---rollout)
+    - [4.1 Record Demonstrations](#41-record-demonstrations)
+    - [4.2 Inspect \& Visualize Dataset](#42-inspect--visualize-dataset)
+    - [4.3 Replay Demonstrations on Hardware](#43-replay-demonstrations-on-hardware)
+    - [4.4 Train a Policy (ACT / Diffusion)](#44-train-a-policy-act--diffusion)
+    - [4.4b Train TurboVLA (Vision-Language-Action Policy)](#44b-train-turbovla-vision-language-action-policy)
+    - [4.5 Deploy \& Rollout Trained Policy](#45-deploy--rollout-trained-policy)
+  - [5. Python API: Kinematics, Dynamics \& Hardware Control](#5-python-api-kinematics-dynamics--hardware-control)
+    - [5.1 C-Accelerated Kinematics \& Dynamics](#51-c-accelerated-kinematics--dynamics)
+    - [5.2 Direct Motor Bus Access](#52-direct-motor-bus-access)
+    - [5.3 Hardware Protections (Idle Torque Timeout)](#53-hardware-protections-idle-torque-timeout)
+  - [6. Testing \& Quality Assurance](#6-testing--quality-assurance)
+  - [7. Troubleshooting \& FAQs](#7-troubleshooting--faqs)
+    - [Q: `Permission denied: '/dev/ttyUSB*'`](#q-permission-denied-devttyusb)
+    - [Q: `Permission denied: '/nexarm_stack_bowls_YYYYMMDD_HHMMSS'`](#q-permission-denied-nexarm_stack_bowls_yyyymmdd_hhmmss)
+    - [Q: `TimeoutError: No position reply from NexArm`](#q-timeouterror-no-position-reply-from-nexarm)
+    - [Q: Camera display errors (`cv2.error` or headless SSH)](#q-camera-display-errors-cv2error-or-headless-ssh)
+    - [Q: Policy training loss doesn't decrease / arm moves hesitantly](#q-policy-training-loss-doesnt-decrease--arm-moves-hesitantly)
+    - [Q: Which port is Leader and which is Follower?](#q-which-port-is-leader-and-which-is-follower)
+    - [Q: Record loop running slower (5.0 Hz) than target FPS (30 Hz)](#q-record-loop-running-slower-50-hz-than-target-fps-30-hz)
 
 ---
 
@@ -564,6 +574,26 @@ sudo chmod 666 /dev/ttyUSB*
 
 _(Log out and back in if this is the first time adding to `dialout`)_.
 
+### Q: `Permission denied: '/nexarm_stack_bowls_YYYYMMDD_HHMMSS'`
+
+**Cause**: `${HF_USER}` was empty, so the dataset repo ID expanded to `/nexarm_stack_bowls` and the recorder tried to create it at the filesystem root.
+
+**Fix**: Log in and set the username before recording, or explicitly choose a writable local dataset root:
+
+```bash
+export HF_USER="$(NO_COLOR=1 hf auth whoami | awk -F': *' 'NR==1 {print $2}')"
+: "${HF_USER:?Run 'uv run hf auth login' first, then set HF_USER to your Hugging Face username}"
+
+uv run lerobot-record \
+    --robot.type=nexarm_follower --robot.port=/dev/ttyUSB0 \
+    --teleop.type=nexarm_leader --teleop.port=/dev/ttyUSB1 \
+    --dataset.repo_id="${HF_USER}/nexarm_stack_bowls" \
+    --dataset.root=outputs/datasets/nexarm_stack_bowls \
+    --dataset.push_to_hub=true
+```
+
+The `--dataset.root` value is local and writable; keep the remaining camera and recording options from your normal command.
+
 ### Q: `TimeoutError: No position reply from NexArm`
 
 **Fix**: The leader firmware may emit debug lines over Serial that interrupt protocol frames. The driver automatically retries up to 3 times. For a permanent fix, comment out `Serial.printf` lines in `Nex_Arm.ino` when `lerobotMode == true` and reflash.
@@ -588,3 +618,36 @@ _(Log out and back in if this is the first time adding to `dialout`)_.
 ### Q: Which port is Leader and which is Follower?
 
 **Fix**: Run `uv run lerobot-find-port`. Plug in only one arm at a time if you are unsure.
+
+### Q: Record loop running slower (5.0 Hz) than target FPS (30 Hz)
+
+**Root Causes**:
+
+1. **Follower Serial Firmware Desync (5.0 Hz Telemetry)**:
+   - When the physical follower arm is in default/standalone mode (not in LeRobot bridge mode), its AT32 coprocessor broadcasts telemetry packets (`CMD_GET_CUR_COORDS = 11`) at exactly **5.0 Hz (every 200 ms)**.
+   - If `read_positions()` accepted these unrequested telemetry frames without verifying the reply command ID (`CMD_READ_POS = 96`), every read would block for ~200 ms, throttling the record loop to 5.0 Hz and confusing Cartesian coordinates with servo positions.
+   - The driver has been updated in [`src/lerobot/motors/nexarm/nexarm.py`](file:///home/marinelab/code/lerobot-nexarm/src/lerobot/motors/nexarm/nexarm.py) to filter incoming packets strictly for the expected command reply (`CMD_READ_POS`), and `rtscts=False` prevents Linux serial driver write blocking on CH340 USB converters.
+
+2. **USB 2.0 Camera Bandwidth Contention (YUYV vs MJPG)**:
+   - By default on Linux, OpenCV requests raw uncompressed `YUYV` (4:2:2). Two 640x480 @ 30 FPS cameras streaming uncompressed video consume ~37 MB/s, which exceeds single USB 2.0 controller bandwidth and causes the UVC driver to throttle or drop frames down to 5–15 FPS.
+   - **Fix**: Specify `"fourcc":"MJPG"` for OpenCV cameras that support Motion-JPEG (like the Logitech C270 / `front` camera):
+
+```bash
+uv run lerobot-record \
+    --robot.type=nexarm_follower \
+    --robot.port=/dev/ttyUSB0 \
+    --teleop.type=nexarm_leader \
+    --teleop.port=/dev/ttyUSB1 \
+    --robot.cameras='{"front":{"type":"opencv","index_or_path":0,"width":640,"height":480,"fps":30,"fourcc":"MJPG"},"wrist":{"type":"opencv","index_or_path":2,"width":640,"height":480,"fps":30}}' \
+    --dataset.repo_id="${HF_USER}/nexarm_stack_bowls" \
+    --dataset.single_task="Stack the bowls with red on bottom, blue in middle, and black on top." \
+    --dataset.num_episodes=50 \
+    --dataset.episode_time_s=15 \
+    --dataset.reset_time_s=20 \
+    --display_data=false \
+    --dataset.streaming_encoding=true \
+    --dataset.encoder_threads=2
+```
+
+3. **Rerun Display Overhead**:
+   - Setting `--display_data=true` logs two uncompressed camera feeds synchronously to Rerun every step. For high-FPS recording without frame drops, set `--display_data=false` or stream to a remote Rerun viewer with `--display_ip`.

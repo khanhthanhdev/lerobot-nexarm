@@ -151,8 +151,6 @@ class NexArmMotorsBus:
             baudrate=self.baudrate,
             timeout=self.timeout,
             write_timeout=self.timeout,
-            dsrdtr=True,
-            rtscts=True,
         )
         time.sleep(0.1)
         self._serial.reset_input_buffer()
@@ -170,6 +168,7 @@ class NexArmMotorsBus:
         frame: bytes,
         expect_reply: bool = True,
         reply_timeout: float = REPLY_TIMEOUT,
+        expected_cmd: int | None = None,
     ) -> tuple[int, bytes] | None:
         if self._serial is None:
             raise ConnectionError("Serial port not open")
@@ -178,9 +177,13 @@ class NexArmMotorsBus:
             self._serial.write(frame)
             if not expect_reply:
                 return None
-            return self._read_reply(reply_timeout)
+            return self._read_reply(reply_timeout, expected_cmd=expected_cmd)
 
-    def _read_reply(self, timeout: float) -> tuple[int, bytes] | None:
+    def _read_reply(
+        self,
+        timeout: float,
+        expected_cmd: int | None = None,
+    ) -> tuple[int, bytes] | None:
         assert self._serial is not None
         buf = bytearray()
         deadline = time.monotonic() + timeout
@@ -188,9 +191,13 @@ class NexArmMotorsBus:
             avail = self._serial.in_waiting
             if avail:
                 buf.extend(self._serial.read(avail))
-                result = self._try_parse(buf)
-                if result is not None:
-                    return result
+                while True:
+                    result = self._try_parse(buf)
+                    if result is None:
+                        break
+                    cmd, args = result
+                    if expected_cmd is None or cmd == expected_cmd:
+                        return (cmd, args)
             else:
                 time.sleep(0.001)
         return None
@@ -224,10 +231,10 @@ class NexArmMotorsBus:
         """
         for attempt in range(retries):
             frame = build_frame(SYSTEM_ID, CMD_READ_POS)
-            result = self._send(frame, reply_timeout=REPLY_TIMEOUT)
+            result = self._send(frame, reply_timeout=REPLY_TIMEOUT, expected_cmd=CMD_READ_POS)
             if result is not None:
                 cmd, args = result
-                if len(args) >= JOINT_COUNT * 2:
+                if cmd == CMD_READ_POS and len(args) >= JOINT_COUNT * 2:
                     return [
                         max(POSITION_MIN, min(POSITION_MAX, struct.unpack_from("<h", args, i * 2)[0]))
                         for i in range(JOINT_COUNT)
