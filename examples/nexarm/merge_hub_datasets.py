@@ -25,8 +25,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--source-repo-ids",
         nargs="+",
-        required=True,
         help="Hub dataset repo IDs to combine, such as user/dataset_20261001 user/dataset_20261002.",
+    )
+    parser.add_argument(
+        "--local-dataset-root",
+        type=Path,
+        help="Upload an already merged local dataset root instead of merging Hub source repos.",
     )
     parser.add_argument(
         "--output-repo-id",
@@ -54,6 +58,25 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+
+    if (args.local_dataset_root is None) == (args.source_repo_ids is None):
+        raise SystemExit("Provide either --local-dataset-root or --source-repo-ids.")
+
+    if args.local_dataset_root is not None:
+        if not args.local_dataset_root.is_dir():
+            raise SystemExit(f"Local dataset directory does not exist: {args.local_dataset_root}")
+        dataset = LeRobotDataset(args.output_repo_id, root=args.local_dataset_root)
+        print(
+            f"Uploading local dataset with {dataset.num_episodes} episodes "
+            f"and {dataset.num_frames} frames to {args.output_repo_id}..."
+        )
+        dataset.push_to_hub(
+            private=True if args.private else None,
+            upload_large_folder=False,
+            tags=["nexarm", "merged"],
+        )
+        print(f"Done: https://huggingface.co/datasets/{args.output_repo_id}")
+        return
 
     if args.output_repo_id in args.source_repo_ids:
         raise SystemExit("Output repo ID must be different from every source repo ID.")

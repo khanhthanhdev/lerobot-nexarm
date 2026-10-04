@@ -14,8 +14,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import TYPE_CHECKING, Any
+
 from .configuration_groot import GrootConfig
-from .modeling_groot import GrootPolicy
-from .processor_groot import make_groot_pre_post_processors
+
+if TYPE_CHECKING:
+    from .modeling_groot import GrootPolicy
+    from .processor_groot import make_groot_pre_post_processors
 
 __all__ = ["GrootConfig", "GrootPolicy", "make_groot_pre_post_processors"]
+
+
+def __getattr__(name: str) -> Any:
+    """Load GR00T's model and processors only when requested by a GR00T caller."""
+    if name == "GrootPolicy":
+        from .modeling_groot import GrootPolicy
+
+        value = GrootPolicy
+    elif name == "make_groot_pre_post_processors":
+        from .processor_groot import make_groot_pre_post_processors
+
+        value = make_groot_pre_post_processors
+    else:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    globals()[name] = value
+    return value
