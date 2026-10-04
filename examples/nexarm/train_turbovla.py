@@ -50,6 +50,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 DEFAULT_TURBOVLA_DIR = Path(__file__).resolve().parents[2] / "TurboVLA"
+DEFAULT_SIM_DATASET_ROOT = Path("outputs/datasets/nexarm_stack_bowls")
 
 
 class EMAModel:
@@ -90,8 +91,9 @@ def parse_args():
         "--dataset-root",
         dest="sim_dataset_root",
         type=Path,
-        default=Path("outputs/datasets/nexarm_stack_bowls"),
-        help="Path to local simulation LeRobot dataset root",
+        default=None,
+        help="Path to local simulation LeRobot dataset root containing meta/info.json "
+        "(defaults to outputs/datasets/nexarm_stack_bowls when --sim-repo-id is unset)",
     )
     parser.add_argument(
         "--sim-repo-id",
@@ -110,7 +112,7 @@ def parse_args():
         "--real-dataset-root",
         type=Path,
         default=None,
-        help="Path to local real-world LeRobot dataset root",
+        help="Path to local real-world LeRobot dataset root containing meta/info.json",
     )
     parser.add_argument(
         "--real-repo-id",
@@ -214,6 +216,40 @@ def parse_args():
     parser.add_argument("--wandb", action="store_true", help="Log metrics to Weights & Biases")
     parser.add_argument("--wandb-project", type=str, default="nexarm-turbovla")
     return parser.parse_args()
+
+
+def resolve_dataset_specs(args: argparse.Namespace) -> list[tuple[str, str, Path | None]]:
+    """Validate local roots before LeRobot can fall back to downloading metadata."""
+    specs = []
+    if not args.no_sim:
+        root = args.sim_dataset_root
+        if root is None and args.sim_repo_id is None:
+            root = DEFAULT_SIM_DATASET_ROOT
+        specs.append(("sim", args.sim_repo_id or "local/nexarm_dataset", root))
+    if args.real_dataset_root is not None or args.real_repo_id is not None:
+        specs.append(("real", args.real_repo_id or "local/nexarm_real_dataset", args.real_dataset_root))
+    if not specs:
+        raise ValueError("No dataset selected: pass --real-dataset-root/--real-repo-id when using --no-sim.")
+    if args.real_ratio is not None and not (0.0 < args.real_ratio < 1.0 and len(specs) == 2):
+        raise ValueError("--real-ratio must be in (0, 1) and requires both a sim and a real dataset.")
+
+    resolved = []
+    for domain, repo_id, root in specs:
+        if root is not None:
+            root = root.expanduser().resolve()
+            info_path = root / "meta" / "info.json"
+            if not info_path.is_file():
+                raise FileNotFoundError(
+                    f"Local {domain} dataset metadata not found: {info_path}. "
+                    f"--{domain}-dataset-root must point to the LeRobot dataset directory containing "
+                    "meta/info.json, data/, and any videos/. Relative paths are resolved from "
+                    f"the working directory ({Path.cwd()}). "
+                    "Check the path or finish generating/copying the dataset. "
+                    f"To download from Hugging Face instead, omit --{domain}-dataset-root "
+                    f"and pass --{domain}-repo-id <owner/dataset>."
+                )
+        resolved.append((domain, repo_id, root))
+    return resolved
 
 
 def resolve_camera_keys(
@@ -610,6 +646,7 @@ def save_checkpoint(
 
 def main():
     args = parse_args()
+    dataset_specs = resolve_dataset_specs(args)
 
     # Detect distributed training (e.g. launched via torchrun)
     is_distributed = "RANK" in os.environ and "WORLD_SIZE" in os.environ
@@ -644,25 +681,18 @@ def main():
     from lerobot.datasets.lerobot_dataset import LeRobotDataset, LeRobotDatasetMetadata
 
     # 1. Dataset loading (simulation and/or real)
-    dataset_specs = []
-    if not args.no_sim:
-        dataset_specs.append(("sim", args.sim_repo_id or "local/nexarm_dataset", args.sim_dataset_root))
-    if args.real_dataset_root is not None or args.real_repo_id is not None:
-        dataset_specs.append(
-            ("real", args.real_repo_id or "local/nexarm_real_dataset", args.real_dataset_root)
-        )
-    if not dataset_specs:
-        raise ValueError("No dataset selected: pass --real-dataset-root/--real-repo-id when using --no-sim.")
-    if args.real_ratio is not None and not (0.0 < args.real_ratio < 1.0 and len(dataset_specs) == 2):
-        raise ValueError("--real-ratio must be in (0, 1) and requires both a sim and a real dataset.")
-
     if is_main_process:
         print("\n[1/5] Loading LeRobot datasets...")
     sub_datasets = []
     for domain, repo_id, root in dataset_specs:
-        meta = LeRobotDatasetMetadata(repo_id, root)
+        meta = LeRobotDatasetMetadata(repo_id, root, local_files_only=root is not None)
         delta_timestamps = {"action": [i / max(1, meta.fps) for i in range(args.horizon)]}
-        ds = LeRobotDataset(repo_id=repo_id, root=root, delta_timestamps=delta_timestamps)
+        ds = LeRobotDataset(
+            repo_id=repo_id,
+            root=root,
+            delta_timestamps=delta_timestamps,
+            local_files_only=root is not None,
+        )
         sub_datasets.append(ds)
         if is_main_process:
             print(

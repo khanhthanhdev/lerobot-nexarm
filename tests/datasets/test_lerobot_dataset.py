@@ -19,6 +19,7 @@ Tests focus on mode contracts (read-only, write-only, resume), guards,
 property delegation, and the full create-record-finalize-read lifecycle.
 """
 
+import shutil
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -119,6 +120,80 @@ def test_init_loads_data(tmp_path, lerobot_dataset_factory):
         root=tmp_path / "ds", total_episodes=1, total_frames=10, use_videos=False
     )
     assert len(dataset) > 0
+
+
+@pytest.mark.parametrize("missing", [None, "meta/info.json", "meta/tasks.parquet", "data"])
+def test_local_files_only_never_contacts_hub(tmp_path, monkeypatch, missing):
+    root = tmp_path / "local"
+    dataset = LeRobotDataset.create(
+        repo_id="local/nexarm_dataset", root=root, fps=10, features=SIMPLE_FEATURES, use_videos=False
+    )
+    for _ in range(3):
+        dataset.add_frame(_make_frame())
+    dataset.save_episode()
+    dataset.finalize()
+    if missing is not None:
+        path = root / missing
+        if path.is_dir():
+            shutil.rmtree(path)
+        else:
+            path.unlink()
+
+    def unexpected_hub_call(*args, **kwargs):
+        pytest.fail("A local-only dataset must not contact the Hub")
+
+    for module in (dataset_metadata_module, lerobot_dataset_module):
+        monkeypatch.setattr(module, "get_safe_version", unexpected_hub_call)
+        monkeypatch.setattr(module, "snapshot_download", unexpected_hub_call)
+
+    if missing is None:
+        loaded = LeRobotDataset("local/nexarm_dataset", root=root, local_files_only=True)
+        assert len(loaded) == 3
+    else:
+        with pytest.raises(FileNotFoundError, match="Hub downloads are disabled") as exc:
+            LeRobotDataset("local/nexarm_dataset", root=root, local_files_only=True)
+        assert str(root) in str(exc.value)
+
+
+def test_local_files_only_reports_missing_video(tmp_path, monkeypatch, lerobot_dataset_factory):
+    # This checks file availability during loading, without decoding video frames.
+    monkeypatch.setattr(
+        "tests.fixtures.dataset_factories.encode_video_frames",
+        lambda image_dir, video_path, **kwargs: video_path.touch(),
+    )
+    dataset = lerobot_dataset_factory(
+        root=tmp_path / "local_video",
+        repo_id="local/nexarm_dataset",
+        total_episodes=1,
+        total_frames=3,
+        use_videos=True,
+        camera_features={
+            "observation.images.front": {
+                "dtype": "video",
+                "shape": (16, 16, 3),
+                "names": ["height", "width", "channels"],
+            }
+        },
+    )
+    video = dataset.root / dataset.meta.get_video_file_path(0, "observation.images.front")
+    video.unlink()
+
+    def unexpected_hub_call(*args, **kwargs):
+        pytest.fail("Missing local video must not trigger a Hub download")
+
+    for module in (dataset_metadata_module, lerobot_dataset_module):
+        monkeypatch.setattr(module, "get_safe_version", unexpected_hub_call)
+        monkeypatch.setattr(module, "snapshot_download", unexpected_hub_call)
+    with pytest.raises(FileNotFoundError, match="data or videos are incomplete") as exc:
+        LeRobotDataset("local/nexarm_dataset", root=dataset.root, local_files_only=True)
+    assert str(video) in str(exc.value)
+
+
+def test_local_files_only_rejects_force_sync(tmp_path):
+    with pytest.raises(ValueError, match="cannot be combined"):
+        LeRobotDatasetMetadata(
+            "local/nexarm_dataset", root=tmp_path, local_files_only=True, force_cache_sync=True
+        )
 
 
 def test_getitem_works_in_read_mode(tmp_path, lerobot_dataset_factory):

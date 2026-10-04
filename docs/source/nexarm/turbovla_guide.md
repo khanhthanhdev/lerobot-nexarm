@@ -100,6 +100,40 @@ uv run python examples/nexarm/train_turbovla.py \
     --save-steps 5000
 ```
 
+### Co-Training with Local Simulation and Hugging Face Real Data
+
+Run from the repository root, or use an absolute path for the local simulation dataset:
+
+```bash
+CUDA_VISIBLE_DEVICES=3,4 uv run torchrun --nproc_per_node=2 --master_port=29500 \
+    examples/nexarm/train_turbovla.py \
+    --sim-dataset-root outputs/datasets/nexarm_stack_bowls \
+    --real-repo-id thanhkt/nexarm_stack_bowls \
+    --real-ratio 0.5 \
+    --cameras front,wrist \
+    --pretrained-checkpoint pretrained/TurboVLA/checkpoints/robotwin/steps_55000_ema_model.safetensors \
+    --output-dir outputs/train/nexarm_turbovla_cotrain \
+    --batch-size 16 \
+    --max-steps 50000 \
+    --save-steps 5000 \
+    --lr 5e-5 \
+    --horizon 16 \
+    --num-workers 8 \
+    --wandb --wandb-project nexarm-turbovla
+```
+
+The simulation directory must already contain the complete `meta/` directory, the recorded `data/`, and any referenced `videos/`. Datasets with an explicit local root are loaded with `local_files_only=True`; incomplete metadata, episodes, or videos produce a local file error without contacting the Hub. The real dataset is downloaded from Hugging Face because `--real-dataset-root` is omitted. To use a Hub simulation dataset too, replace `--sim-dataset-root` with `--sim-repo-id <owner/dataset>`.
+
+If startup reports missing local metadata, locate the actual dataset root:
+
+```bash
+find outputs/datasets -path '*/meta/info.json' -print
+```
+
+Pass the directory above `meta/` as `--sim-dataset-root`; for example, `/path/to/dataset/meta/info.json` requires `--sim-dataset-root /path/to/dataset`. If no metadata exists, generate or copy the complete LeRobot dataset first. Earlier versions of this script fell back to downloading the placeholder `local/nexarm_dataset` when local metadata was missing, producing a misleading Hub 404. Local roots are now checked before distributed initialization or model loading.
+
+For real-only training, use `--no-sim --real-repo-id thanhkt/nexarm_stack_bowls` and omit `--real-ratio`.
+
 ### Outputs Produced:
 
 - `steps_XXXX_ema_pytorch_model.pt` & `steps_XXXX_ema_model.safetensors`: Exponential Moving Average weights (recommended for inference).

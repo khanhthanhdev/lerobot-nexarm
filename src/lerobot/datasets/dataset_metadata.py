@@ -73,6 +73,7 @@ class LeRobotDatasetMetadata:
         revision: str | None = None,
         force_cache_sync: bool = False,
         metadata_buffer_size: int = 10,
+        local_files_only: bool = False,
     ):
         """Load or download metadata for an existing LeRobot dataset.
 
@@ -94,7 +95,11 @@ class LeRobotDatasetMetadata:
                 even when local files exist.
             metadata_buffer_size: Number of episode metadata records to buffer
                 in memory before flushing to parquet.
+            local_files_only: If ``True``, fail on missing local metadata instead
+                of contacting the Hub. Cannot be combined with ``force_cache_sync``.
         """
+        if local_files_only and force_cache_sync:
+            raise ValueError("local_files_only cannot be combined with force_cache_sync.")
         self.repo_id = repo_id
         self.revision = revision if revision else CODEBASE_VERSION
         self._requested_root = Path(root) if root is not None else None
@@ -107,11 +112,18 @@ class LeRobotDatasetMetadata:
 
         try:
             if force_cache_sync or (
-                self._requested_root is None and has_legacy_hub_download_metadata(self.root)
+                not local_files_only
+                and self._requested_root is None
+                and has_legacy_hub_download_metadata(self.root)
             ):
                 raise FileNotFoundError
             self._load_metadata()
-        except (FileNotFoundError, NotADirectoryError):
+        except (FileNotFoundError, NotADirectoryError) as exc:
+            if local_files_only:
+                raise FileNotFoundError(
+                    f"Local dataset metadata is incomplete at {self.root}: {exc}. "
+                    "Restore the complete meta/ directory. Hub downloads are disabled for this dataset."
+                ) from exc
             if is_valid_version(self.revision):
                 self.revision = get_safe_version(self.repo_id, self.revision)
 
