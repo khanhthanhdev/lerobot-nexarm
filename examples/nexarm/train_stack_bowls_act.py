@@ -113,9 +113,17 @@ def main() -> None:
         "--dry-run", action="store_true", help="Check metadata/checkpoint and print the command"
     )
     parser.add_argument("--device", choices=("cuda", "cpu"), default="cuda")
+    parser.add_argument("--num-gpus", type=int, default=1, help="Number of GPUs on this machine")
+    parser.add_argument(
+        "--mixed-precision", choices=("no", "fp16", "bf16"), default="no", help="Accelerate precision"
+    )
     parser.add_argument("--output-dir", type=Path)
     # Forward normal LeRobot flags, such as --steps=1000 and --batch_size=1.
     args, extra = parser.parse_known_args()
+    if args.num_gpus < 1:
+        parser.error("--num-gpus must be at least 1.")
+    if args.num_gpus > 1 and args.device != "cuda":
+        parser.error("Multiple GPUs require --device cuda.")
     if args.pretrained and Path(args.pretrained).exists():
         args.pretrained = str(Path(args.pretrained).resolve())
     if any(not arg.startswith("--") or "=" not in arg for arg in extra):
@@ -169,14 +177,29 @@ def main() -> None:
     if args.check_data:
         check_data(meta, cfg, root)
         return
-    command = [
-        sys.executable,
-        "-m",
-        "lerobot.scripts.lerobot_train",
-        f"--config_path={CONFIG_PATH}",
-        f"--dataset.revision={meta.revision}",
-        f"--policy.device={args.device}",
-    ]
+    command = [sys.executable, "-m"]
+    if args.num_gpus > 1 or args.mixed_precision != "no":
+        command.extend(
+            [
+                "accelerate.commands.launch",
+                f"--num_processes={args.num_gpus}",
+                "--num_machines=1",
+                f"--mixed_precision={args.mixed_precision}",
+            ]
+        )
+        if args.num_gpus > 1:
+            command.append("--multi_gpu")
+        elif args.device == "cpu":
+            command.append("--cpu")
+        command.append("--module")
+    command.extend(
+        [
+            "lerobot.scripts.lerobot_train",
+            f"--config_path={CONFIG_PATH}",
+            f"--dataset.revision={meta.revision}",
+            f"--policy.device={args.device}",
+        ]
+    )
     if root:
         command.append(f"--dataset.root={root}")
     if args.pretrained:
@@ -188,6 +211,11 @@ def main() -> None:
     if not args.dry_run:
         if args.device == "cuda" and not torch.cuda.is_available():
             parser.error("CUDA is unavailable. Select --device cpu or run on a CUDA training machine.")
+        if args.device == "cuda" and torch.cuda.device_count() < args.num_gpus:
+            parser.error(
+                f"Requested {args.num_gpus} GPUs, but only {torch.cuda.device_count()} are visible. "
+                "Check CUDA_VISIBLE_DEVICES or run on a machine with enough GPUs."
+            )
         subprocess.run(command, cwd=PROJECT_ROOT, check=True)
 
 
