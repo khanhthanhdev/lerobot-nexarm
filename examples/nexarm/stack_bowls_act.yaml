@@ -1,0 +1,31 @@
+# Real NexArm demonstrations; feature shapes are inferred from dataset metadata.
+dataset:
+  repo_id: thanhkt/nexarm_stack_bowls
+  video_backend: pyav
+  use_imagenet_stats: true
+  eval_split: 0.1
+
+policy:
+  type: act
+  device: cuda
+  push_to_hub: false
+  optimizer_lr: 0.00001
+  optimizer_lr_backbone: 0.00001
+
+output_dir: outputs/train/nexarm_stack_bowls_act
+job_name: nexarm_stack_bowls_act
+seed: 1000
+# Conservative starting point for an 8 GB GPU. Effective batch size = 16.
+batch_size: 2
+gradient_accumulation_steps: 8
+num_workers: 2
+prefetch_factor: 2
+steps: 100000
+save_freq: 5000
+log_freq: 100
+eval_steps: 5000
+max_eval_samples: 256
+env_eval_freq: 0
+
+wandb:
+  enable: false
