@@ -44,6 +44,7 @@ Foxglove app to ``ws://127.0.0.1:8765``; override the port with ``--display_port
 import logging
 import time
 from dataclasses import asdict, dataclass
+from pathlib import Path
 from pprint import pformat
 
 from lerobot.cameras.opencv import OpenCVCameraConfig  # noqa: F401
@@ -86,6 +87,7 @@ from lerobot.utils.constants import ACTION, OBS_STR
 from lerobot.utils.feature_utils import build_dataset_frame, combine_feature_dicts
 from lerobot.utils.import_utils import register_third_party_plugins
 from lerobot.utils.keyboard_input import init_keyboard_listener
+from lerobot.utils.recording_session import run_manual_session, show_recording_status
 from lerobot.utils.robot_utils import precise_sleep
 from lerobot.utils.utils import (
     init_logging,
@@ -122,6 +124,13 @@ class RecordConfig:
     play_sounds: bool = True
     # Resume recording on an existing dataset.
     resume: bool = False
+    # Wait for Enter/Right, record until pressed again, and reset without a timer.
+    manual_control: bool = False
+    # Write routine logs here while showing the manual collection dashboard.
+    recording_log: str = "outputs/collection/recording.log"
+    # Merge finished sessions into this local root dataset, preserving prior episodes.
+    root_repo_id: str | None = None
+    merge_root: str | None = None
 
     def __post_init__(self):
         if self.teleop is None:
@@ -287,6 +296,17 @@ def record(
     robot_observation_processor: RobotProcessorPipeline | None = None,
 ) -> LeRobotDataset:
     init_logging()
+    if cfg.manual_control:
+        log_path = Path(cfg.recording_log)
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        handler = logging.FileHandler(log_path)
+        handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+        root_logger = logging.getLogger()
+        for old_handler in root_logger.handlers[:]:
+            root_logger.removeHandler(old_handler)
+            old_handler.close()
+        root_logger.addHandler(handler)
+        cfg.play_sounds = False
     logging.info(pformat(asdict(cfg)))
     if cfg.display_data:
         init_visualization(
@@ -384,7 +404,9 @@ def record(
         if teleop is not None:
             teleop.connect()
 
-        listener, events = init_keyboard_listener()
+        listener, events = init_keyboard_listener(manual_control=cfg.manual_control)
+        if cfg.manual_control and listener is None:
+            raise RuntimeError("Manual collection requires an interactive terminal for Enter/Right controls.")
 
         if not cfg.dataset.streaming_encoding:
             logging.info(
@@ -392,8 +414,32 @@ def record(
             )
 
         with VideoEncodingManager(dataset):
+            if cfg.manual_control:
+
+                def run_phase(phase_dataset):
+                    record_loop(
+                        robot=robot,
+                        events=events,
+                        fps=cfg.dataset.fps,
+                        teleop_action_processor=teleop_action_processor,
+                        robot_action_processor=robot_action_processor,
+                        robot_observation_processor=robot_observation_processor,
+                        teleop=teleop,
+                        dataset=phase_dataset,
+                        control_time_s=float("inf"),
+                        single_task=cfg.dataset.single_task,
+                        display_data=cfg.display_data,
+                        display_mode=cfg.display_mode,
+                        display_compressed_images=display_compressed_images,
+                    )
+
+                run_manual_session(dataset, events, cfg.dataset.num_episodes, run_phase)
             recorded_episodes = 0
-            while recorded_episodes < cfg.dataset.num_episodes and not events["stop_recording"]:
+            while (
+                not cfg.manual_control
+                and recorded_episodes < cfg.dataset.num_episodes
+                and not events["stop_recording"]
+            ):
                 log_say(f"Recording episode {dataset.num_episodes}", cfg.play_sounds)
                 record_loop(
                     robot=robot,
@@ -458,13 +504,34 @@ def record(
         if cfg.display_data:
             shutdown_visualization(cfg.display_mode)
 
-        if cfg.dataset.push_to_hub:
+        if cfg.dataset.push_to_hub and not cfg.root_repo_id:
             if dataset and dataset.num_episodes > 0:
                 dataset.push_to_hub(tags=cfg.dataset.tags, private=cfg.dataset.private)
             else:
                 logging.warning("No episodes saved — skipping push to hub")
 
         log_say("Exiting", cfg.play_sounds)
+    if cfg.root_repo_id and dataset.num_episodes > 0:
+        from lerobot.datasets.collection_merge import merge_collection_session
+
+        if cfg.manual_control:
+            show_recording_status(dataset.num_episodes, "MERGING DATA...", cfg.root_repo_id)
+        try:
+            merge_collection_session(
+                dataset, cfg.root_repo_id, Path(cfg.merge_root) if cfg.merge_root else None
+            )
+        except Exception:
+            logging.exception("Local merge failed. Local session retained at %s", dataset.root)
+            print(
+                "Merge failed; local episodes are saved. Retry with:\n"
+                f"uv run --no-sync python examples/nexarm/merge_collection.py --repo-id {dataset.repo_id} "
+                f"--root '{dataset.root}' --root-repo-id {cfg.root_repo_id}"
+                + (f" --merge-root '{cfg.merge_root}'" if cfg.merge_root else ""),
+                flush=True,
+            )
+            raise
+    if cfg.manual_control:
+        show_recording_status(dataset.num_episodes, "FINISHED", str(dataset.root))
     return dataset
 
 

@@ -119,7 +119,7 @@ Or run the ready script:
 uv run python examples/nexarm/teleoperate.py --robot-port <FOLLOWER_PORT> --leader-port <LEADER_PORT>
 ```
 
-**4.5 Record a dataset** — keys: **→** next, **←** redo, **ESC** finish & upload.
+**4.5 Record a dataset** — recording starts immediately, with no recording or reset timeout. Press **→** to end the episode, reset the scene and arm, then press **→** again to record the next episode. Reset movements are not recorded; the follower still follows the leader. Keys: **←** redo, **ESC** finish & upload. Use an interactive terminal; **n** also works in place of **→**.
 
 ```bash
 HF_USER=$(NO_COLOR=1 hf auth whoami | awk -F': *' 'NR==1 {print $2}')
@@ -131,8 +131,8 @@ uv run lerobot-record \
   --dataset.repo_id=${HF_USER}/nexarm_cube_pick \
   --dataset.single_task="Pick the cube and place it into the tray" \
   --dataset.num_episodes=50 \
-  --dataset.episode_time_s=30 \
-  --dataset.reset_time_s=10 \
+  --dataset.episode_time_s=inf \
+  --dataset.reset_time_s=inf \
   --display_data=true
 ```
 
@@ -431,6 +431,7 @@ Single-task grasp-and-place with 50 clean episodes: ACT should reach **> 70% suc
 ### 10.1 Generating & Resuming Datasets (`--resume`)
 
 When generating synthetic demonstration datasets (e.g. for bowl stacking or pick-and-place tasks), avoid overwriting existing data.
+
 - **Append mode**: Use `--resume` with `LeRobotDataset.resume(...)` to keep previous episodes intact.
 - **Avoid seed collisions**: Track the starting seed with `seed_start = dataset.meta.total_episodes` so newly generated trajectories explore unseen configurations instead of duplicating initial object positions.
 
@@ -445,6 +446,7 @@ MUJOCO_GL=egl PYTHONPATH=src python examples/nexarm/generate_stack_bowls_dataset
 ### 10.2 Kinematics & Rim Grasping for Thin-Walled Objects
 
 For concave or hollow objects like bowls and cups:
+
 - **Never plunge straight into the cavity**: Grippers should straddle the outer rim radially.
 - **Radial rim straddle angle**: Calculate the vector from bowl center to gripper jaw pad $\mathbf{u}_{rad}$, orienting wrist pitch around $75^\circ$ and roll around $\pm 80^\circ$ relative to the radial approach vector.
 - **Centering jaw pads**: Account for the physical distance between the gripper base site frame and the active rubber jaw contact pads (`JAW_CENTER_OFFSET = [0.0, 0.033, 0.0]`).
@@ -454,6 +456,7 @@ For concave or hollow objects like bowls and cups:
 
 LeRobot datasets support an arbitrary number of camera streams simultaneously.
 For manipulation and stacking tasks, the recommended 3-camera layout consists of:
+
 1. **`top` / `overhead` (Intel RealSense D435i)**: Mounted directly above the table looking straight down ($Z \approx 0.85$ m). Eliminates line-of-sight occlusions and provides precise $(X, Y)$ concentric alignment. Can record RGB or RGB-D (`use_depth=True`).
 2. **`front`**: Angled overview providing vertical $Z$-height, layer depth, and transit clearance.
 3. **`wrist`**: Gripper-mounted camera (e.g. OAK or mini camera) providing fine-grained finger-to-rim alignment during the final 5 cm of approach.

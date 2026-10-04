@@ -2,6 +2,65 @@
 
 This document provides a concise, step-by-step guide to collecting teleoperation demonstration datasets using the Hiwonder NexArm (Leader-Follower dual arm rig) with LeRobot.
 
+## One-command manual collection
+
+From this checkout, run:
+
+```bash
+./scripts/nexarm/collect.sh
+```
+
+The launcher checks access to the selected USB devices (automatically runs `sudo chmod 666` only if necessary), tests both cameras together at 640×480 / 30 fps, saves front/wrist snapshots under `outputs/collection/<timestamp>/`, and connects the recorder. If sudo is needed, Linux may ask for your password. Defaults: follower `/dev/ttyUSB0`, leader `/dev/ttyUSB1`, Logitech front camera and icSpring wrist camera via stable `/dev/v4l/by-id/` paths. Override the roles if your cables use different ports:
+
+```bash
+./scripts/nexarm/collect.sh --follower-port /dev/ttyUSB1 --leader-port /dev/ttyUSB0
+```
+
+Check the hardware without connecting or moving the arms:
+
+```bash
+./scripts/nexarm/collect.sh --prepare-only
+# Cameras only:
+./scripts/nexarm/collect.sh --test-cameras
+```
+
+The terminal shows a large **saved episode count** and the current phase:
+
+- **READY:** press **Enter / →** to start the first episode.
+- **COLLECTING:** press **Enter / →** to stop and save the episode.
+- **RESET THE ENVIRONMENT:** reset the props and starting pose; follower teleoperation continues without recording. Press **Enter / →** to start the next episode.
+- **← / r:** discard the current recording and reset before trying again.
+- **Esc / q:** finish; a nonempty current recording is saved. Quitting at READY or during reset adds no episode.
+
+Recording and reset have no timeout. Keys are ignored while saving (except quit), so wait for the reset screen before pressing again. Keep the terminal focused. Routine logs go to `outputs/collection/<timestamp>/recording.log`; setup/recording failures are printed.
+
+Defaults collect 50 bowl-stacking episodes into a timestamped local session. When you press **Esc / q** or reach the episode limit, the session automatically merges into the **local** root dataset for `thanhkt/nexarm_stack_bowls`:
+
+```text
+~/.cache/huggingface/lerobot/thanhkt/nexarm_stack_bowls
+```
+
+**The collector never uploads or modifies the Hub dataset.** The screen shows **MERGING DATA...** until completion. Existing root episodes are preserved. The previous local root is kept at the sibling path `nexarm_stack_bowls.previous`; session recordings are also retained. If the local root does not exist yet, its current Hub version is downloaded once as the starting point. Subsequent merges use the local root and work offline.
+
+The local root stores an import ledger in `meta/collection_sessions.json`. Retrying the same session adds no duplicates; resuming a previously merged session adds only its new episodes. A file lock prevents concurrent local merges, and the new dataset is built separately before replacing the local root.
+
+```bash
+./scripts/nexarm/collect.sh --num-episodes 100
+# Resume an existing session by its exact timestamped ID:
+./scripts/nexarm/collect.sh --resume --repo-id thanhkt/nexarm_stack_bowls_20261004_160000
+```
+
+Retry a failed local merge without recording again:
+
+```bash
+uv run --no-sync python examples/nexarm/merge_collection.py \
+    --repo-id thanhkt/nexarm_stack_bowls_20261004_160000
+```
+
+Use `--no-merge` to keep each recording session separate, or `--merge-root /path/to/local/root` to choose the local merged directory. `--root-repo-id` changes the root dataset ID used for metadata and the optional initial download. Camera/USB preflight checks never merge anything.
+
+Use `--front-cam 0 --wrist-cam 2` for camera indexes, or pass device paths. The Logitech uses MJPG; the icSpring uses YUYV, matching the formats tested on this rig. Override with `--front-fourcc` / `--wrist-fourcc` for other cameras.
+
 ---
 
 ## 1. Physical Hardware Checklist
@@ -84,36 +143,45 @@ uv run lerobot-record \
     --teleop.type=nexarm_leader \
     --teleop.port=/dev/ttyUSB1 \
     --robot.cameras='{"front":{"type":"opencv","index_or_path":0,"width":640,"height":480,"fps":30,"fourcc":"MJPG"},"wrist":{"type":"opencv","index_or_path":2,"width":640,"height":480,"fps":30}}' \
-    --dataset.repo_id="${HF_USER}/nexarm_stack_bowls" \
+    --dataset.repo_id="thanhkt/nexarm_stack_bowls" \
     --dataset.single_task="Stack the bowls with red on bottom, blue in middle, and black on top." \
     --dataset.num_episodes=50 \
-    --dataset.episode_time_s=15 \
-    --dataset.reset_time_s=15 \
+    --dataset.episode_time_s=inf \
+    --dataset.reset_time_s=inf \
     --dataset.streaming_encoding=true \
     --dataset.encoder_threads=2 \
     --display_data=false \
-    --play_sounds=false
+    --play_sounds=false \
+    --manual_control=true \
+    --dataset.push_to_hub=false \
+    --root_repo_id=thanhkt/nexarm_stack_bowls
 ```
 
 ### Key Parameter Explanations:
 
-| Flag | Why it is important |
-| :--- | :--- |
-| `"fourcc":"MJPG"` | **Critical for USB bandwidth**: Compresses front camera stream in hardware, preventing USB 2.0 bus contention that causes frame drops. |
-| `--play_sounds=false` | Prevents audio daemon hangs (`espeak` / `say`) on headless or non-standard Linux audio setups when finishing episodes. |
-| `--display_data=false` | Disables real-time Rerun visualizer logging to give 100% of CPU/thread resources to 30 Hz control and video encoding. |
-| `--dataset.episode_time_s=15` | Recording duration for each demonstration episode. |
-| `--dataset.reset_time_s=15` | Pause between episodes giving you time to reset props on the table. |
+| Flag                           | Why it is important                                                                                                                    |
+| :----------------------------- | :------------------------------------------------------------------------------------------------------------------------------------- |
+| `"fourcc":"MJPG"`              | **Critical for USB bandwidth**: Compresses front camera stream in hardware, preventing USB 2.0 bus contention that causes frame drops. |
+| `--play_sounds=false`          | Prevents audio daemon hangs (`espeak` / `say`) on headless or non-standard Linux audio setups when finishing episodes.                 |
+| `--display_data=false`         | Disables real-time Rerun visualizer logging to give 100% of CPU/thread resources to 30 Hz control and video encoding.                  |
+| `--dataset.episode_time_s=inf` | No recording timeout: record until you press **→**.                                                                                    |
+| `--dataset.reset_time_s=inf`   | No reset timeout: reset the scene, then press **→** again to continue recording.                                                       |
 
 ---
 
 ## 5. Keyboard Controls During Recording
 
-| Key | Action |
-| :--- | :--- |
-| **`Enter`** or **`→` (Right Arrow)** | Start the next episode early (skips remaining reset time). |
-| **`←` (Left Arrow)** | **Rerecord / Discard episode**: Discards the current demonstration if you made a mistake or dropped an object. |
-| **`ESC`** | **Finish recording**: Stops the session early, saves all completed episodes, and finalizes video files. |
+With `--manual_control=true`, wait for READY and press **Enter / →** to start. Complete your demonstration, then press **Enter / →** once to end the episode and enter reset mode. Reset the props and return the arm to its starting pose; these reset movements are not recorded, but the follower still follows the leader. Press **Enter / →** again when ready to record the next episode. Neither phase has a timeout.
+
+Repeat until 50 episodes have been recorded, or press **ESC** to finish early. The last episode skips reset mode and finishes the session automatically.
+
+| Key                                         | Action                                                                                                         |
+| :------------------------------------------ | :------------------------------------------------------------------------------------------------------------- |
+| **Enter**, **`→` (Right Arrow)** or **`n`** | While recording: end the episode and enter reset mode. While resetting: continue with the next episode.        |
+| **`←` (Left Arrow)**                        | **Rerecord / Discard episode**: Discards the current demonstration if you made a mistake or dropped an object. |
+| **`ESC`**                                   | **Finish recording**: Stops the session early, saves all completed episodes, and finalizes video files.        |
+
+Run in an interactive terminal so keyboard controls are available. On Wayland or over SSH, keep the recording terminal focused. If arrow keys are intercepted, use **`n`** instead; Enter works when `--manual_control=true`. Without that flag, the original timed/arrow flow starts immediately.
 
 ---
 
@@ -153,3 +221,8 @@ uv run lerobot-dataset-viz \
   `${HF_USER}` is empty. Run `export HF_USER="your_hf_username"`.
 - **KeyboardInterrupt / Freeze on exit**:
   Add `--play_sounds=false` to bypass system text-to-speech calls.
+- **Upload failed / Internet disconnection during upload**:
+  The recorded dataset is already finalized and safely stored locally in `~/.cache/huggingface/lerobot/<repo_id>`. Re-upload it at any time without re-recording:
+  ```bash
+  uv run python examples/nexarm/upload_dataset.py --repo-id "${HF_USER}/<dataset_name>"
+  ```
