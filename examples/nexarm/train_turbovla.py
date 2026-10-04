@@ -13,6 +13,13 @@ Examples:
       --max-steps 50000 \
       --save-steps 5000
 
+  # Co-train on simulation + real teleoperation data (real drawn 50% of the time):
+  uv run python examples/nexarm/train_turbovla.py \
+      --sim-dataset-root outputs/datasets/nexarm_stack_bowls \
+      --real-repo-id thanhkt/nexarm_stack_bowls \
+      --real-ratio 0.5 \
+      --output-dir outputs/train/nexarm_turbovla_cotrain
+
   # Fine-tune from pretrained TurboVLA release:
   uv run python examples/nexarm/train_turbovla.py \
       --dataset-root outputs/datasets/nexarm_stack_bowls \
@@ -79,22 +86,51 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Train TurboVLA on NexArm LeRobot dataset")
     # Dataset args
     parser.add_argument(
+        "--sim-dataset-root",
         "--dataset-root",
+        dest="sim_dataset_root",
         type=Path,
         default=Path("outputs/datasets/nexarm_stack_bowls"),
-        help="Path to local LeRobot dataset root",
+        help="Path to local simulation LeRobot dataset root",
     )
     parser.add_argument(
+        "--sim-repo-id",
         "--repo-id",
+        dest="sim_repo_id",
         type=str,
         default=None,
-        help="Hugging Face repo_id or local dataset identifier",
+        help="Hugging Face repo_id or local identifier of the simulation dataset",
+    )
+    parser.add_argument(
+        "--no-sim",
+        action="store_true",
+        help="Skip the simulation dataset (train on the real dataset only)",
+    )
+    parser.add_argument(
+        "--real-dataset-root",
+        type=Path,
+        default=None,
+        help="Path to local real-world LeRobot dataset root",
+    )
+    parser.add_argument(
+        "--real-repo-id",
+        type=str,
+        default=None,
+        help="Hugging Face repo_id of the real-world dataset (downloaded if --real-dataset-root is unset)",
+    )
+    parser.add_argument(
+        "--real-ratio",
+        type=float,
+        default=None,
+        help="Fraction of training samples drawn from the real dataset when co-training "
+        "(e.g. 0.5). Defaults to proportional to dataset sizes.",
     )
     parser.add_argument(
         "--cameras",
         type=str,
-        default=None,
-        help="Comma-separated list of camera keys to use (e.g. 'front,wrist,top'). Auto-detected if None.",
+        # TODO: top camera temporarily disabled; pass --cameras front,wrist,top to re-enable.
+        default="front,wrist",
+        help="Comma-separated list of camera keys to use (e.g. 'front,wrist,top').",
     )
     parser.add_argument(
         "--front-cam-key",
@@ -305,6 +341,59 @@ def compute_or_load_normalization_stats(
     return stats
 
 
+def merge_normalization_stats(
+    all_stats: list[dict[str, dict[str, list[float]]]],
+) -> dict[str, dict[str, list[float]]]:
+    """Merge per-dataset min/max stats into a single range covering every dataset."""
+    merged = {}
+    for key in ("action", "observation.state"):
+        merged[key] = {
+            "min": np.min([s[key]["min"] for s in all_stats], axis=0).tolist(),
+            "max": np.max([s[key]["max"] for s in all_stats], axis=0).tolist(),
+        }
+    return merged
+
+
+class DomainMixSampler(torch.utils.data.Sampler[int]):
+    """Sample a ConcatDataset so each sub-dataset is drawn with a fixed probability.
+
+    Indices are drawn with replacement from a generator seeded identically on every rank,
+    then sharded by rank, so it also works under DDP.
+    """
+
+    def __init__(
+        self,
+        dataset_sizes: list[int],
+        domain_weights: list[float],
+        num_replicas: int = 1,
+        rank: int = 0,
+        seed: int = 0,
+    ) -> None:
+        self.dataset_sizes = dataset_sizes
+        self.offsets = np.cumsum([0, *dataset_sizes[:-1]]).tolist()
+        self.weights = torch.as_tensor(domain_weights, dtype=torch.double)
+        self.num_replicas = num_replicas
+        self.rank = rank
+        self.seed = seed
+        self.epoch = 0
+        self.num_samples = sum(dataset_sizes) // num_replicas
+
+    def __len__(self) -> int:
+        return self.num_samples
+
+    def __iter__(self):
+        g = torch.Generator()
+        g.manual_seed(self.seed + self.epoch)
+        self.epoch += 1
+        total = self.num_samples * self.num_replicas
+        domains = torch.multinomial(self.weights, total, replacement=True, generator=g)
+        indices = torch.empty(total, dtype=torch.long)
+        for d, (size, offset) in enumerate(zip(self.dataset_sizes, self.offsets, strict=True)):
+            mask = domains == d
+            indices[mask] = torch.randint(size, (int(mask.sum()),), generator=g) + offset
+        return iter(indices[self.rank :: self.num_replicas].tolist())
+
+
 def load_compatible_weights(model: nn.Module, checkpoint_path: Path) -> int:
     """Load pretrained weights into TurboVLA, skipping shape-mismatched heads."""
     print(f"[INFO] Loading initialization weights from {checkpoint_path}...")
@@ -330,12 +419,18 @@ def load_compatible_weights(model: nn.Module, checkpoint_path: Path) -> int:
         if clean_k in target_state:
             if target_state[clean_k].shape == v.shape:
                 matched_state[clean_k] = v
-            elif "view_embedding" in clean_k and target_state[clean_k].shape[-1] == v.shape[-1] and target_state[clean_k].ndim == v.ndim:
+            elif (
+                "view_embedding" in clean_k
+                and target_state[clean_k].shape[-1] == v.shape[-1]
+                and target_state[clean_k].ndim == v.ndim
+            ):
                 expanded = target_state[clean_k].clone()
                 min_v = min(target_state[clean_k].shape[1], v.shape[1])
                 expanded[:, :min_v] = v[:, :min_v]
                 matched_state[clean_k] = expanded
-                print(f"[INFO] Adapted {clean_k} from {tuple(v.shape)} to {tuple(target_state[clean_k].shape)} (transferred {min_v} views)")
+                print(
+                    f"[INFO] Adapted {clean_k} from {tuple(v.shape)} to {tuple(target_state[clean_k].shape)} (transferred {min_v} views)"
+                )
             else:
                 skipped.append(
                     f"{clean_k} (shape mismatch: {tuple(target_state[clean_k].shape)} vs {tuple(v.shape)})"
@@ -548,25 +643,40 @@ def main():
 
     from lerobot.datasets.lerobot_dataset import LeRobotDataset, LeRobotDatasetMetadata
 
-    # 1. Dataset loading
-    repo_id = args.repo_id or "local/nexarm_dataset"
-    if is_main_process:
-        print(f"\n[1/5] Loading LeRobot dataset from {args.dataset_root or repo_id}...")
-    meta = LeRobotDatasetMetadata(repo_id, args.dataset_root)
-    delta_timestamps = {"action": [i / max(1, meta.fps) for i in range(args.horizon)]}
-    dataset = LeRobotDataset(
-        repo_id=repo_id,
-        root=args.dataset_root,
-        delta_timestamps=delta_timestamps,
-    )
-    if is_main_process:
-        print(
-            f"  Dataset contains {len(dataset)} frames across {dataset.num_episodes} episodes (fps={meta.fps})."
+    # 1. Dataset loading (simulation and/or real)
+    dataset_specs = []
+    if not args.no_sim:
+        dataset_specs.append(("sim", args.sim_repo_id or "local/nexarm_dataset", args.sim_dataset_root))
+    if args.real_dataset_root is not None or args.real_repo_id is not None:
+        dataset_specs.append(
+            ("real", args.real_repo_id or "local/nexarm_real_dataset", args.real_dataset_root)
         )
+    if not dataset_specs:
+        raise ValueError("No dataset selected: pass --real-dataset-root/--real-repo-id when using --no-sim.")
+    if args.real_ratio is not None and not (0.0 < args.real_ratio < 1.0 and len(dataset_specs) == 2):
+        raise ValueError("--real-ratio must be in (0, 1) and requires both a sim and a real dataset.")
+
+    if is_main_process:
+        print("\n[1/5] Loading LeRobot datasets...")
+    sub_datasets = []
+    for domain, repo_id, root in dataset_specs:
+        meta = LeRobotDatasetMetadata(repo_id, root)
+        delta_timestamps = {"action": [i / max(1, meta.fps) for i in range(args.horizon)]}
+        ds = LeRobotDataset(repo_id=repo_id, root=root, delta_timestamps=delta_timestamps)
+        sub_datasets.append(ds)
+        if is_main_process:
+            print(
+                f"  [{domain}] {root or repo_id}: {len(ds)} frames across {ds.num_episodes} episodes "
+                f"(fps={meta.fps})."
+            )
 
     # 2. Camera resolution & Normalization statistics
+    # Only cameras present in every dataset can be used (e.g. sim may have an extra 'top' view).
+    common_features = {
+        k: v for k, v in sub_datasets[0].features.items() if all(k in ds.features for ds in sub_datasets)
+    }
     camera_keys = resolve_camera_keys(
-        dataset.features,
+        common_features,
         camera_hints=args.cameras,
         front_hint=args.front_cam_key,
         wrist_hint=args.wrist_cam_key,
@@ -574,7 +684,8 @@ def main():
     if is_main_process:
         print(f"  Resolved {len(camera_keys)} camera views -> {camera_keys}")
 
-    stats = compute_or_load_normalization_stats(dataset)
+    stats = merge_normalization_stats([compute_or_load_normalization_stats(ds) for ds in sub_datasets])
+    dataset = sub_datasets[0] if len(sub_datasets) == 1 else torch.utils.data.ConcatDataset(sub_datasets)
     if is_main_process:
         print("  Normalization min/max statistics initialized:")
         print(f"    Action min: {np.round(stats['action']['min'], 3)}")
@@ -673,16 +784,24 @@ def main():
         stats=stats,
         image_processor=image_processor,
         horizon=args.horizon,
-        dataset_meta=dataset.meta,
+        dataset_meta=sub_datasets[0].meta if len(sub_datasets) == 1 else None,
     )
 
-    sampler = (
-        torch.utils.data.distributed.DistributedSampler(
+    if args.real_ratio is not None:
+        sampler = DomainMixSampler(
+            dataset_sizes=[len(ds) for ds in sub_datasets],
+            domain_weights=[1.0 - args.real_ratio, args.real_ratio],
+            num_replicas=world_size,
+            rank=rank,
+        )
+        if is_main_process:
+            print(f"  Mixing sim/real samples at {1.0 - args.real_ratio:.2f}/{args.real_ratio:.2f}.")
+    elif is_distributed:
+        sampler = torch.utils.data.distributed.DistributedSampler(
             dataset, num_replicas=world_size, rank=rank, shuffle=True
         )
-        if is_distributed
-        else None
-    )
+    else:
+        sampler = None
 
     dataloader = DataLoader(
         dataset,
@@ -751,6 +870,7 @@ def main():
     else:
         pbar = None
     data_iter = iter(dataloader)
+    epoch = 0
 
     model.train()
     running_loss = 0.0
@@ -761,6 +881,9 @@ def main():
         try:
             batch = next(data_iter)
         except StopIteration:
+            epoch += 1
+            if isinstance(sampler, torch.utils.data.distributed.DistributedSampler):
+                sampler.set_epoch(epoch)
             data_iter = iter(dataloader)
             batch = next(data_iter)
 

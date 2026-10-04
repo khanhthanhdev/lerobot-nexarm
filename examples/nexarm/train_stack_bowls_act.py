@@ -185,6 +185,7 @@ def main() -> None:
                 f"--num_processes={args.num_gpus}",
                 "--num_machines=1",
                 f"--mixed_precision={args.mixed_precision}",
+                "--dynamo_backend=no",
             ]
         )
         if args.num_gpus > 1:
@@ -198,6 +199,7 @@ def main() -> None:
             f"--config_path={CONFIG_PATH}",
             f"--dataset.revision={meta.revision}",
             f"--policy.device={args.device}",
+            "--policy.push_to_hub=false",
         ]
     )
     if root:
