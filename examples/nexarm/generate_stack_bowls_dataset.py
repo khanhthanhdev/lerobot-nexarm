@@ -18,10 +18,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from collections import Counter
 from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
+
+# Select an offscreen renderer before MuJoCo/GLFW are imported on headless hosts.
+if not os.environ.get("DISPLAY"):
+    os.environ.setdefault("MUJOCO_GL", "egl")
 
 import mujoco
 import numpy as np

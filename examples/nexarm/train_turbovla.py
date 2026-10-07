@@ -469,7 +469,10 @@ def load_compatible_weights(model: nn.Module, checkpoint_path: Path) -> int:
 
     # Map prefixes if checkpoint comes from starVLA / GroundingDINO
     for k, v in source_state.items():
-        clean_k = k.replace("module.", "").replace("model.", "")
+        # Strip wrapper prefixes only: DINOv3 has legitimate internal `.model.` keys.
+        clean_k = k
+        while clean_k.startswith(("module.", "model.")):
+            clean_k = clean_k.split(".", 1)[1]
         if clean_k in target_state:
             if target_state[clean_k].shape == v.shape:
                 matched_state[clean_k] = v

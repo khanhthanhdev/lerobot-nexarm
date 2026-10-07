@@ -235,10 +235,14 @@ class TurboVLAPolicyRunner:
         # Clean prefix if needed
         clean_state_dict = {}
         for k, v in state_dict.items():
-            k = k.replace("module.", "").replace("model.", "")
+            # Internal `.model.` names belong to DINOv3, not checkpoint wrappers.
+            while k.startswith(("module.", "model.")):
+                k = k.split(".", 1)[1]
             clean_state_dict[k] = v
 
-        self.model.load_state_dict(clean_state_dict, strict=False)
+        # Inference requires the complete trained model; partial loading can silently
+        # combine a trained action head with an untrained or original vision encoder.
+        self.model.load_state_dict(clean_state_dict, strict=True)
         self.model.eval()
 
         # Image processor
