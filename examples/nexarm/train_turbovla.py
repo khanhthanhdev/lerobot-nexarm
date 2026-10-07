@@ -4,6 +4,11 @@
 Supports both synthetic simulation demonstrations (e.g. 3-bowl stacking) and
 real-world physical teleoperation datasets.
 
+Step counts and checkpoint intervals refer to optimizer updates. Effective batch
+size is batch-size × grad-accum-steps × GPU count (final batches may be smaller).
+Episode-end padding is excluded from the action loss. Cameras are auto-detected
+unless explicitly selected with --cameras.
+
 Examples:
   # Train on local dataset:
   uv run python examples/nexarm/train_turbovla.py \
@@ -31,8 +36,8 @@ Examples:
 from __future__ import annotations
 
 import argparse
-import copy
 import json
+import math
 import os
 import sys
 import time
@@ -45,7 +50,7 @@ import torch.nn as nn
 import torch.nn.functional as F  # noqa: N812
 from PIL import Image
 from torch.optim import AdamW
-from torch.optim.lr_scheduler import CosineAnnealingLR, LambdaLR, SequentialLR
+from torch.optim.lr_scheduler import LambdaLR
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -76,7 +81,7 @@ class EMAModel:
                     )
 
     def state_dict(self, base_model: nn.Module) -> dict[str, torch.Tensor]:
-        base_dict = copy.deepcopy(base_model.state_dict())
+        base_dict = {name: value.detach().cpu().clone() for name, value in base_model.state_dict().items()}
         for name, shadow_param in self.shadow.items():
             if name in base_dict:
                 base_dict[name] = shadow_param.to(device="cpu", dtype=base_dict[name].dtype)
@@ -130,8 +135,8 @@ def parse_args():
     parser.add_argument(
         "--cameras",
         type=str,
-        default="front,wrist,top",
-        help="Comma-separated list of camera keys to use (e.g. 'front,wrist,top').",
+        default=None,
+        help="Comma-separated camera keys (default: auto-detect common views).",
     )
     parser.add_argument(
         "--front-cam-key",
@@ -214,7 +219,29 @@ def parse_args():
     parser.add_argument("--num-workers", type=int, default=4, help="DataLoader worker processes")
     parser.add_argument("--wandb", action="store_true", help="Log metrics to Weights & Biases")
     parser.add_argument("--wandb-project", type=str, default="nexarm-turbovla")
-    return parser.parse_args()
+    args = parser.parse_args()
+    for name in (
+        "batch_size",
+        "max_steps",
+        "grad_accum_steps",
+        "save_steps",
+        "log_steps",
+        "horizon",
+        "image_size",
+    ):
+        if getattr(args, name) <= 0:
+            parser.error(f"--{name.replace('_', '-')} must be positive.")
+    if args.num_workers < 0 or args.warmup_steps < 0:
+        parser.error("Require num-workers >= 0 and warmup-steps >= 0.")
+    if (
+        not 0 <= args.ema_decay < 1
+        or not math.isfinite(args.gripper_loss_weight)
+        or args.gripper_loss_weight <= 0
+    ):
+        parser.error("Require 0 <= ema-decay < 1 and a positive finite gripper-loss-weight.")
+    if args.pretrained_checkpoint is not None and not args.pretrained_checkpoint.is_file():
+        parser.error(f"Checkpoint does not exist: {args.pretrained_checkpoint}")
+    return args
 
 
 def resolve_dataset_specs(args: argparse.Namespace) -> list[tuple[str, str, Path | None]]:
@@ -258,32 +285,24 @@ def resolve_camera_keys(
     wrist_hint: str | None = None,
 ) -> list[str]:
     """Identify camera image keys from dataset features."""
-    all_keys = list(features.keys())
+    all_keys = [key for key, feature in features.items() if feature.get("dtype") in ("image", "video")]
 
     if isinstance(camera_hints, str):
         camera_hints = [c.strip() for c in camera_hints.split(",") if c.strip()]
 
-    if camera_hints:
+    hints = [h for h in (front_hint, wrist_hint) if h] or camera_hints
+    if hints:
         resolved = []
-        for h in camera_hints:
-            if h in all_keys:
-                resolved.append(h)
-            else:
-                for k in all_keys:
-                    if h.lower() in k.lower() and k not in resolved:
-                        resolved.append(k)
-                        break
-        if resolved:
-            return resolved
-
-    # Legacy hints check
-    if front_hint or wrist_hint:
-        resolved = []
-        for h in (front_hint, wrist_hint):
-            if h and h in all_keys and h not in resolved:
-                resolved.append(h)
-        if len(resolved) == 2:
-            return resolved
+        for hint in hints:
+            matches = [hint] if hint in all_keys else [k for k in all_keys if hint.lower() in k.lower()]
+            if len(matches) != 1:
+                raise ValueError(
+                    f"Camera hint {hint!r} must match exactly one image/video feature; got {matches}"
+                )
+            if matches[0] in resolved:
+                raise ValueError(f"Duplicate camera: {matches[0]}")
+            resolved.append(matches[0])
+        return resolved
 
     # Auto-detect standard camera views in preferred order: front, wrist, top
     resolved = []
@@ -334,7 +353,7 @@ def compute_or_load_normalization_stats(
 
     # 2. State statistics
     resolved_state_key = state_key if state_key in meta_stats else "observation.state"
-    if resolved_state_key in meta_stats and "min" in meta_stats[resolved_state_key]:
+    if resolved_state_key in meta_stats and all(k in meta_stats[resolved_state_key] for k in ("min", "max")):
         stats["observation.state"] = {
             "min": [float(x) for x in meta_stats[resolved_state_key]["min"]],
             "max": [float(x) for x in meta_stats[resolved_state_key]["max"]],
@@ -411,7 +430,7 @@ class DomainMixSampler(torch.utils.data.Sampler[int]):
         self.rank = rank
         self.seed = seed
         self.epoch = 0
-        self.num_samples = sum(dataset_sizes) // num_replicas
+        self.num_samples = math.ceil(sum(dataset_sizes) / num_replicas)
 
     def __len__(self) -> int:
         return self.num_samples
@@ -529,6 +548,7 @@ class TurboVLANexArmCollator:
         flat_views = []
         states = []
         actions = []
+        padding_masks = []
 
         for item in batch:
             # Language prompt
@@ -545,7 +565,7 @@ class TurboVLANexArmCollator:
 
             # Images from all configured cameras
             for cam_key in self.camera_keys:
-                flat_views.append(to_pil(item[cam_key]).resize((224, 224)))
+                flat_views.append(to_pil(item[cam_key]))
 
             # State
             raw_state = item.get("observation.state", item.get("state", None))
@@ -560,15 +580,14 @@ class TurboVLANexArmCollator:
             raw_action = item["action"]
             if isinstance(raw_action, torch.Tensor):
                 raw_action = raw_action.detach().cpu().numpy()
-            # If shape is [6] instead of [H, 6], repeat to horizon
-            if raw_action.ndim == 1:
-                raw_action = np.tile(raw_action, (self.horizon, 1))
-            elif raw_action.shape[0] < self.horizon:
-                pad_len = self.horizon - raw_action.shape[0]
-                last_row = raw_action[-1:]
-                raw_action = np.concatenate([raw_action, np.tile(last_row, (pad_len, 1))], axis=0)
-            elif raw_action.shape[0] > self.horizon:
-                raw_action = raw_action[: self.horizon]
+            if raw_action.shape != (self.horizon, len(self.amin)):
+                raise ValueError(
+                    f"Expected action chunks of shape {(self.horizon, len(self.amin))}, got {raw_action.shape}"
+                )
+            padding = torch.as_tensor(item["action_is_pad"], dtype=torch.bool)
+            if padding.shape != (self.horizon,):
+                raise ValueError("action_is_pad must match the action horizon")
+            padding_masks.append(padding)
 
             norm_action = 2.0 * (raw_action - self.amin) / np.maximum(self.amax - self.amin, 1e-6) - 1.0
             actions.append(norm_action.astype(np.float32))
@@ -583,6 +602,7 @@ class TurboVLANexArmCollator:
             "samples": {"dinov3": pv},
             "states": torch.as_tensor(np.stack(states), dtype=torch.float32),
             "actions": torch.as_tensor(np.stack(actions), dtype=torch.float32),
+            "action_is_pad": torch.stack(padding_masks),
         }
 
 
@@ -692,6 +712,11 @@ def main():
             delta_timestamps=delta_timestamps,
             local_files_only=root is not None,
         )
+        if len(ds) == 0:
+            raise ValueError(f"The {domain} dataset is empty.")
+        for key in ("action", "observation.state"):
+            if list(ds.features.get(key, {}).get("shape", [])) != [6]:
+                raise ValueError(f"{domain}: {key} must contain six NexArm joints.")
         sub_datasets.append(ds)
         if is_main_process:
             print(
@@ -732,6 +757,8 @@ def main():
     config.vision.image_size = args.image_size
     config.vision.model_name_or_path = args.dinov3_path
     config.text.model_name_or_path = args.bert_path
+    config.text.frozen = args.freeze_text
+    config.vision.frozen = args.freeze_vision
     config.action.action_dim = 6
     config.action.state_dim = 6
     config.action.horizon = args.horizon
@@ -770,8 +797,7 @@ def main():
     if args.freeze_text:
         if is_main_process:
             print("  [INFO] Freezing BERT text encoder.")
-        for p in model.text_encoder.parameters():
-            p.requires_grad = False
+        # config.text.frozen freezes BERT while leaving its new projection trainable.
         model.text_encoder.eval()
 
     if args.freeze_vision:
@@ -840,7 +866,7 @@ def main():
         num_workers=args.num_workers,
         collate_fn=collator,
         pin_memory=(device.type == "cuda"),
-        drop_last=True,
+        drop_last=False,
     )
 
     # Optimizer with parameter groups
@@ -869,17 +895,15 @@ def main():
 
     optimizer = AdamW(param_groups, weight_decay=args.weight_decay)
 
-    # Warmup + Cosine Annealing LR Schedule
-    warmup_steps = min(args.warmup_steps, max(1, args.max_steps // 10))
-    warmup_scheduler = LambdaLR(optimizer, lr_lambda=lambda s: float(s + 1) / float(max(1, warmup_steps)))
-    cosine_scheduler = CosineAnnealingLR(
-        optimizer, T_max=max(1, args.max_steps - warmup_steps), eta_min=args.lr * 0.05
-    )
-    scheduler = SequentialLR(
-        optimizer,
-        schedulers=[warmup_scheduler, cosine_scheduler],
-        milestones=[warmup_steps],
-    )
+    # Schedule counts optimizer updates, preserving each group's relative learning rate.
+    def lr_multiplier(update: int) -> float:
+        if update < args.warmup_steps:
+            return (update + 1) / args.warmup_steps
+        progress = (update - args.warmup_steps) / max(1, args.max_steps - args.warmup_steps)
+        return 0.05 + 0.95 * (1 + math.cos(math.pi * min(progress, 1.0))) / 2
+
+    scheduler = LambdaLR(optimizer, lr_lambda=lr_multiplier)
+    scaler = torch.amp.GradScaler("cuda", enabled=device.type == "cuda" and amp_dtype == torch.float16)
 
     # Weights & Biases
     if args.wandb and is_main_process:
@@ -902,6 +926,16 @@ def main():
     epoch = 0
 
     model.train()
+    for frozen, module in (
+        (args.freeze_text, raw_model.text_encoder),
+        (args.freeze_vision, raw_model.vision_encoder),
+        (args.freeze_interaction, raw_model.vision_language_interaction),
+    ):
+        if frozen:
+            module.eval()
+    optimizer.zero_grad(set_to_none=True)
+    micro_step = 0
+    accumulated_loss = 0.0
     running_loss = 0.0
     start_time = time.time()
     step = 0
@@ -928,7 +962,7 @@ def main():
             if use_amp
             else torch.autocast(device_type="cpu", enabled=False)
         ):
-            predictions = model(instructions, samples, states)
+            predictions = model(instructions, samples, states).float()
             if args.loss_type == "mse":
                 raw_diff = (predictions - targets) ** 2
             elif args.loss_type == "smooth_l1":
@@ -939,29 +973,39 @@ def main():
             if args.gripper_loss_weight != 1.0 and targets.shape[-1] >= 6:
                 weights = torch.ones(targets.shape[-1], device=device, dtype=targets.dtype)
                 weights[5] = args.gripper_loss_weight
-                loss = (raw_diff * weights.view(1, 1, -1)).mean()
-            else:
-                loss = raw_diff.mean()
+                raw_diff = raw_diff * weights.view(1, 1, -1)
+            valid = ~batch["action_is_pad"].to(device)
+            loss = raw_diff.masked_fill(~valid.unsqueeze(-1), 0).sum() / (
+                valid.sum().clamp_min(1) * targets.shape[-1]
+            )
 
             if args.grad_accum_steps > 1:
                 loss = loss / args.grad_accum_steps
 
-        loss.backward()
+        scaler.scale(loss).backward()
+        accumulated_loss += loss.item()
+        micro_step += 1
+        if micro_step % args.grad_accum_steps:
+            continue
 
-        if (step + 1) % args.grad_accum_steps == 0:
-            if args.max_grad_norm > 0:
-                torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
-            optimizer.step()
-            scheduler.step()
-            optimizer.zero_grad()
-
-            if ema is not None and is_main_process:
-                ema.update(raw_model)
-
+        scaler.unscale_(optimizer)
+        if args.max_grad_norm > 0:
+            torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
+        previous_scale = scaler.get_scale()
+        scaler.step(optimizer)
+        scaler.update()
+        optimizer.zero_grad(set_to_none=True)
+        if scaler.get_scale() < previous_scale:
+            accumulated_loss = 0.0
+            continue  # Overflow skipped this optimizer update.
+        scheduler.step()
+        if ema is not None:
+            ema.update(raw_model)
         step += 1
         if pbar is not None:
             pbar.update(1)
-        running_loss += loss.item() * args.grad_accum_steps
+        running_loss += accumulated_loss
+        accumulated_loss = 0.0
 
         # Logging
         if step % args.log_steps == 0 and is_main_process:
@@ -992,10 +1036,11 @@ def main():
         print("\n=== Training Complete ===")
         print(f"Checkpoints and normalization statistics saved in: {args.output_dir.resolve()}")
         print("\nTo evaluate this model in simulation:")
+        final_name = "final_ema_pytorch_model.pt" if ema is not None else "final_model.pt"
         print(
             f"  uv run python examples/nexarm/rollout_turbovla.py \\\n"
             f"      --robot sim \\\n"
-            f"      --checkpoint {args.output_dir / 'final_ema_pytorch_model.pt'} \\\n"
+            f"      --checkpoint {args.output_dir / final_name} \\\n"
             f"      --stats-path {args.output_dir / 'stats_turbovla.json'}"
         )
 

@@ -40,6 +40,8 @@ uv run lerobot-train \
   --resume=true
 ```
 
+Use `--repo-id owner/dataset` to select another real NexArm dataset with the same joint and camera contract. `--check-data` with a local root requires the episode data and videos to already exist locally.
+
 Use `--dataset-root /absolute/path/to/dataset` for an existing local copy, or `--revision COMMIT_SHA` to reproduce a particular Hub version. Relative output paths are resolved from your current directory. Hub data is cached under `HF_LEROBOT_HOME/prepared/thanhkt/nexarm_stack_bowls/COMMIT_SHA` to avoid reusing stale recordings. Video files contain multiple episodes, so even `--check-data` can download hundreds of megabytes. Model publishing and W&B are disabled by default.
 
 ## Three GPUs on one machine

@@ -131,3 +131,154 @@ def test_no_datasets_selected(monkeypatch):
     args = parse_args(monkeypatch, "--no-sim")
     with pytest.raises(ValueError, match="No dataset selected"):
         train_turbovla.resolve_dataset_specs(args)
+
+
+@pytest.mark.parametrize(
+    "flag,value",
+    [("--batch-size", "0"), ("--grad-accum-steps", "0"), ("--ema-decay", "1"), ("--warmup-steps", "-1")],
+)
+def test_invalid_training_options(monkeypatch, flag, value):
+    with pytest.raises(SystemExit):
+        parse_args(monkeypatch, flag, value)
+
+
+def test_collator_preserves_padding_and_image_dimensions():
+    import torch
+
+    stats = {key: {"min": [0.0] * 6, "max": [1.0] * 6} for key in ("action", "observation.state")}
+    processor = Mock(return_value={"pixel_values": torch.zeros(1, 3, 32, 32)})
+    collator = train_turbovla.TurboVLANexArmCollator(["front"], stats, processor, horizon=3)
+    batch = collator(
+        [
+            {
+                "task": "stack bowls",
+                "front": torch.zeros(3, 48, 64),
+                "observation.state": torch.zeros(6),
+                "action": torch.ones(3, 6),
+                "action_is_pad": torch.tensor([False, True, True]),
+            }
+        ]
+    )
+    assert batch["action_is_pad"].tolist() == [[False, True, True]]
+    assert processor.call_args.kwargs["images"][0].size == (64, 48)
+    assert torch.all(batch["actions"] == 1)
+
+
+def test_small_distributed_mix_has_samples_on_every_rank():
+    for rank in range(4):
+        sampler = train_turbovla.DomainMixSampler([1, 1], [0.5, 0.5], num_replicas=4, rank=rank)
+        assert len(sampler) == 1
+        assert len(list(sampler)) == 1
+
+
+def test_training_counts_optimizer_updates(monkeypatch, tmp_path):
+    import sys
+    from types import SimpleNamespace
+
+    import torch
+
+    from lerobot.datasets import lerobot_dataset
+
+    root = make_local_root(tmp_path / "data")
+    parse_args(
+        monkeypatch,
+        "--dataset-root",
+        str(root),
+        "--output-dir",
+        str(tmp_path / "out"),
+        "--device",
+        "cpu",
+        "--max-steps",
+        "2",
+        "--warmup-steps",
+        "0",
+        "--batch-size",
+        "4",
+        "--grad-accum-steps",
+        "3",
+        "--num-workers",
+        "0",
+        "--horizon",
+        "2",
+        "--ema-decay",
+        "0",
+    )
+    features = {key: {"shape": [6]} for key in ("action", "observation.state")}
+    features["front"] = {"dtype": "image", "shape": [8, 8, 3]}
+    stats = {key: {"min": [0.0] * 6, "max": [1.0] * 6} for key in ("action", "observation.state")}
+    meta = SimpleNamespace(fps=30, stats=stats)
+
+    class Dataset(torch.utils.data.Dataset):
+        num_episodes = 1
+
+        def __len__(self):
+            return 1
+
+        def __getitem__(self, index):
+            return {
+                "task": "stack",
+                "front": torch.zeros(3, 8, 8),
+                "observation.state": torch.zeros(6),
+                "action": torch.ones(2, 6),
+                "action_is_pad": torch.tensor([False, True]),
+            }
+
+    ds = Dataset()
+    ds.meta, ds.features = meta, features
+    monkeypatch.setattr(lerobot_dataset, "LeRobotDatasetMetadata", Mock(return_value=meta))
+    monkeypatch.setattr(lerobot_dataset, "LeRobotDataset", Mock(return_value=ds))
+    processor = Mock(return_value={"pixel_values": torch.zeros(1, 3, 8, 8)})
+    monkeypatch.setitem(
+        sys.modules,
+        "transformers",
+        SimpleNamespace(AutoImageProcessor=SimpleNamespace(from_pretrained=lambda _: processor)),
+    )
+    config = SimpleNamespace(
+        vision=SimpleNamespace(),
+        text=SimpleNamespace(),
+        action=SimpleNamespace(),
+        interaction=SimpleNamespace(),
+    )
+
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.action_head = torch.nn.Linear(6, 6)
+            self.text_encoder = torch.nn.Linear(1, 1)
+            self.vision_encoder = torch.nn.Linear(1, 1)
+            self.vision_language_interaction = torch.nn.Linear(1, 1)
+            self.calls = 0
+
+        def forward(self, instructions, samples, states):
+            self.calls += 1
+            assert not self.text_encoder.training
+            return self.action_head(states).unsqueeze(1).expand(-1, 2, -1)
+
+    model = Model()
+    monkeypatch.setitem(
+        sys.modules,
+        "turbovla.models",
+        SimpleNamespace(TurboVLAConfig=lambda: config, build_turbovla=lambda _: model),
+    )
+    save = Mock()
+    monkeypatch.setattr(train_turbovla, "save_checkpoint", save)
+    train_turbovla.main()
+    assert model.calls == 6
+    assert save.call_args.args[-1] == 2
+    assert config.text.frozen
+
+
+def test_camera_hints_only_match_images_and_honor_legacy_names():
+    features = {
+        "front_state": {"dtype": "float32"},
+        "observation.images.front": {"dtype": "video"},
+        "observation.images.wrist": {"dtype": "video"},
+    }
+    assert train_turbovla.resolve_camera_keys(features, "front") == ["observation.images.front"]
+    assert train_turbovla.resolve_camera_keys(features, front_hint="observation.images.wrist") == [
+        "observation.images.wrist"
+    ]
+    with pytest.raises(ValueError, match="exactly one"):
+        train_turbovla.resolve_camera_keys(features, "front,missing")
+    with pytest.raises(ValueError, match="Duplicate"):
+        train_turbovla.resolve_camera_keys(features, "front,front")

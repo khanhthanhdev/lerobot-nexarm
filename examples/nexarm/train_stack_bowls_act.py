@@ -77,11 +77,14 @@ def resolve_policy(meta: LeRobotDatasetMetadata, pretrained: str | None) -> ACTC
     return cfg
 
 
-def check_data(meta: LeRobotDatasetMetadata, cfg: ACTConfig, root: Path | None) -> None:
+def check_data(
+    meta: LeRobotDatasetMetadata, cfg: ACTConfig, root: Path | None, *, local_files_only: bool = False
+) -> None:
     """Decode real frames and verify episode-end action padding without running training."""
     dataset = LeRobotDataset(
-        REPO_ID,
+        meta.repo_id,
         root=root,
+        local_files_only=local_files_only,
         revision=meta.revision,
         episodes=[0],
         video_backend="pyav",
@@ -105,7 +108,8 @@ def check_data(meta: LeRobotDatasetMetadata, cfg: ACTConfig, root: Path | None) 
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
+    parser.add_argument("--repo-id", default=REPO_ID, help="NexArm dataset Hub ID")
     parser.add_argument(
         "--pretrained", help="Compatible ACT Hub model ID or local pretrained_model directory"
     )
@@ -131,8 +135,10 @@ def main() -> None:
         parser.error("--num-gpus must be at least 1.")
     if args.num_gpus > 1 and args.device != "cuda":
         parser.error("Multiple GPUs require --device cuda.")
-    if args.pretrained and Path(args.pretrained).exists():
-        args.pretrained = str(Path(args.pretrained).resolve())
+    if args.device == "cpu" and args.mixed_precision == "fp16":
+        parser.error("FP16 training requires CUDA; use --mixed-precision no on CPU.")
+    if args.pretrained and Path(args.pretrained).expanduser().exists():
+        args.pretrained = str(Path(args.pretrained).expanduser().resolve())
     if any(not arg.startswith("--") or "=" not in arg for arg in extra):
         parser.error("Trainer overrides must use --key=value syntax.")
     protected = (
@@ -147,28 +153,30 @@ def main() -> None:
         parser.error(
             "Use the launcher's dataset/checkpoint options; policy and resume overrides are unsupported."
         )
-    root = args.dataset_root.resolve() if args.dataset_root else None
+    root = args.dataset_root.expanduser().resolve() if args.dataset_root else None
     if root is not None and not (root / "meta" / "info.json").is_file():
         parser.error("--dataset-root must contain an existing LeRobot dataset with meta/info.json.")
     revision = args.revision
     if root is None:
-        revision = HfApi().repo_info(REPO_ID, repo_type="dataset", revision=args.revision).sha
+        revision = HfApi().repo_info(args.repo_id, repo_type="dataset", revision=args.revision).sha
         # Avoid silently reading an older recording at HF_LEROBOT_HOME/repo_id.
-        root = HF_LEROBOT_HOME / "prepared" / REPO_ID / revision
+        root = HF_LEROBOT_HOME / "prepared" / args.repo_id / revision
         snapshot_download(
-            REPO_ID,
+            args.repo_id,
             repo_type="dataset",
             revision=revision,
             local_dir=root,
             allow_patterns="meta/**",
         )
-    meta = LeRobotDatasetMetadata(REPO_ID, root=root, revision=revision)
+    meta = LeRobotDatasetMetadata(
+        args.repo_id, root=root, revision=revision, local_files_only=args.dataset_root is not None
+    )
     validate_metadata(meta)
     cfg = resolve_policy(meta, args.pretrained)
     print(
         json.dumps(
             {
-                "dataset": REPO_ID,
+                "dataset": args.repo_id,
                 "revision": meta.revision,
                 "episodes": meta.total_episodes,
                 "frames": meta.total_frames,
@@ -182,7 +190,7 @@ def main() -> None:
         )
     )
     if args.check_data:
-        check_data(meta, cfg, root)
+        check_data(meta, cfg, root, local_files_only=args.dataset_root is not None)
         return
     command = [sys.executable, "-m"]
     if args.num_gpus > 1 or args.mixed_precision != "no":
@@ -204,6 +212,7 @@ def main() -> None:
         [
             "lerobot.scripts.lerobot_train",
             f"--config_path={CONFIG_PATH}",
+            f"--dataset.repo_id={args.repo_id}",
             f"--dataset.revision={meta.revision}",
             f"--policy.device={args.device}",
             "--policy.push_to_hub=false",
@@ -215,6 +224,13 @@ def main() -> None:
         command.append(f"--policy.path={args.pretrained}")
     if args.output_dir:
         command.append(f"--output_dir={args.output_dir.resolve()}")
+    # The child runs from PROJECT_ROOT; preserve paths supplied from another directory.
+    extra = [
+        f"--output_dir={Path(arg.split('=', 1)[1]).expanduser().resolve()}"
+        if arg.startswith("--output_dir=")
+        else arg
+        for arg in extra
+    ]
     command.extend(extra)
     print(shlex.join(command), flush=True)
     if not args.dry_run:

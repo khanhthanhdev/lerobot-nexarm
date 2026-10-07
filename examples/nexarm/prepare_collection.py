@@ -32,9 +32,13 @@ def parse_args():
     )
     parser.add_argument(
         "--top-cam",
-        nargs="?",
-        const="auto",
-        help="Enable the RealSense D435i top camera (optional serial number; auto-detected if omitted)",
+        default="auto",
+        help="RealSense D435i top camera serial number (default: auto-detect). Use --no-top-cam to disable.",
+    )
+    parser.add_argument(
+        "--no-top-cam",
+        action="store_true",
+        help="Disable the top camera (use only front and wrist cameras)",
     )
     parser.add_argument("--repo-id", default="thanhkt/nexarm_stack_bowls")
     parser.add_argument("--root-repo-id", default="thanhkt/nexarm_stack_bowls")
@@ -344,7 +348,7 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
     test_cameras(configs, output_dir)
     serial = None
-    if args.top_cam is not None:
+    if not args.no_top_cam:
         serial = find_realsense_serial(args.top_cam)
         test_realsense(serial, args, output_dir)
         # Recording stores RGB only; depth and point cloud are checked in the test above.

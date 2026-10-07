@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import itertools
 from dataclasses import dataclass
+from typing import Literal
 
 import mujoco
 import numpy as np
@@ -54,7 +55,17 @@ class NexArmStackBowlsTask:
         max_nesting_delta_m: float = 0.038,
         success_hold_s: float = 0.5,
         timeout_s: float = 40.0,
+        grasp_mode: Literal["contact_assisted", "proximity_assisted"] = "contact_assisted",
+        position_jitter_m: float = 0.005,
     ) -> None:
+        if grasp_mode not in ("contact_assisted", "proximity_assisted"):
+            raise ValueError(f"Unknown grasp mode: {grasp_mode}")
+        if not np.isfinite(position_jitter_m) or not 0 <= position_jitter_m <= 0.05:
+            raise ValueError("position_jitter_m must be between 0 and 0.05 meters")
+        if not 0 < success_hold_s < timeout_s:
+            raise ValueError("Require 0 < success_hold_s < timeout_s")
+        self.grasp_mode = grasp_mode
+        self.position_jitter_m = position_jitter_m
         self.backend = backend
         self.max_concentric_error_m = max_concentric_error_m
         self.min_nesting_delta_m = min_nesting_delta_m
@@ -100,6 +111,8 @@ class NexArmStackBowlsTask:
         order: tuple[str, str, str] | None = None,
         settle_steps: int = 25,
     ) -> NexArmStackBowlsStatus:
+        if order is not None and order not in PERMUTATIONS:
+            raise ValueError("order must contain red, blue, and black exactly once")
         self.backend.reset(settle_steps=0, rng=np.random.default_rng([seed, 1]))
         rng = np.random.default_rng(seed)
 
@@ -117,19 +130,28 @@ class NexArmStackBowlsTask:
             np.array([0.00, -0.18, 0.020]),
             np.array([0.11, -0.27, 0.020]),
         ]
+        # Reject overlapping layouts rather than allowing enlarged jitter to spawn collisions.
+        for _ in range(1000):
+            positions = np.array(base_positions)
+            positions[:, :2] += rng.uniform(-self.position_jitter_m, self.position_jitter_m, (3, 2))
+            if all(
+                np.linalg.norm(positions[i, :2] - positions[j, :2]) >= 0.14
+                for i, j in itertools.combinations(range(3), 2)
+            ):
+                break
+        else:
+            raise RuntimeError("Could not sample a non-overlapping bowl layout")
+
         # Shuffle slot assignment
         slot_order = rng.permutation(3)
 
         for i, color in enumerate(COLORS):
             slot = slot_order[i]
-            # Add small random jitter (+-5mm in X, +-5mm in Y)
-            jitter_x = rng.uniform(-0.005, 0.005)
-            jitter_y = rng.uniform(-0.005, 0.005)
             yaw = rng.uniform(-np.pi, np.pi)
             quat = np.array([np.cos(yaw / 2), 0, 0, np.sin(yaw / 2)])
 
             qpos_adr = int(self.backend.model.jnt_qposadr[self._joint_ids[color]])
-            pos = base_positions[slot] + np.array([jitter_x, jitter_y, 0.0])
+            pos = positions[slot]
             self.backend.data.qpos[qpos_adr : qpos_adr + 3] = pos
             self.backend.data.qpos[qpos_adr + 3 : qpos_adr + 7] = quat
 
@@ -147,7 +169,11 @@ class NexArmStackBowlsTask:
         return self.status()
 
     def _on_physics_step(self) -> None:
-        """Physical grasp constraint helper for concave thin-walled bowls."""
+        """Assist transport after grasp acquisition; neither mode is unassisted physics.
+
+        Contact mode requires both jaws to touch the same bowl. Proximity mode
+        preserves the legacy behavior for comparison, not grasp validation.
+        """
         gripper_ctrl = self.backend.control_to_raw(
             "gripper",
             float(self.backend.data.ctrl[self.backend._actuator_ids["gripper"]]),
@@ -161,7 +187,10 @@ class NexArmStackBowlsTask:
                 candidate_colors = [self.target_bowl] if self.target_bowl is not None else COLORS
                 closest_c = None
                 closest_dist = 999.0
+                contacts = self._bowl_jaw_contacts()
                 for c in candidate_colors:
+                    if self.grasp_mode == "contact_assisted" and len(contacts[c]) != 2:
+                        continue
                     bpos = self.bowl_position(c)
                     d = float(np.linalg.norm(bpos - site_pos))
                     if d < closest_dist:
@@ -183,18 +212,24 @@ class NexArmStackBowlsTask:
                 self.held_bowl = None
                 self.held_rel_pos = None
 
+    def _bowl_jaw_contacts(self) -> dict[str, set[int]]:
+        """Return penetrating jaw contacts grouped by bowl (ignores contact margins)."""
+        contacts: dict[str, set[int]] = {color: set() for color in COLORS}
+        jaws = {self._left_jaw_geom_id, self._right_jaw_geom_id}
+        bodies = {body_id: color for color, body_id in self._body_ids.items()}
+        for con in self.backend.data.contact[: self.backend.data.ncon]:
+            if con.dist > 0:
+                continue
+            for jaw, other in ((con.geom1, con.geom2), (con.geom2, con.geom1)):
+                if jaw in jaws:
+                    color = bodies.get(int(self.backend.model.geom_bodyid[other]))
+                    if color is not None:
+                        contacts[color].add(int(jaw))
+        return contacts
+
     def _is_gripper_disengaged(self) -> bool:
-        """Check if gripper jaws are not contacting any bowl."""
-        for i in range(self.backend.data.ncon):
-            con = self.backend.data.contact[i]
-            g1, g2 = con.geom1, con.geom2
-            is_jaw = g1 in (self._left_jaw_geom_id, self._right_jaw_geom_id) or g2 in (
-                self._left_jaw_geom_id,
-                self._right_jaw_geom_id,
-            )
-            if is_jaw:
-                return False
-        return True
+        """Require no assisted attachment and no jaw contact with any bowl."""
+        return self.held_bowl is None and not any(self._bowl_jaw_contacts().values())
 
     def status(self) -> NexArmStackBowlsStatus:
         bottom, middle, top = self.current_order
@@ -223,6 +258,12 @@ class NexArmStackBowlsTask:
         vel_m = np.linalg.norm(self.bowl_velocity(middle))
         vel_t = np.linalg.norm(self.bowl_velocity(top))
         is_stable = max(vel_b, vel_m, vel_t) < 0.05
+        # A spinning or tipped stack must not pass just because its centers align.
+        for color in COLORS:
+            body_id = self._body_ids[color]
+            angular_speed = np.linalg.norm(self.backend.data.cvel[body_id, :3])
+            upright = self.backend.data.xmat[body_id].reshape(3, 3)[2, 2] > np.cos(np.deg2rad(15))
+            is_stable = is_stable and angular_speed < 0.5 and upright
 
         current_time = float(self.backend.data.time)
         is_stacked = is_concentric and is_nested and is_released and is_stable
