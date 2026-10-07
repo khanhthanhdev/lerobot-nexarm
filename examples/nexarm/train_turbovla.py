@@ -130,8 +130,7 @@ def parse_args():
     parser.add_argument(
         "--cameras",
         type=str,
-        # TODO: top camera temporarily disabled; pass --cameras front,wrist,top to re-enable.
-        default="front,wrist",
+        default="front,wrist,top",
         help="Comma-separated list of camera keys to use (e.g. 'front,wrist,top').",
     )
     parser.add_argument(

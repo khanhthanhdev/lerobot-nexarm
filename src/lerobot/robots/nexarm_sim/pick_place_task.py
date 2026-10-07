@@ -35,6 +35,7 @@ class NexArmPickPlaceTask:
         target_radius_m: float = 0.05,
         success_hold_s: float = 0.5,
         timeout_s: float = 20.0,
+        layout_scale: float = 1.0,
     ) -> None:
         if target_radius_m <= 0:
             raise ValueError("target_radius_m must be positive")
@@ -42,10 +43,13 @@ class NexArmPickPlaceTask:
             raise ValueError("success_hold_s must be positive")
         if timeout_s <= 0:
             raise ValueError("timeout_s must be positive")
+        if layout_scale <= 0:
+            raise ValueError("layout_scale must be positive")
         self.backend = backend
         self.target_radius_m = target_radius_m
         self.success_hold_s = success_hold_s
         self.timeout_s = timeout_s
+        self.layout_scale = layout_scale
         self._cube_joint_id = self._required_id(mujoco.mjtObj.mjOBJ_JOINT, "cube_joint")
         self._cube_body_id = self._required_id(mujoco.mjtObj.mjOBJ_BODY, "cube")
         self._target_body_id = self._required_id(mujoco.mjtObj.mjOBJ_BODY, "target_zone")
@@ -74,16 +78,23 @@ class NexArmPickPlaceTask:
     def target_position(self) -> np.ndarray:
         return self.backend.data.xpos[self._target_body_id].copy()
 
+    @property
+    def cube_speed(self) -> float:
+        """Linear speed of the cube in m/s."""
+        cube_dof = int(self.backend.model.jnt_dofadr[self._cube_joint_id])
+        return float(np.linalg.norm(self.backend.data.qvel[cube_dof : cube_dof + 3]))
+
     def reset(self, *, seed: int = 0, settle_steps: int = 0) -> NexArmPickPlaceStatus:
-        self.backend.reset(settle_steps=0)
+        # Separate streams keep cube/target placement independent of domain randomization.
+        self.backend.reset(settle_steps=0, rng=np.random.default_rng([seed, 1]))
         rng = np.random.default_rng(seed)
         # Randomize relative to the poses declared by the scene instead of
         # assuming the original Fusion world coordinates. This keeps the task
         # valid when the robot is mounted or the scene is recentered.
         cube_center = self._cube_spawn_xy + np.array([0.001, 0.01])
         target_center = self._target_spawn_xy + np.array([0.0, 0.01])
-        cube_xy = cube_center + rng.uniform((-0.03, -0.04), (0.03, 0.04))
-        target_xy = target_center + rng.uniform((-0.03, -0.04), (0.03, 0.04))
+        cube_xy = cube_center + self.layout_scale * rng.uniform((-0.03, -0.04), (0.03, 0.04))
+        target_xy = target_center + self.layout_scale * rng.uniform((-0.03, -0.04), (0.03, 0.04))
         if np.linalg.norm(cube_xy - target_xy) < self.target_radius_m + 0.04:
             target_xy[0] = target_center[0] - 0.03
         cube_qpos = int(self.backend.model.jnt_qposadr[self._cube_joint_id])

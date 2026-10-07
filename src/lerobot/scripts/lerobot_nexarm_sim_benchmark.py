@@ -560,7 +560,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--fps", type=int, default=30)
     parser.add_argument("--camera-width", type=int, default=640)
     parser.add_argument("--camera-height", type=int, default=480)
-    parser.add_argument("--cameras", nargs="+", default=["front", "wrist"])
+    parser.add_argument("--cameras", nargs="+", default=["front", "wrist", "top"])
     parser.add_argument("--task", default=DEFAULT_TASK)
     parser.add_argument("--settle-steps", type=int, default=25)
     parser.add_argument("--warmup-steps", type=int, default=2)

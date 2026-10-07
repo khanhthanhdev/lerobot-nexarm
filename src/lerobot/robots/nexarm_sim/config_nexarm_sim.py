@@ -27,10 +27,11 @@ class NexArmSimConfig(RobotConfig):
     fps: int = 30
     camera_width: int = 640
     camera_height: int = 480
-    camera_names: tuple[str, ...] = ("front", "wrist")
+    camera_names: tuple[str, ...] = ("front", "wrist", "top")
     settle_steps: int = 100
     action_delay_steps: int = 0
     enable_domain_randomization: bool = False
+    calibration_path: Path | None = None
 
     def __post_init__(self) -> None:
         super().__post_init__()

@@ -10,6 +10,7 @@
 #   --fps            Control loop rate (default: 30)
 #   --front-cam      OpenCV camera index for front camera (default: 0)
 #   --wrist-cam      OpenCV camera index for wrist camera (default: 1)
+#   --top-cam        Enable RealSense top camera (serial number)
 #   --rerun-save-path outputs/rerun/nexarm_teleop.rrd  Save a replayable session
 #   --no-display     Disable Rerun visualization
 
@@ -17,6 +18,7 @@ import argparse
 import time
 
 from lerobot.cameras.opencv import OpenCVCameraConfig
+from lerobot.cameras.realsense import RealSenseCameraConfig
 from lerobot.robots.nexarm_follower import NexArmFollower, NexArmFollowerConfig
 from lerobot.teleoperators.nexarm_leader import NexArmLeader, NexArmLeaderConfig
 from lerobot.utils.robot_utils import precise_sleep
@@ -30,6 +32,7 @@ def parse_args():
     parser.add_argument("--fps", type=int, default=30)
     parser.add_argument("--front-cam", type=int, default=0)
     parser.add_argument("--wrist-cam", type=int, default=1)
+    parser.add_argument("--top-cam", help="RealSense serial number to enable the top camera")
     parser.add_argument("--no-display", action="store_true")
     parser.add_argument(
         "--rerun-save-path",
@@ -45,6 +48,14 @@ def main():
         "front": OpenCVCameraConfig(index_or_path=args.front_cam, width=640, height=480, fps=args.fps),
         "wrist": OpenCVCameraConfig(index_or_path=args.wrist_cam, width=640, height=480, fps=args.fps),
     }
+
+    if args.top_cam is not None:
+        camera_config["top"] = RealSenseCameraConfig(
+            serial_number_or_name=args.top_cam,
+            width=640,
+            height=480,
+            fps=args.fps,
+        )
 
     follower_config = NexArmFollowerConfig(port=args.follower_port, cameras=camera_config)
     leader_config = NexArmLeaderConfig(port=args.leader_port)

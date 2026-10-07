@@ -85,7 +85,7 @@ class NexArmPickPlaceEnv(gym.Env):
             fps=self.fps,
             camera_width=self.observation_width,
             camera_height=self.observation_height,
-            camera_names=("front", "wrist"),
+            camera_names=("front", "wrist", "top"),
         )
         self.task = NexArmPickPlaceTask(
             self.backend,
@@ -139,6 +139,12 @@ class NexArmPickPlaceEnv(gym.Env):
             shape=(self.observation_height, self.observation_width, 3),
             dtype=np.uint8,
         )
+        top_img_space = spaces.Box(
+            low=0,
+            high=255,
+            shape=(self.observation_height, self.observation_width, 3),
+            dtype=np.uint8,
+        )
 
         if self.obs_type == "pixels_agent_pos":
             self.observation_space = spaces.Dict(
@@ -148,10 +154,12 @@ class NexArmPickPlaceEnv(gym.Env):
                         {
                             "front": front_img_space,
                             "wrist": wrist_img_space,
+                            "top": top_img_space,
                         }
                     ),
                     "pixels/front": front_img_space,
                     "pixels/wrist": wrist_img_space,
+                    "pixels/top": top_img_space,
                 }
             )
         elif self.obs_type == "pixels":
@@ -161,10 +169,12 @@ class NexArmPickPlaceEnv(gym.Env):
                         {
                             "front": front_img_space,
                             "wrist": wrist_img_space,
+                            "top": top_img_space,
                         }
                     ),
                     "pixels/front": front_img_space,
                     "pixels/wrist": wrist_img_space,
+                    "pixels/top": top_img_space,
                 }
             )
         elif self.obs_type == "state":
@@ -209,9 +219,11 @@ class NexArmPickPlaceEnv(gym.Env):
         if self.obs_type in ("pixels_agent_pos", "pixels"):
             front_img = self.backend.render("front")
             wrist_img = self.backend.render("wrist")
-            obs["pixels"] = {"front": front_img, "wrist": wrist_img}
+            top_img = self.backend.render("top")
+            obs["pixels"] = {"front": front_img, "wrist": wrist_img, "top": top_img}
             obs["pixels/front"] = front_img
             obs["pixels/wrist"] = wrist_img
+            obs["pixels/top"] = top_img
 
         if self.obs_type == "state":
             cube_pos = self.task.cube_position

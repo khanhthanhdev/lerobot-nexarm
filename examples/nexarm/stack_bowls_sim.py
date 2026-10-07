@@ -38,7 +38,7 @@ def main() -> None:
         id="stack_bowls",
         model_path=args.model,
         fps=args.fps,
-        camera_names=("front", "wrist"),
+        camera_names=("front", "wrist", "top"),
         camera_width=640,
         camera_height=480,
         settle_steps=0,

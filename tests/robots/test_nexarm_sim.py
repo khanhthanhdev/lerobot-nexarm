@@ -173,12 +173,12 @@ def test_sim_robot_matches_physical_feature_contract() -> None:
     )
     expected_joint_keys = {f"{name}.pos" for name in JOINT_NAMES}
     assert set(robot.action_features) == expected_joint_keys
-    assert set(robot.observation_features) == expected_joint_keys | {"front", "wrist"}
+    assert set(robot.observation_features) == expected_joint_keys | {"front", "wrist", "top"}
 
     robot.connect()
     try:
         observation = robot.get_observation()
-        assert set(observation) == expected_joint_keys | {"front", "wrist"}
+        assert set(observation) == expected_joint_keys | {"front", "wrist", "top"}
 
         action = {f"{name}.pos": HOME_POSITIONS[name] for name in JOINT_NAMES}
         action["gripper.pos"] = 1000.0

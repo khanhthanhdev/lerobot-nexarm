@@ -257,8 +257,10 @@ class NexArmEnv(EnvConfig):
             "agent_pos": OBS_STATE,
             "front": f"{OBS_IMAGE}.front",
             "wrist": f"{OBS_IMAGE}.wrist",
+            "top": f"{OBS_IMAGE}.top",
             "pixels/front": f"{OBS_IMAGES}.front",
             "pixels/wrist": f"{OBS_IMAGES}.wrist",
+            "pixels/top": f"{OBS_IMAGES}.top",
             "environment_state": OBS_ENV_STATE,
         }
     )
@@ -271,6 +273,9 @@ class NexArmEnv(EnvConfig):
                 type=FeatureType.VISUAL, shape=(self.observation_height, self.observation_width, 3)
             )
             self.features["pixels/wrist"] = PolicyFeature(
+                type=FeatureType.VISUAL, shape=(self.observation_height, self.observation_width, 3)
+            )
+            self.features["pixels/top"] = PolicyFeature(
                 type=FeatureType.VISUAL, shape=(self.observation_height, self.observation_width, 3)
             )
         if self.obs_type == "state":

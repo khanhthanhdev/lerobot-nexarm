@@ -2,29 +2,44 @@
 
 """Generate successful scripted NexArm MuJoCo episodes as a LeRobot dataset.
 
+Each episode samples its own cube/target layout, trajectory timing and offsets, domain randomization and
+(optionally) action latency, all derived from the episode seed. Episodes are kept only if the physical
+task gate and the quality gates pass. Provenance goes to ``generation_report.json`` and one line per
+attempt to ``generation_episodes.jsonl``.
+
 Example:
     MUJOCO_GL=egl uv run python examples/nexarm/generate_sim_dataset.py \
         --repo-id local/nexarm_sim_pick_place \
         --root outputs/datasets/nexarm_sim_pick_place \
         --episodes 20
+
+Calibrated to a real arm (see calibrate_sim.py), sharded over 4 GPUs, held-out eval split:
+    uv run python examples/nexarm/generate_sim_dataset.py --calibration outputs/calibration/nexarm.json \
+        --episodes 200 --workers 4 --gpus 0,1,2,3 --split eval
 """
 
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
-from collections.abc import Callable
+import sys
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
 
+try:  # imported as a package module (tests) or run as a script
+    from examples.nexarm import sim_dataset_utils as utils
+except ModuleNotFoundError:
+    import sim_dataset_utils as utils  # type: ignore[no-redef]
+
 if TYPE_CHECKING:
     from lerobot.datasets.lerobot_dataset import LeRobotDataset
 
 from lerobot.motors.nexarm.nexarm import JOINT_NAMES
-from lerobot.robots.nexarm_sim import NexArmPickPlaceTask, NexArmSim, NexArmSimConfig
+from lerobot.robots.nexarm_sim import NexArmPickPlaceTask, NexArmSim, NexArmSimConfig, SimCalibration
 from lerobot.robots.nexarm_sim.mujoco_backend import HOME_POSITIONS, RAW_RANGES, resolve_model_path
 from lerobot.utils.constants import ACTION, OBS_STR
 from lerobot.utils.feature_utils import build_dataset_frame, hw_to_dataset_features
@@ -32,6 +47,154 @@ from lerobot.utils.feature_utils import build_dataset_frame, hw_to_dataset_featu
 DEFAULT_TASK = "Pick up the red cube, place it in the green target zone, and release it."
 OPEN_GRIPPER = float(RAW_RANGES["gripper"][0])
 CLOSED_GRIPPER = float(RAW_RANGES["gripper"][1])
+ARM_JOINTS = JOINT_NAMES[:-1]
+NUM_STAGES = 10
+SETTLE_TOLERANCE = 15.0  # raw servo units (~1.3 degrees)
+MIN_SETTLE_STEPS = 3
+# Min-jerk has ~1.9x the peak speed of linear interpolation, which shakes the cube out of the jaws while
+# carrying it, so it is only used for the free-space stages (approach, descend, release, retreat).
+SMOOTH_STAGES = frozenset({0, 1, 8, 9})
+
+
+@dataclass(frozen=True)
+class TrajectoryVariation:
+    """Per-episode perturbation of the scripted pick/place waypoints. The default is the nominal path."""
+
+    step_scale: tuple[float, ...] = (1.0,) * NUM_STAGES
+    grasp_xy: tuple[float, float] = (0.0, 0.0)
+    grasp_z: float = 0.0
+    approach_dz: float = 0.0
+    lift_dz: float = 0.0
+    transfer_dz: float = 0.0
+    release_xy: tuple[float, float] = (0.0, 0.0)
+
+    @classmethod
+    def sample(cls, seed: int) -> TrajectoryVariation:
+        rng = np.random.default_rng([seed, 2])
+        return cls(
+            step_scale=tuple(float(x) for x in rng.uniform(0.75, 1.3, size=NUM_STAGES)),
+            grasp_xy=(float(rng.uniform(-0.003, 0.003)), float(rng.uniform(-0.003, 0.003))),
+            grasp_z=float(rng.uniform(-0.002, 0.002)),
+            approach_dz=float(rng.uniform(-0.02, 0.02)),
+            lift_dz=float(rng.uniform(-0.02, 0.02)),
+            transfer_dz=float(rng.uniform(-0.02, 0.02)),
+            release_xy=(float(rng.uniform(-0.005, 0.005)), float(rng.uniform(-0.005, 0.005))),
+        )
+
+
+class ActionNoise:
+    """Temporally correlated (AR(1)) noise on the arm joints, in raw servo units."""
+
+    def __init__(self, std: float, rng: np.random.Generator, rho: float = 0.9) -> None:
+        self.std = std
+        self.rng = rng
+        self.rho = rho
+        self._state = np.zeros(len(ARM_JOINTS))
+        # Last clean waypoint: stages start from it so the recorded labels stay continuous despite noise.
+        self.anchor: dict[str, float] | None = None
+
+    def sample(self) -> dict[str, float]:
+        innovation = self.rng.normal(0.0, self.std * np.sqrt(1 - self.rho**2), size=self._state.shape)
+        self._state = self.rho * self._state + innovation
+        return {f"{name}.pos": float(v) for name, v in zip(ARM_JOINTS, self._state, strict=True)}
+
+
+@dataclass
+class EpisodeMetrics:
+    frames: int = 0
+    max_action_delta: float = 0.0  # largest per-step arm command change (raw units)
+    max_action_jerk: float = 0.0  # largest per-step change of that change
+    min_limit_margin: float = float("inf")  # closest arm command to a servo limit (raw units)
+    final_place_error_m: float = float("nan")
+    final_cube_speed: float = float("nan")
+
+
+@dataclass
+class QualityThresholds:
+    min_frames: int = 150
+    max_frames: int = 700
+    max_action_delta: float = 300.0
+    max_action_jerk: float = 150.0
+    min_limit_margin: float = 50.0
+    max_place_error_m: float = 0.02
+    max_cube_speed: float = 0.05
+
+
+class FrameRecorder:
+    """Tracks quality metrics for each recorded (observation, command) pair and forwards them to a sink."""
+
+    def __init__(self, sink: Callable[[dict[str, object], dict[str, float]], None] | None = None) -> None:
+        self.sink = sink
+        self.metrics = EpisodeMetrics()
+        self._prev: np.ndarray | None = None
+        self._prev_delta: np.ndarray | None = None
+
+    def __call__(self, observation: dict[str, object], action: dict[str, float]) -> None:
+        arm = np.array([action[f"{name}.pos"] for name in ARM_JOINTS])
+        metrics = self.metrics
+        metrics.frames += 1
+        if self._prev is not None:
+            delta = arm - self._prev
+            metrics.max_action_delta = max(metrics.max_action_delta, float(np.abs(delta).max()))
+            if self._prev_delta is not None:
+                metrics.max_action_jerk = max(
+                    metrics.max_action_jerk, float(np.abs(delta - self._prev_delta).max())
+                )
+            self._prev_delta = delta
+        self._prev = arm
+        low = np.array([RAW_RANGES[name][0] for name in ARM_JOINTS])
+        high = np.array([RAW_RANGES[name][1] for name in ARM_JOINTS])
+        metrics.min_limit_margin = min(
+            metrics.min_limit_margin, float(np.minimum(arm - low, high - arm).min())
+        )
+        if self.sink is not None:
+            self.sink(observation, action)
+
+
+def check_quality(metrics: EpisodeMetrics, limits: QualityThresholds) -> str | None:
+    """Return the reason an otherwise successful episode must be rejected, or None."""
+    if metrics.frames < limits.min_frames:
+        return "quality_too_short"
+    if metrics.frames > limits.max_frames:
+        return "quality_too_long"
+    if metrics.max_action_delta > limits.max_action_delta:
+        return "quality_velocity_spike"
+    if metrics.max_action_jerk > limits.max_action_jerk:
+        return "quality_jerk_spike"
+    if metrics.min_limit_margin < limits.min_limit_margin:
+        return "quality_joint_limit"
+    if not metrics.final_place_error_m <= limits.max_place_error_m:
+        return "quality_placement_error"
+    if not metrics.final_cube_speed <= limits.max_cube_speed:
+        return "quality_cube_moving"
+    return None
+
+
+def _min_jerk(alpha: np.ndarray) -> np.ndarray:
+    return 10 * alpha**3 - 15 * alpha**4 + 6 * alpha**5
+
+
+def _clip_action(action: dict[str, float]) -> dict[str, float]:
+    return {
+        key: float(np.clip(value, *RAW_RANGES[key.removesuffix(".pos")])) for key, value in action.items()
+    }
+
+
+def _send(
+    robot: NexArmSim,
+    command: dict[str, float],
+    noise: ActionNoise | None,
+    record_frame: Callable[[dict[str, object], dict[str, float]], None] | None,
+) -> None:
+    """Send ``command`` (plus optional noise) and record the clean command as the action label."""
+    observation = robot.get_observation() if record_frame is not None else {}
+    executed = command
+    if noise is not None:
+        jitter = noise.sample()
+        executed = _clip_action({key: command[key] + jitter.get(key, 0.0) for key in command})
+    robot.send_action(executed)
+    if record_frame is not None:
+        record_frame(observation, command)
 
 
 def _interpolate_stage(
@@ -44,6 +207,8 @@ def _interpolate_stage(
     steps: int,
     record_frame: Callable[[dict[str, object], dict[str, float]], None] | None,
     settle_steps: int = 10,
+    noise: ActionNoise | None = None,
+    smooth: bool = True,
 ) -> bool:
     solution = robot.backend.solve_ik(
         target_xyz,
@@ -54,26 +219,34 @@ def _interpolate_stage(
     if solution is None:
         return False
 
-    start = robot.backend.joint_positions()
+    start = (
+        noise.anchor if noise is not None and noise.anchor is not None else robot.backend.joint_positions()
+    )
     target = {f"{name}.pos": HOME_POSITIONS[name] for name in JOINT_NAMES}
     target.update({f"{name}.pos": value for name, value in solution.items()})
     target["gripper.pos"] = gripper
+    target = _clip_action(target)
+    if noise is not None:
+        noise.anchor = target
 
-    for alpha in np.linspace(0.0, 1.0, steps, endpoint=True):
-        action = {key: float((1 - alpha) * start[key] + alpha * target[key]) for key in target}
-        observation = robot.get_observation() if record_frame is not None else {}
-        sent = robot.send_action(action)
-        if record_frame is not None:
-            record_frame(observation, sent)
+    alphas = np.linspace(0.0, 1.0, steps, endpoint=True)
+    for alpha in _min_jerk(alphas) if smooth else alphas:
+        command = _clip_action({key: float((1 - alpha) * start[key] + alpha * target[key]) for key in target})
+        _send(robot, command, noise, record_frame)
         if task.observe().terminated:
             break
-    for _ in range(settle_steps):
-        observation = robot.get_observation() if record_frame is not None else {}
-        sent = robot.send_action(target)
-        if record_frame is not None:
-            record_frame(observation, sent)
+    # Hold the waypoint only until the arm has converged; idle frames teach a policy to stall.
+    for step in range(settle_steps):
+        _send(robot, target, noise, record_frame)
         if task.observe().terminated:
             break
+        if step + 1 >= MIN_SETTLE_STEPS:
+            current = robot.backend.joint_positions()
+            if (
+                max(abs(current[f"{name}.pos"] - target[f"{name}.pos"]) for name in ARM_JOINTS)
+                < SETTLE_TOLERANCE
+            ):
+                break
     return True
 
 
@@ -84,8 +257,16 @@ def generate_episode(
     seed: int,
     record_frame: Callable[[dict[str, object], dict[str, float]], None] | None = None,
     trace: bool = False,
+    variation: TrajectoryVariation | None = None,
+    action_noise: float = 0.0,
 ) -> tuple[bool, str]:
-    """Run one deterministic pick/place attempt and return its accepted status."""
+    """Run one pick/place attempt and return its accepted status.
+
+    ``variation=None`` runs the nominal path. ``action_noise`` (raw units, std) perturbs the executed
+    arm commands while the recorded action stays the clean target.
+    """
+    variation = variation or TrajectoryVariation()
+    noise = ActionNoise(action_noise, np.random.default_rng([seed, 4])) if action_noise > 0 else None
 
     task.reset(seed=seed, settle_steps=25)
     cube = robot.backend.body_position("cube")
@@ -93,22 +274,23 @@ def generate_episode(
 
     # Account for gripper_frame site offset relative to the jaw collision
     # boxes to ensure vertical overlap with the 20 mm cube.
-    cube_grasp = cube + np.array([0.0, 0.0, -0.020])
-    target_release = target + np.array([0.0, 0.0, -0.018])
-    stages = (
-        (cube_grasp + [0.0, 0.0, 0.12], OPEN_GRIPPER, 16),
+    cube_grasp = cube + np.array([variation.grasp_xy[0], variation.grasp_xy[1], -0.020 + variation.grasp_z])
+    target_release = target + np.array([variation.release_xy[0], variation.release_xy[1], -0.018])
+    base_stages = (
+        (cube_grasp + [0.0, 0.0, 0.12 + variation.approach_dz], OPEN_GRIPPER, 16),
         (cube_grasp, OPEN_GRIPPER, 18),
         (cube_grasp, CLOSED_GRIPPER, 80),
         (cube_grasp + [0.0, 0.0, 0.055], CLOSED_GRIPPER, 30),
         (cube_grasp + [0.0, 0.0, 0.09], CLOSED_GRIPPER, 50),
-        (cube_grasp + [0.0, 0.0, 0.13], CLOSED_GRIPPER, 50),
-        (target_release + [0.0, 0.0, 0.12], CLOSED_GRIPPER, 60),
+        (cube_grasp + [0.0, 0.0, 0.13 + variation.lift_dz], CLOSED_GRIPPER, 50),
+        (target_release + [0.0, 0.0, 0.12 + variation.transfer_dz], CLOSED_GRIPPER, 60),
         (target_release, CLOSED_GRIPPER, 18),
         (target_release, OPEN_GRIPPER, 24),
         (target_release + [0.0, 0.0, 0.14], OPEN_GRIPPER, 18),
     )
 
-    for stage_index, (waypoint, gripper, steps) in enumerate(stages):
+    for stage_index, (waypoint, gripper, base_steps) in enumerate(base_stages):
+        steps = max(4, round(base_steps * variation.step_scale[stage_index]))
         if not _interpolate_stage(
             robot,
             task,
@@ -117,6 +299,8 @@ def generate_episode(
             seed=seed * 100 + stage_index,
             steps=steps,
             record_frame=record_frame,
+            noise=noise,
+            smooth=stage_index in SMOOTH_STAGES,
         ):
             return False, f"ik_failed_stage_{stage_index}"
         status = task.status()
@@ -135,12 +319,9 @@ def generate_episode(
             return status.success, status.reason or "terminated"
 
     # Hold after release so the task's stability gate can accept the placement.
-    hold_action = robot.backend.joint_positions()
+    hold_action = _clip_action(robot.backend.joint_positions())
     for _ in range(35):
-        observation = robot.get_observation() if record_frame is not None else {}
-        sent = robot.send_action(hold_action)
-        if record_frame is not None:
-            record_frame(observation, sent)
+        _send(robot, hold_action, None, record_frame)
         status = task.observe()
         if status.terminated:
             return status.success, status.reason or "terminated"
@@ -170,13 +351,21 @@ def _build_dataset(robot: NexArmSim, args: argparse.Namespace) -> LeRobotDataset
     )
 
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__)
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument("--repo-id", default="local/nexarm_sim_pick_place")
     parser.add_argument("--root", type=Path, default=Path("outputs/datasets/nexarm_sim_pick_place"))
     parser.add_argument("--episodes", type=int, default=20, help="Number of accepted episodes to write")
     parser.add_argument("--max-attempts", type=int, default=None)
-    parser.add_argument("--seed-start", type=int, default=0)
+    parser.add_argument(
+        "--split",
+        choices=("train", "eval"),
+        default="train",
+        help=f"train seeds are < {utils.EVAL_SEED_OFFSET}; eval seeds start at {utils.EVAL_SEED_OFFSET}",
+    )
+    parser.add_argument("--seed-start", type=int, default=None, help="Defaults to the start of the split")
     parser.add_argument("--fps", type=int, default=30)
     parser.add_argument("--camera-width", type=int, default=640)
     parser.add_argument("--camera-height", type=int, default=480)
@@ -184,35 +373,95 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--task", default=DEFAULT_TASK)
     parser.add_argument("--trace", action="store_true")
     parser.add_argument(
-        "--domain-randomization",
+        "--no-dr",
+        dest="domain_randomization",
+        action="store_false",
+        help="Disable per-episode visual and dynamics domain randomization (on by default)",
+    )
+    parser.add_argument(
         "--dr",
+        "--domain-randomization",
+        dest="_dr_alias",
         action="store_true",
-        help="Enable Visual and Dynamics Domain Randomization per episode",
+        help="No-op; DR is the default",
+    )
+    parser.add_argument(
+        "--no-variation", dest="variation", action="store_false", help="Use the nominal trajectory"
+    )
+    parser.add_argument("--layout-scale", type=float, default=1.0, help="Scale the cube/target spawn area")
+    parser.add_argument(
+        "--action-noise",
+        type=float,
+        default=0.0,
+        help="Std (raw servo units, try 3-5) of correlated noise on executed arm commands; labels stay clean",
+    )
+    parser.add_argument(
+        "--calibration", type=Path, default=None, help="SimCalibration JSON from calibrate_sim.py"
     )
     parser.add_argument(
         "--action-delay-steps",
         type=int,
-        default=0,
-        help="Action transport delay in control steps (e.g. 1=33ms, 2=66ms)",
+        default=None,
+        help="Action transport delay in control steps (e.g. 1=33ms). Defaults to the calibration, else 0",
     )
+    parser.add_argument(
+        "--action-delay-range",
+        type=int,
+        nargs=2,
+        metavar=("MIN", "MAX"),
+        default=None,
+        help="Sample the delay per episode in [MIN, MAX]. With --calibration defaults to calibrated +-1",
+    )
+    parser.add_argument("--workers", type=int, default=1, help="Parallel shard processes")
+    parser.add_argument("--gpus", type=str, default=None, help="Comma-separated GPU ids for EGL rendering")
     parser.add_argument("--no-video", dest="video", action="store_false")
-    parser.set_defaults(video=True)
-    args = parser.parse_args()
+    parser.set_defaults(video=True, domain_randomization=True)
+    args = parser.parse_args(argv)
     if args.episodes <= 0 or args.fps <= 0:
         parser.error("--episodes and --fps must be positive")
     if args.camera_width <= 0 or args.camera_height <= 0:
         parser.error("camera dimensions must be positive")
-    if args.action_delay_steps < 0:
+    if args.action_delay_steps is not None and args.action_delay_steps < 0:
         parser.error("--action-delay-steps cannot be negative")
+    if (
+        args.action_delay_range is not None
+        and not 0 <= args.action_delay_range[0] <= args.action_delay_range[1]
+    ):
+        parser.error("--action-delay-range must satisfy 0 <= MIN <= MAX")
+    if args.action_noise < 0 or args.layout_scale <= 0 or args.workers <= 0:
+        parser.error("--action-noise must be >= 0; --layout-scale and --workers must be positive")
     if args.max_attempts is None:
         args.max_attempts = args.episodes * 3
     if args.max_attempts < args.episodes:
         parser.error("--max-attempts cannot be smaller than --episodes")
+    if args.seed_start is None:
+        args.seed_start = utils.EVAL_SEED_OFFSET if args.split == "eval" else 0
+    try:
+        utils.validate_seed_range(args.split, args.seed_start, args.max_attempts)
+    except ValueError as error:
+        parser.error(str(error))
     return args
 
 
-def main() -> int:
-    args = parse_args()
+def main(argv: Sequence[str] | None = None) -> int:
+    raw_argv = list(sys.argv[1:] if argv is None else argv)
+    args = parse_args(raw_argv)
+
+    if args.workers > 1:
+        gpus = [g.strip() for g in args.gpus.split(",") if g.strip()] if args.gpus else None
+        return utils.run_sharded(
+            Path(__file__).resolve(),
+            raw_argv,
+            repo_id=args.repo_id,
+            root=args.root,
+            episodes=args.episodes,
+            seed_start=args.seed_start,
+            max_attempts=args.max_attempts,
+            workers=args.workers,
+            gpus=gpus,
+            split=args.split,
+        )
+
     robot = NexArmSim(
         NexArmSimConfig(
             id="synthetic_generator",
@@ -221,39 +470,83 @@ def main() -> int:
             camera_width=args.camera_width,
             camera_height=args.camera_height,
             settle_steps=0,
-            action_delay_steps=args.action_delay_steps,
             enable_domain_randomization=args.domain_randomization,
+            calibration_path=args.calibration,
         )
     )
     dataset = _build_dataset(robot, args)
     robot.connect()
-    task = NexArmPickPlaceTask(robot.backend)
+    task = NexArmPickPlaceTask(robot.backend, layout_scale=args.layout_scale)
+    calibrated_delay = SimCalibration.load(args.calibration).action_delay_steps if args.calibration else None
+    base_delay = args.action_delay_steps if args.action_delay_steps is not None else (calibrated_delay or 0)
+    delay_range = args.action_delay_range
+    if delay_range is None and calibrated_delay is not None and args.action_delay_steps is None:
+        delay_range = (max(0, calibrated_delay - 1), calibrated_delay + 1)
+
+    limits = QualityThresholds()
+    args.root.mkdir(parents=True, exist_ok=True)
+    episodes_path = args.root / utils.EPISODES_NAME
+    episodes_path.unlink(missing_ok=True)
     accepted = 0
     attempts = 0
     accepted_seeds: list[int] = []
     rejected_attempts: list[dict[str, int | str]] = []
+    accepted_metrics: list[EpisodeMetrics] = []
+
+    def sink(observation: dict[str, object], action: dict[str, float]) -> None:
+        observation_frame = build_dataset_frame(dataset.features, observation, prefix=OBS_STR)
+        action_frame = build_dataset_frame(dataset.features, action, prefix=ACTION)
+        dataset.add_frame({**observation_frame, **action_frame, "task": args.task})
 
     try:
         while accepted < args.episodes and attempts < args.max_attempts:
             seed = args.seed_start + attempts
-
-            def record_frame(observation: dict[str, object], action: dict[str, float]) -> None:
-                observation_frame = build_dataset_frame(dataset.features, observation, prefix=OBS_STR)
-                action_frame = build_dataset_frame(dataset.features, action, prefix=ACTION)
-                dataset.add_frame({**observation_frame, **action_frame, "task": args.task})
+            delay_rng = np.random.default_rng([seed, 3])
+            delay = (
+                int(delay_rng.integers(delay_range[0], delay_range[1] + 1))
+                if delay_range is not None
+                else base_delay
+            )
+            robot.backend.action_delay_steps = delay
+            variation = TrajectoryVariation.sample(seed) if args.variation else TrajectoryVariation()
+            recorder = FrameRecorder(sink)
 
             success, reason = generate_episode(
                 robot,
                 task,
                 seed=seed,
-                record_frame=record_frame,
+                record_frame=recorder,
                 trace=args.trace,
+                variation=variation,
+                action_noise=args.action_noise,
             )
             attempts += 1
+            metrics = recorder.metrics
+            metrics.final_place_error_m = float(
+                np.linalg.norm(task.cube_position[:2] - task.target_position[:2])
+            )
+            metrics.final_cube_speed = task.cube_speed
+            if success:
+                quality_reason = check_quality(metrics, limits)
+                if quality_reason is not None:
+                    success, reason = False, quality_reason
+
+            row = {
+                "seed": seed,
+                "accepted": success,
+                "reason": reason,
+                "episode_index": accepted if success else None,
+                "action_delay_steps": delay,
+                "variation": variation,
+                "dr_params": robot.backend.last_domain_params,
+                "metrics": metrics,
+            }
+            utils.append_jsonl(episodes_path, row)
             if success:
                 dataset.save_episode(parallel_encoding=False)
                 accepted += 1
                 accepted_seeds.append(seed)
+                accepted_metrics.append(metrics)
                 print(f"accepted seed={seed} ({accepted}/{args.episodes})")
             else:
                 dataset.clear_episode_buffer()
@@ -264,23 +557,33 @@ def main() -> int:
         dataset.finalize()
 
     model_path = resolve_model_path(args.model)
-    model_sha256 = hashlib.sha256(model_path.read_bytes()).hexdigest()
     report = {
         "generator": "examples/nexarm/generate_sim_dataset.py",
+        "provenance": utils.collect_provenance(vars(args), model_path, args.calibration),
         "model_path": str(model_path),
-        "model_sha256": model_sha256,
+        "model_sha256": utils.sha256_file(model_path),
         "repo_id": args.repo_id,
+        "split": args.split,
         "fps": args.fps,
         "camera_width": args.camera_width,
         "camera_height": args.camera_height,
         "video": args.video,
         "requested_episodes": args.episodes,
         "attempts": attempts,
+        "acceptance_rate": accepted / max(1, attempts),
         "accepted_seeds": accepted_seeds,
         "rejected_attempts": rejected_attempts,
+        "quality_thresholds": limits,
+        "stats": {
+            "frames": utils.summarize([m.frames for m in accepted_metrics]),
+            "max_action_jerk": utils.summarize([m.max_action_jerk for m in accepted_metrics]),
+            "place_error_m": utils.summarize([m.final_place_error_m for m in accepted_metrics]),
+        },
     }
-    report_path = args.root / "generation_report.json"
-    report_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    if accepted:
+        report["validation"] = utils.validate_dataset(args.repo_id, args.root, accepted)
+    report_path = args.root / utils.REPORT_NAME
+    report_path.write_text(json.dumps(utils.to_jsonable(report), indent=2) + "\n", encoding="utf-8")
     print(f"wrote {accepted} episode(s) from {attempts} attempt(s) to {args.root}")
     return 0 if accepted == args.episodes else 1
 

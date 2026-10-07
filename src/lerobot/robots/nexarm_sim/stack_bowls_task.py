@@ -100,7 +100,7 @@ class NexArmStackBowlsTask:
         order: tuple[str, str, str] | None = None,
         settle_steps: int = 25,
     ) -> NexArmStackBowlsStatus:
-        self.backend.reset(settle_steps=0)
+        self.backend.reset(settle_steps=0, rng=np.random.default_rng([seed, 1]))
         rng = np.random.default_rng(seed)
 
         # Select permutation (cycle uniformly through the 6 permutations by seed)

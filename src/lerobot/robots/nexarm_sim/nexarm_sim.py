@@ -21,6 +21,7 @@ from lerobot.types import RobotAction, RobotObservation
 from lerobot.utils.decorators import check_if_already_connected, check_if_not_connected
 
 from ..robot import Robot
+from .calibration import SimCalibration, apply_calibration
 from .config_nexarm_sim import NexArmSimConfig
 from .mujoco_backend import NexArmMujocoBackend
 
@@ -77,6 +78,8 @@ class NexArmSim(Robot):
             action_delay_steps=self.config.action_delay_steps,
             enable_domain_randomization=self.config.enable_domain_randomization,
         )
+        if self.config.calibration_path is not None:
+            apply_calibration(self._backend, SimCalibration.load(self.config.calibration_path))
         self.configure()
 
     def calibrate(self) -> None:

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from collections import deque
 from collections.abc import Callable, Mapping
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import mujoco
@@ -61,6 +62,27 @@ def resolve_model_path(model_path: Path | str) -> Path:
     return resolved
 
 
+@dataclass
+class DomainRandomizationRanges:
+    """Sampling ranges for per-episode domain randomization.
+
+    Joint scales multiply the (possibly calibrated) nominal damping/frictionloss.
+    """
+
+    camera_pos_m: float = 0.012
+    camera_fovy_deg: float = 1.5
+    camera_rot_rad: float = 0.035
+    light_scale: tuple[float, float] = (0.75, 1.35)
+    cube_friction: tuple[float, float] = (0.8, 2.2)
+    cube_mass_scale: tuple[float, float] = (0.8, 1.25)
+    joint_damping_scale: dict[str, tuple[float, float]] = field(
+        default_factory=lambda: dict.fromkeys(JOINT_NAMES, (0.8, 1.25))
+    )
+    joint_friction_scale: dict[str, tuple[float, float]] = field(
+        default_factory=lambda: dict.fromkeys(JOINT_NAMES, (0.75, 1.30))
+    )
+
+
 class NexArmMujocoBackend:
     """MuJoCo state, control conversion, stepping, and camera rendering."""
 
@@ -84,6 +106,8 @@ class NexArmMujocoBackend:
         self.action_delay_steps = max(0, int(action_delay_steps))
         self.enable_domain_randomization = bool(enable_domain_randomization)
         self._action_queue: deque[dict[str, float]] = deque()
+        self.dr_ranges = DomainRandomizationRanges()
+        self.last_domain_params: dict[str, object] = {}
         self._renderer: mujoco.Renderer | None = None
         self.step_callback: Callable[[], None] | None = None
 
@@ -161,16 +185,21 @@ class NexArmMujocoBackend:
             return raw_high - ratio * (raw_high - raw_low)
         return raw_low + ratio * (raw_high - raw_low)
 
-    def randomize_domain(self, rng: np.random.Generator | None = None) -> None:
-        """Apply Visual Domain Randomization (VDR) and Dynamics Domain Randomization (DDR)."""
+    def randomize_domain(self, rng: np.random.Generator | None = None) -> dict[str, object]:
+        """Apply Visual and Dynamics Domain Randomization and return the sampled parameters."""
         if rng is None:
             rng = np.random.default_rng()
+        ranges = self.dr_ranges
+        params: dict[str, object] = {}
 
         # 1. Camera extrinsics & intrinsics perturbation
+        cameras: dict[str, dict[str, object]] = {}
         for name, cid in self._camera_ids.items():
-            self.model.cam_pos[cid] = self._nominal_cam_pos[name] + rng.uniform(-0.012, 0.012, size=3)
-            self.model.cam_fovy[cid] = self._nominal_cam_fovy[name] + float(rng.uniform(-1.5, 1.5))
-            euler_noise = rng.uniform(-0.035, 0.035, size=3)
+            pos_delta = rng.uniform(-ranges.camera_pos_m, ranges.camera_pos_m, size=3)
+            fovy_delta = float(rng.uniform(-ranges.camera_fovy_deg, ranges.camera_fovy_deg))
+            euler_noise = rng.uniform(-ranges.camera_rot_rad, ranges.camera_rot_rad, size=3)
+            self.model.cam_pos[cid] = self._nominal_cam_pos[name] + pos_delta
+            self.model.cam_fovy[cid] = self._nominal_cam_fovy[name] + fovy_delta
             delta_q = np.array([1.0, euler_noise[0] / 2, euler_noise[1] / 2, euler_noise[2] / 2])
             delta_q /= np.linalg.norm(delta_q)
             w1, x1, y1, z1 = self._nominal_cam_quat[name]
@@ -184,9 +213,15 @@ class NexArmMujocoBackend:
                 ]
             )
             self.model.cam_quat[cid] = perturbed_q / np.linalg.norm(perturbed_q)
+            cameras[name] = {
+                "pos_delta_m": pos_delta.tolist(),
+                "fovy_delta_deg": fovy_delta,
+                "rot_delta_rad": euler_noise.tolist(),
+            }
+        params["cameras"] = cameras
 
         # 2. Lighting intensity & color variation
-        light_scale = float(rng.uniform(0.75, 1.35))
+        light_scale = float(rng.uniform(*ranges.light_scale))
         for i in range(self.model.nlight):
             self.model.light_ambient[i] = np.clip(
                 self._nominal_light_ambient[i] * light_scale * rng.uniform(0.9, 1.1, size=3),
@@ -198,34 +233,52 @@ class NexArmMujocoBackend:
                 0.1,
                 1.0,
             )
+        params["light_scale"] = light_scale
 
         # 3. Floor & Cube visual / physical properties
         floor_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, "floor")
         if floor_id >= 0:
-            self.model.geom_rgba[floor_id, :3] = rng.uniform(0.65, 0.95, size=3)
+            floor_rgb = rng.uniform(0.65, 0.95, size=3)
+            self.model.geom_rgba[floor_id, :3] = floor_rgb
+            params["floor_rgb"] = floor_rgb.tolist()
 
         cube_geom_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, "cube_collision")
         if cube_geom_id >= 0:
-            self.model.geom_rgba[cube_geom_id, :3] = np.clip(
+            cube_rgb = np.clip(
                 self._nominal_geom_rgba[cube_geom_id, :3] + rng.uniform(-0.12, 0.12, size=3),
                 0.0,
                 1.0,
             )
-            self.model.geom_friction[cube_geom_id, 0] = float(rng.uniform(0.8, 2.2))
+            self.model.geom_rgba[cube_geom_id, :3] = cube_rgb
+            cube_friction = float(rng.uniform(*ranges.cube_friction))
+            self.model.geom_friction[cube_geom_id, 0] = cube_friction
+            params["cube_rgb"] = cube_rgb.tolist()
+            params["cube_friction"] = cube_friction
 
         cube_body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "cube")
         if cube_body_id >= 0:
-            self.model.body_mass[cube_body_id] = self._nominal_body_mass[cube_body_id] * float(
-                rng.uniform(0.8, 1.25)
-            )
+            mass_scale = float(rng.uniform(*ranges.cube_mass_scale))
+            self.model.body_mass[cube_body_id] = self._nominal_body_mass[cube_body_id] * mass_scale
+            params["cube_mass_scale"] = mass_scale
 
         # 4. Joint dynamics (damping & frictionloss)
-        for _feature_name, joint_id in self._joint_ids.items():
+        joints: dict[str, dict[str, float]] = {}
+        for feature_name, joint_id in self._joint_ids.items():
             dof_adr = int(self.model.jnt_dofadr[joint_id])
-            damping_scale = float(rng.uniform(0.8, 1.25))
-            friction_scale = float(rng.uniform(0.75, 1.30))
+            damping_scale = float(rng.uniform(*ranges.joint_damping_scale[feature_name]))
+            friction_scale = float(rng.uniform(*ranges.joint_friction_scale[feature_name]))
             self.model.dof_damping[dof_adr] = self._nominal_dof_damping[dof_adr] * damping_scale
             self.model.dof_frictionloss[dof_adr] = self._nominal_dof_frictionloss[dof_adr] * friction_scale
+            joints[feature_name] = {"damping_scale": damping_scale, "frictionloss_scale": friction_scale}
+        params["joints"] = joints
+        return params
+
+    def snapshot_nominal_dynamics(self) -> None:
+        """Adopt the current dynamics as the nominal values that domain randomization perturbs."""
+        self._nominal_dof_damping = self.model.dof_damping.copy()
+        self._nominal_dof_frictionloss = self.model.dof_frictionloss.copy()
+        self._nominal_geom_friction = self.model.geom_friction.copy()
+        self._nominal_body_mass = self.model.body_mass.copy()
 
     def reset_domain(self) -> None:
         """Restore nominal camera, lighting, material, and dynamics parameters."""
@@ -243,9 +296,10 @@ class NexArmMujocoBackend:
 
     def reset(self, settle_steps: int = 0, rng: np.random.Generator | None = None) -> None:
         if self.enable_domain_randomization:
-            self.randomize_domain(rng)
+            self.last_domain_params = self.randomize_domain(rng)
         else:
             self.reset_domain()
+            self.last_domain_params = {}
 
         mujoco.mj_resetData(self.model, self.data)
         home_action: dict[str, float] = {}
@@ -264,6 +318,22 @@ class NexArmMujocoBackend:
         mujoco.mj_forward(self.model, self.data)
         for _ in range(settle_steps):
             mujoco.mj_step(self.model, self.data)
+
+    def set_joint_positions(self, positions: Mapping[str, float]) -> None:
+        """Teleport the arm to raw servo positions (zero velocity) and hold them as the control target."""
+        mujoco.mj_resetData(self.model, self.data)
+        pose: dict[str, float] = {}
+        for feature_name in JOINT_NAMES:
+            raw_low, raw_high = RAW_RANGES[feature_name]
+            raw = float(np.clip(float(positions[f"{feature_name}.pos"]), raw_low, raw_high))
+            control = self.raw_to_control(feature_name, raw)
+            self.data.ctrl[self._actuator_ids[feature_name]] = control
+            self.data.qpos[self.model.jnt_qposadr[self._joint_ids[feature_name]]] = control
+            pose[f"{feature_name}.pos"] = raw
+        self._action_queue.clear()
+        for _ in range(self.action_delay_steps):
+            self._action_queue.append(dict(pose))
+        mujoco.mj_forward(self.model, self.data)
 
     def set_action(self, action: Mapping[str, float]) -> dict[str, float]:
         missing = [f"{name}.pos" for name in JOINT_NAMES if f"{name}.pos" not in action]

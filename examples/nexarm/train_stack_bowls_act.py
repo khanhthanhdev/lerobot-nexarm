@@ -31,6 +31,12 @@ JOINT_NAMES = [
     "gripper.pos",
 ]
 CAMERAS = ("observation.images.front", "observation.images.wrist")
+OPTIONAL_CAMERAS = ("observation.images.top",)
+
+
+def dataset_cameras(meta: LeRobotDatasetMetadata) -> tuple[str, ...]:
+    """Required front/wrist cameras plus the top camera when the dataset has it."""
+    return CAMERAS + tuple(key for key in OPTIONAL_CAMERAS if key in meta.features)
 
 
 def validate_metadata(meta: LeRobotDatasetMetadata) -> None:
@@ -43,11 +49,12 @@ def validate_metadata(meta: LeRobotDatasetMetadata) -> None:
         feature = meta.features.get(key, {})
         if list(feature.get("shape", [])) != [6] or feature.get("names") != JOINT_NAMES:
             raise ValueError(f"{key} must contain the six NexArm joints in order: {JOINT_NAMES}")
-    for key in CAMERAS:
+    cameras = dataset_cameras(meta)
+    for key in cameras:
         feature = meta.features.get(key, {})
         if feature.get("dtype") != "video" or list(feature.get("shape", [])) != [480, 640, 3]:
             raise ValueError(f"Expected {key} as 480x640 RGB video.")
-    for key in ("action", "observation.state", *CAMERAS):
+    for key in ("action", "observation.state", *cameras):
         if key not in meta.stats:
             raise ValueError(f"Dataset normalization statistics missing for {key}.")
 
@@ -64,7 +71,7 @@ def resolve_policy(meta: LeRobotDatasetMetadata, pretrained: str | None) -> ACTC
         raise ValueError("--pretrained must point to an ACT checkpoint.")
     if cfg.input_features != inputs or cfg.output_features != outputs:
         raise ValueError(
-            "Checkpoint features must match both front/wrist cameras and six-dimensional state/action. "
+            "Checkpoint features must match front/wrist (and top, if recorded) cameras and six-dimensional state/action. "
             "Use a compatible NexArm ACT checkpoint, or omit --pretrained for initial training."
         )
     return cfg
@@ -83,7 +90,7 @@ def check_data(meta: LeRobotDatasetMetadata, cfg: ACTConfig, root: Path | None) 
     for index in (0, len(dataset) - 1):
         sample = dataset[index]
         expected = {"observation.state": (6,), "action": (cfg.chunk_size, 6)}
-        expected.update(dict.fromkeys(CAMERAS, (3, 480, 640)))
+        expected.update(dict.fromkeys(dataset_cameras(meta), (3, 480, 640)))
         for key, shape in expected.items():
             if tuple(sample[key].shape) != shape or not torch.isfinite(sample[key]).all():
                 raise ValueError(
@@ -94,7 +101,7 @@ def check_data(meta: LeRobotDatasetMetadata, cfg: ACTConfig, root: Path | None) 
             raise ValueError("Invalid action padding mask.")
         if index == len(dataset) - 1 and cfg.chunk_size > 1 and not mask[1:].all():
             raise ValueError("Future actions must be padded at the episode boundary.")
-    print("Real-data check passed: front/wrist videos, state, action chunks, and episode-end padding.")
+    print("Real-data check passed: front/wrist(/top) videos, state, action chunks, and episode-end padding.")
 
 
 def main() -> None:
@@ -167,7 +174,7 @@ def main() -> None:
                 "frames": meta.total_frames,
                 "tasks": meta.total_tasks,
                 "fps": meta.fps,
-                "cameras": CAMERAS,
+                "cameras": dataset_cameras(meta),
                 "chunk_size": cfg.chunk_size,
                 "pretrained": args.pretrained,
             },

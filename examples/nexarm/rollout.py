@@ -26,6 +26,7 @@
 #       --display_data=true
 
 import argparse
+import json
 import subprocess
 import sys
 
@@ -37,6 +38,7 @@ def parse_args():
     parser.add_argument("--fps", type=int, default=30, help="Control loop and camera frame rate")
     parser.add_argument("--front-cam", type=int, default=0)
     parser.add_argument("--wrist-cam", type=int, default=1)
+    parser.add_argument("--top-cam", help="RealSense serial number to enable the top camera")
     parser.add_argument(
         "--strategy",
         default="base",
@@ -78,10 +80,31 @@ def parse_args():
 def main():
     args = parse_args()
 
-    cameras_json = (
-        f'{{"front":{{"type":"opencv","index_or_path":{args.front_cam},"width":640,"height":480,"fps":{args.fps}}},'
-        f'"wrist":{{"type":"opencv","index_or_path":{args.wrist_cam},"width":640,"height":480,"fps":{args.fps}}}}}'
-    )
+    cameras = {
+        "front": {
+            "type": "opencv",
+            "index_or_path": args.front_cam,
+            "width": 640,
+            "height": 480,
+            "fps": args.fps,
+        },
+        "wrist": {
+            "type": "opencv",
+            "index_or_path": args.wrist_cam,
+            "width": 640,
+            "height": 480,
+            "fps": args.fps,
+        },
+    }
+    if args.top_cam is not None:
+        cameras["top"] = {
+            "type": "intelrealsense",
+            "serial_number_or_name": args.top_cam,
+            "width": 640,
+            "height": 480,
+            "fps": args.fps,
+        }
+    cameras_json = json.dumps(cameras)
 
     cmd = [
         sys.executable,

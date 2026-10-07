@@ -209,14 +209,14 @@ Same grasp, approach vector, and timing. Coherent strategies are much easier to 
 
 ### 5.7 Recommended defaults for your first task
 
-| Setting          | Value                                                                                                                                                 |
-| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Episodes         | **50** to start, scale to 100–300 after first training                                                                                                |
-| Episode length   | 20–45 s (shorter is fine for grasp/place)                                                                                                             |
-| Reset time       | 10 s                                                                                                                                                  |
-| FPS              | 30                                                                                                                                                    |
-| Cameras          | **2 cameras recommended**: 1 fixed front + 1 wrist. Multi-view often outperforms single-view. A single fixed camera also works to keep things simple. |
-| Task description | Short, specific, action-phrased sentence                                                                                                              |
+| Setting          | Value                                                                                                                                                                                                                     |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Episodes         | **50** to start, scale to 100–300 after first training                                                                                                                                                                    |
+| Episode length   | 20–45 s (shorter is fine for grasp/place)                                                                                                                                                                                 |
+| Reset time       | 10 s                                                                                                                                                                                                                      |
+| FPS              | 30                                                                                                                                                                                                                        |
+| Cameras          | **3 cameras supported**: fixed front + wrist + top (RealSense; add `--top-cam <serial>`). 2 (front + wrist) also works. Multi-view often outperforms single-view. A single fixed camera also works to keep things simple. |
+| Task description | Short, specific, action-phrased sentence                                                                                                                                                                                  |
 
 ### 5.8 Troubleshooting signal
 

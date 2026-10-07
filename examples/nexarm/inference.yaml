@@ -19,6 +19,13 @@ robot:
       width: 640
       height: 480
       fps: 30
+    # Optional RealSense top camera: uncomment and set your serial number.
+    # top:
+    #   type: intelrealsense
+    #   serial_number_or_name: "YOUR_SERIAL"
+    #   width: 640
+    #   height: 480
+    #   fps: 30
 
 strategy:
   type: sentry

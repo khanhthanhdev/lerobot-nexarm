@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from .calibration import JointCalibration, SimCalibration, apply_calibration
 from .config_nexarm_sim import NexArmSimConfig
 from .nexarm_sim import NexArmSim
 from .pick_place_task import NexArmPickPlaceStatus, NexArmPickPlaceTask
@@ -25,6 +26,9 @@ from .stack_bowls_task import (
 )
 
 __all__ = [
+    "JointCalibration",
+    "SimCalibration",
+    "apply_calibration",
     "NexArmPickPlaceStatus",
     "NexArmPickPlaceTask",
     "NexArmSim",

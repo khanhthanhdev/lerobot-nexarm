@@ -12,7 +12,7 @@ Examples:
   python examples/nexarm/rollout_turbovla.py \
       --robot real \
       --follower-port /dev/ttyUSB1 \
-      --front-cam 0 --wrist-cam 1 \
+      --front-cam 0 --wrist-cam 1 [--top-cam <RealSense serial>] \
       --checkpoint /path/to/steps_20000_ema_pytorch_model.pt \
       --task "Pick up the red cube and place it into the green zone"
 """
@@ -90,6 +90,9 @@ def parse_args():
     parser.add_argument("--follower-port", default="/dev/ttyUSB1")
     parser.add_argument("--front-cam", type=int, default=0)
     parser.add_argument("--wrist-cam", type=int, default=1)
+    parser.add_argument(
+        "--top-cam", help="RealSense serial number for the top camera (required for 3-view checkpoints)"
+    )
 
     # Sim args
     parser.add_argument(
@@ -154,8 +157,16 @@ class TurboVLAPolicyRunner:
         # Resolve BERT path (check local cache snapshots first)
         if bert_path is None:
             bert_snapshots = [
-                Path(os.path.expanduser("~/.cache/huggingface/hub/models--google-bert--bert-base-uncased/snapshots/86b5e0934494bd15c9632b12f734a8a67f723594")),
-                Path(os.path.expanduser("~/.cache/huggingface/hub/models--bert-base-uncased/snapshots/86b5e0934494bd15c9632b12f734a8a67f723594")),
+                Path(
+                    os.path.expanduser(
+                        "~/.cache/huggingface/hub/models--google-bert--bert-base-uncased/snapshots/86b5e0934494bd15c9632b12f734a8a67f723594"
+                    )
+                ),
+                Path(
+                    os.path.expanduser(
+                        "~/.cache/huggingface/hub/models--bert-base-uncased/snapshots/86b5e0934494bd15c9632b12f734a8a67f723594"
+                    )
+                ),
             ]
             for cand in bert_snapshots:
                 if cand.exists():
@@ -331,22 +342,23 @@ def run_sim(args, runner: TurboVLAPolicyRunner):
         )
         task_type = "stack_bowls" if is_bowl else "pick_place"
 
-    if task_type == "stack_bowls":
-        if "bowl" not in str(args.model).lower() or args.model.name == "scene.xml":
-            args.model = Path("sim/fusion_export/bowl_stack_scene.xml")
+    if task_type == "stack_bowls" and (
+        "bowl" not in str(args.model).lower() or args.model.name == "scene.xml"
+    ):
+        args.model = Path("sim/fusion_export/bowl_stack_scene.xml")
 
     # Match 640x480 native aspect ratio of the dataset cameras
     desired_cams = ("front", "wrist", "top") if runner.num_views == 3 else ("front", "wrist")
 
     # Inspect cameras available in the MuJoCo model to avoid hard crash on missing cameras
     import mujoco
+
     from lerobot.robots.nexarm_sim.mujoco_backend import resolve_model_path
 
     resolved_model_path = resolve_model_path(args.model)
     _temp_model = mujoco.MjModel.from_xml_path(str(resolved_model_path))
     available_cams = {
-        mujoco.mj_id2name(_temp_model, mujoco.mjtObj.mjOBJ_CAMERA, i)
-        for i in range(_temp_model.ncam)
+        mujoco.mj_id2name(_temp_model, mujoco.mjtObj.mjOBJ_CAMERA, i) for i in range(_temp_model.ncam)
     }
 
     cam_names = tuple(c for c in desired_cams if c in available_cams)
@@ -355,7 +367,9 @@ def run_sim(args, runner: TurboVLAPolicyRunner):
 
     missing_cams = [c for c in desired_cams if c not in available_cams]
     if missing_cams:
-        print(f"[WARN] Cameras {missing_cams} not found in {args.model}. Available: {sorted(available_cams)}. Falling back to {cam_names}.")
+        print(
+            f"[WARN] Cameras {missing_cams} not found in {args.model}. Available: {sorted(available_cams)}. Falling back to {cam_names}."
+        )
 
     config = NexArmSimConfig(
         id="turbovla_rollout",
@@ -452,6 +466,14 @@ def run_real(args, runner: TurboVLAPolicyRunner):
         "front": OpenCVCameraConfig(index_or_path=args.front_cam, width=640, height=480, fps=args.fps),
         "wrist": OpenCVCameraConfig(index_or_path=args.wrist_cam, width=640, height=480, fps=args.fps),
     }
+    if runner.num_views == 3:
+        if not args.top_cam:
+            raise SystemExit("This checkpoint uses 3 views; pass --top-cam <RealSense serial>.")
+        from lerobot.cameras.realsense import RealSenseCameraConfig
+
+        cameras["top"] = RealSenseCameraConfig(
+            serial_number_or_name=args.top_cam, width=640, height=480, fps=args.fps
+        )
     config = NexArmFollowerConfig(port=args.follower_port, cameras=cameras)
     robot = NexArmFollower(config)
     robot.connect()
@@ -465,7 +487,8 @@ def run_real(args, runner: TurboVLAPolicyRunner):
             wrist_img = obs["wrist"]
             curr_joints = np.array([obs[f"{name}.pos"] for name in JOINT_NAMES], dtype=np.float32)
 
-            chunk = runner.predict_chunk(front_img, wrist_img, curr_joints, args.task)
+            extra = {"top_img": obs["top"]} if "top" in cameras else {}
+            chunk = runner.predict_chunk(front_img, wrist_img, curr_joints, args.task, **extra)
             for i in range(min(args.open_loop_steps, len(chunk))):
                 t0 = time.perf_counter()
                 act_vec = chunk[i]
