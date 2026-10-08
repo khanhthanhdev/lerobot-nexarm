@@ -72,6 +72,11 @@ def parse_args():
         "--open-loop-steps", type=int, default=8, help="Number of steps to execute before re-inferring chunk"
     )
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
+    parser.add_argument(
+        "--debug-actions",
+        action="store_true",
+        help="Log observed joints and predicted targets, including gripper values before snapping",
+    )
 
     # Text & Foundation model args
     parser.add_argument(
@@ -142,10 +147,12 @@ class TurboVLAPolicyRunner:
         allow_hf_download: bool = False,
         binarize_gripper: bool = True,
         gripper_threshold: float = 1800.0,
+        debug_actions: bool = False,
     ):
         self.device = torch.device(device)
         self.binarize_gripper = binarize_gripper
         self.gripper_threshold = gripper_threshold
+        self.debug_actions = debug_actions
         checkpoint_path = Path(checkpoint_path)
         turbovla_repo = Path(turbovla_repo)
         sys.path.insert(0, str(turbovla_repo))
@@ -273,6 +280,12 @@ class TurboVLAPolicyRunner:
             amax = np.array(self.stats["action"]["max"], dtype=np.float32)
             # TurboVLA min_max maps [min, max] -> [-1, 1]
             unnorm = 0.5 * (action + 1.0) * (amax - amin) + amin
+            if self.debug_actions:
+                print(
+                    f"[ACTION] Predicted gripper before snapping: "
+                    f"min={unnorm[..., 5].min():.1f}, max={unnorm[..., 5].max():.1f}; "
+                    f"snapping={self.binarize_gripper}, threshold={self.gripper_threshold:.1f}"
+                )
             if self.binarize_gripper and unnorm.shape[-1] >= 6:
                 unnorm[..., 5] = np.where(unnorm[..., 5] > self.gripper_threshold, amax[5], amin[5])
             return unnorm
@@ -326,7 +339,17 @@ class TurboVLAPolicyRunner:
 
         predicted = self.model(instructions, samples, states)
         pred_actions = predicted.squeeze(0).cpu().numpy()
-        return self.unnormalize_action(pred_actions)
+        chunk = self.unnormalize_action(pred_actions)
+        if self.debug_actions:
+            print(f"[ACTION] Observed joints: {np.round(state_vector, 1).tolist()}")
+            print(f"[ACTION] First target:    {np.round(chunk[0], 1).tolist()}")
+            print(f"[ACTION] Last target:     {np.round(chunk[-1], 1).tolist()}")
+            print(
+                f"[ACTION] Max arm target offset across chunk: "
+                f"{np.max(np.abs(chunk[:, :5] - state_vector[:5])):.1f} raw units; "
+                f"normalized state range=[{norm_state.min():.3f}, {norm_state.max():.3f}]"
+            )
+        return chunk
 
 
 def run_sim(args, runner: TurboVLAPolicyRunner):
@@ -516,6 +539,7 @@ def main():
         allow_hf_download=args.allow_hf_download,
         binarize_gripper=args.binarize_gripper,
         gripper_threshold=args.gripper_threshold,
+        debug_actions=args.debug_actions,
     )
     if args.robot == "sim":
         run_sim(args, runner)
