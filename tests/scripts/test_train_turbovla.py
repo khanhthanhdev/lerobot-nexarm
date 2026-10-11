@@ -275,10 +275,97 @@ def test_camera_hints_only_match_images_and_honor_legacy_names():
         "observation.images.wrist": {"dtype": "video"},
     }
     assert train_turbovla.resolve_camera_keys(features, "front") == ["observation.images.front"]
-    assert train_turbovla.resolve_camera_keys(features, front_hint="observation.images.wrist") == [
-        "observation.images.wrist"
-    ]
     with pytest.raises(ValueError, match="exactly one"):
         train_turbovla.resolve_camera_keys(features, "front,missing")
     with pytest.raises(ValueError, match="Duplicate"):
         train_turbovla.resolve_camera_keys(features, "front,front")
+
+
+def test_legacy_camera_key_flags_select_front_and_wrist():
+    features = {
+        "observation.images.front": {"dtype": "video"},
+        "observation.images.wrist": {"dtype": "video"},
+        "observation.images.top": {"dtype": "video"},
+        "observation.images.side": {"dtype": "video"},
+    }
+    # The unset key is matched by name; the model always gets [front, wrist] in that order.
+    assert train_turbovla.resolve_camera_keys(features, wrist_hint="observation.images.wrist") == [
+        "observation.images.front",
+        "observation.images.wrist",
+    ]
+    assert train_turbovla.resolve_camera_keys(features, front_hint="side") == [
+        "observation.images.side",
+        "observation.images.wrist",
+    ]
+    with pytest.raises(ValueError, match="Duplicate"):
+        train_turbovla.resolve_camera_keys(features, front_hint="observation.images.wrist")
+
+
+def test_cameras_and_legacy_camera_key_flags_conflict(monkeypatch):
+    with pytest.raises(SystemExit):
+        parse_args(monkeypatch, "--cameras", "front,wrist", "--wrist-cam-key", "wrist")
+
+
+def tasks_meta(fps, *tasks):
+    from types import SimpleNamespace
+
+    import pandas as pd
+
+    index = pd.Index(tasks, name="task")
+    return SimpleNamespace(fps=fps, tasks=pd.DataFrame({"task_index": range(len(tasks))}, index=index))
+
+
+def test_checkpoint_metadata_prefers_real_prompt_and_infers_task_type():
+    sim = tasks_meta(30, "Stack the bowls with blue on bottom, red in middle, and black on top.")
+    real = tasks_meta(30, "Stack the bowls with red on bottom, blue in middle, and black on top.")
+    keys = ["observation.images.front", "observation.images.wrist"]
+
+    metadata = train_turbovla.checkpoint_metadata(["sim", "real"], [sim, real], keys, "auto")
+
+    assert metadata == {
+        "task_type": "stack_bowls",
+        "camera_keys": keys,
+        "fps": 30,
+        "task": "Stack the bowls with red on bottom, blue in middle, and black on top.",
+    }
+    pick = tasks_meta(30, "Pick up the red cube, place it in the green target zone, and release it.")
+    assert train_turbovla.checkpoint_metadata(["sim"], [pick], keys, "auto")["task_type"] == "pick_place"
+    explicit = train_turbovla.checkpoint_metadata(["sim"], [pick], keys, "stack_bowls")
+    assert explicit["task_type"] == "stack_bowls"
+
+
+def test_checkpoint_metadata_requires_one_fps():
+    metas = [tasks_meta(30, "a"), tasks_meta(15, "b")]
+    with pytest.raises(ValueError, match="share one fps"):
+        train_turbovla.checkpoint_metadata(["sim", "real"], metas, [], "auto")
+
+
+def test_saved_config_round_trips_through_rollout_loader(tmp_path):
+    import json
+    from types import SimpleNamespace
+
+    import torch
+
+    from examples.nexarm.rollout_turbovla import load_checkpoint_config
+
+    config = SimpleNamespace(
+        action=SimpleNamespace(action_dim=6, state_dim=6, horizon=8),
+        vision=SimpleNamespace(num_views=3, image_size=256),
+    )
+    stats = {key: {"min": [0.0] * 6, "max": [1.0] * 6} for key in ("action", "observation.state")}
+    metadata = {
+        "task_type": "stack_bowls",
+        "camera_keys": ["observation.images.top", "observation.images.front", "observation.images.wrist"],
+        "fps": 15,
+        "task": "Stack the bowls with red on bottom, blue in middle, and black on top.",
+    }
+    train_turbovla.save_checkpoint(
+        torch.nn.Linear(1, 1), None, config, stats, tmp_path, 2, is_final=True, metadata=metadata
+    )
+
+    saved = json.loads((tmp_path / "config.json").read_text())
+    assert saved["vision"] == {"num_views": 3, "image_size": 256}
+    loaded = load_checkpoint_config(tmp_path / "final_model.pt")
+    assert loaded.camera_names == ["top", "front", "wrist"]
+    assert (loaded.image_size, loaded.horizon, loaded.fps, loaded.task_type) == (256, 8, 15, "stack_bowls")
+    assert loaded.task == metadata["task"]

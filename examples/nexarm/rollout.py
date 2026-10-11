@@ -3,16 +3,17 @@
 # Run inference with a trained policy on NexArm (no leader arm needed).
 #
 # Replace YOUR_HF_USERNAME with your actual Hugging Face username.
+# The opened cameras must match the policy's image inputs: front, wrist and the RealSense top
+# camera by default; pass --no-top-cam for a policy trained on front/wrist only.
 #
-# Usage — local checkpoint:
+# Usage — local checkpoint (follower /dev/ttyUSB1 is the default):
 #   python examples/nexarm/rollout.py \
-#       --follower-port COM19 \
 #       --policy-path outputs/train/nexarm_act/checkpoints/last/pretrained_model \
 #       --rerun-save-path outputs/rerun/nexarm_rollout.rrd
 #
-# Usage — policy from Hugging Face Hub:
+# Usage — policy from Hugging Face Hub, front/wrist cameras only:
 #   python examples/nexarm/rollout.py \
-#       --follower-port COM19 \
+#       --follower-port COM19 --no-top-cam \
 #       --policy-path YOUR_HF_USERNAME/nexarm_act
 #
 # Alternatively, use the CLI directly:
@@ -20,8 +21,8 @@
 #       --strategy.type=base \
 #       --policy.path=outputs/train/nexarm_act/checkpoints/last/pretrained_model \
 #       --robot.type=nexarm_follower \
-#       --robot.port=COM19 \
-#       --robot.cameras='{"front":{"type":"opencv","index_or_path":0,"width":640,"height":480,"fps":30},"wrist":{"type":"opencv","index_or_path":1,"width":640,"height":480,"fps":30}}' \
+#       --robot.port=/dev/ttyUSB1 \
+#       --robot.cameras='{"front":{"type":"opencv","index_or_path":0,"width":640,"height":480,"fps":30},"wrist":{"type":"opencv","index_or_path":1,"width":640,"height":480,"fps":30},"top":{"type":"intelrealsense","serial_number_or_name":"YOUR_SERIAL","width":640,"height":480,"fps":30}}' \
 #       --fps=30 \
 #       --display_data=true
 
@@ -30,15 +31,32 @@ import json
 import subprocess
 import sys
 
+try:  # imported as a package module (tests) or run as a script
+    from examples.nexarm.camera_config import (
+        CameraSetupError,
+        add_camera_args,
+        build_camera_dicts,
+        camera_names,
+        check_policy_cameras,
+    )
+except ModuleNotFoundError:
+    from camera_config import (  # type: ignore[no-redef]
+        CameraSetupError,
+        add_camera_args,
+        build_camera_dicts,
+        camera_names,
+        check_policy_cameras,
+    )
 
-def parse_args():
+IMAGE_PREFIX = "observation.images."
+
+
+def parse_args(argv=None):
     parser = argparse.ArgumentParser(description="Run NexArm inference")
-    parser.add_argument("--follower-port", required=True)
+    parser.add_argument("--follower-port", default="/dev/ttyUSB1")
     parser.add_argument("--policy-path", required=True, help="Local checkpoint dir or HF Hub repo id")
     parser.add_argument("--fps", type=int, default=30, help="Control loop and camera frame rate")
-    parser.add_argument("--front-cam", type=int, default=0)
-    parser.add_argument("--wrist-cam", type=int, default=1)
-    parser.add_argument("--top-cam", help="RealSense serial number to enable the top camera")
+    add_camera_args(parser)
     parser.add_argument(
         "--strategy",
         default="base",
@@ -71,40 +89,25 @@ def parse_args():
         "--rerun-save-path",
         help="Optional .rrd path to save camera frames, observations, and policy actions",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     if args.strategy in ("sentry", "highlight", "dagger") and not args.repo_id:
         parser.error(f"--strategy {args.strategy} requires --repo-id to specify the dataset destination")
     return args
 
 
+def policy_camera_names(policy_path: str) -> list[str]:
+    """Camera names (``front``, ``wrist``, ``top``) the policy expects as image inputs."""
+    import lerobot.policies  # noqa: F401  # registers the policy config types (act, smolvla, ...)
+    from lerobot.configs import PreTrainedConfig
+
+    config = PreTrainedConfig.from_pretrained(policy_path)
+    return [key.removeprefix(IMAGE_PREFIX) for key in config.image_features]
+
+
 def main():
     args = parse_args()
-
-    cameras = {
-        "front": {
-            "type": "opencv",
-            "index_or_path": args.front_cam,
-            "width": 640,
-            "height": 480,
-            "fps": args.fps,
-        },
-        "wrist": {
-            "type": "opencv",
-            "index_or_path": args.wrist_cam,
-            "width": 640,
-            "height": 480,
-            "fps": args.fps,
-        },
-    }
-    if args.top_cam is not None:
-        cameras["top"] = {
-            "type": "intelrealsense",
-            "serial_number_or_name": args.top_cam,
-            "width": 640,
-            "height": 480,
-            "fps": args.fps,
-        }
-    cameras_json = json.dumps(cameras)
+    check_policy_cameras(camera_names(args), policy_camera_names(args.policy_path), args.policy_path)
+    cameras_json = json.dumps(build_camera_dicts(args, args.fps))
 
     cmd = [
         sys.executable,
@@ -133,4 +136,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except CameraSetupError as error:
+        raise SystemExit(f"Rollout setup failed: {error}") from error

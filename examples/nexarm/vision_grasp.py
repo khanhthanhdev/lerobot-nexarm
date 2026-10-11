@@ -27,11 +27,12 @@ import cv2
 import numpy as np
 
 from lerobot.motors.nexarm import NexArmKinematicsDynamics
-from lerobot.motors.nexarm.kinematics_dynamics import HOME_POSITIONS, JOINT_NAMES, RAW_RANGES
+from lerobot.motors.nexarm.kinematics_dynamics import HOME_POSITIONS, JOINT_NAMES
+from lerobot.motors.nexarm.nexarm import GRIPPER_CLOSED_POS, GRIPPER_OPEN_POS
 from lerobot.robots.nexarm_sim import NexArmPickPlaceTask, NexArmSim, NexArmSimConfig
 
-OPEN_GRIPPER = float(RAW_RANGES["gripper"][0])
-CLOSED_GRIPPER = float(RAW_RANGES["gripper"][1])
+OPEN_GRIPPER = float(GRIPPER_OPEN_POS)
+CLOSED_GRIPPER = float(GRIPPER_CLOSED_POS)
 
 
 def parse_args() -> argparse.Namespace:

@@ -8,6 +8,7 @@ of viewpoints, field-of-view, and table plane before policy rollout.
 
 Usage:
     python examples/nexarm/calibrate_camera_alignment.py --cam-index 0 --camera-name front
+    python examples/nexarm/calibrate_camera_alignment.py --cam-index /dev/video4 --camera-name top
     python examples/nexarm/calibrate_camera_alignment.py --mock --save-snapshot outputs/calibration/test_align.png
 """
 
@@ -24,11 +25,24 @@ import numpy as np
 
 from lerobot.robots.nexarm_sim.mujoco_backend import NexArmMujocoBackend, resolve_model_path
 
+try:  # imported as a package module (tests) or run as a script
+    from examples.nexarm.camera_config import camera_source
+except ModuleNotFoundError:
+    from camera_config import camera_source  # type: ignore[no-redef]
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="NexArm Sim-to-Real Camera Alignment Tool")
-    parser.add_argument("--cam-index", type=int, default=0, help="Physical camera OpenCV index (default: 0)")
-    parser.add_argument("--camera-name", default="front", choices=["front", "wrist"], help="Sim camera name")
+    parser.add_argument(
+        "--cam-index",
+        type=camera_source,
+        default=0,
+        help="Physical camera: OpenCV index or device path (default: 0). For the top RealSense, use its "
+        "RGB V4L2 node (e.g. /dev/video4).",
+    )
+    parser.add_argument(
+        "--camera-name", default="front", choices=["front", "wrist", "top"], help="Sim camera name"
+    )
     parser.add_argument("--model", type=Path, default=Path("sim/fusion_export/scene.xml"))
     parser.add_argument("--width", type=int, default=640)
     parser.add_argument("--height", type=int, default=480)

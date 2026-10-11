@@ -15,10 +15,25 @@ from pathlib import Path
 import numpy as np
 import torch
 
+try:  # imported as a package module (tests) or run as a script
+    from examples.nexarm.rollout_turbovla import (
+        DEFAULT_GRIPPER_THRESHOLD,
+        TurboVLAPolicyRunner,
+        gripper_is_closed,
+    )
+    from examples.nexarm.train_turbovla import TurboVLANexArmCollator, resolve_camera_keys
+except ModuleNotFoundError:
+    from rollout_turbovla import (  # type: ignore[no-redef]
+        DEFAULT_GRIPPER_THRESHOLD,
+        TurboVLAPolicyRunner,
+        gripper_is_closed,
+    )
+    from train_turbovla import TurboVLANexArmCollator, resolve_camera_keys  # type: ignore[no-redef]
+
 
 def select_groups(actions: np.ndarray, episodes: np.ndarray, horizon: int, limit: int, threshold: float):
     """Select pre-close chunks and open/closed controls without crossing episodes."""
-    closed = actions[:, 5] > threshold
+    closed = gripper_is_closed(actions[:, 5], threshold)
     crossings = np.flatnonzero(closed[1:] & ~closed[:-1] & (episodes[1:] == episodes[:-1])) + 1
     before = set()
     for crossing in crossings:
@@ -38,6 +53,19 @@ def select_groups(actions: np.ndarray, episodes: np.ndarray, horizon: int, limit
     return groups, len(crossings)
 
 
+def diagnostic_cameras(features: dict, saved_keys: tuple[str, ...] | None, hints: str | None) -> list[str]:
+    """Cameras in the checkpoint's trained order, or detected the way training does for old checkpoints."""
+    if saved_keys is None:
+        return resolve_camera_keys(features, camera_hints=hints)
+    cameras = list(saved_keys)
+    if hints is not None and resolve_camera_keys(features, camera_hints=hints) != cameras:
+        raise ValueError(f"--cameras {hints!r} differs from the checkpoint's camera_keys {cameras}")
+    missing = [key for key in cameras if key not in features]
+    if missing:
+        raise ValueError(f"Dataset is missing checkpoint camera(s) {missing}")
+    return cameras
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dataset-root", type=Path, required=True)
@@ -48,9 +76,11 @@ def main():
     )
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     parser.add_argument("--samples-per-group", type=int, default=24)
-    parser.add_argument("--gripper-threshold", type=float, default=1800.0)
+    parser.add_argument("--gripper-threshold", type=float, default=DEFAULT_GRIPPER_THRESHOLD)
     parser.add_argument(
-        "--cameras", help="Same camera selection/order as training; defaults to auto-detection"
+        "--cameras",
+        help="Camera selection/order for checkpoints without saved camera_keys "
+        "(default: the checkpoint's camera_keys, else auto-detection as in training)",
     )
     parser.add_argument("--output", type=Path, default=Path("outputs/diagnostics/turbovla.json"))
     args = parser.parse_args()
@@ -58,10 +88,6 @@ def main():
         parser.error("Require positive samples-per-group and a finite gripper-threshold")
     if not (args.dataset_root / "meta/info.json").is_file():
         parser.error("dataset-root must contain meta/info.json")
-
-    # Sibling scripts are importable when this file is executed directly.
-    from rollout_turbovla import TurboVLAPolicyRunner
-    from train_turbovla import TurboVLANexArmCollator, resolve_camera_keys
 
     from lerobot.datasets.lerobot_dataset import LeRobotDataset, LeRobotDatasetMetadata
 
@@ -80,14 +106,10 @@ def main():
         delta_timestamps={"action": [i / meta.fps for i in range(horizon)]},
         local_files_only=True,
     )
-    cameras = resolve_camera_keys(dataset.features, camera_hints=args.cameras)
+    cameras = diagnostic_cameras(dataset.features, runner.checkpoint_config.camera_keys, args.cameras)
     if len(cameras) != runner.num_views:
         raise ValueError(f"Dataset cameras {cameras} do not match checkpoint's {runner.num_views} views")
-    # Match training's explicit resize, including checkpoints trained at non-default sizes.
-    with (args.checkpoint.parent / "config.json").open() as handle:
-        config = json.load(handle)
-    image_size = config.get("vision", {}).get("image_size", 224)
-    runner.image_processor.size = {"height": image_size, "width": image_size}
+    # The runner already applies the checkpoint's image size exactly as training did.
     collator = TurboVLANexArmCollator(cameras, runner.stats, runner.image_processor, horizon, dataset.meta)
 
     # Read numerical columns without decoding videos for the entire dataset.
@@ -128,8 +150,10 @@ def main():
             predicted = runner.unnormalize_action(prediction)[valid]
             target = runner.unnormalize_action(batch["actions"][0].numpy())[valid]
             errors.append(np.abs(predicted - target))
-            closing = target[:, 5] > args.gripper_threshold
-            closed_predictions.extend((predicted[closing, 5] > args.gripper_threshold).tolist())
+            closing = gripper_is_closed(target[:, 5], args.gripper_threshold)
+            closed_predictions.extend(
+                gripper_is_closed(predicted[closing, 5], args.gripper_threshold).tolist()
+            )
             details.append(
                 {
                     "index": index,

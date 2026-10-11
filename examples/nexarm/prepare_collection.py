@@ -11,37 +11,31 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+try:  # imported as a package module (tests) or run as a script
+    from examples.nexarm.camera_config import add_camera_args, build_camera_dicts, find_realsense_serial
+except ModuleNotFoundError:
+    from camera_config import (  # type: ignore[no-redef]
+        add_camera_args,
+        build_camera_dicts,
+        find_realsense_serial,
+    )
+
 REPO = Path(__file__).resolve().parents[2]
+DEFAULT_ROOT_REPO_ID = "thanhkt/nexarm_stack_bowls_top"
 
 
-def camera_source(value):
-    return int(value) if value.isdecimal() else str(Path(value).expanduser())
-
-
-def parse_args():
+def parse_args(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--follower-port", default="/dev/ttyUSB0")
-    parser.add_argument("--leader-port", default="/dev/ttyUSB1")
-    parser.add_argument(
-        "--front-cam",
-        type=camera_source,
-        default="/dev/v4l/by-id/usb-046d_C270_HD_WEBCAM_E49C2640-video-index0",
-    )
-    parser.add_argument(
-        "--wrist-cam", type=camera_source, default="/dev/v4l/by-id/usb-icSpring_icspring_camera-video-index0"
-    )
-    parser.add_argument(
-        "--top-cam",
-        default="auto",
-        help="RealSense D435i top camera serial number (default: auto-detect). Use --no-top-cam to disable.",
-    )
-    parser.add_argument(
-        "--no-top-cam",
-        action="store_true",
-        help="Disable the top camera (use only front and wrist cameras)",
-    )
+    parser.add_argument("--leader-port", default="/dev/ttyUSB0")
+    parser.add_argument("--follower-port", default="/dev/ttyUSB1")
+    add_camera_args(parser)
     parser.add_argument("--repo-id", default="thanhkt/nexarm_stack_bowls")
-    parser.add_argument("--root-repo-id", default="thanhkt/nexarm_stack_bowls")
+    parser.add_argument(
+        "--root-repo-id",
+        default=DEFAULT_ROOT_REPO_ID,
+        help="Merged root dataset (default: %(default)s, 3 cameras, created by the first session). "
+        "For the 2-camera root use --no-top-cam --root-repo-id thanhkt/nexarm_stack_bowls.",
+    )
     parser.add_argument("--no-merge", action="store_true", help="Keep the session separate without merging")
     parser.add_argument("--merge-root", type=Path, help="Local merged root directory")
     parser.add_argument(
@@ -51,8 +45,6 @@ def parse_args():
     parser.add_argument("--fps", type=int, default=30)
     parser.add_argument("--width", type=int, default=640)
     parser.add_argument("--height", type=int, default=480)
-    parser.add_argument("--front-fourcc", default="MJPG")
-    parser.add_argument("--wrist-fourcc", default="YUYV")
     parser.add_argument(
         "--prepare-only", action="store_true", help="Test USB access and cameras without connecting the arms"
     )
@@ -72,7 +64,7 @@ def parse_args():
         "--resume", action="store_true", help="Use the exact existing --repo-id, including its timestamp"
     )
     parser.add_argument("--root", type=Path, help="Optional dataset directory")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     if min(args.num_episodes, args.fps, args.width, args.height) <= 0:
         parser.error("Episode count, fps, width, and height must be positive")
     if args.stress_test is not None and args.stress_test <= 0:
@@ -127,19 +119,6 @@ def test_cameras(configs, output_dir):
         for camera in cameras.values():
             if camera.is_connected:
                 camera.disconnect()
-
-
-def find_realsense_serial(requested):
-    import pyrealsense2 as rs
-
-    serials = [d.get_info(rs.camera_info.serial_number) for d in rs.context().query_devices()]
-    if requested != "auto":
-        if requested not in serials:
-            raise ValueError(f"RealSense {requested} not found; connected: {serials or 'none'}")
-        return requested
-    if len(serials) != 1:
-        raise ValueError(f"Expected exactly one RealSense, found {len(serials)}; pass --top-cam <serial>")
-    return serials[0]
 
 
 def test_realsense(serial, args, output_dir):
@@ -322,44 +301,22 @@ def main():
             raise ValueError("Leader and follower must use different serial ports")
         ensure_access([args.follower_port, args.leader_port])
         print(f"USB OK: follower={args.follower_port}, leader={args.leader_port}")
-    cameras = [
-        ("front", args.front_cam, args.front_fourcc),
-        ("wrist", args.wrist_cam, args.wrist_fourcc),
-    ]
-    configs = {
-        name: {
-            "type": "opencv",
-            "index_or_path": source,
-            "width": args.width,
-            "height": args.height,
-            "fps": args.fps,
-            "fourcc": fourcc,
-        }
-        for name, source, fourcc in cameras
-    }
+    serial = None if args.no_top_cam else find_realsense_serial(args.top_cam)
+    configs = build_camera_dicts(args, args.fps, args.width, args.height, top_serial=serial)
+    opencv = {name: config for name, config in configs.items() if config["type"] == "opencv"}
     sources = [
         Path(f"/dev/video{source}" if isinstance(source, int) else source).resolve()
-        for _, source, _ in cameras
+        for source in (config["index_or_path"] for config in opencv.values())
     ]
     if len(set(sources)) != len(sources):
         raise ValueError("Each camera must use a different device")
     ensure_access(sources)
     output_dir = REPO / "outputs" / "collection" / datetime.now().strftime("%Y%m%d_%H%M%S")
     output_dir.mkdir(parents=True, exist_ok=True)
-    test_cameras(configs, output_dir)
-    serial = None
-    if not args.no_top_cam:
-        serial = find_realsense_serial(args.top_cam)
+    test_cameras(opencv, output_dir)
+    if serial:
+        # Recording stores RGB only; depth and point cloud are checked here.
         test_realsense(serial, args, output_dir)
-        # Recording stores RGB only; depth and point cloud are checked in the test above.
-        configs["top"] = {
-            "type": "intelrealsense",
-            "serial_number_or_name": serial,
-            "width": args.width,
-            "height": args.height,
-            "fps": args.fps,
-            "use_depth": False,
-        }
     if args.stress_test:
         stress_test_cameras(configs, serial, args, args.stress_test)
     if args.prepare_only or args.test_cameras:

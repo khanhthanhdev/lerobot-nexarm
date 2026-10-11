@@ -2,37 +2,44 @@
 
 # Teleoperate NexArm: leader arm controls follower arm in real time.
 #
-# Usage:
-#   python examples/nexarm/teleoperate.py --follower-port COM19 --leader-port COM18
-#   python examples/nexarm/teleoperate.py --follower-port /dev/ttyUSB1 --leader-port /dev/ttyUSB0
+# Usage (leader /dev/ttyUSB0 and follower /dev/ttyUSB1 are the defaults):
+#   python examples/nexarm/teleoperate.py
+#   python examples/nexarm/teleoperate.py --leader-port COM18 --follower-port COM19
 #
 # Optional flags:
 #   --fps            Control loop rate (default: 30)
-#   --front-cam      OpenCV camera index for front camera (default: 0)
-#   --wrist-cam      OpenCV camera index for wrist camera (default: 1)
-#   --top-cam        Enable RealSense top camera (serial number)
+#   --front-cam      Front camera index or /dev/v4l/by-id path (default: 0)
+#   --wrist-cam      Wrist camera index or /dev/v4l/by-id path (default: 1)
+#   --front-fourcc / --wrist-fourcc  Camera pixel format, e.g. MJPG or YUYV (default: auto)
+#   --top-cam        RealSense top camera serial (default: auto-detect exactly one)
+#   --no-top-cam     Run without the top camera
 #   --rerun-save-path outputs/rerun/nexarm_teleop.rrd  Save a replayable session
 #   --no-display     Disable Rerun visualization
 
 import argparse
 import time
 
-from lerobot.cameras.opencv import OpenCVCameraConfig
-from lerobot.cameras.realsense import RealSenseCameraConfig
 from lerobot.robots.nexarm_follower import NexArmFollower, NexArmFollowerConfig
 from lerobot.teleoperators.nexarm_leader import NexArmLeader, NexArmLeaderConfig
 from lerobot.utils.robot_utils import precise_sleep
 from lerobot.utils.visualization_utils import init_rerun, log_rerun_data, shutdown_rerun
 
+try:  # imported as a package module (tests) or run as a script
+    from examples.nexarm.camera_config import CameraSetupError, add_camera_args, build_camera_configs
+except ModuleNotFoundError:
+    from camera_config import (  # type: ignore[no-redef]
+        CameraSetupError,
+        add_camera_args,
+        build_camera_configs,
+    )
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Teleoperate NexArm")
-    parser.add_argument("--follower-port", required=True, help="Serial port for follower ESP32 (e.g. COM19)")
-    parser.add_argument("--leader-port", required=True, help="Serial port for leader ESP32 (e.g. COM18)")
+    parser.add_argument("--leader-port", default="/dev/ttyUSB0", help="Serial port for the leader ESP32")
+    parser.add_argument("--follower-port", default="/dev/ttyUSB1", help="Serial port for the follower ESP32")
     parser.add_argument("--fps", type=int, default=30)
-    parser.add_argument("--front-cam", type=int, default=0)
-    parser.add_argument("--wrist-cam", type=int, default=1)
-    parser.add_argument("--top-cam", help="RealSense serial number to enable the top camera")
+    add_camera_args(parser)
     parser.add_argument("--no-display", action="store_true")
     parser.add_argument(
         "--rerun-save-path",
@@ -43,20 +50,10 @@ def parse_args():
 
 def main():
     args = parse_args()
+    if args.no_display and args.rerun_save_path:
+        raise ValueError("--rerun-save-path requires Rerun visualization; omit --no-display.")
 
-    camera_config = {
-        "front": OpenCVCameraConfig(index_or_path=args.front_cam, width=640, height=480, fps=args.fps),
-        "wrist": OpenCVCameraConfig(index_or_path=args.wrist_cam, width=640, height=480, fps=args.fps),
-    }
-
-    if args.top_cam is not None:
-        camera_config["top"] = RealSenseCameraConfig(
-            serial_number_or_name=args.top_cam,
-            width=640,
-            height=480,
-            fps=args.fps,
-        )
-
+    camera_config = build_camera_configs(args, args.fps)
     follower_config = NexArmFollowerConfig(port=args.follower_port, cameras=camera_config)
     leader_config = NexArmLeaderConfig(port=args.leader_port)
 
@@ -68,8 +65,6 @@ def main():
 
     if not args.no_display:
         init_rerun(session_name="nexarm_teleoperate", save_path=args.rerun_save_path)
-    elif args.rerun_save_path:
-        raise ValueError("--rerun-save-path requires Rerun visualization; omit --no-display.")
 
     print("Teleoperation started. Press Ctrl+C to stop.")
     try:
@@ -94,4 +89,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except CameraSetupError as error:
+        raise SystemExit(f"Teleoperation setup failed: {error}") from error

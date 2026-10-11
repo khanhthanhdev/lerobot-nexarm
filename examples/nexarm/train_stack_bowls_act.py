@@ -15,21 +15,16 @@ from huggingface_hub import HfApi, snapshot_download
 
 from lerobot.configs import FeatureType, PreTrainedConfig
 from lerobot.datasets import LeRobotDataset, LeRobotDatasetMetadata
+from lerobot.motors.nexarm.nexarm import JOINT_NAMES as MOTOR_NAMES
 from lerobot.policies.act import ACTConfig
 from lerobot.utils.constants import HF_LEROBOT_HOME
 from lerobot.utils.feature_utils import dataset_to_policy_features
 
+# Existing 2-camera real dataset; pass --repo-id thanhkt/nexarm_stack_bowls_top for the 3-camera root.
 REPO_ID = "thanhkt/nexarm_stack_bowls"
 CONFIG_PATH = Path(__file__).with_name("stack_bowls_act.yaml")
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-JOINT_NAMES = [
-    "shoulder_pan.pos",
-    "shoulder_lift.pos",
-    "elbow_flex.pos",
-    "wrist_flex.pos",
-    "wrist_roll.pos",
-    "gripper.pos",
-]
+JOINT_NAMES = [f"{name}.pos" for name in MOTOR_NAMES]
 CAMERAS = ("observation.images.front", "observation.images.wrist")
 OPTIONAL_CAMERAS = ("observation.images.top",)
 
@@ -39,10 +34,27 @@ def dataset_cameras(meta: LeRobotDatasetMetadata) -> tuple[str, ...]:
     return CAMERAS + tuple(key for key in OPTIONAL_CAMERAS if key in meta.features)
 
 
+def camera_shape(meta: LeRobotDatasetMetadata) -> tuple[int, int, int]:
+    """The (height, width, 3) every camera was recorded at, read from the dataset metadata."""
+    shapes = {key: tuple(meta.features.get(key, {}).get("shape", ())) for key in dataset_cameras(meta)}
+    if len(set(shapes.values())) != 1:
+        raise ValueError(f"All cameras must share one resolution; dataset metadata has {shapes}.")
+    shape = next(iter(shapes.values()))
+    if len(shape) != 3 or shape[2] != 3:
+        raise ValueError(f"Expected (height, width, 3) RGB camera features; dataset metadata has {shapes}.")
+    return shape
+
+
 def validate_metadata(meta: LeRobotDatasetMetadata) -> None:
-    """Fail early if the real dataset's robot or feature contract has changed."""
-    if meta.info.robot_type != "nexarm_follower" or meta.fps != 30:
-        raise ValueError("Expected a nexarm_follower dataset recorded at 30 FPS.")
+    """Fail early if the real dataset's robot or feature contract has changed.
+
+    fps and camera resolution come from the dataset (collection --fps/--width/--height), so any
+    consistent recording setup trains; only the robot, joints and camera set are fixed.
+    """
+    if meta.info.robot_type != "nexarm_follower":
+        raise ValueError(f"Expected a nexarm_follower dataset, got robot_type={meta.info.robot_type!r}.")
+    if not meta.fps or meta.fps <= 0:
+        raise ValueError(f"Dataset metadata has no valid fps ({meta.fps!r}).")
     if meta.total_episodes < 2:
         raise ValueError("Need at least two episodes for training and held-out evaluation.")
     for key in ("observation.state", "action"):
@@ -51,9 +63,9 @@ def validate_metadata(meta: LeRobotDatasetMetadata) -> None:
             raise ValueError(f"{key} must contain the six NexArm joints in order: {JOINT_NAMES}")
     cameras = dataset_cameras(meta)
     for key in cameras:
-        feature = meta.features.get(key, {})
-        if feature.get("dtype") != "video" or list(feature.get("shape", [])) != [480, 640, 3]:
-            raise ValueError(f"Expected {key} as 480x640 RGB video.")
+        if meta.features.get(key, {}).get("dtype") != "video":
+            raise ValueError(f"Expected {key} as an RGB video feature.")
+    camera_shape(meta)
     for key in ("action", "observation.state", *cameras):
         if key not in meta.stats:
             raise ValueError(f"Dataset normalization statistics missing for {key}.")
@@ -90,10 +102,11 @@ def check_data(
         video_backend="pyav",
         delta_timestamps={"action": [i / meta.fps for i in cfg.action_delta_indices]},
     )
+    height, width, channels = camera_shape(meta)
     for index in (0, len(dataset) - 1):
         sample = dataset[index]
         expected = {"observation.state": (6,), "action": (cfg.chunk_size, 6)}
-        expected.update(dict.fromkeys(dataset_cameras(meta), (3, 480, 640)))
+        expected.update(dict.fromkeys(dataset_cameras(meta), (channels, height, width)))
         for key, shape in expected.items():
             if tuple(sample[key].shape) != shape or not torch.isfinite(sample[key]).all():
                 raise ValueError(

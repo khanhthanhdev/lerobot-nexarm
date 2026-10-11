@@ -13,7 +13,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-id", required=True, help="Exact timestamped local collection ID")
     parser.add_argument("--root", type=Path, help="Local session directory, if outside the normal cache")
-    parser.add_argument("--root-repo-id", default="thanhkt/nexarm_stack_bowls")
+    parser.add_argument(
+        "--root-repo-id",
+        default="thanhkt/nexarm_stack_bowls_top",
+        help="Merged root dataset (same default as prepare_collection.py; created if it does not exist)",
+    )
     parser.add_argument("--merge-root", type=Path, help="Local merged root directory")
     args = parser.parse_args()
     session = LeRobotDataset(args.repo_id, root=args.root or HF_LEROBOT_HOME / args.repo_id)

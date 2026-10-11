@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Merge already uploaded LeRobot datasets and upload the combined dataset.
 
+Source Hub repos are kept unless --delete-sources is passed (deleted only after the merged upload).
+Without --output-dir the merged dataset is built in a temporary directory that is removed after upload.
+
 Example:
     uv run python examples/nexarm/merge_hub_datasets.py \\
         --source-repo-ids my-user/nexarm_pick_20261001_120000 my-user/nexarm_pick_20261002_150000 \\
@@ -41,17 +44,24 @@ def parse_args() -> argparse.Namespace:
         "--output-dir",
         type=Path,
         default=None,
-        help="Local directory for the merged dataset. Defaults to the standard LeRobot cache location.",
+        help="Local directory to build and keep the merged dataset. Defaults to a fresh temporary "
+        "directory that is deleted after upload.",
     )
     parser.add_argument(
         "--private",
         action="store_true",
         help="Create the output Hub dataset as private.",
     )
-    parser.add_argument(
+    sources = parser.add_mutually_exclusive_group()
+    sources.add_argument(
+        "--delete-sources",
+        action="store_true",
+        help="Delete the source Hub repos after the merged dataset has uploaded (default: keep them).",
+    )
+    sources.add_argument(
         "--keep-sources",
         action="store_true",
-        help="Keep the source Hub repos after the merged dataset has uploaded.",
+        help="Keep the source Hub repos (the default; accepted for older commands).",
     )
     return parser.parse_args()
 
@@ -86,7 +96,9 @@ def main() -> None:
     print(f"Loading {len(args.source_repo_ids)} source datasets from the Hub...")
     datasets = [LeRobotDataset(repo_id) for repo_id in args.source_repo_ids]
     for dataset in datasets:
-        print(f"  {dataset.repo_id}: {dataset.meta.total_episodes} episodes, {dataset.meta.total_frames} frames")
+        print(
+            f"  {dataset.repo_id}: {dataset.meta.total_episodes} episodes, {dataset.meta.total_frames} frames"
+        )
 
     output_dir = args.output_dir
     if output_dir is None:
@@ -111,7 +123,7 @@ def main() -> None:
     if args.output_dir is None:
         shutil.rmtree(output_dir)
 
-    if not args.keep_sources:
+    if args.delete_sources:
         api = HfApi()
         for repo_id in args.source_repo_ids:
             api.delete_repo(repo_id=repo_id, repo_type="dataset")

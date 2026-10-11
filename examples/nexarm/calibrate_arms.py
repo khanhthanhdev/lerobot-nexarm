@@ -14,6 +14,7 @@ import argparse
 from lerobot.motors import MotorCalibration
 from lerobot.motors.nexarm.nexarm import (
     JOINT_NAMES,
+    POSITION_CENTER,
     POSITION_MAX,
     POSITION_MIN,
     map_leader_to_follower,
@@ -77,7 +78,7 @@ def main():
         l_map = mapped_leader[i]
         f_raw = follower_pos[i]
         diff = f_raw - l_map
-        homing_offset = 2048 + diff
+        homing_offset = POSITION_CENTER + diff
 
         new_calibration[name] = MotorCalibration(
             id=i + 1,

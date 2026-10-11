@@ -51,3 +51,30 @@ def test_cpu_fp16_rejected_before_dataset_access(monkeypatch):
     with pytest.raises(SystemExit):
         launcher.main()
     hub.assert_not_called()
+
+
+def stack_bowls_meta(fps, shapes):
+    features = {
+        key: {"dtype": "float32", "shape": [6], "names": launcher.JOINT_NAMES}
+        for key in ("observation.state", "action")
+    }
+    for name, shape in shapes.items():
+        features[f"observation.images.{name}"] = {"dtype": "video", "shape": list(shape)}
+    return SimpleNamespace(
+        info=SimpleNamespace(robot_type="nexarm_follower"),
+        fps=fps,
+        total_episodes=4,
+        features=features,
+        stats=dict.fromkeys(features, {}),
+    )
+
+
+def test_metadata_fps_and_resolution_come_from_the_dataset():
+    meta = stack_bowls_meta(15, {"front": (240, 320, 3), "wrist": (240, 320, 3), "top": (240, 320, 3)})
+    launcher.validate_metadata(meta)
+    assert launcher.camera_shape(meta) == (240, 320, 3)
+    assert launcher.dataset_cameras(meta)[-1] == "observation.images.top"
+
+    mixed = stack_bowls_meta(30, {"front": (480, 640, 3), "wrist": (240, 320, 3)})
+    with pytest.raises(ValueError, match="share one resolution"):
+        launcher.validate_metadata(mixed)

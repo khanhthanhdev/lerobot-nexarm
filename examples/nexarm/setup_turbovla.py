@@ -188,7 +188,7 @@ def main() -> int:
             return 0
         else:
             print(
-                "Status: Some dependencies are missing. Run `uv sync --extra smolvla --extra training --extra groot`."
+                "Status: Some dependencies are missing. Run `uv sync --locked --extra test --extra dev --extra core_scripts --extra training --extra nexarm --extra intelrealsense --extra smolvla --extra groot`."
             )
             return 1
 
@@ -203,7 +203,7 @@ def main() -> int:
         print("Status: Setup complete! You are ready to train NexArm with TurboVLA.")
         print("\nTo train TurboVLA on a dataset:")
         print(
-            "  uv run python examples/nexarm/train_turbovla.py --dataset-root outputs/datasets/nexarm_stack_bowls"
+            "  uv run python examples/nexarm/train_turbovla.py --sim-dataset-root outputs/datasets/nexarm_stack_bowls"
         )
         return 0
     else:

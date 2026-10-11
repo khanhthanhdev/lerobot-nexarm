@@ -1,20 +1,29 @@
 #!/usr/bin/env python3
 """Run real-time inference with a trained TurboVLA policy on NexArm (Simulation or Hardware).
 
+The checkpoint directory's config.json (written by train_turbovla.py) supplies the task type,
+camera keys and order, image size, fps and default prompt. Older checkpoints without those fields
+fall back to front/wrist[/top] by view count, 224 px images, 30 fps and a task-type heuristic.
+
 Examples:
-  # In MuJoCo simulation:
+  # In MuJoCo simulation (stack-bowls prompts follow the sampled bowl order):
   python examples/nexarm/rollout_turbovla.py \
       --robot sim \
-      --checkpoint /path/to/steps_20000_ema_pytorch_model.pt \
-      --task "Pick up the red cube and place it into the green zone"
+      --checkpoint /path/to/steps_20000_ema_pytorch_model.pt
 
-  # On physical NexArm:
+  # Pick-and-place in simulation with an explicit prompt:
+  python examples/nexarm/rollout_turbovla.py \
+      --robot sim --task-type pick_place \
+      --checkpoint /path/to/steps_20000_ema_pytorch_model.pt \
+      --task "Pick up the red cube, place it in the green target zone, and release it."
+
+  # On physical NexArm (front, wrist and auto-detected RealSense top camera by default):
   python examples/nexarm/rollout_turbovla.py \
       --robot real \
       --follower-port /dev/ttyUSB1 \
-      --front-cam 0 --wrist-cam 1 [--top-cam <RealSense serial>] \
+      --front-cam 0 --wrist-cam 1 [--top-cam <RealSense serial> | --no-top-cam] \
       --checkpoint /path/to/steps_20000_ema_pytorch_model.pt \
-      --task "Pick up the red cube and place it into the green zone"
+      --task "Stack the bowls with red on bottom, blue in middle, and black on top."
 """
 
 from __future__ import annotations
@@ -22,12 +31,14 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import platform
 import sys
 import time
+from dataclasses import dataclass
 from pathlib import Path
 
-# In headless environments without X11 DISPLAY, default MuJoCo to EGL hardware acceleration
-if "DISPLAY" not in os.environ:
+# Headless Linux hosts normally need EGL; other platforms keep MuJoCo's normal choice.
+if platform.system() == "Linux" and not os.environ.get("DISPLAY"):
     os.environ.setdefault("MUJOCO_GL", "egl")
 
 import numpy as np
@@ -35,13 +46,119 @@ import torch
 from PIL import Image
 
 # Import NexArm robot interfaces
-from lerobot.motors.nexarm.nexarm import JOINT_NAMES
+from lerobot.motors.nexarm.nexarm import GRIPPER_CLOSED_POS, GRIPPER_OPEN_POS, JOINT_NAMES
 from lerobot.utils.robot_utils import precise_sleep
 
+try:  # imported as a package module (tests) or run as a script
+    from examples.nexarm.camera_config import (
+        CameraSetupError,
+        add_camera_args,
+        build_camera_configs,
+        camera_names,
+        check_policy_cameras,
+    )
+except ModuleNotFoundError:
+    from camera_config import (  # type: ignore[no-redef]
+        CameraSetupError,
+        add_camera_args,
+        build_camera_configs,
+        camera_names,
+        check_policy_cameras,
+    )
+
 DEFAULT_TURBOVLA_DIR = Path(__file__).resolve().parents[2] / "TurboVLA"
+# Raw gripper position between GRIPPER_OPEN_POS and GRIPPER_CLOSED_POS that separates open from closed.
+DEFAULT_GRIPPER_THRESHOLD = 1800.0
+DEFAULT_IMAGE_SIZE = 224
+DEFAULT_FPS = 30
+TASK_TYPES = ("pick_place", "stack_bowls")
+IMAGE_PREFIX = "observation.images."
+# Camera order used by checkpoints that predate saved camera keys.
+LEGACY_CAMERA_ORDER = ("front", "wrist", "top")
+# Prompts used to generate/record the training data for each task.
+PICK_PLACE_TASK = "Pick up the red cube, place it in the green target zone, and release it."
+REAL_STACK_BOWLS_TASK = "Stack the bowls with red on bottom, blue in middle, and black on top."
+DEFAULT_TASKS = {"pick_place": PICK_PLACE_TASK, "stack_bowls": REAL_STACK_BOWLS_TASK}
 
 
-def parse_args():
+def gripper_is_closed(values: np.ndarray | float, threshold: float) -> np.ndarray:
+    """Whether raw gripper positions are on the closed side of ``threshold``."""
+    values = np.asarray(values)
+    return values > threshold if GRIPPER_CLOSED_POS > GRIPPER_OPEN_POS else values < threshold
+
+
+@dataclass(frozen=True)
+class TurboVLACheckpointConfig:
+    """Training-time contract saved next to a TurboVLA checkpoint (``config.json``)."""
+
+    horizon: int = 16
+    num_views: int = 2
+    image_size: int = DEFAULT_IMAGE_SIZE
+    camera_keys: tuple[str, ...] | None = None
+    task_type: str | None = None
+    fps: int | None = None
+    task: str | None = None
+
+    @property
+    def camera_names(self) -> list[str]:
+        """Robot/sim camera names in the order the model was trained on."""
+        if self.camera_keys:
+            return [key.removeprefix(IMAGE_PREFIX) for key in self.camera_keys]
+        return list(LEGACY_CAMERA_ORDER[: self.num_views])
+
+
+def load_checkpoint_config(checkpoint_path: Path | str) -> TurboVLACheckpointConfig:
+    """Read ``config.json`` beside the checkpoint; missing fields keep backward-compatible defaults."""
+    cfg_path = Path(checkpoint_path).parent / "config.json"
+    if not cfg_path.is_file():
+        print(f"[WARN] {cfg_path} not found; assuming a 2-view, {DEFAULT_IMAGE_SIZE}px checkpoint.")
+        return TurboVLACheckpointConfig()
+    saved = json.loads(cfg_path.read_text())
+    action, vision = saved.get("action", {}), saved.get("vision", {})
+    camera_keys = saved.get("camera_keys")
+    config = TurboVLACheckpointConfig(
+        horizon=int(action.get("horizon", saved.get("horizon", 16))),
+        num_views=int(vision.get("num_views", saved.get("num_views", 2))),
+        image_size=int(vision.get("image_size", saved.get("image_size", DEFAULT_IMAGE_SIZE))),
+        camera_keys=tuple(camera_keys) if camera_keys else None,
+        task_type=saved.get("task_type"),
+        fps=int(saved["fps"]) if saved.get("fps") else None,
+        task=saved.get("task") or None,
+    )
+    if config.camera_keys is not None and len(config.camera_keys) != config.num_views:
+        raise ValueError(
+            f"{cfg_path}: camera_keys {list(config.camera_keys)} do not match num_views={config.num_views}"
+        )
+    if config.task_type is not None and config.task_type not in TASK_TYPES:
+        raise ValueError(f"{cfg_path}: unknown task_type {config.task_type!r}; expected one of {TASK_TYPES}")
+    print(
+        f"[INFO] Loaded {cfg_path}: horizon={config.horizon}, cameras={config.camera_names}, "
+        f"image_size={config.image_size}, task_type={config.task_type}, fps={config.fps}"
+    )
+    return config
+
+
+def resolve_task_type(requested: str, checkpoint: TurboVLACheckpointConfig, hints: list[str]) -> str:
+    """Explicit --task-type, then the saved task type, then the legacy name/view-count heuristic."""
+    if requested != "auto":
+        return requested
+    if checkpoint.task_type:
+        return checkpoint.task_type
+    names = [hint.lower() for hint in hints]
+    is_bowl = checkpoint.num_views == 3 or any(
+        keyword in name for name in names for keyword in ("bowl", "paper_finetuned", "turbovla_ddp")
+    )
+    task_type = "stack_bowls" if is_bowl else "pick_place"
+    print(f"[WARN] Checkpoint has no saved task_type; guessed {task_type!r}. Pass --task-type to override.")
+    return task_type
+
+
+def resolve_prompt(task: str | None, checkpoint: TurboVLACheckpointConfig, task_type: str) -> str:
+    """Explicit --task, then the prompt saved with the checkpoint, then the task's training prompt."""
+    return task or checkpoint.task or DEFAULT_TASKS[task_type]
+
+
+def parse_args(argv=None):
     parser = argparse.ArgumentParser(description="Run TurboVLA policy on NexArm")
     parser.add_argument("--robot", choices=["sim", "real"], default="sim", help="Robot backend")
     parser.add_argument(
@@ -64,10 +181,17 @@ def parse_args():
     )
     parser.add_argument(
         "--task",
-        default="Pick up the red cube, place it in the green target zone, and release it.",
-        help="Language prompt",
+        default=None,
+        help="Language prompt (default: the prompt saved with the checkpoint; in the stack-bowls sim, "
+        "the instruction for the sampled bowl order)",
     )
-    parser.add_argument("--fps", type=int, default=30, help="Control loop frequency")
+    parser.add_argument(
+        "--fps",
+        type=int,
+        default=None,
+        help="Control loop frequency (default: the training dataset fps saved with the checkpoint, "
+        f"else {DEFAULT_FPS})",
+    )
     parser.add_argument(
         "--open-loop-steps", type=int, default=8, help="Number of steps to execute before re-inferring chunk"
     )
@@ -93,18 +217,15 @@ def parse_args():
 
     # Real hardware args
     parser.add_argument("--follower-port", default="/dev/ttyUSB1")
-    parser.add_argument("--front-cam", type=int, default=0)
-    parser.add_argument("--wrist-cam", type=int, default=1)
-    parser.add_argument(
-        "--top-cam", help="RealSense serial number for the top camera (required for 3-view checkpoints)"
-    )
+    add_camera_args(parser)
 
     # Sim args
     parser.add_argument(
         "--task-type",
         choices=["auto", "pick_place", "stack_bowls"],
         default="auto",
-        help="Simulation task environment (auto-detects from checkpoint/model)",
+        help="Task environment and default prompt (auto: the task_type saved with the checkpoint, "
+        "else guessed from checkpoint/model names)",
     )
     parser.add_argument("--model", type=Path, default=Path("sim/fusion_export/scene.xml"))
     parser.add_argument("--seed", type=int, default=0)
@@ -130,10 +251,11 @@ def parse_args():
     parser.add_argument(
         "--gripper-threshold",
         type=float,
-        default=1800.0,
-        help="Raw position threshold above which the gripper snaps to closed (default: 1800.0)",
+        default=DEFAULT_GRIPPER_THRESHOLD,
+        help="Raw gripper position separating open from closed when snapping "
+        f"(closed side is towards {GRIPPER_CLOSED_POS}; default: {DEFAULT_GRIPPER_THRESHOLD})",
     )
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 class TurboVLAPolicyRunner:
@@ -146,7 +268,7 @@ class TurboVLAPolicyRunner:
         bert_path: str | None = None,
         allow_hf_download: bool = False,
         binarize_gripper: bool = True,
-        gripper_threshold: float = 1800.0,
+        gripper_threshold: float = DEFAULT_GRIPPER_THRESHOLD,
         debug_actions: bool = False,
     ):
         self.device = torch.device(device)
@@ -190,40 +312,21 @@ class TurboVLAPolicyRunner:
         )
         dino_path = str(dino_cache) if dino_cache.exists() else "facebook/dinov3-vitb16-pretrain-lvd1689m"
 
-        # Default TurboVLA config for NexArm
+        # TurboVLA config for NexArm, matching the training-time contract saved with the checkpoint.
+        self.checkpoint_config = load_checkpoint_config(checkpoint_path)
         config = TurboVLAConfig()
         config.text.model_name_or_path = str(bert_path)
         config.text.local_files_only = not allow_hf_download
         config.vision.model_name_or_path = str(dino_path)
         config.vision.local_files_only = not allow_hf_download
-        config.vision.num_views = 2
-        config.vision.image_size = 224
+        config.vision.num_views = self.checkpoint_config.num_views
+        config.vision.image_size = self.checkpoint_config.image_size
         config.action.action_dim = 6
         config.action.state_dim = 6
-        config.action.horizon = 16
-
-        # Check for saved config.json
-        cfg_path = checkpoint_path.parent / "config.json"
-        if cfg_path.is_file():
-            try:
-                with open(cfg_path) as f:
-                    saved_cfg = json.load(f)
-                if "action" in saved_cfg and "horizon" in saved_cfg["action"]:
-                    config.action.horizon = int(saved_cfg["action"]["horizon"])
-                elif "horizon" in saved_cfg:
-                    config.action.horizon = int(saved_cfg["horizon"])
-                if "vision" in saved_cfg and "num_views" in saved_cfg["vision"]:
-                    config.vision.num_views = int(saved_cfg["vision"]["num_views"])
-                elif "num_views" in saved_cfg:
-                    config.vision.num_views = int(saved_cfg["num_views"])
-                print(
-                    f"[INFO] Loaded config overrides from {cfg_path} "
-                    f"(horizon={config.action.horizon}, num_views={config.vision.num_views})"
-                )
-            except Exception as e:
-                print(f"[WARN] Failed to parse {cfg_path}: {e}")
+        config.action.horizon = self.checkpoint_config.horizon
 
         self.num_views = config.vision.num_views
+        self.camera_names = self.checkpoint_config.camera_names
 
         print(f"[INFO] Building TurboVLA model on {self.device} (BERT: {bert_path})...")
         self.model = build_turbovla(config).to(self.device)
@@ -256,6 +359,10 @@ class TurboVLAPolicyRunner:
         self.image_processor = AutoImageProcessor.from_pretrained(
             dino_path, local_files_only=not allow_hf_download
         )
+        # Same explicit resize as training.
+        if hasattr(self.image_processor, "size"):
+            size = self.checkpoint_config.image_size
+            self.image_processor.size = {"height": size, "width": size}
 
         # Normalization stats
         self.stats = None
@@ -287,7 +394,12 @@ class TurboVLAPolicyRunner:
                     f"snapping={self.binarize_gripper}, threshold={self.gripper_threshold:.1f}"
                 )
             if self.binarize_gripper and unnorm.shape[-1] >= 6:
-                unnorm[..., 5] = np.where(unnorm[..., 5] > self.gripper_threshold, amax[5], amin[5])
+                # Snap to the dataset's extreme closed/open values on each side of the threshold.
+                closed, opened = (
+                    (amax[5], amin[5]) if GRIPPER_CLOSED_POS > GRIPPER_OPEN_POS else (amin[5], amax[5])
+                )
+                is_closed = gripper_is_closed(unnorm[..., 5], self.gripper_threshold)
+                unnorm[..., 5] = np.where(is_closed, closed, opened)
             return unnorm
         return action
 
@@ -298,41 +410,35 @@ class TurboVLAPolicyRunner:
             return 2.0 * (state - smin) / np.maximum(smax - smin, 1e-6) - 1.0
         return state
 
+    def ordered_views(self, images: dict[str, np.ndarray] | list[np.ndarray]) -> list[np.ndarray]:
+        """Camera frames in the trained order; missing views are an error, never padded."""
+        if isinstance(images, dict):
+            missing = [name for name in self.camera_names if name not in images]
+            if missing:
+                raise ValueError(
+                    f"Observation is missing camera(s) {missing}; the checkpoint expects {self.camera_names}."
+                )
+            return [images[name] for name in self.camera_names]
+        img_list = list(images)
+        if len(img_list) != self.num_views:
+            raise ValueError(
+                f"Expected {self.num_views} camera views {self.camera_names}, got {len(img_list)}."
+            )
+        return img_list
+
     @torch.no_grad()
     def predict_chunk(
         self,
-        images: list[np.ndarray] | dict[str, np.ndarray] | np.ndarray,
-        wrist_img: np.ndarray | None = None,
-        state_vector: np.ndarray | None = None,
+        images: dict[str, np.ndarray] | list[np.ndarray],
+        state_vector: np.ndarray,
         task: str | None = None,
-        **kwargs,
     ) -> np.ndarray:
-        # Handle backward compatibility: predict_chunk(front_img, wrist_img, state_vector, task)
-        if isinstance(images, np.ndarray) and wrist_img is not None:
-            if self.num_views == 3 and "top_img" in kwargs:
-                img_list = [images, wrist_img, kwargs["top_img"]]
-            else:
-                img_list = [images, wrist_img]
-        elif isinstance(images, dict):
-            cam_order = ["front", "wrist", "top"] if self.num_views == 3 else ["front", "wrist"]
-            img_list = [images[k] for k in cam_order if k in images]
-        elif isinstance(images, list):
-            img_list = images
-        else:
-            img_list = [images]
-
-        if len(img_list) < self.num_views:
-            img_list.extend([img_list[-1]] * (self.num_views - len(img_list)))
-        elif len(img_list) > self.num_views:
-            img_list = img_list[: self.num_views]
-
+        img_list = self.ordered_views(images)
         pil_imgs = [Image.fromarray(x) if isinstance(x, np.ndarray) else x for x in img_list]
         pv = self.image_processor(images=pil_imgs, return_tensors="pt")["pixel_values"]
-        # shape [1, num_views, 3, 224, 224]
+        # shape [1, num_views, 3, image_size, image_size]
         samples = {"dinov3": pv.unsqueeze(0).to(self.device)}
 
-        if state_vector is None:
-            state_vector = kwargs.get("curr_joints", np.zeros(6, dtype=np.float32))
         norm_state = self.normalize_state(state_vector)
         states = torch.as_tensor(norm_state, device=self.device, dtype=torch.float32).unsqueeze(0)
         instructions = [task or ""]
@@ -360,24 +466,17 @@ def run_sim(args, runner: TurboVLAPolicyRunner):
         NexArmStackBowlsTask,
     )
 
-    task_type = args.task_type
-    if task_type == "auto":
-        is_bowl = (
-            runner.num_views == 3
-            or any("bowl" in str(x).lower() for x in (args.checkpoint, args.model, args.task))
-            or any(kw in str(args.checkpoint).lower() for kw in ("paper_finetuned", "turbovla_ddp"))
-        )
-        task_type = "stack_bowls" if is_bowl else "pick_place"
+    task_type = resolve_task_type(
+        args.task_type, runner.checkpoint_config, [str(x) for x in (args.checkpoint, args.model, args.task)]
+    )
 
     if task_type == "stack_bowls" and (
         "bowl" not in str(args.model).lower() or args.model.name == "scene.xml"
     ):
         args.model = Path("sim/fusion_export/bowl_stack_scene.xml")
 
-    # Match 640x480 native aspect ratio of the dataset cameras
-    desired_cams = ("front", "wrist", "top") if runner.num_views == 3 else ("front", "wrist")
-
-    # Inspect cameras available in the MuJoCo model to avoid hard crash on missing cameras
+    # The trained camera views, in order; a scene without one of them cannot run this checkpoint.
+    cam_names = tuple(runner.camera_names)
     import mujoco
 
     from lerobot.robots.nexarm_sim.mujoco_backend import resolve_model_path
@@ -387,15 +486,11 @@ def run_sim(args, runner: TurboVLAPolicyRunner):
     available_cams = {
         mujoco.mj_id2name(_temp_model, mujoco.mjtObj.mjOBJ_CAMERA, i) for i in range(_temp_model.ncam)
     }
-
-    cam_names = tuple(c for c in desired_cams if c in available_cams)
-    if not cam_names:
-        cam_names = ("front", "wrist")
-
-    missing_cams = [c for c in desired_cams if c not in available_cams]
+    missing_cams = [c for c in cam_names if c not in available_cams]
     if missing_cams:
-        print(
-            f"[WARN] Cameras {missing_cams} not found in {args.model}. Available: {sorted(available_cams)}. Falling back to {cam_names}."
+        raise SystemExit(
+            f"Cameras {missing_cams} required by the checkpoint are not in {args.model} "
+            f"(available: {sorted(available_cams)}). Pass a --model scene with cameras {list(cam_names)}."
         )
 
     config = NexArmSimConfig(
@@ -413,13 +508,15 @@ def run_sim(args, runner: TurboVLAPolicyRunner):
     if task_type == "stack_bowls":
         task = NexArmStackBowlsTask(robot.backend, timeout_s=args.timeout)
         task.reset(seed=args.seed, settle_steps=25)
-        if "Pick up the red cube" in args.task or "Stack the bowls" in args.task:
+        # Training covers every bowl order, so the prompt must describe this episode's order.
+        if args.task is None or "Stack the bowls" in args.task:
             from lerobot.robots.nexarm_sim.stack_bowls_task import get_task_instruction
 
             args.task = get_task_instruction(*task.current_order)
     else:
         task = NexArmPickPlaceTask(robot.backend, timeout_s=args.timeout)
         task.reset(seed=args.seed, settle_steps=25)
+        args.task = resolve_prompt(args.task, runner.checkpoint_config, task_type)
 
     print(f"[INFO] Running TurboVLA in simulation ({task_type}) for task: '{args.task}'")
 
@@ -486,22 +583,12 @@ def run_sim(args, runner: TurboVLAPolicyRunner):
 
 
 def run_real(args, runner: TurboVLAPolicyRunner):
-    from lerobot.cameras.opencv import OpenCVCameraConfig
     from lerobot.robots.nexarm_follower import NexArmFollower, NexArmFollowerConfig
 
-    cameras = {
-        "front": OpenCVCameraConfig(index_or_path=args.front_cam, width=640, height=480, fps=args.fps),
-        "wrist": OpenCVCameraConfig(index_or_path=args.wrist_cam, width=640, height=480, fps=args.fps),
-    }
-    if runner.num_views == 3:
-        if not args.top_cam:
-            raise SystemExit("This checkpoint uses 3 views; pass --top-cam <RealSense serial>.")
-        from lerobot.cameras.realsense import RealSenseCameraConfig
-
-        cameras["top"] = RealSenseCameraConfig(
-            serial_number_or_name=args.top_cam, width=640, height=480, fps=args.fps
-        )
-    config = NexArmFollowerConfig(port=args.follower_port, cameras=cameras)
+    check_policy_cameras(camera_names(args), runner.camera_names, str(args.checkpoint))
+    task_type = resolve_task_type(args.task_type, runner.checkpoint_config, [str(args.checkpoint)])
+    args.task = resolve_prompt(args.task, runner.checkpoint_config, task_type)
+    config = NexArmFollowerConfig(port=args.follower_port, cameras=build_camera_configs(args, args.fps))
     robot = NexArmFollower(config)
     robot.connect()
 
@@ -510,12 +597,8 @@ def run_real(args, runner: TurboVLAPolicyRunner):
     try:
         while True:
             obs = robot.get_observation()
-            front_img = obs["front"]
-            wrist_img = obs["wrist"]
             curr_joints = np.array([obs[f"{name}.pos"] for name in JOINT_NAMES], dtype=np.float32)
-
-            extra = {"top_img": obs["top"]} if "top" in cameras else {}
-            chunk = runner.predict_chunk(front_img, wrist_img, curr_joints, args.task, **extra)
+            chunk = runner.predict_chunk(obs, state_vector=curr_joints, task=args.task)
             for i in range(min(args.open_loop_steps, len(chunk))):
                 t0 = time.perf_counter()
                 act_vec = chunk[i]
@@ -541,6 +624,7 @@ def main():
         gripper_threshold=args.gripper_threshold,
         debug_actions=args.debug_actions,
     )
+    args.fps = args.fps or runner.checkpoint_config.fps or DEFAULT_FPS
     if args.robot == "sim":
         run_sim(args, runner)
     else:
@@ -548,4 +632,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except CameraSetupError as error:
+        raise SystemExit(f"Rollout setup failed: {error}") from error

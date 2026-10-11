@@ -29,7 +29,8 @@ import tty
 import numpy as np
 
 from lerobot.motors.nexarm import NexArmKinematicsDynamics
-from lerobot.motors.nexarm.kinematics_dynamics import HOME_POSITIONS, JOINT_NAMES, RAW_RANGES
+from lerobot.motors.nexarm.kinematics_dynamics import HOME_POSITIONS, JOINT_NAMES
+from lerobot.motors.nexarm.nexarm import GRIPPER_CLOSED_POS, GRIPPER_MID_POS, GRIPPER_OPEN_POS
 from lerobot.robots.nexarm_sim import NexArmSim, NexArmSimConfig
 
 
@@ -72,6 +73,11 @@ class RawTerminal:
         return None
 
 
+def gripper_is_closed(gripper_raw: float) -> bool:
+    """Raw 2833 (GRIPPER_CLOSED_POS) is closed and 1195 (GRIPPER_OPEN_POS) is open."""
+    return (gripper_raw > GRIPPER_MID_POS) == (GRIPPER_CLOSED_POS > GRIPPER_OPEN_POS)
+
+
 def format_hud(
     target_xyz: np.ndarray,
     target_rpy_deg: np.ndarray,
@@ -95,7 +101,7 @@ def format_hud(
         "   " + " | ".join(f"{name[:8]}: {current_q[f'{name}.pos']:4.0f}" for name in JOINT_NAMES[:-1]),
         " Gravity Compensation Torques g(q) [Nm]:",
         "   " + " | ".join(f"{name[:8]}: {grav_torques.get(name, 0.0):+5.2f}" for name in JOINT_NAMES[:-1]),
-        f" Gripper Status:          Raw: {gripper_raw:4.0f} ({'OPEN' if gripper_raw > 2400 else 'CLOSED'})",
+        f" Gripper Status:          Raw: {gripper_raw:4.0f} ({'CLOSED' if gripper_is_closed(gripper_raw) else 'OPEN'})",
         "================================================================================",
         " Controls:",
         "   [W/S] : +/- X (Forward/Back)      [I/K] : +/- Pitch (Tilt Up/Down)",
@@ -117,7 +123,7 @@ def main() -> int:
 
     target_xyz = fk_home["position"].copy()
     target_rpy = fk_home["rpy_rad"].copy()
-    gripper_raw = float(RAW_RANGES["gripper"][0])  # Open by default
+    gripper_raw = float(GRIPPER_OPEN_POS)  # Open by default
 
     current_q = {f"{name}.pos": HOME_POSITIONS[name] for name in JOINT_NAMES}
     current_q["gripper.pos"] = gripper_raw
@@ -187,10 +193,10 @@ def main() -> int:
                             target_rpy[0] += step_rad
                         elif key in (" ", "g"):
                             # Toggle gripper between open and closed
-                            if gripper_raw < 2000:
-                                gripper_raw = float(RAW_RANGES["gripper"][1])
+                            if gripper_is_closed(gripper_raw):
+                                gripper_raw = float(GRIPPER_OPEN_POS)
                             else:
-                                gripper_raw = float(RAW_RANGES["gripper"][0])
+                                gripper_raw = float(GRIPPER_CLOSED_POS)
                             current_q["gripper.pos"] = gripper_raw
                         elif key == "1":
                             step_m, step_rad = 0.001, np.deg2rad(1.0)

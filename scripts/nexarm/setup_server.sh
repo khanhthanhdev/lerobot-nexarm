@@ -12,7 +12,7 @@ fi
 uv --version
 
 echo "=== [2/4] Syncing locked Python environment with training extras ==="
-uv sync --extra smolvla --extra training --extra groot
+uv sync --locked --extra test --extra dev --extra core_scripts --extra training --extra nexarm --extra intelrealsense --extra smolvla --extra groot
 
 echo "=== [3/4] Verifying dependencies and health ==="
 uv run python examples/nexarm/setup_turbovla.py --check-only

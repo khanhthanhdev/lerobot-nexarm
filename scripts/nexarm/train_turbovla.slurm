@@ -23,8 +23,8 @@ uv run torchrun \
     --nproc_per_node=4 \
     --master_port=$(expr 10000 + $(echo -n $SLURM_JOB_ID | tail -c 4)) \
     examples/nexarm/train_turbovla.py \
-    --dataset-root outputs/datasets/nexarm_stack_bowls \
-    --output-dir outputs/train/nexarm_turbovla_cluster \
+    --sim-dataset-root outputs/datasets/nexarm_stack_bowls \
+    --output-dir outputs/train/nexarm_turbovla \
     --batch-size 16 \
     --max-steps 50000 \
     --save-steps 5000 \

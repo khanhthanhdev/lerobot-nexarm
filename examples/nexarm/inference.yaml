@@ -19,13 +19,14 @@ robot:
       width: 640
       height: 480
       fps: 30
-    # Optional RealSense top camera: uncomment and set your serial number.
-    # top:
-    #   type: intelrealsense
-    #   serial_number_or_name: "YOUR_SERIAL"
-    #   width: 640
-    #   height: 480
-    #   fps: 30
+    # RealSense D435i top camera (on by default). The name works when exactly one D435i is
+    # connected; otherwise use its serial number. Delete this block to run without a top camera.
+    top:
+      type: intelrealsense
+      serial_number_or_name: "Intel RealSense D435I"
+      width: 640
+      height: 480
+      fps: 30
 
 strategy:
   type: sentry

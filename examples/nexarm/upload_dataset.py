@@ -14,10 +14,10 @@ Usage:
         --repo-id <username>/<dataset_name> \
         --root ~/.cache/huggingface/lerobot/<username>/<local_folder>
 
-    # Use chunked resumable upload for flaky or slow connections:
+    # Chunked resumable upload (upload_large_folder) is the default; for one plain commit instead:
     uv run python examples/nexarm/upload_dataset.py \
         --repo-id <username>/<dataset_name> \
-        --large-folder
+        --no-large-folder
 """
 
 import argparse
@@ -50,15 +50,10 @@ def parse_args():
     )
     parser.add_argument(
         "--large-folder",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
         default=True,
-        help="Use chunked resumable upload (HfApi.upload_large_folder). Recommended for videos.",
-    )
-    parser.add_argument(
-        "--no-large-folder",
-        dest="large_folder",
-        action="store_false",
-        help="Use standard single-commit upload_folder instead of upload_large_folder.",
+        help="Use chunked resumable upload (HfApi.upload_large_folder), recommended for videos "
+        "(default). --no-large-folder uses a single-commit upload_folder instead.",
     )
     parser.add_argument(
         "--private",

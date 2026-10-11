@@ -9,6 +9,10 @@ size is batch-size × grad-accum-steps × GPU count (final batches may be smalle
 Episode-end padding is excluded from the action loss. Cameras are auto-detected
 unless explicitly selected with --cameras.
 
+Each checkpoint directory's config.json records the contract rollout_turbovla.py and
+diagnose_turbovla.py rely on: task_type, camera_keys (ordered), vision.image_size, fps
+(shared by every training dataset) and task (default prompt from the training data).
+
 Examples:
   # Train on local dataset:
   uv run python examples/nexarm/train_turbovla.py \
@@ -56,6 +60,7 @@ from tqdm import tqdm
 
 DEFAULT_TURBOVLA_DIR = Path(__file__).resolve().parents[2] / "TurboVLA"
 DEFAULT_SIM_DATASET_ROOT = Path("outputs/datasets/nexarm_stack_bowls")
+TASK_TYPES = ("pick_place", "stack_bowls")
 
 
 class EMAModel:
@@ -142,13 +147,22 @@ def parse_args():
         "--front-cam-key",
         type=str,
         default=None,
-        help="Key for front camera (auto-detected if None)",
+        help="Front camera key. With --front-cam-key and/or --wrist-cam-key the model uses exactly two "
+        "views [front, wrist]; an unset one is matched by the name 'front'/'wrist'. "
+        "Cannot be combined with --cameras.",
     )
     parser.add_argument(
         "--wrist-cam-key",
         type=str,
         default=None,
-        help="Key for wrist camera (auto-detected if None)",
+        help="Wrist camera key (see --front-cam-key).",
+    )
+    parser.add_argument(
+        "--task-type",
+        choices=["auto", *TASK_TYPES],
+        default="auto",
+        help="Task saved in the checkpoint for rollout (auto: stack_bowls if a training prompt mentions "
+        "bowls, pick_place if one mentions a cube)",
     )
     parser.add_argument(
         "--gripper-loss-weight",
@@ -239,6 +253,8 @@ def parse_args():
         or args.gripper_loss_weight <= 0
     ):
         parser.error("Require 0 <= ema-decay < 1 and a positive finite gripper-loss-weight.")
+    if args.cameras and (args.front_cam_key or args.wrist_cam_key):
+        parser.error("Use either --cameras or --front-cam-key/--wrist-cam-key, not both.")
     if args.pretrained_checkpoint is not None and not args.pretrained_checkpoint.is_file():
         parser.error(f"Checkpoint does not exist: {args.pretrained_checkpoint}")
     return args
@@ -290,7 +306,7 @@ def resolve_camera_keys(
     if isinstance(camera_hints, str):
         camera_hints = [c.strip() for c in camera_hints.split(",") if c.strip()]
 
-    hints = [h for h in (front_hint, wrist_hint) if h] or camera_hints
+    hints = [front_hint or "front", wrist_hint or "wrist"] if (front_hint or wrist_hint) else camera_hints
     if hints:
         resolved = []
         for hint in hints:
@@ -318,6 +334,50 @@ def resolve_camera_keys(
         raise ValueError(f"Could not resolve camera keys from dataset features: {all_keys}")
 
     return resolved
+
+
+def dataset_tasks(meta) -> list[str]:
+    """Task prompts of a dataset, in task-index order."""
+    tasks = getattr(meta, "tasks", None)
+    if tasks is None:
+        return []
+    if "task_index" in getattr(tasks, "columns", ()):
+        tasks = tasks.sort_values("task_index")
+    return [str(task) for task in tasks.index]
+
+
+def infer_task_type(prompts: list[str]) -> str | None:
+    """stack_bowls/pick_place from the training prompts, or None when they name neither."""
+    text = " ".join(prompts).lower()
+    if "bowl" in text:
+        return "stack_bowls"
+    if "cube" in text:
+        return "pick_place"
+    return None
+
+
+def checkpoint_metadata(
+    domains: list[str], metas: list[Any], camera_keys: list[str], task_type: str
+) -> dict[str, Any]:
+    """Training contract saved in config.json for rollout and diagnosis."""
+    fps_values = {int(meta.fps) for meta in metas}
+    if len(fps_values) != 1:
+        raise ValueError(
+            f"All training datasets must share one fps (got {sorted(fps_values)}); action chunks and the "
+            "rollout control rate depend on it."
+        )
+    prompts = [dataset_tasks(meta) for meta in metas]
+    # Real rollouts use the real dataset's prompt when co-training; sim stack-bowls prompts vary by episode.
+    preferred = [tasks for domain, tasks in zip(domains, prompts, strict=True) if domain == "real" and tasks]
+    preferred = preferred or [tasks for tasks in prompts if tasks]
+    if task_type == "auto":
+        task_type = infer_task_type([task for tasks in prompts for task in tasks])
+    return {
+        "task_type": task_type,
+        "camera_keys": list(camera_keys),
+        "fps": fps_values.pop(),
+        "task": preferred[0][0] if preferred else None,
+    }
 
 
 def compute_or_load_normalization_stats(
@@ -617,6 +677,7 @@ def save_checkpoint(
     output_dir: Path,
     step: int,
     is_final: bool = False,
+    metadata: dict[str, Any] | None = None,
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     step_str = "final" if is_final else f"steps_{step}"
@@ -649,6 +710,7 @@ def save_checkpoint(
         json.dump(
             {
                 "model_name": "TurboVLA",
+                **(metadata or {}),
                 "action": {
                     "action_dim": config.action.action_dim,
                     "state_dim": config.action.state_dim,
@@ -706,6 +768,7 @@ def main():
     if is_main_process:
         print("\n[1/5] Loading LeRobot datasets...")
     sub_datasets = []
+    metas = []
     for domain, repo_id, root in dataset_specs:
         meta = LeRobotDatasetMetadata(repo_id, root, local_files_only=root is not None)
         delta_timestamps = {"action": [i / max(1, meta.fps) for i in range(args.horizon)]}
@@ -721,6 +784,7 @@ def main():
             if list(ds.features.get(key, {}).get("shape", [])) != [6]:
                 raise ValueError(f"{domain}: {key} must contain six NexArm joints.")
         sub_datasets.append(ds)
+        metas.append(meta)
         if is_main_process:
             print(
                 f"  [{domain}] {root or repo_id}: {len(ds)} frames across {ds.num_episodes} episodes "
@@ -738,8 +802,15 @@ def main():
         front_hint=args.front_cam_key,
         wrist_hint=args.wrist_cam_key,
     )
+    metadata = checkpoint_metadata(
+        [domain for domain, _, _ in dataset_specs], metas, camera_keys, args.task_type
+    )
     if is_main_process:
         print(f"  Resolved {len(camera_keys)} camera views -> {camera_keys}")
+        print(
+            f"  Checkpoint contract: task_type={metadata['task_type']}, fps={metadata['fps']}, "
+            f"task={metadata['task']!r}"
+        )
 
     stats = merge_normalization_stats([compute_or_load_normalization_stats(ds) for ds in sub_datasets])
     dataset = sub_datasets[0] if len(sub_datasets) == 1 else torch.utils.data.ConcatDataset(sub_datasets)
@@ -1026,7 +1097,7 @@ def main():
 
         # Periodic checkpoint
         if (step % args.save_steps == 0 or step == args.max_steps) and is_main_process:
-            save_checkpoint(raw_model, ema, config, stats, args.output_dir, step)
+            save_checkpoint(raw_model, ema, config, stats, args.output_dir, step, metadata=metadata)
 
     if pbar is not None:
         pbar.close()
@@ -1034,7 +1105,9 @@ def main():
     # 6. Finalization
     if is_main_process:
         print("\n[5/5] Finalizing training and saving final checkpoints...")
-        save_checkpoint(raw_model, ema, config, stats, args.output_dir, step, is_final=True)
+        save_checkpoint(
+            raw_model, ema, config, stats, args.output_dir, step, is_final=True, metadata=metadata
+        )
 
         print("\n=== Training Complete ===")
         print(f"Checkpoints and normalization statistics saved in: {args.output_dir.resolve()}")

@@ -24,10 +24,10 @@ Example with NexArm:
 ```shell
 lerobot-record \\
     --robot.type=nexarm_follower \\
-    --robot.port=/dev/ttyUSB0 \\
+    --robot.port=/dev/ttyUSB1 \\
     --robot.cameras="{ front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30}, wrist: {type: opencv, index_or_path: 1, width: 640, height: 480, fps: 30}}" \\
     --teleop.type=nexarm_leader \\
-    --teleop.port=/dev/ttyUSB1 \\
+    --teleop.port=/dev/ttyUSB0 \\
     --dataset.repo_id=<my_username>/<my_dataset_name> \\
     --dataset.num_episodes=10 \\
     --dataset.single_task="Pick and place the yellow cube" \\
@@ -128,7 +128,9 @@ class RecordConfig:
     manual_control: bool = False
     # Write routine logs here while showing the manual collection dashboard.
     recording_log: str = "outputs/collection/recording.log"
-    # Merge finished sessions into this local root dataset, preserving prior episodes.
+    # Merge finished sessions into this local root dataset, preserving prior episodes. Compatibility
+    # (fps, robot type, features incl. cameras and resolution) is checked before recording; a root
+    # that exists neither locally nor on the Hub is created by the first session.
     root_repo_id: str | None = None
     merge_root: str | None = None
 
@@ -353,6 +355,17 @@ def record(
         ),
     )
 
+    if cfg.root_repo_id:
+        from lerobot.datasets.collection_merge import check_session_mergeable
+
+        check_session_mergeable(
+            cfg.root_repo_id,
+            Path(cfg.merge_root) if cfg.merge_root else None,
+            fps=cfg.dataset.fps,
+            robot_type=robot.robot_type,
+            features=dataset_features,
+        )
+
     dataset = None
     listener = None
 
@@ -387,7 +400,7 @@ def record(
                 cfg.dataset.repo_id,
                 cfg.dataset.fps,
                 root=cfg.dataset.root,
-                robot_type=robot.name,
+                robot_type=robot.robot_type,
                 features=dataset_features,
                 use_videos=cfg.dataset.video,
                 image_writer_processes=cfg.dataset.num_image_writer_processes,
@@ -532,6 +545,9 @@ def record(
             raise
     if cfg.manual_control:
         show_recording_status(dataset.num_episodes, "FINISHED", str(dataset.root))
+    if dataset is not None:
+        # New sessions get a timestamp suffix; follow-up commands (replay, train) need this exact id.
+        print(f"Dataset repo_id: {dataset.repo_id}\nDataset root: {dataset.root}", flush=True)
     return dataset
 
 
