@@ -7,16 +7,21 @@ from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
+import pytest
 
+from examples.nexarm import generate_sim_dataset as generator_module
 from examples.nexarm.generate_sim_dataset import (
     ARM_JOINTS,
     EpisodeMetrics,
+    FrameRecorder,
     QualityThresholds,
     TrajectoryVariation,
+    arm_raw_limits,
     check_quality,
     generate_episode,
     main as generator_main,
 )
+from lerobot.motors.nexarm.mujoco_mapping import JOINT_MAPPING_VERSION
 from lerobot.robots.nexarm_sim import NexArmPickPlaceTask, NexArmSim, NexArmSimConfig
 
 MODEL_PATH = Path(__file__).resolve().parents[2] / "sim" / "fusion_export" / "scene.xml"
@@ -143,3 +148,45 @@ def test_generator_writes_dataset_report_and_episode_log(tmp_path: Path) -> None
     rows = [json.loads(line) for line in (root / "generation_episodes.jsonl").read_text().splitlines()]
     assert sum(row["accepted"] for row in rows) == 2
     assert all(row["dr_params"] for row in rows)
+
+
+def test_limit_margin_uses_reachable_joint_range() -> None:
+    robot = _connected_robot()
+    try:
+        limits = arm_raw_limits(robot.backend)
+        recorder = FrameRecorder(raw_limits=limits)
+        command = {f"{name}.pos": 2048.0 for name in ARM_JOINTS}
+        command["shoulder_pan.pos"] = limits["shoulder_pan"][0] + 10.0
+        recorder({}, command)
+        # The pan joint saturates near 512 ticks, not at the 0..4095 command range.
+        assert limits["shoulder_pan"][0] > 0
+        assert recorder.metrics.min_limit_margin == pytest.approx(10.0)
+    finally:
+        robot.disconnect()
+
+
+def test_generator_without_cameras_writes_follower_dataset(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        generator_module,
+        "NexArmSimConfig",
+        lambda **kwargs: NexArmSimConfig(**{**kwargs, "camera_names": ()}),
+    )
+    root = tmp_path / "dataset"
+    code = generator_main(
+        ["--repo-id", "local/test_nexarm_sim_gen", "--root", str(root), "--episodes", "1", "--no-video"]
+        + ["--model", str(MODEL_PATH)]
+    )
+    assert code == 0
+    assert json.loads((root / "meta" / "info.json").read_text())["robot_type"] == "nexarm_follower"
+    report = json.loads((root / "generation_report.json").read_text())
+    assert report["domain_randomization"] is True
+    assert report["validation"]["episodes"] == 1
+
+    resume_args = ["--repo-id", "local/test_nexarm_sim_gen", "--root", str(root), "--episodes", "1"]
+    assert generator_main([*resume_args, "--no-video", "--model", str(MODEL_PATH), "--resume"]) == 0
+    report = json.loads((root / "generation_report.json").read_text())
+    assert report["joint_mapping"] == JOINT_MAPPING_VERSION
+    assert report["validation"]["episodes"] == 2
+    assert len(set(report["accepted_seeds"])) == 2

@@ -6,48 +6,60 @@ Example:
     uv run python examples/nexarm/generate_stack_bowls_dataset.py \
         --repo-id local/nexarm_stack_bowls \
         --root outputs/datasets/nexarm_stack_bowls \
-        --episodes 50 --position-jitter-m 0.02 --domain-randomization
+        --episodes 50 --position-jitter-m 0.02
 
-Grasps default to contact-gated assistance (both jaws must touch the bowl).
+Calibrated to a real arm (see calibrate_sim.py), sharded over 2 GPUs, held-out eval split:
+    uv run python examples/nexarm/generate_stack_bowls_dataset.py --calibration outputs/calibration/nexarm.json \
+        --episodes 200 --gpus 0,1 --split eval
+
+Domain randomization (visual, dynamics and every bowl's friction/mass/color) is on by default; --no-dr
+disables it. Grasps default to contact-gated assistance (both jaws must touch the bowl).
 This still assists bowl transport and is not a physical grasp benchmark.
 Use --grasp-mode proximity_assisted only to reproduce the legacy shortcut.
-Generation provenance is stored in meta/generation.jsonl alongside the dataset.
+Provenance goes to ``generation_report.json`` and one line per attempt to ``generation_episodes.jsonl``
+at the dataset root, as in generate_sim_dataset.py.
 """
 
 from __future__ import annotations
 
 import argparse
-import json
 import os
+import platform
+import sys
 from collections import Counter
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-# Select an offscreen renderer before MuJoCo/GLFW are imported on headless hosts.
-if not os.environ.get("DISPLAY"):
+# Select an offscreen renderer before MuJoCo/GLFW are imported on headless Linux hosts.
+if platform.system() == "Linux" and not os.environ.get("DISPLAY"):
     os.environ.setdefault("MUJOCO_GL", "egl")
 
 import mujoco
 import numpy as np
 
+try:  # imported as a package module (tests) or run as a script
+    from examples.nexarm import sim_dataset_utils as utils
+except ModuleNotFoundError:
+    import sim_dataset_utils as utils  # type: ignore[no-redef]
+
 if TYPE_CHECKING:
     from lerobot.datasets.lerobot_dataset import LeRobotDataset
 
-from lerobot.motors.nexarm.nexarm import JOINT_NAMES
+from lerobot.motors.nexarm.nexarm import GRIPPER_CLOSED_POS, GRIPPER_OPEN_POS, JOINT_NAMES
 from lerobot.robots.nexarm_sim import (
     NexArmSim,
     NexArmSimConfig,
     NexArmStackBowlsTask,
     get_task_instruction,
 )
-from lerobot.robots.nexarm_sim.mujoco_backend import HOME_POSITIONS, MUJOCO_JOINTS, RAW_RANGES
+from lerobot.robots.nexarm_sim.mujoco_backend import HOME_POSITIONS, MUJOCO_JOINTS, resolve_model_path
 from lerobot.robots.nexarm_sim.stack_bowls_task import PERMUTATIONS
 from lerobot.utils.constants import ACTION, OBS_STR
 from lerobot.utils.feature_utils import build_dataset_frame, hw_to_dataset_features
 
-OPEN_GRIPPER = float(RAW_RANGES["gripper"][0])  # 1195.0 (wide open: 67.4mm gap)
-CLOSED_GRIPPER = float(RAW_RANGES["gripper"][1])  # 2833.0 (pinched closed: 16.7mm gap)
+OPEN_GRIPPER = float(GRIPPER_OPEN_POS)  # wide open: 67.4mm gap
+CLOSED_GRIPPER = float(GRIPPER_CLOSED_POS)  # pinched closed: 16.7mm gap
 BOWL_RIM_RADIUS = 0.061  # Outer rim radius in meters
 BOWL_RIM_Z_OFFSET = 0.0215  # Height of bowl rim above bowl body center
 JAW_CENTER_OFFSET = np.array([0.0, 0.033, 0.0])  # Jaw collision pad center in gripper_frame
@@ -421,250 +433,27 @@ def generate_episode(
 
 
 def _build_dataset(robot: NexArmSim, args: argparse.Namespace) -> LeRobotDataset:
-    from lerobot.datasets.lerobot_dataset import LeRobotDataset
-
     features = {
         **hw_to_dataset_features(robot.action_features, ACTION, args.video),
         **hw_to_dataset_features(robot.observation_features, OBS_STR, args.video),
     }
-    if args.resume:
-        print(f"[INFO] Resuming existing dataset at {args.root}...")
-        dataset = LeRobotDataset.resume(
-            repo_id=args.repo_id,
-            root=args.root,
-            streaming_encoding=args.video,
-            encoder_queue_maxsize=240,
-            encoder_threads=4 if args.video else None,
-            image_writer_threads=4 if not args.video else 0,
-        )
-        try:
-            if dataset.fps != args.fps:
-                raise ValueError(f"Existing dataset uses {dataset.fps} FPS; requested {args.fps}")
-            for key, feature in features.items():
-                actual = dataset.features.get(key, {})
-                for field in ("dtype", "shape", "names"):
-                    if actual.get(field) != feature.get(field):
-                        raise ValueError(f"Existing dataset feature {key} has incompatible {field}")
-            recorded_keys = {key for key in dataset.features if key.startswith((f"{OBS_STR}.", f"{ACTION}"))}
-            if recorded_keys != set(features):
-                raise ValueError("Existing dataset cameras or action/state features do not match")
-        except BaseException:
-            dataset.finalize()
-            raise
-        return dataset
-
-    return LeRobotDataset.create(
-        repo_id=args.repo_id,
-        fps=args.fps,
-        root=args.root,
-        robot_type=robot.name,
-        features=features,
-        use_videos=args.video,
-        streaming_encoding=args.video,
+    return utils.open_dataset(
+        args,
+        features,
+        robot.robot_type,
         encoder_queue_maxsize=240,
         encoder_threads=4 if args.video else None,
         image_writer_threads=4 if not args.video else 0,
     )
 
 
-def _generation_log(root: Path) -> Path:
-    return root / "meta" / "generation.jsonl"
-
-
-def _next_seed(root: Path, fallback: int) -> int:
-    """Resume beyond reserved attempt ranges, including rejected or interrupted attempts."""
-    path = _generation_log(root)
-    if not path.exists():
-        return fallback
-    with path.open() as stream:
-        return max([fallback, *(int(json.loads(line).get("next_seed", 0)) for line in stream)])
-
-
-def _log_generation(root: Path, record: dict[str, object]) -> None:
-    path = _generation_log(root)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a") as stream:
-        stream.write(json.dumps(record, allow_nan=False) + "\n")
-
-
-def _merge_generation_logs(datasets: list[LeRobotDataset], root: Path) -> None:
-    offset = 0
-    for dataset in datasets:
-        path = _generation_log(Path(dataset.root))
-        if path.exists():
-            with path.open() as stream:
-                for line in stream:
-                    record = json.loads(line)
-                    if record.get("episode_index") is not None:
-                        record["episode_index"] += offset
-                    _log_generation(root, record)
-        offset += dataset.meta.total_episodes
-
-
-def _run_multi_gpu(args: argparse.Namespace, gpu_list: list[str]) -> int:
-    import os
-    import shutil
-    import subprocess
-    import sys
-    import tempfile
-
-    from lerobot.datasets.dataset_tools import merge_datasets
-    from lerobot.datasets.lerobot_dataset import LeRobotDataset
-
-    num_workers = len(gpu_list)
-    episodes_per_worker = [args.episodes // num_workers] * num_workers
-    for i in range(args.episodes % num_workers):
-        episodes_per_worker[i] += 1
-    attempts_per_worker = [args.max_attempts * n // args.episodes for n in episodes_per_worker]
-    for i in range(args.max_attempts - sum(attempts_per_worker)):
-        attempts_per_worker[i] += 1
-
-    temp_shards: list[tuple[str, Path]] = []
-    procs: list[subprocess.Popen] = []
-
-    existing_ds = None
-    if args.resume:
-        if not args.root.is_dir():
-            raise FileNotFoundError(f"Cannot resume missing dataset: {args.root}")
-        existing_ds = LeRobotDataset(args.repo_id, root=args.root)
-    elif args.root.exists():
-        raise FileExistsError(f"Dataset already exists: {args.root}. Use --resume to append.")
-
-    base_seed = args.seed_start
-    if base_seed is None:
-        base_seed = _next_seed(args.root, existing_ds.meta.total_episodes) if existing_ds is not None else 0
-    # Each worker can consume its entire attempt budget without overlapping seeds.
-    args.root.parent.mkdir(parents=True, exist_ok=True)
-    work_root = Path(tempfile.mkdtemp(prefix=f"{args.root.name}_workers_", dir=args.root.parent))
-
-    print(
-        f"[INFO] Launching {num_workers} parallel workers on GPUs {gpu_list} to generate "
-        f"{args.episodes} episodes total ({episodes_per_worker} per worker)..."
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-
-    for worker_idx, (gpu_id, worker_eps) in enumerate(zip(gpu_list, episodes_per_worker, strict=True)):
-        if worker_eps <= 0:
-            continue
-        shard_root = work_root / f"shard_{worker_idx}"
-        shard_repo = f"{args.repo_id}_shard_{worker_idx}"
-        temp_shards.append((shard_repo, shard_root))
-
-        worker_seed = base_seed + sum(attempts_per_worker[:worker_idx])
-
-        cmd = [
-            sys.executable,
-            "-u",
-            str(Path(__file__).resolve()),
-            "--repo-id",
-            shard_repo,
-            "--root",
-            str(shard_root),
-            "--episodes",
-            str(worker_eps),
-            "--max-attempts",
-            str(attempts_per_worker[worker_idx]),
-            "--seed-start",
-            str(worker_seed),
-            "--fps",
-            str(args.fps),
-            "--camera-width",
-            str(args.camera_width),
-            "--camera-height",
-            str(args.camera_height),
-            "--cameras",
-            args.cameras,
-            "--model",
-            str(args.model),
-            "--grasp-mode",
-            args.grasp_mode,
-            "--position-jitter-m",
-            str(args.position_jitter_m),
-        ]
-        if args.order is not None:
-            cmd.extend(["--order", args.order])
-        if args.domain_randomization:
-            cmd.append("--domain-randomization")
-        if not args.video:
-            cmd.append("--no-video")
-
-        env = os.environ.copy()
-        env["PYTHONUNBUFFERED"] = "1"
-        env["MUJOCO_GL"] = "egl"
-        env["MUJOCO_EGL_DEVICE_ID"] = str(gpu_id)
-        env["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
-
-        p = subprocess.Popen(cmd, env=env)
-        procs.append(p)
-
-    failed = False
-    try:
-        for p in procs:
-            if p.wait() != 0:
-                failed = True
-    except BaseException:
-        for p in procs:
-            if p.poll() is None:
-                p.terminate()
-        for p in procs:
-            p.wait()
-        raise
-
-    if failed:
-        print(f"[ERROR] One or more workers failed. Partial datasets preserved at {work_root}")
-        return 1
-
-    print(f"[INFO] All workers completed successfully. Merging {len(temp_shards)} shards into {args.root}...")
-    try:
-        shard_datasets = [LeRobotDataset(repo_id, root=shard_root) for repo_id, shard_root in temp_shards]
-        for shard, count in zip(shard_datasets, (n for n in episodes_per_worker if n > 0), strict=True):
-            if shard.meta.total_episodes != count:
-                raise RuntimeError(f"Worker wrote {shard.meta.total_episodes} episodes; expected {count}")
-        all_to_merge = ([existing_ds] if existing_ds is not None else []) + shard_datasets
-        merged_root = work_root / "merged"
-        merge_datasets(all_to_merge, output_repo_id=args.repo_id, output_dir=merged_root)
-        _merge_generation_logs(all_to_merge, merged_root)
-        # Keep the original available until the complete merged dataset is ready.
-        backup_root = work_root / "original"
-        if existing_ds is not None:
-            args.root.rename(backup_root)
-        try:
-            merged_root.rename(args.root)
-        except BaseException:
-            if backup_root.exists():
-                backup_root.rename(args.root)
-            raise
-    except BaseException:
-        print(f"[ERROR] Merge failed. Worker datasets preserved at {work_root}")
-        raise
-    shutil.rmtree(work_root)
-    print(f"[INFO] Successfully merged into final dataset at {args.root}")
-
-    return 0
-
-
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-id", default="local/nexarm_stack_bowls")
     parser.add_argument("--root", type=Path, default=Path("outputs/datasets/nexarm_stack_bowls"))
     parser.add_argument("--episodes", type=int, default=20, help="Number of accepted episodes to write")
-    parser.add_argument("--max-attempts", type=int, default=None)
-    parser.add_argument(
-        "--gpus",
-        type=str,
-        default=None,
-        help="Comma-separated GPU IDs to parallelize across (e.g. '0,7' or '0,1').",
-    )
-    parser.add_argument(
-        "--resume",
-        action="store_true",
-        help="Resume/append new episodes to an existing dataset without overwriting or deleting it.",
-    )
-    parser.add_argument(
-        "--seed-start",
-        type=int,
-        default=None,
-        help="Starting random seed. If not specified, starts from 0 (or from existing episode count if --resume).",
-    )
     parser.add_argument("--fps", type=int, default=30)
     parser.add_argument("--camera-width", type=int, default=640)
     parser.add_argument("--camera-height", type=int, default=480)
@@ -675,12 +464,6 @@ def parse_args() -> argparse.Namespace:
         help="Comma-separated list of cameras (e.g. 'front,wrist,top')",
     )
     parser.add_argument("--model", type=Path, default=Path("sim/fusion_export/bowl_stack_scene.xml"))
-    parser.add_argument(
-        "--domain-randomization",
-        "--dr",
-        action="store_true",
-        help="Enable Visual and Dynamics Domain Randomization per episode",
-    )
     parser.add_argument(
         "--grasp-mode",
         choices=("contact_assisted", "proximity_assisted"),
@@ -698,85 +481,72 @@ def parse_args() -> argparse.Namespace:
         choices=[",".join(order) for order in PERMUTATIONS],
         help="Fixed bottom,middle,top order; otherwise cycle all six task instructions.",
     )
-    parser.add_argument("--no-video", dest="video", action="store_false")
-    parser.set_defaults(video=True)
-    args = parser.parse_args()
-    if args.max_attempts is None:
-        args.max_attempts = args.episodes * 3
-    for name in ("episodes", "max_attempts", "fps", "camera_width", "camera_height"):
-        if getattr(args, name) <= 0:
-            parser.error(f"--{name.replace('_', '-')} must be positive")
+    utils.add_generation_args(parser)
+    args = parser.parse_args(argv)
     if not np.isfinite(args.position_jitter_m) or not 0 <= args.position_jitter_m <= 0.05:
         parser.error("--position-jitter-m must be between 0 and 0.05")
     camera_names = [name.strip() for name in args.cameras.split(",")]
     if any(not name for name in camera_names) or len(set(camera_names)) != len(camera_names):
         parser.error("--cameras must contain distinct nonempty names")
-    if args.seed_start is not None and args.seed_start < 0:
-        parser.error("--seed-start cannot be negative")
-    if args.max_attempts < args.episodes:
-        parser.error("--max-attempts must be at least --episodes")
-    if args.gpus is not None:
-        gpu_list = [g.strip() for g in args.gpus.split(",")]
-        if any(not g.isdecimal() for g in gpu_list) or len(set(gpu_list)) != len(gpu_list):
-            parser.error("--gpus must contain distinct nonnegative GPU IDs")
+    args.camera_names = tuple(camera_names)
+    utils.finalize_generation_args(parser, args)
     return args
 
 
-def main() -> int:
-    args = parse_args()
+def main(argv: Sequence[str] | None = None) -> int:
+    raw_argv = list(sys.argv[1:] if argv is None else argv)
+    args = parse_args(raw_argv)
 
-    if args.gpus is not None:
-        gpu_list = [g.strip() for g in args.gpus.split(",") if g.strip()]
-        return _run_multi_gpu(args, gpu_list)
+    if args.workers > 1:
+        return utils.run_sharded(
+            Path(__file__).resolve(),
+            raw_argv,
+            repo_id=args.repo_id,
+            root=args.root,
+            episodes=args.episodes,
+            seed_start=args.seed_start,
+            max_attempts=args.max_attempts,
+            workers=args.workers,
+            gpus=args.gpus,
+            split=args.split,
+            resume=args.resume,
+        )
+    if args.gpus:
+        return utils.run_on_gpu(Path(__file__).resolve(), raw_argv, args.gpus[0])
 
-    cam_names = tuple(c.strip() for c in args.cameras.split(",") if c.strip())
     robot = NexArmSim(
         NexArmSimConfig(
             id="synthetic_bowl_generator",
             model_path=args.model,
             fps=args.fps,
-            camera_names=cam_names,
+            camera_names=args.camera_names,
             camera_width=args.camera_width,
             camera_height=args.camera_height,
             settle_steps=0,
+            action_delay_steps=args.action_delay_steps,
             enable_domain_randomization=args.domain_randomization,
+            calibration_path=args.calibration,
         )
     )
+    previous_report = utils.read_report(args.root) if args.resume else None
     dataset = _build_dataset(robot, args)
-    accepted = 0
-    attempts = 0
-
-    if args.seed_start is None:
-        base_seed = _next_seed(args.root, dataset.meta.total_episodes) if args.resume else 0
-    else:
-        base_seed = args.seed_start
+    existing_episodes = dataset.meta.total_episodes
+    episodes_path = args.root / utils.EPISODES_NAME
+    if not args.resume:
+        episodes_path.unlink(missing_ok=True)
+    base_delay, delay_range = utils.delay_schedule(args)
+    order = tuple(args.order.split(",")) if args.order is not None else None
 
     print(
         f"[INFO] Generating {args.episodes} episodes of 3-bowl stacking dataset "
-        f"(resume={args.resume}, starting_seed={base_seed}, total_existing={dataset.meta.total_episodes})..."
+        f"(resume={args.resume}, starting_seed={args.seed_start}, total_existing={existing_episodes})..."
     )
 
-    failures: Counter[str] = Counter()
-    order = tuple(args.order.split(",")) if args.order is not None else None
+    accepted = 0
+    attempts = 0
+    accepted_seeds: list[int] = []
+    rejected_attempts: list[dict[str, int | str]] = []
     try:
-        # Reserve the full seed range before starting, so interrupted runs cannot reuse it.
-        _log_generation(
-            args.root,
-            {
-                "type": "run",
-                "next_seed": base_seed + args.max_attempts,
-                "seed_start": base_seed,
-                "grasp_mode": args.grasp_mode,
-                "position_jitter_m": args.position_jitter_m,
-                "order": order,
-                "domain_randomization": args.domain_randomization,
-                "model": str(args.model),
-                "fps": args.fps,
-                "cameras": cam_names,
-                "camera_width": args.camera_width,
-                "camera_height": args.camera_height,
-            },
-        )
         robot.connect()
         task = NexArmStackBowlsTask(
             robot.backend,
@@ -784,7 +554,9 @@ def main() -> int:
             position_jitter_m=args.position_jitter_m,
         )
         while accepted < args.episodes and attempts < args.max_attempts:
-            seed = base_seed + attempts
+            seed = args.seed_start + attempts
+            delay = utils.episode_delay(seed, base_delay, delay_range)
+            robot.backend.action_delay_steps = delay
 
             bottom, middle, top = order or PERMUTATIONS[seed % len(PERMUTATIONS)]
             current_prompt = get_task_instruction(bottom, middle, top)
@@ -806,31 +578,32 @@ def main() -> int:
                 record_frame=record_frame,
             )
             attempts += 1
-
-            episode_index = dataset.meta.total_episodes if success else None
+            utils.append_jsonl(
+                episodes_path,
+                {
+                    "seed": seed,
+                    "accepted": success,
+                    "reason": reason,
+                    "episode_index": existing_episodes + accepted if success else None,
+                    "action_delay_steps": delay,
+                    "order": task.current_order,
+                    "prompt": current_prompt,
+                    "grasp_mode": args.grasp_mode,
+                    "dr_params": robot.backend.last_domain_params,
+                },
+            )
             if success:
                 dataset.save_episode()
                 accepted += 1
+                accepted_seeds.append(seed)
                 print(
                     f"Accepted episode {accepted}/{args.episodes} (seed={seed}, prompt='{current_prompt}')",
                     flush=True,
                 )
             else:
-                failures[reason] += 1
                 dataset.clear_episode_buffer()
+                rejected_attempts.append({"seed": seed, "reason": reason})
                 print(f"Rejected attempt {attempts} (seed={seed}, reason='{reason}')", flush=True)
-            _log_generation(
-                args.root,
-                {
-                    "type": "attempt",
-                    "seed": seed,
-                    "episode_index": episode_index,
-                    "success": success,
-                    "reason": reason,
-                    "grasp_mode": args.grasp_mode,
-                    "order": task.current_order,
-                },
-            )
     finally:
         try:
             if robot.is_connected:
@@ -838,11 +611,35 @@ def main() -> int:
         finally:
             dataset.finalize()
 
+    total_episodes = existing_episodes + accepted
+    report = utils.base_report(
+        "examples/nexarm/generate_stack_bowls_dataset.py",
+        args,
+        model_path=resolve_model_path(args.model),
+        attempts=attempts,
+        accepted_seeds=accepted_seeds,
+        rejected_attempts=rejected_attempts,
+    )
+    report.update(
+        {
+            "cameras": list(args.camera_names),
+            "grasp_mode": args.grasp_mode,
+            "position_jitter_m": args.position_jitter_m,
+            "order": order,
+        }
+    )
+    if previous_report is not None:
+        report = utils.combine_reports([previous_report, report])
+    if total_episodes:
+        report["validation"] = utils.validate_dataset(args.repo_id, args.root, total_episodes)
+    utils.write_report(args.root, report)
+
     print(
-        f"[INFO] Finished: {accepted}/{args.episodes} episodes written to {args.root} (total dataset episodes: {dataset.meta.total_episodes})",
+        f"[INFO] Finished: {accepted}/{args.episodes} episodes written to {args.root} "
+        f"(total dataset episodes: {total_episodes})",
         flush=True,
     )
-    print(f"[INFO] Rejection counts: {dict(failures)}", flush=True)
+    print(f"[INFO] Rejection counts: {dict(Counter(a['reason'] for a in rejected_attempts))}", flush=True)
     return 0 if accepted >= args.episodes else 1
 
 

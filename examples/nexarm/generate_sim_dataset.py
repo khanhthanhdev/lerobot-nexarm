@@ -21,9 +21,8 @@ Calibrated to a real arm (see calibrate_sim.py), sharded over 4 GPUs, held-out e
 from __future__ import annotations
 
 import argparse
-import json
 import sys
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -38,18 +37,24 @@ except ModuleNotFoundError:
 if TYPE_CHECKING:
     from lerobot.datasets.lerobot_dataset import LeRobotDataset
 
-from lerobot.motors.nexarm.nexarm import JOINT_NAMES
-from lerobot.robots.nexarm_sim import NexArmPickPlaceTask, NexArmSim, NexArmSimConfig, SimCalibration
-from lerobot.robots.nexarm_sim.mujoco_backend import HOME_POSITIONS, RAW_RANGES, resolve_model_path
+from lerobot.motors.nexarm.mujoco_mapping import reachable_raw_range
+from lerobot.motors.nexarm.nexarm import GRIPPER_CLOSED_POS, GRIPPER_OPEN_POS, JOINT_NAMES
+from lerobot.robots.nexarm_sim import NexArmPickPlaceTask, NexArmSim, NexArmSimConfig
+from lerobot.robots.nexarm_sim.mujoco_backend import (
+    HOME_POSITIONS,
+    RAW_RANGES,
+    NexArmMujocoBackend,
+    resolve_model_path,
+)
 from lerobot.utils.constants import ACTION, OBS_STR
 from lerobot.utils.feature_utils import build_dataset_frame, hw_to_dataset_features
 
 DEFAULT_TASK = "Pick up the red cube, place it in the green target zone, and release it."
-OPEN_GRIPPER = float(RAW_RANGES["gripper"][0])
-CLOSED_GRIPPER = float(RAW_RANGES["gripper"][1])
+OPEN_GRIPPER = float(GRIPPER_OPEN_POS)
+CLOSED_GRIPPER = float(GRIPPER_CLOSED_POS)
 ARM_JOINTS = JOINT_NAMES[:-1]
 NUM_STAGES = 10
-SETTLE_TOLERANCE = 15.0  # raw servo units (~1.3 degrees)
+SETTLE_TOLERANCE = 15.0  # raw servo units: 15 * 360 / 4096 ticks per revolution ~= 1.3 degrees
 MIN_SETTLE_STEPS = 3
 # Min-jerk has ~1.9x the peak speed of linear interpolation, which shakes the cube out of the jaws while
 # carrying it, so it is only used for the free-space stages (approach, descend, release, retreat).
@@ -104,7 +109,7 @@ class EpisodeMetrics:
     frames: int = 0
     max_action_delta: float = 0.0  # largest per-step arm command change (raw units)
     max_action_jerk: float = 0.0  # largest per-step change of that change
-    min_limit_margin: float = float("inf")  # closest arm command to a servo limit (raw units)
+    min_limit_margin: float = float("inf")  # closest arm command to a reachable joint limit (raw units)
     final_place_error_m: float = float("nan")
     final_cube_speed: float = float("nan")
 
@@ -120,14 +125,33 @@ class QualityThresholds:
     max_cube_speed: float = 0.05
 
 
-class FrameRecorder:
-    """Tracks quality metrics for each recorded (observation, command) pair and forwards them to a sink."""
+def arm_raw_limits(backend: NexArmMujocoBackend) -> dict[str, tuple[float, float]]:
+    """Raw interval each arm joint can actually reach; commands beyond it saturate at the joint limit."""
+    return {
+        name: reachable_raw_range(name, backend.model.jnt_range[backend._joint_ids[name]])
+        for name in ARM_JOINTS
+    }
 
-    def __init__(self, sink: Callable[[dict[str, object], dict[str, float]], None] | None = None) -> None:
+
+class FrameRecorder:
+    """Tracks quality metrics for each recorded (observation, command) pair and forwards them to a sink.
+
+    ``raw_limits`` are the per-joint reachable raw ranges (see :func:`arm_raw_limits`) used for the
+    joint-limit margin; they default to the full servo command range.
+    """
+
+    def __init__(
+        self,
+        sink: Callable[[dict[str, object], dict[str, float]], None] | None = None,
+        raw_limits: Mapping[str, tuple[float, float]] | None = None,
+    ) -> None:
         self.sink = sink
         self.metrics = EpisodeMetrics()
         self._prev: np.ndarray | None = None
         self._prev_delta: np.ndarray | None = None
+        limits = raw_limits or RAW_RANGES
+        self._low = np.array([limits[name][0] for name in ARM_JOINTS], dtype=np.float64)
+        self._high = np.array([limits[name][1] for name in ARM_JOINTS], dtype=np.float64)
 
     def __call__(self, observation: dict[str, object], action: dict[str, float]) -> None:
         arm = np.array([action[f"{name}.pos"] for name in ARM_JOINTS])
@@ -142,10 +166,8 @@ class FrameRecorder:
                 )
             self._prev_delta = delta
         self._prev = arm
-        low = np.array([RAW_RANGES[name][0] for name in ARM_JOINTS])
-        high = np.array([RAW_RANGES[name][1] for name in ARM_JOINTS])
         metrics.min_limit_margin = min(
-            metrics.min_limit_margin, float(np.minimum(arm - low, high - arm).min())
+            metrics.min_limit_margin, float(np.minimum(arm - self._low, self._high - arm).min())
         )
         if self.sink is not None:
             self.sink(observation, action)
@@ -331,20 +353,14 @@ def generate_episode(
 
 
 def _build_dataset(robot: NexArmSim, args: argparse.Namespace) -> LeRobotDataset:
-    from lerobot.datasets.lerobot_dataset import LeRobotDataset
-
     features = {
         **hw_to_dataset_features(robot.action_features, ACTION, args.video),
         **hw_to_dataset_features(robot.observation_features, OBS_STR, args.video),
     }
-    return LeRobotDataset.create(
-        repo_id=args.repo_id,
-        fps=args.fps,
-        root=args.root,
-        robot_type=robot.name,
-        features=features,
-        use_videos=args.video,
-        streaming_encoding=args.video,
+    return utils.open_dataset(
+        args,
+        features,
+        robot.robot_type,
         encoder_queue_maxsize=120,
         encoder_threads=2 if args.video else None,
         image_writer_threads=4 if not args.video else 0,
@@ -358,33 +374,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--repo-id", default="local/nexarm_sim_pick_place")
     parser.add_argument("--root", type=Path, default=Path("outputs/datasets/nexarm_sim_pick_place"))
     parser.add_argument("--episodes", type=int, default=20, help="Number of accepted episodes to write")
-    parser.add_argument("--max-attempts", type=int, default=None)
-    parser.add_argument(
-        "--split",
-        choices=("train", "eval"),
-        default="train",
-        help=f"train seeds are < {utils.EVAL_SEED_OFFSET}; eval seeds start at {utils.EVAL_SEED_OFFSET}",
-    )
-    parser.add_argument("--seed-start", type=int, default=None, help="Defaults to the start of the split")
     parser.add_argument("--fps", type=int, default=30)
     parser.add_argument("--camera-width", type=int, default=640)
     parser.add_argument("--camera-height", type=int, default=480)
     parser.add_argument("--model", type=Path, default=Path("sim/fusion_export/scene.xml"))
     parser.add_argument("--task", default=DEFAULT_TASK)
     parser.add_argument("--trace", action="store_true")
-    parser.add_argument(
-        "--no-dr",
-        dest="domain_randomization",
-        action="store_false",
-        help="Disable per-episode visual and dynamics domain randomization (on by default)",
-    )
-    parser.add_argument(
-        "--dr",
-        "--domain-randomization",
-        dest="_dr_alias",
-        action="store_true",
-        help="No-op; DR is the default",
-    )
     parser.add_argument(
         "--no-variation", dest="variation", action="store_false", help="Use the nominal trajectory"
     )
@@ -395,51 +390,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default=0.0,
         help="Std (raw servo units, try 3-5) of correlated noise on executed arm commands; labels stay clean",
     )
-    parser.add_argument(
-        "--calibration", type=Path, default=None, help="SimCalibration JSON from calibrate_sim.py"
-    )
-    parser.add_argument(
-        "--action-delay-steps",
-        type=int,
-        default=None,
-        help="Action transport delay in control steps (e.g. 1=33ms). Defaults to the calibration, else 0",
-    )
-    parser.add_argument(
-        "--action-delay-range",
-        type=int,
-        nargs=2,
-        metavar=("MIN", "MAX"),
-        default=None,
-        help="Sample the delay per episode in [MIN, MAX]. With --calibration defaults to calibrated +-1",
-    )
-    parser.add_argument("--workers", type=int, default=1, help="Parallel shard processes")
-    parser.add_argument("--gpus", type=str, default=None, help="Comma-separated GPU ids for EGL rendering")
-    parser.add_argument("--no-video", dest="video", action="store_false")
-    parser.set_defaults(video=True, domain_randomization=True)
+    utils.add_generation_args(parser)
     args = parser.parse_args(argv)
-    if args.episodes <= 0 or args.fps <= 0:
-        parser.error("--episodes and --fps must be positive")
-    if args.camera_width <= 0 or args.camera_height <= 0:
-        parser.error("camera dimensions must be positive")
-    if args.action_delay_steps is not None and args.action_delay_steps < 0:
-        parser.error("--action-delay-steps cannot be negative")
-    if (
-        args.action_delay_range is not None
-        and not 0 <= args.action_delay_range[0] <= args.action_delay_range[1]
-    ):
-        parser.error("--action-delay-range must satisfy 0 <= MIN <= MAX")
-    if args.action_noise < 0 or args.layout_scale <= 0 or args.workers <= 0:
-        parser.error("--action-noise must be >= 0; --layout-scale and --workers must be positive")
-    if args.max_attempts is None:
-        args.max_attempts = args.episodes * 3
-    if args.max_attempts < args.episodes:
-        parser.error("--max-attempts cannot be smaller than --episodes")
-    if args.seed_start is None:
-        args.seed_start = utils.EVAL_SEED_OFFSET if args.split == "eval" else 0
-    try:
-        utils.validate_seed_range(args.split, args.seed_start, args.max_attempts)
-    except ValueError as error:
-        parser.error(str(error))
+    if args.action_noise < 0 or args.layout_scale <= 0:
+        parser.error("--action-noise must be >= 0 and --layout-scale must be positive")
+    utils.finalize_generation_args(parser, args)
     return args
 
 
@@ -448,7 +403,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(raw_argv)
 
     if args.workers > 1:
-        gpus = [g.strip() for g in args.gpus.split(",") if g.strip()] if args.gpus else None
         return utils.run_sharded(
             Path(__file__).resolve(),
             raw_argv,
@@ -458,9 +412,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             seed_start=args.seed_start,
             max_attempts=args.max_attempts,
             workers=args.workers,
-            gpus=gpus,
+            gpus=args.gpus,
             split=args.split,
+            resume=args.resume,
         )
+    if args.gpus:
+        return utils.run_on_gpu(Path(__file__).resolve(), raw_argv, args.gpus[0])
 
     robot = NexArmSim(
         NexArmSimConfig(
@@ -470,23 +427,23 @@ def main(argv: Sequence[str] | None = None) -> int:
             camera_width=args.camera_width,
             camera_height=args.camera_height,
             settle_steps=0,
+            action_delay_steps=args.action_delay_steps,
             enable_domain_randomization=args.domain_randomization,
             calibration_path=args.calibration,
         )
     )
+    previous_report = utils.read_report(args.root) if args.resume else None
     dataset = _build_dataset(robot, args)
+    existing_episodes = dataset.meta.total_episodes
     robot.connect()
     task = NexArmPickPlaceTask(robot.backend, layout_scale=args.layout_scale)
-    calibrated_delay = SimCalibration.load(args.calibration).action_delay_steps if args.calibration else None
-    base_delay = args.action_delay_steps if args.action_delay_steps is not None else (calibrated_delay or 0)
-    delay_range = args.action_delay_range
-    if delay_range is None and calibrated_delay is not None and args.action_delay_steps is None:
-        delay_range = (max(0, calibrated_delay - 1), calibrated_delay + 1)
+    raw_limits = arm_raw_limits(robot.backend)
+    base_delay, delay_range = utils.delay_schedule(args)
 
     limits = QualityThresholds()
-    args.root.mkdir(parents=True, exist_ok=True)
     episodes_path = args.root / utils.EPISODES_NAME
-    episodes_path.unlink(missing_ok=True)
+    if not args.resume:
+        episodes_path.unlink(missing_ok=True)
     accepted = 0
     attempts = 0
     accepted_seeds: list[int] = []
@@ -501,15 +458,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         while accepted < args.episodes and attempts < args.max_attempts:
             seed = args.seed_start + attempts
-            delay_rng = np.random.default_rng([seed, 3])
-            delay = (
-                int(delay_rng.integers(delay_range[0], delay_range[1] + 1))
-                if delay_range is not None
-                else base_delay
-            )
+            delay = utils.episode_delay(seed, base_delay, delay_range)
             robot.backend.action_delay_steps = delay
             variation = TrajectoryVariation.sample(seed) if args.variation else TrajectoryVariation()
-            recorder = FrameRecorder(sink)
+            recorder = FrameRecorder(sink, raw_limits)
 
             success, reason = generate_episode(
                 robot,
@@ -535,7 +487,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "seed": seed,
                 "accepted": success,
                 "reason": reason,
-                "episode_index": accepted if success else None,
+                "episode_index": existing_episodes + accepted if success else None,
                 "action_delay_steps": delay,
                 "variation": variation,
                 "dr_params": robot.backend.last_domain_params,
@@ -557,33 +509,26 @@ def main(argv: Sequence[str] | None = None) -> int:
         dataset.finalize()
 
     model_path = resolve_model_path(args.model)
-    report = {
-        "generator": "examples/nexarm/generate_sim_dataset.py",
-        "provenance": utils.collect_provenance(vars(args), model_path, args.calibration),
-        "model_path": str(model_path),
-        "model_sha256": utils.sha256_file(model_path),
-        "repo_id": args.repo_id,
-        "split": args.split,
-        "fps": args.fps,
-        "camera_width": args.camera_width,
-        "camera_height": args.camera_height,
-        "video": args.video,
-        "requested_episodes": args.episodes,
-        "attempts": attempts,
-        "acceptance_rate": accepted / max(1, attempts),
-        "accepted_seeds": accepted_seeds,
-        "rejected_attempts": rejected_attempts,
-        "quality_thresholds": limits,
-        "stats": {
-            "frames": utils.summarize([m.frames for m in accepted_metrics]),
-            "max_action_jerk": utils.summarize([m.max_action_jerk for m in accepted_metrics]),
-            "place_error_m": utils.summarize([m.final_place_error_m for m in accepted_metrics]),
-        },
+    report = utils.base_report(
+        "examples/nexarm/generate_sim_dataset.py",
+        args,
+        model_path=model_path,
+        attempts=attempts,
+        accepted_seeds=accepted_seeds,
+        rejected_attempts=rejected_attempts,
+    )
+    report["quality_thresholds"] = limits
+    report["stats"] = {
+        "frames": utils.summarize([m.frames for m in accepted_metrics]),
+        "max_action_jerk": utils.summarize([m.max_action_jerk for m in accepted_metrics]),
+        "place_error_m": utils.summarize([m.final_place_error_m for m in accepted_metrics]),
     }
-    if accepted:
-        report["validation"] = utils.validate_dataset(args.repo_id, args.root, accepted)
-    report_path = args.root / utils.REPORT_NAME
-    report_path.write_text(json.dumps(utils.to_jsonable(report), indent=2) + "\n", encoding="utf-8")
+    if previous_report is not None:
+        report = utils.combine_reports([previous_report, report])
+    total_episodes = existing_episodes + accepted
+    if total_episodes:
+        report["validation"] = utils.validate_dataset(args.repo_id, args.root, total_episodes)
+    utils.write_report(args.root, report)
     print(f"wrote {accepted} episode(s) from {attempts} attempt(s) to {args.root}")
     return 0 if accepted == args.episodes else 1
 

@@ -25,7 +25,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--model",
         type=Path,
-        default=Path("sim/fusion_export/scene_stack_bowls.xml"),
+        default=Path("sim/fusion_export/bowl_stack_scene.xml"),
         help="Path to MuJoCo scene XML",
     )
     parser.add_argument("--fps", type=int, default=30, help="Simulation frame rate")

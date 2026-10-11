@@ -5,8 +5,9 @@
 Replays the recorded real ``action`` stream of each episode through the simulator, starting from the real
 initial pose, and compares the simulated joint trajectory with the real ``observation.state``. It fits
 the action delay and per-joint ``kp`` / damping / frictionloss scales (and their spread, used as the
-domain-randomization range) and writes a ``SimCalibration`` JSON that ``generate_sim_dataset.py`` and
-``NexArmSimConfig.calibration_path`` accept.
+domain-randomization range) and writes a ``SimCalibration`` JSON that ``generate_sim_dataset.py``,
+``generate_stack_bowls_dataset.py`` and ``NexArmSimConfig.calibration_path`` accept. The file records the
+fitted ``fps`` (loaders refuse another run fps) and ``fitted_joints``.
 
 For the cleanest fit, record a few object-free episodes that sweep each joint through its range
 (e.g. with teleoperate/record). Contact-rich frames (a grasped cube) bias the gripper fit, so the gripper is
@@ -281,6 +282,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         "fitted_joints": args.joints,
         "rmse_raw_units": {name: values.tolist() for name, values in columns.items()},
     }
+    # Loaders refuse a calibration fitted at another fps and only re-centre DR on the fitted joints.
+    calibration.fps = fps
+    calibration.fitted_joints = list(args.joints)
     calibration.save(args.out)
 
     print(f"\naction_delay_steps = {calibration.action_delay_steps}")
