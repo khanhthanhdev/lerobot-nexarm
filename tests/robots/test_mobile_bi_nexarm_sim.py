@@ -9,6 +9,8 @@ import mujoco
 import numpy as np
 import pytest
 
+from lerobot.motors.nexarm.mujoco_mapping import reachable_raw_range
+from lerobot.motors.nexarm.nexarm import raw_to_radians
 from lerobot.robots.mobile_bi_nexarm_sim import (
     ARM_FEATURES,
     STATE_ACTION_NAMES,
@@ -51,7 +53,15 @@ def test_canonical_contract_order_and_round_trip() -> None:
         "lift_axis.height_mm",
     )
     for joint in contract.joints:
-        for raw in (joint.raw_range[0], joint.home_raw, joint.raw_range[1]):
+        low, high = joint.raw_range
+        if joint.feature != "gripper":
+            # Arm joints use the servo constant, so raw values beyond the joint limits saturate.
+            low, high = reachable_raw_range(joint.feature, joint.sim_range)
+            assert joint.raw_to_sim(joint.home_raw) == pytest.approx(0.0)
+            assert joint.raw_to_sim(joint.raw_range[0]) == pytest.approx(
+                max(joint.sim_range[0], raw_to_radians(joint.raw_range[0]))
+            )
+        for raw in (low, joint.home_raw, high):
             assert joint.sim_to_raw(joint.raw_to_sim(raw)) == pytest.approx(raw)
     home_fk = contract.forward_kinematics(
         "left", {joint.feature: joint.home_raw for joint in contract.joints}

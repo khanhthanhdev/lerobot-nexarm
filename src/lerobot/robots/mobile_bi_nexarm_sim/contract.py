@@ -13,6 +13,8 @@ from typing import Any
 import numpy as np
 import numpy.typing as npt
 
+from lerobot.motors.nexarm.mujoco_mapping import joint_position_to_raw, raw_to_joint_position
+
 ARM_FEATURES = (
     "shoulder_pan",
     "shoulder_lift",
@@ -51,11 +53,17 @@ class JointContract:
 
     def raw_to_sim(self, raw: float) -> float:
         raw_low, raw_high = self.raw_range
+        clamped = min(max(float(raw), raw_low), raw_high)
+        if self.feature != "gripper":
+            # Arm joints share the single-arm servo-constant conversion, clamped to the joint range.
+            return raw_to_joint_position(self.feature, clamped, self.sim_range)
         sim_low, sim_high = self.sim_range
-        ratio = (min(max(float(raw), raw_low), raw_high) - raw_low) / (raw_high - raw_low)
+        ratio = (clamped - raw_low) / (raw_high - raw_low)
         return sim_low + ratio * (sim_high - sim_low)
 
     def sim_to_raw(self, value: float) -> float:
+        if self.feature != "gripper":
+            return joint_position_to_raw(self.feature, value, self.sim_range)
         sim_low, sim_high = self.sim_range
         raw_low, raw_high = self.raw_range
         ratio = (min(max(float(value), sim_low), sim_high) - sim_low) / (sim_high - sim_low)

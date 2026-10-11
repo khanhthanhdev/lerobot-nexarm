@@ -23,24 +23,23 @@ import mujoco
 import numpy as np
 import numpy.typing as npt
 
-from lerobot.motors.nexarm.nexarm import JOINT_NAMES, POSITION_MAX, POSITION_MIN
+from lerobot.motors.nexarm.mujoco_mapping import (
+    HOME_POSITIONS,
+    MUJOCO_JOINTS,
+    RAW_RANGES,
+    joint_position_to_raw,
+    raw_to_joint_position,
+)
+from lerobot.motors.nexarm.nexarm import JOINT_NAMES
 
-MUJOCO_JOINTS = {
-    "shoulder_pan": "joint_1_base_to_link_1",
-    "shoulder_lift": "joint_2_link_1_to_link_2",
-    "elbow_flex": "joint_3_link_2_to_link_3",
-    "wrist_flex": "joint_4_link_3_to_link_4",
-    "wrist_roll": "joint_5_link_4_to_link_5",
-    "gripper": "right_jaw_slide_joint",
-}
-
-# The physical follower accepts 0..4095 for every servo. Its leader mapping
-# deliberately restricts the useful gripper command range to 1195..2833.
-RAW_RANGES: dict[str, tuple[int, int]] = dict.fromkeys(JOINT_NAMES[:-1], (POSITION_MIN, POSITION_MAX))
-RAW_RANGES["gripper"] = (1195, 2833)
-
-HOME_POSITIONS: dict[str, float] = dict.fromkeys(JOINT_NAMES[:-1], 2048.0)
-HOME_POSITIONS["gripper"] = 2833.0
+__all__ = [
+    "HOME_POSITIONS",
+    "MUJOCO_JOINTS",
+    "RAW_RANGES",
+    "DomainRandomizationRanges",
+    "NexArmMujocoBackend",
+    "resolve_model_path",
+]
 
 
 def resolve_model_path(model_path: Path | str) -> Path:
@@ -66,15 +65,18 @@ def resolve_model_path(model_path: Path | str) -> Path:
 class DomainRandomizationRanges:
     """Sampling ranges for per-episode domain randomization.
 
-    Joint scales multiply the (possibly calibrated) nominal damping/frictionloss.
+    Joint scales multiply the (possibly calibrated) nominal damping/frictionloss. Object ranges apply to
+    every free-floating task object (``object_bodies``; ``None`` selects all bodies with a free joint).
     """
 
     camera_pos_m: float = 0.012
     camera_fovy_deg: float = 1.5
     camera_rot_rad: float = 0.035
     light_scale: tuple[float, float] = (0.75, 1.35)
-    cube_friction: tuple[float, float] = (0.8, 2.2)
-    cube_mass_scale: tuple[float, float] = (0.8, 1.25)
+    object_bodies: tuple[str, ...] | None = None
+    object_friction: tuple[float, float] = (0.8, 2.2)
+    object_mass_scale: tuple[float, float] = (0.8, 1.25)
+    object_rgb_jitter: float = 0.12
     joint_damping_scale: dict[str, tuple[float, float]] = field(
         default_factory=lambda: dict.fromkeys(JOINT_NAMES, (0.8, 1.25))
     )
@@ -157,33 +159,32 @@ class NexArmMujocoBackend:
         self._nominal_geom_friction = self.model.geom_friction.copy()
         self._nominal_geom_rgba = self.model.geom_rgba.copy()
         self._nominal_body_mass = self.model.body_mass.copy()
+        self._nominal_body_inertia = self.model.body_inertia.copy()
 
+        # Shrink the physics timestep slightly so an integer number of steps spans exactly one frame.
         control_period = 1.0 / fps
         self.steps_per_action = max(1, round(control_period / self.model.opt.timestep))
-
-    def _control_range(self, feature_name: str) -> tuple[float, float]:
-        actuator_id = self._actuator_ids[feature_name]
-        low, high = self.model.actuator_ctrlrange[actuator_id]
-        return float(low), float(high)
+        self.model.opt.timestep = control_period / self.steps_per_action
 
     def raw_to_control(self, feature_name: str, raw_position: float) -> float:
-        raw_low, raw_high = RAW_RANGES[feature_name]
-        raw_position = float(np.clip(raw_position, raw_low, raw_high))
-        control_low, control_high = self._control_range(feature_name)
-        if feature_name == "gripper":
-            ratio = (raw_high - raw_position) / (raw_high - raw_low)
-        else:
-            ratio = (raw_position - raw_low) / (raw_high - raw_low)
-        return control_low + ratio * (control_high - control_low)
+        joint_range = self.model.jnt_range[self._joint_ids[feature_name]]
+        return raw_to_joint_position(feature_name, raw_position, joint_range)
 
     def control_to_raw(self, feature_name: str, control_position: float) -> float:
-        control_low, control_high = self._control_range(feature_name)
-        control_position = float(np.clip(control_position, control_low, control_high))
-        raw_low, raw_high = RAW_RANGES[feature_name]
-        ratio = (control_position - control_low) / (control_high - control_low)
-        if feature_name == "gripper":
-            return raw_high - ratio * (raw_high - raw_low)
-        return raw_low + ratio * (raw_high - raw_low)
+        joint_range = self.model.jnt_range[self._joint_ids[feature_name]]
+        return joint_position_to_raw(feature_name, control_position, joint_range)
+
+    def clamp_action(self, action: Mapping[str, float]) -> dict[str, float]:
+        """Validate a raw action and clip every joint to the command range the follower accepts."""
+        missing = [f"{name}.pos" for name in JOINT_NAMES if f"{name}.pos" not in action]
+        if missing:
+            raise KeyError(f"NexArm simulation action is missing keys: {missing}")
+        clamped: dict[str, float] = {}
+        for feature_name in JOINT_NAMES:
+            key = f"{feature_name}.pos"
+            raw_low, raw_high = RAW_RANGES[feature_name]
+            clamped[key] = float(np.clip(float(action[key]), raw_low, raw_high))
+        return clamped
 
     def randomize_domain(self, rng: np.random.Generator | None = None) -> dict[str, object]:
         """Apply Visual and Dynamics Domain Randomization and return the sampled parameters."""
@@ -235,31 +236,37 @@ class NexArmMujocoBackend:
             )
         params["light_scale"] = light_scale
 
-        # 3. Floor & Cube visual / physical properties
+        # 3. Floor & task-object visual / physical properties
         floor_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, "floor")
         if floor_id >= 0:
             floor_rgb = rng.uniform(0.65, 0.95, size=3)
             self.model.geom_rgba[floor_id, :3] = floor_rgb
             params["floor_rgb"] = floor_rgb.tolist()
 
-        cube_geom_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, "cube_collision")
-        if cube_geom_id >= 0:
-            cube_rgb = np.clip(
-                self._nominal_geom_rgba[cube_geom_id, :3] + rng.uniform(-0.12, 0.12, size=3),
-                0.0,
-                1.0,
-            )
-            self.model.geom_rgba[cube_geom_id, :3] = cube_rgb
-            cube_friction = float(rng.uniform(*ranges.cube_friction))
-            self.model.geom_friction[cube_geom_id, 0] = cube_friction
-            params["cube_rgb"] = cube_rgb.tolist()
-            params["cube_friction"] = cube_friction
-
-        cube_body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "cube")
-        if cube_body_id >= 0:
-            mass_scale = float(rng.uniform(*ranges.cube_mass_scale))
-            self.model.body_mass[cube_body_id] = self._nominal_body_mass[cube_body_id] * mass_scale
-            params["cube_mass_scale"] = mass_scale
+        objects: dict[str, dict[str, object]] = {}
+        for body_name, body_id in self._object_body_ids(ranges.object_bodies).items():
+            friction = float(rng.uniform(*ranges.object_friction))
+            mass_scale = float(rng.uniform(*ranges.object_mass_scale))
+            rgb_delta = rng.uniform(-ranges.object_rgb_jitter, ranges.object_rgb_jitter, size=3)
+            colored = False
+            for geom_id in np.flatnonzero(self.model.geom_bodyid == body_id):
+                if self.model.geom_contype[geom_id] or self.model.geom_conaffinity[geom_id]:
+                    self.model.geom_friction[geom_id, 0] = friction
+                # Material colors (e.g. the bowl colors named in the task prompt) stay fixed;
+                # only visible geoms colored by their own rgba are jittered.
+                if self.model.geom_matid[geom_id] < 0 and self.model.geom_group[geom_id] < 3:
+                    self.model.geom_rgba[geom_id, :3] = np.clip(
+                        self._nominal_geom_rgba[geom_id, :3] + rgb_delta, 0.0, 1.0
+                    )
+                    colored = True
+            self.model.body_mass[body_id] = self._nominal_body_mass[body_id] * mass_scale
+            self.model.body_inertia[body_id] = self._nominal_body_inertia[body_id] * mass_scale
+            objects[body_name] = {
+                "friction": friction,
+                "mass_scale": mass_scale,
+                "rgb_delta": rgb_delta.tolist() if colored else None,
+            }
+        params["objects"] = objects
 
         # 4. Joint dynamics (damping & frictionloss)
         joints: dict[str, dict[str, float]] = {}
@@ -273,12 +280,31 @@ class NexArmMujocoBackend:
         params["joints"] = joints
         return params
 
+    def _object_body_ids(self, names: tuple[str, ...] | None) -> dict[str, int]:
+        """Task objects to randomize: the named bodies, or every body that owns a free joint."""
+        if names is not None:
+            ids = {name: mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, name) for name in names}
+            missing = sorted(name for name, body_id in ids.items() if body_id < 0)
+            if missing:
+                raise ValueError(f"MuJoCo model is missing domain-randomized object bodies: {missing}")
+            return ids
+        free_bodies = {
+            int(self.model.jnt_bodyid[joint_id])
+            for joint_id in range(self.model.njnt)
+            if self.model.jnt_type[joint_id] == mujoco.mjtJoint.mjJNT_FREE
+        }
+        return {
+            mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_BODY, body_id) or f"body_{body_id}": body_id
+            for body_id in sorted(free_bodies)
+        }
+
     def snapshot_nominal_dynamics(self) -> None:
         """Adopt the current dynamics as the nominal values that domain randomization perturbs."""
         self._nominal_dof_damping = self.model.dof_damping.copy()
         self._nominal_dof_frictionloss = self.model.dof_frictionloss.copy()
         self._nominal_geom_friction = self.model.geom_friction.copy()
         self._nominal_body_mass = self.model.body_mass.copy()
+        self._nominal_body_inertia = self.model.body_inertia.copy()
 
     def reset_domain(self) -> None:
         """Restore nominal camera, lighting, material, and dynamics parameters."""
@@ -293,6 +319,7 @@ class NexArmMujocoBackend:
         self.model.geom_friction[:] = self._nominal_geom_friction
         self.model.geom_rgba[:] = self._nominal_geom_rgba
         self.model.body_mass[:] = self._nominal_body_mass
+        self.model.body_inertia[:] = self._nominal_body_inertia
 
     def reset(self, settle_steps: int = 0, rng: np.random.Generator | None = None) -> None:
         if self.enable_domain_randomization:
@@ -336,27 +363,19 @@ class NexArmMujocoBackend:
         mujoco.mj_forward(self.model, self.data)
 
     def set_action(self, action: Mapping[str, float]) -> dict[str, float]:
-        missing = [f"{name}.pos" for name in JOINT_NAMES if f"{name}.pos" not in action]
-        if missing:
-            raise KeyError(f"NexArm simulation action is missing keys: {missing}")
-
-        sent: dict[str, float] = {}
+        sent = self.clamp_action(action)
         for feature_name in JOINT_NAMES:
-            key = f"{feature_name}.pos"
-            raw_low, raw_high = RAW_RANGES[feature_name]
-            raw_position = float(np.clip(float(action[key]), raw_low, raw_high))
-            self.data.ctrl[self._actuator_ids[feature_name]] = self.raw_to_control(feature_name, raw_position)
-            sent[key] = raw_position
+            self.data.ctrl[self._actuator_ids[feature_name]] = self.raw_to_control(
+                feature_name, sent[f"{feature_name}.pos"]
+            )
         return sent
 
     def step(self, action: Mapping[str, float] | None = None) -> dict[str, float] | None:
+        """Advance one control period; returns the action applied this tick (delayed when latency is set)."""
         if action is not None:
             if self.action_delay_steps > 0:
-                self._action_queue.append(
-                    {f"{name}.pos": float(action[f"{name}.pos"]) for name in JOINT_NAMES}
-                )
-                action_to_apply = self._action_queue.popleft()
-                sent = self.set_action(action_to_apply)
+                self._action_queue.append(self.clamp_action(action))
+                sent = self.set_action(self._action_queue.popleft())
             else:
                 sent = self.set_action(action)
         else:

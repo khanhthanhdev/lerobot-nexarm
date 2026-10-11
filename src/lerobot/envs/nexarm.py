@@ -22,6 +22,11 @@ import numpy as np
 from gymnasium import spaces
 
 from lerobot.motors.nexarm.nexarm import JOINT_NAMES
+from lerobot.robots.nexarm_sim.calibration import (
+    SimCalibration,
+    apply_calibration,
+    resolve_action_delay_steps,
+)
 from lerobot.robots.nexarm_sim.mujoco_backend import (
     RAW_RANGES,
     NexArmMujocoBackend,
@@ -59,6 +64,9 @@ class NexArmPickPlaceEnv(gym.Env):
         target_radius_m: float = 0.05,
         success_hold_s: float = 0.5,
         control_mode: Literal["raw", "normalized"] = "raw",
+        calibration_path: Path | str | None = None,
+        enable_domain_randomization: bool = False,
+        action_delay_steps: int | None = None,
     ) -> None:
         super().__init__()
         self.obs_type = obs_type
@@ -86,7 +94,19 @@ class NexArmPickPlaceEnv(gym.Env):
             camera_width=self.observation_width,
             camera_height=self.observation_height,
             camera_names=("front", "wrist", "top"),
+            action_delay_steps=resolve_action_delay_steps(action_delay_steps, None),
+            enable_domain_randomization=enable_domain_randomization,
         )
+        if calibration_path is not None:
+            try:
+                apply_calibration(
+                    self.backend,
+                    SimCalibration.load(calibration_path),
+                    action_delay_steps=action_delay_steps,
+                )
+            except BaseException:
+                self.backend.close()
+                raise
         self.task = NexArmPickPlaceTask(
             self.backend,
             target_radius_m=self.target_radius_m,
@@ -315,8 +335,9 @@ class NexArmPickPlaceEnv(gym.Env):
     ) -> tuple[dict[str, np.ndarray], float, bool, bool, dict[str, Any]]:
         self._step_count += 1
         raw_action = self._action_to_raw(action)
-        self.backend.set_action(raw_action)
-        status = self.task.step()
+        # Step through the backend so calibrated action latency applies, then evaluate the task.
+        self.backend.step(raw_action)
+        status = self.task.observe()
 
         obs = self._get_obs()
         reward = self._compute_reward(status)

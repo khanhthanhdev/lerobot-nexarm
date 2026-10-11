@@ -9,7 +9,12 @@ from dataclasses import dataclass
 import mujoco
 import numpy as np
 
-from .mujoco_backend import RAW_RANGES, NexArmMujocoBackend
+from lerobot.motors.nexarm.nexarm import GRIPPER_CLOSED_POS, GRIPPER_OPEN_POS
+
+from .mujoco_backend import NexArmMujocoBackend
+
+# The cube counts as released once the measured gripper is within 15% of the open end of its travel.
+GRIPPER_RELEASED_MAX_POS = GRIPPER_OPEN_POS + 0.15 * (GRIPPER_CLOSED_POS - GRIPPER_OPEN_POS)
 
 
 @dataclass(frozen=True)
@@ -173,9 +178,7 @@ class NexArmPickPlaceTask:
     def _is_released(self) -> bool:
         gripper_joint_id = self.backend._joint_ids["gripper"]
         qpos = float(self.backend.data.qpos[self.backend.model.jnt_qposadr[gripper_joint_id]])
-        raw = self.backend.control_to_raw("gripper", qpos)
-        low, high = RAW_RANGES["gripper"]
-        return raw <= low + 0.15 * (high - low)
+        return self.backend.control_to_raw("gripper", qpos) <= GRIPPER_RELEASED_MAX_POS
 
     def _is_grasped(self) -> bool:
         touched: set[int] = set()

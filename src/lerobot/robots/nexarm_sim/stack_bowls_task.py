@@ -13,6 +13,12 @@ import numpy as np
 
 from .mujoco_backend import NexArmMujocoBackend
 
+# Grasp-assist hysteresis on the commanded raw gripper target, inside GRIPPER_OPEN_POS..
+# GRIPPER_CLOSED_POS. A command above the engage threshold (towards closed) may attach a bowl;
+# one below the release threshold (towards open) drops it.
+GRIPPER_ASSIST_ENGAGE_POS = 2400
+GRIPPER_ASSIST_RELEASE_POS = 1600
+
 COLORS = ("red", "blue", "black")
 PERMUTATIONS: list[tuple[str, str, str]] = list(itertools.permutations(COLORS))
 # 6 permutations:
@@ -182,7 +188,7 @@ class NexArmStackBowlsTask:
         site_pos = self.backend.data.site_xpos[site_id].copy()
         site_mat = self.backend.data.site_xmat[site_id].reshape(3, 3).copy()
 
-        if gripper_ctrl > 2400:  # Gripper commanded closed (towards 2833)
+        if gripper_ctrl > GRIPPER_ASSIST_ENGAGE_POS:  # commanded towards closed
             if self.held_bowl is None:
                 candidate_colors = [self.target_bowl] if self.target_bowl is not None else COLORS
                 closest_c = None
@@ -207,7 +213,7 @@ class NexArmStackBowlsTask:
                 target_bpos = site_pos + site_mat @ self.held_rel_pos
                 self.backend.data.qpos[qadr : qadr + 3] = target_bpos
                 self.backend.data.qvel[dofadr : dofadr + 6] = 0
-        elif gripper_ctrl < 1600:  # Gripper commanded open (towards 1195)
+        elif gripper_ctrl < GRIPPER_ASSIST_RELEASE_POS:  # commanded towards open
             if self.held_bowl is not None:
                 self.held_bowl = None
                 self.held_rel_pos = None

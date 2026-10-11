@@ -31,22 +31,24 @@ import mujoco
 import numpy as np
 import numpy.typing as npt
 
-from lerobot.motors.nexarm.nexarm import JOINT_NAMES, POSITION_MAX, POSITION_MIN
+from lerobot.motors.nexarm.mujoco_mapping import (
+    HOME_POSITIONS,
+    MUJOCO_JOINTS,
+    RAW_RANGES,
+    joint_position_to_raw,
+    raw_to_joint_position,
+)
+from lerobot.motors.nexarm.nexarm import JOINT_NAMES
 
-MUJOCO_JOINTS = {
-    "shoulder_pan": "joint_1_base_to_link_1",
-    "shoulder_lift": "joint_2_link_1_to_link_2",
-    "elbow_flex": "joint_3_link_2_to_link_3",
-    "wrist_flex": "joint_4_link_3_to_link_4",
-    "wrist_roll": "joint_5_link_4_to_link_5",
-    "gripper": "right_jaw_slide_joint",
-}
-
-RAW_RANGES: dict[str, tuple[int, int]] = dict.fromkeys(JOINT_NAMES[:-1], (POSITION_MIN, POSITION_MAX))
-RAW_RANGES["gripper"] = (1195, 2833)
-
-HOME_POSITIONS: dict[str, float] = dict.fromkeys(JOINT_NAMES[:-1], 2048.0)
-HOME_POSITIONS["gripper"] = 2833.0
+__all__ = [
+    "HOME_POSITIONS",
+    "JOINT_NAMES",
+    "MUJOCO_JOINTS",
+    "RAW_RANGES",
+    "NexArmKinematicsDynamics",
+    "rotation_matrix_to_rpy",
+    "rpy_to_rotation_matrix",
+]
 
 
 def rpy_to_rotation_matrix(roll: float, pitch: float, yaw: float) -> np.ndarray:
@@ -112,20 +114,12 @@ class NexArmKinematicsDynamics:
         self.dof_addrs = [int(self.model.jnt_dofadr[self._joint_ids[name]]) for name in self.arm_names]
 
     def raw_to_control(self, feature_name: str, raw_position: float) -> float:
-        raw_low, raw_high = RAW_RANGES[feature_name]
-        raw_position = float(np.clip(raw_position, raw_low, raw_high))
         jid = self._joint_ids[feature_name]
-        low, high = self.model.jnt_range[jid]
-        ratio = (raw_position - raw_low) / (raw_high - raw_low)
-        return float(low + ratio * (high - low))
+        return raw_to_joint_position(feature_name, raw_position, self.model.jnt_range[jid])
 
     def control_to_raw(self, feature_name: str, control_position: float) -> float:
         jid = self._joint_ids[feature_name]
-        low, high = self.model.jnt_range[jid]
-        control_position = float(np.clip(control_position, low, high))
-        raw_low, raw_high = RAW_RANGES[feature_name]
-        ratio = (control_position - low) / (high - low)
-        return float(raw_low + ratio * (raw_high - raw_low))
+        return joint_position_to_raw(feature_name, control_position, self.model.jnt_range[jid])
 
     def _set_qpos(self, joint_positions: Mapping[str, float] | npt.ArrayLike) -> None:
         if isinstance(joint_positions, Mapping):

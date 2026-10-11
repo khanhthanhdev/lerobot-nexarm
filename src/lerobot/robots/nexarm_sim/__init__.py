@@ -14,7 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .calibration import JointCalibration, SimCalibration, apply_calibration
+from .calibration import (
+    JointCalibration,
+    SimCalibration,
+    apply_calibration,
+    check_calibration_fps,
+    resolve_action_delay_steps,
+)
 from .config_nexarm_sim import NexArmSimConfig
 from .nexarm_sim import NexArmSim
 from .pick_place_task import NexArmPickPlaceStatus, NexArmPickPlaceTask
@@ -29,6 +35,8 @@ __all__ = [
     "JointCalibration",
     "SimCalibration",
     "apply_calibration",
+    "check_calibration_fps",
+    "resolve_action_delay_steps",
     "NexArmPickPlaceStatus",
     "NexArmPickPlaceTask",
     "NexArmSim",

@@ -29,7 +29,8 @@ class NexArmSimConfig(RobotConfig):
     camera_height: int = 480
     camera_names: tuple[str, ...] = ("front", "wrist", "top")
     settle_steps: int = 100
-    action_delay_steps: int = 0
+    # None takes the calibrated latency (or 0 without a calibration); an explicit value always wins.
+    action_delay_steps: int | None = None
     enable_domain_randomization: bool = False
     calibration_path: Path | None = None
 
@@ -41,5 +42,5 @@ class NexArmSimConfig(RobotConfig):
             raise ValueError("camera dimensions must be positive")
         if self.settle_steps < 0:
             raise ValueError("settle_steps cannot be negative")
-        if self.action_delay_steps < 0:
+        if self.action_delay_steps is not None and self.action_delay_steps < 0:
             raise ValueError("action_delay_steps cannot be negative")

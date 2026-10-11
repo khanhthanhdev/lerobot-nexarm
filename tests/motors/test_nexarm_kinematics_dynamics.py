@@ -9,6 +9,17 @@ import pytest
 
 from lerobot.motors.nexarm import NexArmKinematicsDynamics
 from lerobot.motors.nexarm.kinematics_dynamics import HOME_POSITIONS, JOINT_NAMES
+from lerobot.motors.nexarm.mujoco_mapping import (
+    joint_position_to_raw,
+    raw_to_joint_position,
+    reachable_raw_range,
+)
+from lerobot.motors.nexarm.nexarm import (
+    GRIPPER_CLOSED_POS,
+    GRIPPER_OPEN_POS,
+    POSITION_CENTER,
+    TICKS_PER_REVOLUTION,
+)
 
 
 @pytest.fixture
@@ -89,3 +100,38 @@ def test_mass_matrix_positive_definite(kd: NexArmKinematicsDynamics) -> None:
     assert np.allclose(M, M.T, atol=1e-5)
     eigenvalues = np.linalg.eigvalsh(M)
     assert np.all(eigenvalues > 0.0)
+
+
+@pytest.mark.parametrize("name", JOINT_NAMES)
+def test_shared_converter_round_trip(name: str) -> None:
+    joint_range = (-2.0, 2.0) if name != "gripper" else (0.0, 0.0255)
+    low, high = reachable_raw_range(name, joint_range)
+    for raw in np.linspace(low, high, 7):
+        value = raw_to_joint_position(name, raw, joint_range)
+        assert joint_range[0] <= value <= joint_range[1]
+        assert joint_position_to_raw(name, value, joint_range) == pytest.approx(raw)
+
+
+def test_arm_converter_uses_servo_constant() -> None:
+    assert raw_to_joint_position("elbow_flex", POSITION_CENTER, (-2.0, 2.0)) == 0.0
+    quarter_turn = POSITION_CENTER + TICKS_PER_REVOLUTION / 4
+    assert raw_to_joint_position("elbow_flex", quarter_turn, (-2.0, 2.0)) == pytest.approx(np.pi / 2)
+    # Beyond the joint limit the position saturates like a hard stop.
+    assert raw_to_joint_position("elbow_flex", 0, (-2.0, 2.0)) == pytest.approx(-2.0)
+
+
+def test_kinematics_and_backend_agree_on_every_joint(kd: NexArmKinematicsDynamics) -> None:
+    from lerobot.robots.nexarm_sim.mujoco_backend import NexArmMujocoBackend
+
+    backend = NexArmMujocoBackend(
+        model_path=kd.model_path, fps=30, camera_width=64, camera_height=48, camera_names=()
+    )
+    try:
+        for name in JOINT_NAMES:
+            for raw in (0.0, 1000.0, GRIPPER_OPEN_POS, POSITION_CENTER, GRIPPER_CLOSED_POS, 3500.0):
+                assert kd.raw_to_control(name, raw) == pytest.approx(backend.raw_to_control(name, raw))
+        gripper_low, gripper_high = kd.model.jnt_range[kd._joint_ids["gripper"]]
+        assert kd.raw_to_control("gripper", GRIPPER_CLOSED_POS) == pytest.approx(gripper_low)
+        assert kd.raw_to_control("gripper", GRIPPER_OPEN_POS) == pytest.approx(gripper_high)
+    finally:
+        backend.close()

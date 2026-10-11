@@ -199,3 +199,47 @@ def test_nexarm_env_control_modes():
     assert np.all(next_obs_norm["agent_pos"] >= -1.0)
     assert np.all(next_obs_norm["agent_pos"] <= 1.0)
     env_norm.close()
+
+
+def test_nexarm_env_config_forwards_calibration_and_domain_randomization():
+    cfg = NexArmEnv(
+        obs_type="state",
+        calibration_path="calibration.json",
+        enable_domain_randomization=True,
+        action_delay_steps=2,
+    )
+    kwargs = cfg.gym_kwargs
+    assert kwargs["calibration_path"] == "calibration.json"
+    assert kwargs["enable_domain_randomization"] is True
+    assert kwargs["action_delay_steps"] == 2
+
+
+def test_nexarm_env_applies_calibration_latency_and_domain_randomization(tmp_path):
+    from lerobot.motors.nexarm.nexarm import JOINT_NAMES
+    from lerobot.robots.nexarm_sim import SimCalibration
+    from lerobot.robots.nexarm_sim.mujoco_backend import HOME_POSITIONS
+
+    path = tmp_path / "calibration.json"
+    SimCalibration(action_delay_steps=2, fps=30).save(path)
+    env = gym.make(
+        "NexArmPickPlace-v0",
+        obs_type="state",
+        calibration_path=path,
+        enable_domain_randomization=True,
+    )
+    try:
+        backend = env.unwrapped.backend
+        assert backend.action_delay_steps == 2
+        env.reset(seed=3)
+        assert "cube" in backend.last_domain_params["objects"]
+        home_pan = backend.data.ctrl[backend._actuator_ids["shoulder_pan"]]
+        # The delayed command reaches the actuators only after the calibrated latency.
+        action = np.array([HOME_POSITIONS[name] for name in JOINT_NAMES], dtype=np.float32)
+        action[0] = 3000.0
+        env.step(action)
+        assert backend.data.ctrl[backend._actuator_ids["shoulder_pan"]] == pytest.approx(home_pan)
+    finally:
+        env.close()
+
+    with pytest.raises(ValueError, match="fps"):
+        gym.make("NexArmPickPlace-v0", obs_type="state", fps=15, calibration_path=path)

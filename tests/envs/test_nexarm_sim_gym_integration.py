@@ -45,7 +45,7 @@ def create_synthetic_nexarm_dataset(root_dir: Path, repo_id: str, num_frames: in
         repo_id=repo_id,
         fps=30,
         root=root_dir,
-        robot_type="nexarm_sim",
+        robot_type="nexarm_follower",
         features=features,
         use_videos=True,
         streaming_encoding=False,

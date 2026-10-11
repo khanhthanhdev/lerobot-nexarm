@@ -8,7 +8,15 @@ import mujoco
 import numpy as np
 import pytest
 
-from lerobot.motors.nexarm.nexarm import JOINT_NAMES
+from lerobot.motors.nexarm.mujoco_mapping import reachable_raw_range
+from lerobot.motors.nexarm.nexarm import (
+    GRIPPER_CLOSED_POS,
+    GRIPPER_OPEN_POS,
+    JOINT_NAMES,
+    POSITION_MAX,
+    POSITION_MIN,
+    raw_to_radians,
+)
 from lerobot.robots.nexarm_sim import (
     NexArmPickPlaceTask,
     NexArmSim,
@@ -35,10 +43,69 @@ def backend() -> NexArmMujocoBackend:
 
 def test_raw_control_round_trip(backend: NexArmMujocoBackend) -> None:
     for name in JOINT_NAMES:
-        low, high = RAW_RANGES[name]
+        joint_range = backend.model.jnt_range[backend._joint_ids[name]]
+        low, high = reachable_raw_range(name, joint_range)
         for raw in (low, (low + high) / 2, high):
             actual = backend.control_to_raw(name, backend.raw_to_control(name, raw))
             assert actual == pytest.approx(raw)
+
+
+def test_arm_joints_use_servo_constant_and_clamp_to_joint_range(backend: NexArmMujocoBackend) -> None:
+    for name in JOINT_NAMES[:-1]:
+        low, high = backend.model.jnt_range[backend._joint_ids[name]]
+        assert backend.raw_to_control(name, 2600.0) == pytest.approx(raw_to_radians(2600.0))
+        assert backend.raw_to_control(name, POSITION_MIN) == pytest.approx(
+            max(low, raw_to_radians(POSITION_MIN))
+        )
+        assert backend.raw_to_control(name, POSITION_MAX) == pytest.approx(
+            min(high, raw_to_radians(POSITION_MAX))
+        )
+
+
+def test_gripper_raw_closed_maps_to_closed_slide(backend: NexArmMujocoBackend) -> None:
+    low, high = backend.model.jnt_range[backend._joint_ids["gripper"]]
+    assert backend.raw_to_control("gripper", GRIPPER_CLOSED_POS) == pytest.approx(low)
+    assert backend.raw_to_control("gripper", GRIPPER_OPEN_POS) == pytest.approx(high)
+
+
+@pytest.mark.parametrize("fps", [30, 15, 7])
+def test_physics_time_per_frame_matches_fps(fps: int) -> None:
+    backend = NexArmMujocoBackend(
+        model_path=MODEL_PATH, fps=fps, camera_width=64, camera_height=48, camera_names=()
+    )
+    try:
+        backend.reset()
+        for _ in range(fps):
+            backend.step()
+        assert backend.model.opt.timestep * backend.steps_per_action == pytest.approx(1.0 / fps, rel=1e-12)
+        assert backend.data.time == pytest.approx(1.0, rel=1e-9)
+    finally:
+        backend.close()
+
+
+def test_sim_robot_reports_follower_type_and_returns_commanded_action() -> None:
+    robot = NexArmSim(
+        NexArmSimConfig(
+            id="test", model_path=MODEL_PATH, camera_names=(), settle_steps=0, action_delay_steps=2
+        )
+    )
+    assert robot.name == "nexarm_sim"
+    assert robot.robot_type == "nexarm_follower"
+    robot.connect()
+    try:
+        action = {f"{name}.pos": HOME_POSITIONS[name] + 100 for name in JOINT_NAMES}
+        action["gripper.pos"] = 1000.0
+        sent = robot.send_action(action)
+        # The commanded (clamped) target is returned although the delay queue applies home this tick.
+        assert sent["shoulder_pan.pos"] == action["shoulder_pan.pos"]
+        assert sent["gripper.pos"] == GRIPPER_OPEN_POS
+        backend = robot.backend
+        pan_ctrl = backend.data.ctrl[backend._actuator_ids["shoulder_pan"]]
+        assert pan_ctrl == pytest.approx(
+            backend.raw_to_control("shoulder_pan", HOME_POSITIONS["shoulder_pan"])
+        )
+    finally:
+        robot.disconnect()
 
 
 def test_backend_steps_and_renders(backend: NexArmMujocoBackend) -> None:
@@ -171,6 +238,7 @@ def test_sim_robot_matches_physical_feature_contract() -> None:
             settle_steps=0,
         )
     )
+    assert robot.robot_type == "nexarm_follower"
     expected_joint_keys = {f"{name}.pos" for name in JOINT_NAMES}
     assert set(robot.action_features) == expected_joint_keys
     assert set(robot.observation_features) == expected_joint_keys | {"front", "wrist", "top"}
@@ -317,6 +385,58 @@ def test_action_delay_buffer() -> None:
     backend.close()
 
 
+def test_domain_randomization_covers_every_task_object() -> None:
+    backend = NexArmMujocoBackend(
+        model_path=MODEL_PATH.with_name("bowl_stack_scene.xml"),
+        fps=30,
+        camera_width=64,
+        camera_height=48,
+        camera_names=(),
+        enable_domain_randomization=True,
+    )
+    try:
+        model = backend.model
+        wall = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, "bowl_red_wall_0")
+        visual = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, "bowl_red_visual")
+        body = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "bowl_red")
+        nominal_friction = float(model.geom_friction[wall, 0])
+        nominal_mass = float(model.body_mass[body])
+        nominal_visual_rgba = model.geom_rgba[visual].copy()
+
+        backend.reset(rng=np.random.default_rng(5))
+        objects = backend.last_domain_params["objects"]
+        assert set(objects) == {"bowl_red", "bowl_blue", "bowl_black"}
+        assert model.geom_friction[wall, 0] == pytest.approx(objects["bowl_red"]["friction"])
+        assert model.body_mass[body] == pytest.approx(nominal_mass * objects["bowl_red"]["mass_scale"])
+        # Bowl colors name the task (material colors), so they are not jittered.
+        np.testing.assert_array_equal(model.geom_rgba[visual], nominal_visual_rgba)
+
+        backend.reset_domain()
+        assert model.geom_friction[wall, 0] == pytest.approx(nominal_friction)
+        assert model.body_mass[body] == pytest.approx(nominal_mass)
+    finally:
+        backend.close()
+
+
+def test_domain_randomization_randomizes_cube() -> None:
+    backend = NexArmMujocoBackend(
+        model_path=MODEL_PATH,
+        fps=30,
+        camera_width=64,
+        camera_height=48,
+        camera_names=(),
+        enable_domain_randomization=True,
+    )
+    try:
+        backend.reset(rng=np.random.default_rng(1))
+        cube = backend.last_domain_params["objects"]["cube"]
+        geom = mujoco.mj_name2id(backend.model, mujoco.mjtObj.mjOBJ_GEOM, "cube_collision")
+        assert backend.model.geom_friction[geom, 0] == pytest.approx(cube["friction"])
+        assert cube["rgb_delta"] is not None
+    finally:
+        backend.close()
+
+
 def test_domain_randomization() -> None:
     backend = NexArmMujocoBackend(
         model_path=MODEL_PATH,
@@ -337,3 +457,9 @@ def test_domain_randomization() -> None:
     backend.reset_domain()
     assert np.allclose(backend.model.cam_pos[front_cam_id], nominal_cam_pos)
     backend.close()
+
+
+def test_sim_config_defaults_to_three_cameras() -> None:
+    config = NexArmSimConfig(id="defaults")
+    assert config.camera_names == ("front", "wrist", "top")
+    assert config.action_delay_steps is None

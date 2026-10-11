@@ -95,7 +95,10 @@ class MobileBiNexArmMujocoBackend:
         ]
         if missing_cameras:
             raise ValueError(f"MuJoCo model is missing configured cameras: {missing_cameras}")
-        self.steps_per_action = max(1, round((1 / fps) / self.model.opt.timestep))
+        # Shrink the physics timestep slightly so an integer number of steps spans exactly one frame.
+        control_period = 1.0 / fps
+        self.steps_per_action = max(1, round(control_period / self.model.opt.timestep))
+        self.model.opt.timestep = control_period / self.steps_per_action
 
     def _required_id(self, object_type: mujoco.mjtObj, name: str) -> int:
         object_id = mujoco.mj_name2id(self.model, object_type, name)

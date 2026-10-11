@@ -129,3 +129,21 @@ def test_episode_summary_and_artifacts(tmp_path) -> None:
         rows = list(csv.DictReader(csv_file))
     assert rows[0]["label"] == "act"
     assert json.loads(rows[0]["termination_reasons"]) == {"success": 1, "timeout": 1}
+
+
+def test_parse_args_exposes_calibration_and_domain_randomization(tmp_path) -> None:
+    defaults = parse_args(["--policy", "act=checkpoint"])
+    assert defaults.calibration is None
+    assert defaults.action_delay_steps is None
+    assert defaults.dr is False
+    assert defaults.cameras == ["front", "wrist", "top"]
+
+    path = tmp_path / "calibration.json"
+    args = parse_args(
+        ["--policy", "act=checkpoint", "--calibration", str(path), "--action-delay-steps", "1", "--dr"]
+    )
+    assert args.calibration == path
+    assert args.action_delay_steps == 1
+    assert args.dr is True
+    with pytest.raises(SystemExit):
+        parse_args(["--policy", "act=checkpoint", "--action-delay-steps", "-1"])

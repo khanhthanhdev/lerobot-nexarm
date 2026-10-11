@@ -28,6 +28,7 @@ from lerobot.motors import MotorCalibration
 from lerobot.motors.nexarm import NexArmMotorsBus
 from lerobot.motors.nexarm.nexarm import (
     JOINT_NAMES,
+    POSITION_CENTER,
     POSITION_MAX,
     POSITION_MIN,
     map_leader_to_follower,
@@ -82,7 +83,7 @@ class NexArmLeader(Teleoperator):
             self.calibration[name] = MotorCalibration(
                 id=i + 1,
                 drive_mode=0,
-                homing_offset=2048,
+                homing_offset=POSITION_CENTER,
                 range_min=POSITION_MIN,
                 range_max=POSITION_MAX,
             )
@@ -102,7 +103,7 @@ class NexArmLeader(Teleoperator):
                     cal = self.calibration[name]
                     if cal.drive_mode == 1:
                         follower_pos[i] = 4096 - follower_pos[i]
-                    offset = cal.homing_offset - 2048
+                    offset = cal.homing_offset - POSITION_CENTER
                     follower_pos[i] = max(POSITION_MIN, min(POSITION_MAX, follower_pos[i] + offset))
         return {f"{name}.pos": float(follower_pos[i]) for i, name in enumerate(JOINT_NAMES)}
 

@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import math
 import struct
 import threading
 import time
@@ -64,6 +65,25 @@ JOINT_NAMES = (
 
 POSITION_MIN = 0
 POSITION_MAX = 4095
+POSITION_CENTER = 2048
+# HX-30HM / HX-65HM servos map 4096 raw ticks onto one full 360° revolution.
+TICKS_PER_REVOLUTION = 4096
+
+# Follower gripper raw range: 1195 is fully open, 2833 is fully closed.
+GRIPPER_OPEN_POS = 1195
+GRIPPER_CLOSED_POS = 2833
+GRIPPER_MID_POS = (GRIPPER_OPEN_POS + GRIPPER_CLOSED_POS) / 2
+
+
+def raw_to_radians(raw_position: float) -> float:
+    """Convert an arm-joint raw servo position to radians relative to the 2048 center."""
+    return (float(raw_position) - POSITION_CENTER) * 2.0 * math.pi / TICKS_PER_REVOLUTION
+
+
+def radians_to_raw(angle: float) -> float:
+    """Inverse of :func:`raw_to_radians`."""
+    return POSITION_CENTER + float(angle) * TICKS_PER_REVOLUTION / (2.0 * math.pi)
+
 
 DEFAULT_BAUDRATE = 1_000_000
 DEFAULT_TIMEOUT = 0.05
@@ -114,8 +134,8 @@ def map_leader_to_follower(leader_pos: list[int | float]) -> list[int]:
         if idx == 1:
             p = 4096 - p
         elif idx == 5:
-            p = 2833 + (p - 2048) * 4
-            p = max(1195, min(2833, p))
+            p = GRIPPER_CLOSED_POS + (p - POSITION_CENTER) * 4
+            p = max(GRIPPER_OPEN_POS, min(GRIPPER_CLOSED_POS, p))
         result.append(max(POSITION_MIN, min(POSITION_MAX, p)))
     return result
 

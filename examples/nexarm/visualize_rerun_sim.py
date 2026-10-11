@@ -48,6 +48,16 @@ except ImportError:
     print("Error: rerun-sdk is required. Install via: uv sync --extra viz")
     sys.exit(1)
 
+from lerobot.motors.nexarm.mujoco_mapping import HOME_POSITIONS
+from lerobot.motors.nexarm.nexarm import (
+    GRIPPER_CLOSED_POS,
+    GRIPPER_MID_POS,
+    GRIPPER_OPEN_POS,
+    JOINT_NAMES,
+    POSITION_MAX,
+    POSITION_MIN,
+    radians_to_raw,
+)
 from lerobot.robots.nexarm_sim import (
     NexArmPickPlaceTask,
     NexArmSim,
@@ -225,32 +235,16 @@ NAMED_POSES = [
 def deg_to_raw(joint_name: str, val: float) -> float:
     """Convert joint angle in degrees (or mm opening for gripper) to raw servo units."""
     if joint_name == "gripper":
-        # 0mm -> 2833 (closed), 51mm -> 1195 (open)
+        # 0 mm -> closed, 51 mm -> fully open
         ratio = float(np.clip(val / 51.0, 0.0, 1.0))
-        return 2833.0 - ratio * (2833.0 - 1195.0)
-
-    limits_deg = {
-        "shoulder_pan": 135.0,
-        "shoulder_lift": 120.0,
-        "elbow_flex": 135.0,
-        "wrist_flex": 100.0,
-        "wrist_roll": 180.0,
-    }
-    max_deg = limits_deg.get(joint_name, 180.0)
-    ratio = float(np.clip(val / max_deg, -1.0, 1.0))
-    return 2048.0 + ratio * 2047.0
+        return GRIPPER_CLOSED_POS - ratio * (GRIPPER_CLOSED_POS - GRIPPER_OPEN_POS)
+    # Servo constant (TICKS_PER_REVOLUTION around POSITION_CENTER), as in the simulator.
+    return float(np.clip(radians_to_raw(math.radians(val)), POSITION_MIN, POSITION_MAX))
 
 
 def default_home_action() -> dict[str, float]:
-    """Return home posture with all arm joints at 2048 and gripper closed at 2833."""
-    return {
-        "shoulder_pan.pos": 2048.0,
-        "shoulder_lift.pos": 2048.0,
-        "elbow_flex.pos": 2048.0,
-        "wrist_flex.pos": 2048.0,
-        "wrist_roll.pos": 2048.0,
-        "gripper.pos": 2833.0,
-    }
+    """Return home posture with all arm joints centered and the gripper closed."""
+    return {f"{name}.pos": HOME_POSITIONS[name] for name in JOINT_NAMES}
 
 
 def parse_args() -> argparse.Namespace:
@@ -686,12 +680,13 @@ def run_trajectory_demo(
         recording.set_time("simulation_time", duration=t)
 
         raw_action = {
-            "shoulder_pan.pos": 2048.0 + 700.0 * math.sin(1.2 * t),
-            "shoulder_lift.pos": 2048.0 + 500.0 * math.sin(1.0 * t),
-            "elbow_flex.pos": 2048.0 + 600.0 * math.cos(0.9 * t),
-            "wrist_flex.pos": 2048.0 + 400.0 * math.sin(1.5 * t),
-            "wrist_roll.pos": 2048.0 + 800.0 * math.cos(1.1 * t),
-            "gripper.pos": 2014.0 + 819.0 * math.sin(2.0 * t),
+            "shoulder_pan.pos": deg_to_raw("shoulder_pan", 46.2 * math.sin(1.2 * t)),
+            "shoulder_lift.pos": deg_to_raw("shoulder_lift", 29.3 * math.sin(1.0 * t)),
+            "elbow_flex.pos": deg_to_raw("elbow_flex", 39.6 * math.cos(0.9 * t)),
+            "wrist_flex.pos": deg_to_raw("wrist_flex", 19.5 * math.sin(1.5 * t)),
+            "wrist_roll.pos": deg_to_raw("wrist_roll", 70.3 * math.cos(1.1 * t)),
+            "gripper.pos": GRIPPER_MID_POS
+            + 0.5 * (GRIPPER_CLOSED_POS - GRIPPER_OPEN_POS) * math.sin(2.0 * t),
         }
 
         sim.send_action(raw_action)

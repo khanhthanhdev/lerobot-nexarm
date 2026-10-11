@@ -246,6 +246,11 @@ class NexArmEnv(EnvConfig):
     observation_width: int = 640
     reward_type: str = "dense"
     render_mode: str = "rgb_array"
+    # SimCalibration JSON from examples/nexarm/calibrate_sim.py; its fps must equal ``fps``.
+    calibration_path: str | None = None
+    enable_domain_randomization: bool = False
+    # None takes the calibrated latency (or 0); an explicit value overrides the calibration.
+    action_delay_steps: int | None = None
     features: dict[str, PolicyFeature] = field(
         default_factory=lambda: {
             ACTION: PolicyFeature(type=FeatureType.ACTION, shape=(6,)),
@@ -300,6 +305,9 @@ class NexArmEnv(EnvConfig):
             "observation_height": self.observation_height,
             "observation_width": self.observation_width,
             "fps": self.fps,
+            "calibration_path": self.calibration_path,
+            "enable_domain_randomization": self.enable_domain_randomization,
+            "action_delay_steps": self.action_delay_steps,
         }
 
 

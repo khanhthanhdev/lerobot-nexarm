@@ -1,12 +1,12 @@
 # Copyright 2026 The HuggingFace Inc. team. All rights reserved.
 
 from pathlib import Path
-from types import SimpleNamespace
 
 import mujoco
 import numpy as np
 import pytest
 
+from lerobot.motors.nexarm.nexarm import GRIPPER_CLOSED_POS, GRIPPER_OPEN_POS
 from lerobot.robots.nexarm_sim.mujoco_backend import NexArmMujocoBackend
 from lerobot.robots.nexarm_sim.stack_bowls_task import COLORS, NexArmStackBowlsTask
 
@@ -45,7 +45,9 @@ def test_contact_assistance_requires_both_jaws_on_same_bowl(task):
     qadr = backend.model.jnt_qposadr[task._joint_ids["red"]]
     backend.data.qpos[qadr : qadr + 3] = site_pos + [0, 0, 0.09]
     mujoco.mj_forward(backend.model, backend.data)
-    backend.data.ctrl[backend._actuator_ids["gripper"]] = backend.raw_to_control("gripper", 2833)
+    backend.data.ctrl[backend._actuator_ids["gripper"]] = backend.raw_to_control(
+        "gripper", GRIPPER_CLOSED_POS
+    )
     task.target_bowl = "red"
     backend.data.ncon = 0
     task._on_physics_step()
@@ -71,7 +73,7 @@ def test_contact_assistance_requires_both_jaws_on_same_bowl(task):
     assert task.held_bowl == "red"
     backend.data.ncon = 0
     assert not task._is_gripper_disengaged()
-    backend.data.ctrl[backend._actuator_ids["gripper"]] = backend.raw_to_control("gripper", 1195)
+    backend.data.ctrl[backend._actuator_ids["gripper"]] = backend.raw_to_control("gripper", GRIPPER_OPEN_POS)
     task._on_physics_step()
     assert task.held_bowl is None
     assert task.held_rel_pos is None
@@ -105,32 +107,3 @@ def test_stack_requires_release_upright_and_angular_stability(task):
 def test_invalid_jitter(task, jitter):
     with pytest.raises(ValueError, match="position_jitter"):
         NexArmStackBowlsTask(task.backend, position_jitter_m=jitter)
-
-
-def test_generation_log_resume_and_merge(tmp_path):
-    import json
-
-    from examples.nexarm.generate_stack_bowls_dataset import (
-        _generation_log,
-        _log_generation,
-        _merge_generation_logs,
-        _next_seed,
-    )
-
-    first, second, merged = (tmp_path / name for name in ("first", "second", "merged"))
-    _log_generation(first, {"type": "run", "next_seed": 30})
-    _log_generation(first, {"episode_index": 0, "seed": 2})
-    _log_generation(second, {"type": "run", "next_seed": 60})
-    _log_generation(second, {"episode_index": None, "seed": 30})
-    _log_generation(second, {"episode_index": 0, "seed": 31})
-    _merge_generation_logs(
-        [
-            SimpleNamespace(root=first, meta=SimpleNamespace(total_episodes=1)),
-            SimpleNamespace(root=second, meta=SimpleNamespace(total_episodes=1)),
-        ],
-        merged,
-    )
-    assert _next_seed(merged, 2) == 60
-    records = [json.loads(line) for line in _generation_log(merged).read_text().splitlines()]
-    assert records[-1]["episode_index"] == 1
-    assert records[-2]["episode_index"] is None

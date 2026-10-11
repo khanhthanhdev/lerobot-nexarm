@@ -29,7 +29,7 @@ from functools import cached_property
 from lerobot.cameras import make_cameras_from_configs
 from lerobot.motors import MotorCalibration
 from lerobot.motors.nexarm import NexArmMotorsBus
-from lerobot.motors.nexarm.nexarm import JOINT_NAMES, POSITION_MAX, POSITION_MIN
+from lerobot.motors.nexarm.nexarm import JOINT_NAMES, POSITION_CENTER, POSITION_MAX, POSITION_MIN
 from lerobot.types import RobotAction, RobotObservation
 from lerobot.utils.decorators import check_if_already_connected, check_if_not_connected
 
@@ -107,7 +107,7 @@ class NexArmFollower(Robot):
             self.calibration[name] = MotorCalibration(
                 id=i + 1,
                 drive_mode=0,
-                homing_offset=2048,
+                homing_offset=POSITION_CENTER,
                 range_min=POSITION_MIN,
                 range_max=POSITION_MAX,
             )

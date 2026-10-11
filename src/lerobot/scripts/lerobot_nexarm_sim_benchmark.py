@@ -377,6 +377,9 @@ def benchmark_policy(spec: PolicySpec, args: argparse.Namespace) -> dict[str, An
             camera_height=args.camera_height,
             camera_names=tuple(args.cameras),
             settle_steps=0,
+            action_delay_steps=args.action_delay_steps,
+            enable_domain_randomization=args.dr,
+            calibration_path=args.calibration,
         ),
         policy=policy_cfg,
         strategy=BaseStrategyConfig(),
@@ -567,6 +570,24 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--realtime", action="store_true", help="Throttle simulation to the configured FPS")
     parser.add_argument("--torch-compile", action="store_true")
     parser.add_argument("--fail-fast", action="store_true")
+    parser.add_argument(
+        "--calibration",
+        type=Path,
+        default=None,
+        help="SimCalibration JSON from calibrate_sim.py (must be fitted at --fps)",
+    )
+    parser.add_argument(
+        "--action-delay-steps",
+        type=int,
+        default=None,
+        help="Override the action latency in frames (default: calibration value, else 0)",
+    )
+    parser.add_argument(
+        "--dr",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Per-episode domain randomization (cameras, lighting, objects, joint dynamics); off by default",
+    )
     args = parser.parse_args(argv)
     if args.episodes <= 0:
         parser.error("--episodes must be positive")
@@ -576,6 +597,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         parser.error("--episode-timeout must be positive")
     if args.settle_steps < 0 or args.warmup_steps < 0:
         parser.error("--settle-steps and --warmup-steps cannot be negative")
+    if args.action_delay_steps is not None and args.action_delay_steps < 0:
+        parser.error("--action-delay-steps cannot be negative")
     labels = [spec.label for spec in args.policy]
     if len(labels) != len(set(labels)):
         parser.error("policy labels must be unique")
@@ -633,6 +656,9 @@ def main(argv: list[str] | None = None) -> int:
             "task": args.task,
             "realtime": args.realtime,
             "torch_compile": args.torch_compile,
+            "calibration": str(args.calibration) if args.calibration else None,
+            "action_delay_steps": args.action_delay_steps,
+            "domain_randomization": args.dr,
         },
         "results": results,
     }
