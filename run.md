@@ -10,7 +10,7 @@ This guide provides copy-pasteable instructions for setting up, running, and dev
   - [Table of Contents](#table-of-contents)
   - [1. Prerequisites \& Environment Setup](#1-prerequisites--environment-setup)
     - [Install `uv` \& Clone](#install-uv--clone)
-    - [Dependency Profiles (Choose Your Extra)](#dependency-profiles-choose-your-extra)
+    - [Dependency Profiles](#dependency-profiles)
     - [Git LFS \& Hugging Face Authentication](#git-lfs--hugging-face-authentication)
     - [Linux Serial Permissions](#linux-serial-permissions)
   - [2. Quickstart Path A: Simulation (Zero Hardware Needed)](#2-quickstart-path-a-simulation-zero-hardware-needed)
@@ -66,26 +66,24 @@ git clone https://github.com/Hiwonder-official/lerobot-nexarm.git
 cd lerobot-nexarm
 ```
 
-### Dependency Profiles (Choose Your Extra)
+### Dependency Profiles
 
-Sync the exact dependencies needed for your workflow:
+This is the canonical install for every NexArm guide. The **full NexArm profile** covers simulation data generation, real collection and rollout (including the RealSense `top` camera), training, Rerun visualization and tests:
 
 ```bash
-# Profile 1: Simulation only (MuJoCo, Gymnasium, OpenCV, PyTorch, PySerial)
-uv sync --locked
-
-# Profile 2: Physical Hardware & Teleoperation (adds serial protocols + Rerun viz)
-uv sync --locked --extra nexarm --extra viz
-
-# Profile 3: Hardware + Policy Training (adds datasets, wandb, accelerate)
-uv sync --locked --extra nexarm --extra training --extra viz
-
-# Profile 4: Development & Testing (adds pytest, ruff, mypy, pre-commit)
-uv sync --locked --extra nexarm --extra dev --extra test
-
-# Profile 5: Everything (all policies, simulation tools, benchmarks)
-uv sync --locked --extra all
+uv sync --locked --extra test --extra dev --extra core_scripts --extra training --extra nexarm --extra intelrealsense
 ```
+
+Add extras to that line instead of syncing a smaller set:
+
+| Workflow                                | Add                                |
+| --------------------------------------- | ---------------------------------- |
+| TurboVLA (`train_turbovla.py`, rollout) | `--extra smolvla --extra groot`    |
+| Benchmarking pi0 / SmolVLA checkpoints  | `--extra pi --extra smolvla`       |
+| Diffusion policy                        | `--extra diffusion`                |
+| Everything (all policies and tools)     | use `uv sync --locked --extra all` |
+
+`uv sync --locked` alone is enough for the MuJoCo viewer and keyboard demos (sections 2.1–2.4), but not for dataset generation, recording or training. `uv sync` uninstalls every extra you do not list, so always repeat the full line.
 
 > **Note**: Always invoke commands through `uv run <command>` (e.g. `uv run python ...` or `uv run lerobot-teleoperate`). Do not manually activate the `.venv` or install packages with `pip`.
 
@@ -131,7 +129,7 @@ Optional flags:
 
 ### 2.2 6-DOF Cartesian Keyboard Teleoperation
 
-Control the simulated robot's end-effector in 3D Cartesian task space ($X, Y, Z$, Roll, Pitch, Yaw) using real-time Damped Least-Squares (DLS) Inverse Kinematics:
+Control the simulated robot's end-effector in 3D Cartesian task space ($X, Y, Z$, Roll, Pitch, Yaw) using real-time Damped Least-Squares (DLS) Inverse Kinematics (Linux/macOS only; the script needs `termios`):
 
 ```bash
 uv run python examples/nexarm/teleoperate_cartesian.py --robot sim
@@ -152,7 +150,7 @@ uv run python examples/nexarm/teleoperate_cartesian.py --robot sim
 | **`H`**             | Return to default **Home Pose**                                                          |
 | **`Q`**             | **Exit** gracefully                                                                      |
 
-> **Headless / CI Mode**: Add `--dry-run` to run 50 headless steps without opening a window:
+> **Headless / CI Mode**: Add `--dry-run` to run 5 headless steps without opening a window:
 >
 > ```bash
 > uv run python examples/nexarm/teleoperate_cartesian.py --robot sim --dry-run
@@ -178,21 +176,25 @@ uv run python examples/nexarm/demo_gym_env.py
 
 ### 2.5 Sim Dataset Generation with Domain Randomization
 
-Generate synthetic demonstration datasets with visual and dynamics domain randomization, plus simulated USB transport latency:
+Generate scripted pick-and-place demonstrations. Visual, dynamics and object domain randomization (DR) is on by default; `--no-dr` disables it. Each new run needs its own `--root` (default `outputs/datasets/nexarm_sim_pick_place`): a fresh run on an existing root is an error, and `--resume` appends to it.
 
 ```bash
-# Standard dataset
-uv run python examples/nexarm/generate_sim_dataset.py \
+# Nominal dataset without domain randomization
+MUJOCO_GL=egl uv run python examples/nexarm/generate_sim_dataset.py \
     --repo-id local/nexarm_sim_standard \
-    --num-episodes 20
+    --root outputs/datasets/nexarm_sim_standard \
+    --episodes 20 \
+    --no-dr
 
-# Sim2Real-hardened dataset (Visual DR + Dynamics DR + 2-step latency)
-uv run python examples/nexarm/generate_sim_dataset.py \
+# Sim2Real-hardened dataset (DR + 2-step latency)
+MUJOCO_GL=egl uv run python examples/nexarm/generate_sim_dataset.py \
     --repo-id local/nexarm_sim2real \
-    --num-episodes 50 \
-    --domain-randomization \
+    --root outputs/datasets/nexarm_sim2real \
+    --episodes 50 \
     --action-delay-steps 2
 ```
+
+The 3-bowl stacking generator `generate_stack_bowls_dataset.py` takes the same generation flags; see [`pipeline.md`](docs/source/nexarm/pipeline.md#1a-simulation-scripted-demonstrations). Sim datasets and sim calibrations made before the servo-constant joint mapping (`rad = (raw - 2048) * 2π / 4096`) encode different angles: regenerate them (they cannot be resumed).
 
 ### 2.6 Rerun 3D Simulation Showcase
 
@@ -220,9 +222,10 @@ uv run python examples/nexarm/visualize_rerun_sim.py --mode all --view save
    - Connect USB cable from the ESP32 board to the host PC.
 2. **Leader Arm**:
    - Connect USB cable from the master ESP32 board to the host PC (powered via USB).
-3. **Cameras**:
-   - `front` camera: Mounted overlooking the workspace table (top-down view).
-   - `wrist` camera: Mounted on the arm near the gripper facing the end-effector.
+3. **Cameras** (all 640x480 @ 30 FPS):
+   - `front` camera: USB webcam overlooking the workspace table.
+   - `wrist` camera: USB webcam on the arm near the gripper facing the end-effector.
+   - `top` camera: Intel RealSense D435i looking down at the table (only RGB is recorded). It is **on by default** in every recording and rollout script; pass `--no-top-cam` if you do not have one.
 
 ### 3.2 Find Serial Ports
 
@@ -233,17 +236,20 @@ uv run lerobot-find-port
 ```
 
 - Unplug and replug each arm when prompted.
-- **Linux**: Typically `/dev/ttyUSB0` (Leader) and `/dev/ttyUSB1` (Follower).
+- **Linux**: `/dev/ttyUSB0` (Leader) and `/dev/ttyUSB1` (Follower). Every script, YAML and guide in this repository uses these defaults.
 - **Windows**: Typically `COM18` (Leader) and `COM19` (Follower).
 - **macOS**: Typically `/dev/tty.usbserial-*`.
 
 ### 3.3 Find & Verify USB Cameras
 
-Identify the OpenCV camera indices for the `front` and `wrist` cameras:
+Identify the OpenCV camera indices for the `front` and `wrist` cameras and the RealSense serial for `top`:
 
 ```bash
 uv run lerobot-find-cameras opencv
+uv run lerobot-find-cameras realsense
 ```
+
+The example scripts take `--front-cam` / `--wrist-cam` as an index or a device path such as `/dev/v4l/by-id/...` (defaults `0` / `1`), with optional `--front-fourcc` / `--wrist-fourcc` (e.g. `MJPG`). `--top-cam` defaults to auto-detecting exactly one RealSense; pass its serial when several are connected. A missing RealSense or `pyrealsense2` stops the script with an error naming `--no-top-cam` and `uv sync --extra intelrealsense`.
 
 To visually check the camera feeds, save snapshots with:
 
@@ -297,9 +303,11 @@ uv run python examples/nexarm/teleoperate.py \
 uv run lerobot-teleoperate \
     --robot.type=nexarm_follower --robot.port=/dev/ttyUSB1 \
     --teleop.type=nexarm_leader  --teleop.port=/dev/ttyUSB0 \
-    --robot.cameras='{"front":{"type":"opencv","index_or_path":0,"width":640,"height":480,"fps":30},"wrist":{"type":"opencv","index_or_path":1,"width":640,"height":480,"fps":30}}' \
+    --robot.cameras='{"front":{"type":"opencv","index_or_path":0,"width":640,"height":480,"fps":30},"wrist":{"type":"opencv","index_or_path":1,"width":640,"height":480,"fps":30},"top":{"type":"intelrealsense","serial_number_or_name":"<REALSENSE_SERIAL>","width":640,"height":480,"fps":30}}' \
     --display_data=true
 ```
+
+The `lerobot-*` CLIs only open the cameras listed in `--robot.cameras`; remove the `top` entry to run with front and wrist only.
 
 ### 3.5 6-DOF Cartesian Hardware Teleoperation
 
@@ -320,7 +328,7 @@ Execute autonomous visual object detection (HSV color tracking), 2D-to-3D worksp
 uv run python examples/nexarm/vision_grasp.py \
     --robot real \
     --port /dev/ttyUSB1 \
-    --camera-index 0
+    --cam-index 0
 
 # Test in simulation first
 uv run python examples/nexarm/vision_grasp.py --robot sim
@@ -332,14 +340,16 @@ Overlay live physical camera frames onto the MuJoCo simulated camera view to ali
 
 ```bash
 uv run python examples/nexarm/calibrate_camera_alignment.py \
-    --camera top \
-    --real-camera-index 0 \
-    --blend-alpha 0.5
+    --camera-name front \
+    --cam-index 0
 ```
 
-- Press **`M`** to cycle view modes: Alpha Blend $\to$ Side-by-Side $\to$ Canny Edge Overlay.
-- Press **`[` / `]`** to adjust transparency.
-- Press **`S`** to save a snapshot to disk.
+- `--camera-name` selects the sim camera (`front`, `wrist` or `top`). `--cam-index` takes an OpenCV index or device path; for the top RealSense use its RGB V4L2 node (e.g. `/dev/video4`).
+- Press **`m`** to cycle view modes: Alpha Blend $\to$ Side-by-Side $\to$ Canny Edge Overlay.
+- Press **`+` / `-`** to adjust transparency.
+- Press **`s`** to save a snapshot, **`q`** or **`Esc`** to quit.
+
+The full camera and scene matching procedure is in [`sim_calibration.md`](docs/source/nexarm/sim_calibration.md#step-7-align-the-cameras).
 
 ---
 
@@ -366,14 +376,19 @@ uv run python examples/nexarm/record.py \
 uv run lerobot-record \
     --robot.type=nexarm_follower --robot.port=/dev/ttyUSB1 \
     --teleop.type=nexarm_leader  --teleop.port=/dev/ttyUSB0 \
-    --robot.cameras='{"front":{"type":"opencv","index_or_path":0,"width":640,"height":480,"fps":30},"wrist":{"type":"opencv","index_or_path":1,"width":640,"height":480,"fps":30}}' \
+    --robot.cameras='{"front":{"type":"opencv","index_or_path":0,"width":640,"height":480,"fps":30},"wrist":{"type":"opencv","index_or_path":1,"width":640,"height":480,"fps":30},"top":{"type":"intelrealsense","serial_number_or_name":"<REALSENSE_SERIAL>","width":640,"height":480,"fps":30}}' \
     --dataset.repo_id=local/nexarm_pick_cube \
     --dataset.single_task="Pick up the red cube and place it into the green zone" \
     --dataset.num_episodes=50 \
     --dataset.episode_time_s=12 \
     --dataset.reset_time_s=8 \
+    --dataset.push_to_hub=false \
     --display_data=true
 ```
+
+`lerobot-record` pushes to the Hub by default; keep `--dataset.push_to_hub=false` for a `local/` id (use `<hf_user>/...` to upload). `record.py` records front, wrist and the RealSense top camera by default (add `--no-top-cam` for front and wrist only); `--fps` sets both the camera and dataset frame rate. For the stack-bowls collection rig with automatic merging, use [`DATA_COLLECTION_GUIDE.md`](DATA_COLLECTION_GUIDE.md) instead.
+
+**The recorder appends a timestamp to the repo id.** `local/nexarm_pick_cube` is saved as e.g. `local/nexarm_pick_cube_20261011_093000` under `~/.cache/huggingface/lerobot/`, and the final `Dataset repo_id:` and `Dataset root:` are printed when recording ends. Use that printed id in every follow-up command below (shown as `local/nexarm_pick_cube_<YYYYMMDD_HHMMSS>`).
 
 **Episode Controls During Recording:**
 
@@ -386,7 +401,7 @@ uv run lerobot-record \
 Visualize recorded episodes, camera video streams, and joint state trajectories:
 
 ```bash
-uv run lerobot-dataset-viz --repo-id local/nexarm_pick_cube --episode-index 0
+uv run lerobot-dataset-viz --repo-id local/nexarm_pick_cube_<YYYYMMDD_HHMMSS> --episode-index 0
 ```
 
 ### 4.3 Replay Demonstrations on Hardware
@@ -397,7 +412,7 @@ Verify recorded actions by playing back an episode directly on the follower arm:
 uv run lerobot-replay \
     --robot.type=nexarm_follower \
     --robot.port=/dev/ttyUSB1 \
-    --dataset.repo_id=local/nexarm_pick_cube \
+    --dataset.repo_id=local/nexarm_pick_cube_<YYYYMMDD_HHMMSS> \
     --dataset.episode=0
 ```
 
@@ -407,7 +422,7 @@ Train an **Action Chunking with Transformers (ACT)** policy on your dataset:
 
 ```bash
 uv run lerobot-train \
-    --dataset.repo_id=local/nexarm_pick_cube \
+    --dataset.repo_id=local/nexarm_pick_cube_<YYYYMMDD_HHMMSS> \
     --policy.type=act \
     --policy.device=cuda \
     --output_dir=outputs/train/nexarm_act \
@@ -428,9 +443,9 @@ Train the real-time 32 Hz Vision-Language-Action model (DINOv3 visual backbone +
 # 1. Verify dependencies and download backbones
 uv run python examples/nexarm/setup_turbovla.py --download-backbones
 
-# 2. Train TurboVLA policy on NexArm LeRobot dataset
+# 2. Train TurboVLA on the simulated stack-bowls dataset
 uv run python examples/nexarm/train_turbovla.py \
-    --dataset-root outputs/datasets/nexarm_stack_bowls \
+    --sim-dataset-root outputs/datasets/nexarm_stack_bowls \
     --output-dir outputs/train/nexarm_turbovla \
     --batch-size 16 \
     --max-steps 50000 \
@@ -439,9 +454,10 @@ uv run python examples/nexarm/train_turbovla.py \
 # 3. Rollout trained TurboVLA policy in MuJoCo simulation
 uv run python examples/nexarm/rollout_turbovla.py \
     --robot sim \
-    --checkpoint outputs/train/nexarm_turbovla/final_ema_pytorch_model.pt \
-    --task "Stack the red bowl on the blue bowl and then stack the black bowl on top."
+    --checkpoint outputs/train/nexarm_turbovla/final_ema_pytorch_model.pt
 ```
+
+TurboVLA needs `--extra smolvla --extra groot` added to the [full profile](#dependency-profiles). The checkpoint's `config.json` stores the task type, camera keys, image size, fps and training prompt, and rollout uses them; in the stack-bowls sim the prompt follows the sampled bowl order, so omit `--task`. Real data, co-training and real-robot rollout are in [`turbovla_guide.md`](docs/source/nexarm/turbovla_guide.md).
 
 ### 4.5 Deploy & Rollout Trained Policy
 
@@ -454,17 +470,19 @@ uv run python examples/nexarm/rollout.py \
     --policy-path outputs/train/nexarm_act/checkpoints/last/pretrained_model \
     --front-cam 0 \
     --wrist-cam 1 \
-    --strategy sentry
+    --strategy base
 
 # Using lerobot-rollout CLI
 uv run lerobot-rollout \
     --robot.type=nexarm_follower \
     --robot.port=/dev/ttyUSB1 \
-    --robot.cameras='{"front":{"type":"opencv","index_or_path":0,"width":640,"height":480,"fps":30},"wrist":{"type":"opencv","index_or_path":1,"width":640,"height":480,"fps":30}}' \
+    --robot.cameras='{"front":{"type":"opencv","index_or_path":0,"width":640,"height":480,"fps":30},"wrist":{"type":"opencv","index_or_path":1,"width":640,"height":480,"fps":30},"top":{"type":"intelrealsense","serial_number_or_name":"<REALSENSE_SERIAL>","width":640,"height":480,"fps":30}}' \
     --policy.path=outputs/train/nexarm_act/checkpoints/last/pretrained_model \
-    --strategy.type=sentry \
+    --strategy.type=base \
     --display_data=true
 ```
+
+The cameras must match the policy's image inputs: `rollout.py` exits at startup if they differ. A policy trained on a 2-camera dataset (for example the legacy `thanhkt/nexarm_stack_bowls`) needs `--no-top-cam` (or no `top` entry in `--robot.cameras`). To save the rollout as an evaluation dataset, use `--strategy sentry --repo-id <user>/eval_nexarm` (`rollout.py`) or `--strategy.type=sentry --dataset.repo_id=<user>/eval_nexarm --dataset.single_task="<task>"` (`lerobot-rollout`).
 
 ---
 
@@ -578,21 +596,14 @@ _(Log out and back in if this is the first time adding to `dialout`)_.
 
 **Cause**: `${HF_USER}` was empty, so the dataset repo ID expanded to `/nexarm_stack_bowls` and the recorder tried to create it at the filesystem root.
 
-**Fix**: Log in and set the username before recording, or explicitly choose a writable local dataset root:
+**Fix**: Log in and set the username before recording:
 
 ```bash
 export HF_USER="$(NO_COLOR=1 hf auth whoami | awk -F': *' 'NR==1 {print $2}')"
 : "${HF_USER:?Run 'uv run hf auth login' first, then set HF_USER to your Hugging Face username}"
-
-uv run lerobot-record \
-    --robot.type=nexarm_follower --robot.port=/dev/ttyUSB0 \
-    --teleop.type=nexarm_leader --teleop.port=/dev/ttyUSB1 \
-    --dataset.repo_id="${HF_USER}/nexarm_stack_bowls" \
-    --dataset.root=outputs/datasets/nexarm_stack_bowls \
-    --dataset.push_to_hub=true
 ```
 
-The `--dataset.root` value is local and writable; keep the remaining camera and recording options from your normal command.
+Then keep `--dataset.repo_id="${HF_USER}/nexarm_stack_bowls"` in your normal command and leave `--dataset.root` unset: the session is written to `~/.cache/huggingface/lerobot/${HF_USER}/nexarm_stack_bowls_<YYYYMMDD_HHMMSS>`, a new directory every run. `--dataset.root` is the dataset directory itself and is not timestamped, so a fixed value fails with `FileExistsError` on the second run; if you need a custom location, give each session its own path (e.g. `--dataset.root=outputs/recordings/nexarm_stack_bowls_$(date +%Y%m%d_%H%M%S)`). Do not use `outputs/datasets/nexarm_stack_bowls`, which is the stack-bowls sim generator's default output.
 
 ### Q: `TimeoutError: No position reply from NexArm`
 
@@ -626,19 +637,19 @@ The `--dataset.root` value is local and writable; keep the remaining camera and 
 1. **Follower Serial Firmware Desync (5.0 Hz Telemetry)**:
    - When the physical follower arm is in default/standalone mode (not in LeRobot bridge mode), its AT32 coprocessor broadcasts telemetry packets (`CMD_GET_CUR_COORDS = 11`) at exactly **5.0 Hz (every 200 ms)**.
    - If `read_positions()` accepted these unrequested telemetry frames without verifying the reply command ID (`CMD_READ_POS = 96`), every read would block for ~200 ms, throttling the record loop to 5.0 Hz and confusing Cartesian coordinates with servo positions.
-   - The driver has been updated in [`src/lerobot/motors/nexarm/nexarm.py`](file:///home/marinelab/code/lerobot-nexarm/src/lerobot/motors/nexarm/nexarm.py) to filter incoming packets strictly for the expected command reply (`CMD_READ_POS`), and `rtscts=False` prevents Linux serial driver write blocking on CH340 USB converters.
+   - The driver has been updated in [`src/lerobot/motors/nexarm/nexarm.py`](src/lerobot/motors/nexarm/nexarm.py) to filter incoming packets strictly for the expected command reply (`CMD_READ_POS`), and `rtscts=False` prevents Linux serial driver write blocking on CH340 USB converters.
 
 2. **USB 2.0 Camera Bandwidth Contention (YUYV vs MJPG)**:
    - By default on Linux, OpenCV requests raw uncompressed `YUYV` (4:2:2). Two 640x480 @ 30 FPS cameras streaming uncompressed video consume ~37 MB/s, which exceeds single USB 2.0 controller bandwidth and causes the UVC driver to throttle or drop frames down to 5–15 FPS.
-   - **Fix**: Specify `"fourcc":"MJPG"` for OpenCV cameras that support Motion-JPEG (like the Logitech C270 / `front` camera):
+   - **Fix**: Specify `"fourcc":"MJPG"` for OpenCV cameras that support Motion-JPEG (like the Logitech C270 / `front` camera); the example scripts take `--front-fourcc MJPG`:
 
 ```bash
 uv run lerobot-record \
     --robot.type=nexarm_follower \
-    --robot.port=/dev/ttyUSB0 \
+    --robot.port=/dev/ttyUSB1 \
     --teleop.type=nexarm_leader \
-    --teleop.port=/dev/ttyUSB1 \
-    --robot.cameras='{"front":{"type":"opencv","index_or_path":0,"width":640,"height":480,"fps":30,"fourcc":"MJPG"},"wrist":{"type":"opencv","index_or_path":2,"width":640,"height":480,"fps":30}}' \
+    --teleop.port=/dev/ttyUSB0 \
+    --robot.cameras='{"front":{"type":"opencv","index_or_path":0,"width":640,"height":480,"fps":30,"fourcc":"MJPG"},"wrist":{"type":"opencv","index_or_path":2,"width":640,"height":480,"fps":30},"top":{"type":"intelrealsense","serial_number_or_name":"<REALSENSE_SERIAL>","width":640,"height":480,"fps":30}}' \
     --dataset.repo_id="${HF_USER}/nexarm_stack_bowls" \
     --dataset.single_task="Stack the bowls with red on bottom, blue in middle, and black on top." \
     --dataset.num_episodes=50 \
@@ -650,4 +661,4 @@ uv run lerobot-record \
 ```
 
 3. **Rerun Display Overhead**:
-   - Setting `--display_data=true` logs two uncompressed camera feeds synchronously to Rerun every step. For high-FPS recording without frame drops, set `--display_data=false` or stream to a remote Rerun viewer with `--display_ip`.
+   - Setting `--display_data=true` logs every uncompressed camera feed synchronously to Rerun every step. For high-FPS recording without frame drops, set `--display_data=false` or stream to a remote Rerun viewer with `--display_ip`.

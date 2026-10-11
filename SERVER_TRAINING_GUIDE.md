@@ -9,7 +9,7 @@ This guide provides complete, copy-pasteable instructions to set up, prepare dat
 | Component                  | NexArm TurboVLA Configuration                                                                                 |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | **Robot Platform**         | Hiwonder NexArm (6-DOF: `shoulder_pan`, `shoulder_lift`, `elbow_flex`, `wrist_flex`, `wrist_roll`, `gripper`) |
-| **Vision Backbone**        | DINOv3 ViT-B (2 views: `front` + `wrist` at 224×224 resolution)                                               |
+| **Vision Backbone**        | DINOv3 ViT-B over the dataset's views (`front`, `wrist`, and `top` when present) at 224×224 by default        |
 | **Language Encoder**       | Online BERT (`google-bert/bert-base-uncased`)                                                                 |
 | **Interaction**            | 6-layer bidirectional cross-attention                                                                         |
 | **Action Head**            | ACT-style transformer decoder (horizon: 16 steps, action dim: 6, state dim: 6)                                |
@@ -36,6 +36,8 @@ The script automatically:
 2. Syncs the environment with PyTorch, CUDA, Transformers, DINOv3 (timm), Accelerate, and LeRobot.
 3. Caches foundation models (`facebook/dinov3-vitb16-pretrain-lvd1689m` and `google-bert/bert-base-uncased`).
 
+The script syncs only `--extra smolvla --extra training --extra groot`, which is enough for a training server (including simulation data generation). On a machine that also records or rolls out on the real arm, use the full NexArm profile from [`run.md`, Dependency Profiles](run.md#dependency-profiles) plus `--extra smolvla --extra groot`.
+
 _(Optional)_ If you want to fine-tune from official released TurboVLA weights:
 
 ```bash
@@ -46,51 +48,53 @@ uv run python examples/nexarm/setup_turbovla.py --download-pretrained
 
 ## 2. Dataset Preparation
 
-TurboVLA trains on datasets in the **LeRobot 2.0/3.0 format** containing `front` + `wrist` camera images, 6-DOF joint states, 6-DOF action targets, and task language descriptions.
+TurboVLA trains on datasets in the **LeRobot 2.0/3.0 format** containing `front`, `wrist` and optionally `top` camera images, 6-DOF joint states, 6-DOF action targets, and task language descriptions. When several datasets are combined, only the cameras present in all of them are used.
 
 ### Path A: Generate Dataset Directly on the Server (Simulation)
 
 You can generate hundreds of high-quality, physics-verified demonstration episodes on the server without any hardware:
 
 ```bash
-# Generate 50 episodes of the 3-Bowl Stacking Task (with 6 language instruction permutations)
-uv run python examples/nexarm/generate_stack_bowls_dataset.py \
+# Generate 50 episodes of the 3-Bowl Stacking Task (with 6 language instruction permutations),
+# front/wrist/top cameras, domain randomization on, rendered on GPUs 0 and 1
+MUJOCO_GL=egl uv run python examples/nexarm/generate_stack_bowls_dataset.py \
     --repo-id local/nexarm_stack_bowls \
     --root outputs/datasets/nexarm_stack_bowls \
     --episodes 50 \
-    --fps 30
+    --gpus 0,1
 
-# For visual domain randomization (lighting, textures, colors):
-uv run python examples/nexarm/generate_stack_bowls_dataset.py \
-    --repo-id local/nexarm_stack_bowls_dr \
-    --root outputs/datasets/nexarm_stack_bowls_dr \
-    --episodes 100 \
-    --domain-randomization
+# Append 50 more episodes to the same dataset
+MUJOCO_GL=egl uv run python examples/nexarm/generate_stack_bowls_dataset.py \
+    --root outputs/datasets/nexarm_stack_bowls \
+    --episodes 50 --gpus 0,1 --resume
 ```
+
+Domain randomization (lighting, textures, colors, dynamics, bowl friction/mass) is on by default; `--no-dr` disables it. A fresh run on an existing `--root` is an error; `--resume` continues after the last logged seed and needs `generation_episodes.jsonl` at the root. Datasets generated before the servo-constant joint mapping change are stale: regenerate them. More flags: [`pipeline.md`, section 1a](docs/source/nexarm/pipeline.md#1a-simulation-scripted-demonstrations).
 
 ### Path B: Transfer Locally Recorded Teleoperation Dataset to Server
 
-If you recorded real demonstrations on your local robot workstation via `examples/nexarm/record.py`:
+Real recordings live under `~/.cache/huggingface/lerobot/`: the collection launcher merges into `thanhkt/nexarm_stack_bowls_top`, and `record.py` / `lerobot-record` print the timestamped `Dataset root:` of each session.
 
 ```bash
-# 1. On your local machine, compress the recorded dataset:
-tar -czvf nexarm_dataset.tar.gz outputs/datasets/nexarm_real_task/
+# 1. On your local machine, compress the dataset root:
+tar -czvf nexarm_dataset.tar.gz -C ~/.cache/huggingface/lerobot/thanhkt nexarm_stack_bowls_top
 
 # 2. Transfer to server via rsync or scp:
 rsync -avzP nexarm_dataset.tar.gz user@server-ip:~/lerobot-nexarm/
 
-# 3. On the server, extract it:
-tar -xzvf nexarm_dataset.tar.gz
+# 3. On the server, extract it and train with --real-dataset-root datasets/nexarm_stack_bowls_top:
+mkdir -p datasets && tar -xzvf nexarm_dataset.tar.gz -C datasets
 ```
 
 ### Path C: Sync via Hugging Face Hub
 
 ```bash
-# On local machine (upload):
-uv run hf upload local/nexarm_dataset outputs/datasets/nexarm_dataset --repo-type dataset
+# On local machine (upload the dataset root):
+uv run python examples/nexarm/upload_dataset.py \
+    --repo-id your_username/nexarm_stack_bowls_top \
+    --root ~/.cache/huggingface/lerobot/thanhkt/nexarm_stack_bowls_top
 
-# On server (use directly by repo-id):
-# Pass `--repo-id your_username/nexarm_dataset` to train_turbovla.py
+# On server: pass --real-repo-id your_username/nexarm_stack_bowls_top to train_turbovla.py
 ```
 
 ---
@@ -110,7 +114,7 @@ bash scripts/nexarm/train_turbovla_single_gpu.sh \
 
 # Or using the Python script directly:
 CUDA_VISIBLE_DEVICES=0 uv run python examples/nexarm/train_turbovla.py \
-    --dataset-root outputs/datasets/nexarm_stack_bowls \
+    --sim-dataset-root outputs/datasets/nexarm_stack_bowls \
     --output-dir outputs/train/nexarm_turbovla \
     --batch-size 16 \
     --max-steps 50000 \
@@ -128,14 +132,14 @@ Automatically distributes batches across all available GPUs on the node:
 # Uses all detected GPUs automatically (or set NUM_GPUS=4):
 bash scripts/nexarm/train_turbovla_multi_gpu.sh \
     outputs/datasets/nexarm_stack_bowls \
-    outputs/train/nexarm_turbovla_ddp \
+    outputs/train/nexarm_turbovla \
     16 50000 5000
 
 # Or explicitly:
 uv run torchrun --nproc_per_node=4 \
     examples/nexarm/train_turbovla.py \
-    --dataset-root outputs/datasets/nexarm_stack_bowls \
-    --output-dir outputs/train/nexarm_turbovla_ddp \
+    --sim-dataset-root outputs/datasets/nexarm_stack_bowls \
+    --output-dir outputs/train/nexarm_turbovla \
     --batch-size 16 \
     --max-steps 50000 \
     --save-steps 5000 \
@@ -150,6 +154,8 @@ Submit a batch job to a SLURM cluster:
 sbatch scripts/nexarm/train_turbovla.slurm
 ```
 
+The job trains on `--sim-dataset-root outputs/datasets/nexarm_stack_bowls` and writes to `outputs/train/nexarm_turbovla`, like the launchers above; edit the script to change them. To co-train with real data, add to the `train_turbovla.py` commands `--real-dataset-root <root>` (or `--real-repo-id`) and `--real-ratio`, as in [`turbovla_guide.md`](docs/source/nexarm/turbovla_guide.md#co-training-with-simulation-and-real-data).
+
 To monitor your SLURM job:
 
 ```bash
@@ -163,7 +169,7 @@ To achieve fast convergence with fewer steps on smaller demonstration datasets (
 
 ```bash
 uv run python examples/nexarm/train_turbovla.py \
-    --dataset-root outputs/datasets/nexarm_stack_bowls \
+    --sim-dataset-root outputs/datasets/nexarm_stack_bowls \
     --pretrained-checkpoint pretrained/TurboVLA/checkpoints/robotwin/steps_55000_ema_model.safetensors \
     --output-dir outputs/train/nexarm_turbovla_ft \
     --freeze-vision \
@@ -190,7 +196,7 @@ Enable online logging by adding `--wandb`:
 
 ```bash
 uv run python examples/nexarm/train_turbovla.py \
-    --dataset-root outputs/datasets/nexarm_stack_bowls \
+    --sim-dataset-root outputs/datasets/nexarm_stack_bowls \
     --output-dir outputs/train/nexarm_turbovla \
     --wandb --wandb-project nexarm-turbovla
 ```
@@ -207,7 +213,7 @@ In your `--output-dir` (e.g. `outputs/train/nexarm_turbovla/`), the training run
 | `final_ema_model.safetensors` | SafeTensors format of the EMA checkpoint                                  |
 | `final_model.pt`              | Raw optimizer weights from the last step                                  |
 | `stats_turbovla.json`         | Dataset min/max normalization stats (automatically loaded by rollout)     |
-| `config.json`                 | Model architecture settings (`action_dim=6`, `state_dim=6`, `horizon=16`) |
+| `config.json`                 | Architecture plus `task_type`, `camera_keys`, `image_size`, `fps`, `task` |
 | `steps_XXXX_*`                | Periodic checkpoints saved every `--save-steps`                           |
 
 ---
@@ -226,9 +232,10 @@ rsync -avzP user@server-ip:~/lerobot-nexarm/outputs/train/nexarm_turbovla/ ./out
 ```bash
 uv run python examples/nexarm/rollout_turbovla.py \
     --robot sim \
-    --checkpoint outputs/train/nexarm_turbovla/final_ema_pytorch_model.pt \
-    --task "Stack the red bowl on the blue bowl and then stack the black bowl on top."
+    --checkpoint outputs/train/nexarm_turbovla/final_ema_pytorch_model.pt
 ```
+
+Rollout reads the task type, cameras, image size, fps and prompt from `config.json`; in the stack-bowls scene the prompt follows the sampled bowl order, so leave `--task` unset.
 
 ### B. Deploy on Physical NexArm Follower:
 
@@ -239,8 +246,10 @@ uv run python examples/nexarm/rollout_turbovla.py \
     --front-cam 0 \
     --wrist-cam 1 \
     --checkpoint outputs/train/nexarm_turbovla/final_ema_pytorch_model.pt \
-    --task "Pick up the red cube, place it in the green target zone, and release it."
+    --task "Stack the bowls with red on bottom, blue in middle, and black on top."
 ```
+
+The RealSense `top` camera is opened by default; add `--no-top-cam` for a 2-view checkpoint (the script exits if the cameras differ from the checkpoint's). See [`turbovla_guide.md`](docs/source/nexarm/turbovla_guide.md#4-rollout--evaluation) for legacy checkpoints.
 
 ---
 

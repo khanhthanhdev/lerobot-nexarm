@@ -12,7 +12,7 @@ Before suggesting any command, an agent MUST ask the user at least these questio
 2. **What hardware do you have?**
    - Robot: NexArm follower / NexArm simulation (`nexarm_sim`, `mobile_bi_nexarm_sim`)
    - Teleop: NexArm leader arm / keyboard / gamepad / simulation
-   - Cameras: how many, resolution, USB index (usually `front` and `wrist` at 640x480)
+   - Cameras: how many, resolution, USB index (default `front` and `wrist` USB webcams plus a RealSense D435i `top`, all 640x480; without a RealSense every script needs `--no-top-cam`)
 3. **What machine will you train on?**
    - GPU model + VRAM (e.g. "laptop 3060 6 GB", "RTX 4090 24 GB", "A100 80 GB", "CPU only")
    - OS: macOS / Linux / Windows
@@ -48,9 +48,9 @@ Go to §4 (NexArm end-to-end), then §5 (data tips), then §6 (pick a policy —
 
 Use `nexarm_sim` or simulation scripts in `examples/nexarm/`:
 
-- `python examples/nexarm/demo_gym_env.py`
-- `python examples/nexarm/pick_place_sim.py`
-- `python examples/nexarm/generate_sim_dataset.py`
+- `uv run python examples/nexarm/demo_gym_env.py`
+- `uv run python examples/nexarm/pick_place_sim.py`
+- `uv run python examples/nexarm/generate_sim_dataset.py` (see §10 and [`pipeline.md`](./docs/source/nexarm/pipeline.md))
 
 ### Path C — "I just want to understand the codebase"
 
@@ -64,28 +64,17 @@ Minimum commands in order. Confirm follower (slave) and leader (master) arms are
 
 **4.1 Install**
 
-Select the profile matching your workflow:
+Use the canonical full NexArm profile from [`run.md`, Dependency Profiles](./run.md#dependency-profiles) (simulation, real collection with the RealSense top camera, training, tests):
 
 ```bash
-# Profile 1: Simulation & Benchmark (no physical robot needed)
-uv sync --locked --extra dev --extra viz
-
-# Profile 2: Hardware Teleoperation & Recording
-uv sync --locked --extra nexarm --extra core_scripts
-
-# Profile 3: Training & Evaluation (ACT baseline included)
-uv sync --locked --extra training --extra evaluation
-# For Diffusion: add --extra diffusion
-# For SmolVLA: add --extra smolvla
-
-# Profile 4: Full Development Stack (everything)
-uv sync --locked --extra all
+uv sync --locked --extra test --extra dev --extra core_scripts --extra training --extra nexarm --extra intelrealsense
+# Add to that line: --extra diffusion (Diffusion), --extra smolvla (SmolVLA), --extra smolvla --extra groot (TurboVLA)
 
 git lfs install && git lfs pull
 uv run hf auth login                         # required to push datasets/policies
 ```
 
-All repository commands should use `uv run`, which keeps Python and dependencies inside the locked project environment.
+`uv sync` uninstalls extras you do not list, so always repeat the full line. All repository commands should use `uv run`, which keeps Python and dependencies inside the locked project environment.
 
 **4.2 Find USB ports** — run once per arm, unplug when prompted.
 
@@ -93,7 +82,7 @@ All repository commands should use `uv run`, which keeps Python and dependencies
 uv run lerobot-find-port
 ```
 
-Linux typically assigns `/dev/ttyUSB0` and `/dev/ttyUSB1` (or check `dmesg`). Ensure port permissions (`sudo chmod 666 /dev/ttyUSB*`).
+Repository convention (every script default and guide): leader `/dev/ttyUSB0`, follower `/dev/ttyUSB1`. If your cables enumerate the other way, pass the ports explicitly (or check `dmesg`). Ensure port permissions (`sudo chmod 666 /dev/ttyUSB*`).
 
 **4.3 Joint layout & hardware architecture**
 
@@ -101,33 +90,36 @@ Linux typically assigns `/dev/ttyUSB0` and `/dev/ttyUSB1` (or check `dmesg`). En
 - **Servos**: HX-30HM serial bus servos (0-4095 range, 1 Mbps).
 - **Follower**: Dual-chip (ESP32 + AT32). Automatically enters bridge mode (CMD 68) when connected.
 - **Leader**: Master ESP32 runs with torque disabled (CMD 98) for zero-resistance gravity-defying manipulation.
-- Joint 2 (`shoulder_lift`) is mirrored (`4096 - pos`), Joint 6 (`gripper`) is mapped `[1195, 2833]`.
+- Joint 2 (`shoulder_lift`) is mirrored (`4096 - pos`), Joint 6 (`gripper`) is mapped `[1195, 2833]` (raw 1195 = open, 2833 = closed).
+- Arm joint angle: `rad = (raw - 2048) * 2π / 4096` (4096 ticks per revolution); the simulation uses the same mapping.
 
 **4.4 Teleoperate** (sanity check, leader mirrors follower in real-time)
 
 ```bash
 uv run lerobot-teleoperate \
-  --robot.type=nexarm_follower --robot.port=<FOLLOWER_PORT> \
-  --teleop.type=nexarm_leader  --teleop.port=<LEADER_PORT> \
-  --robot.cameras="{ front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30}, wrist: {type: opencv, index_or_path: 1, width: 640, height: 480, fps: 30}}" \
+  --robot.type=nexarm_follower --robot.port=/dev/ttyUSB1 \
+  --teleop.type=nexarm_leader  --teleop.port=/dev/ttyUSB0 \
+  --robot.cameras="{ front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30}, wrist: {type: opencv, index_or_path: 1, width: 640, height: 480, fps: 30}, top: {type: intelrealsense, serial_number_or_name: <REALSENSE_SERIAL>, width: 640, height: 480, fps: 30}}" \
   --display_data=true
 ```
 
-Or run the ready script:
+Or run the ready script (defaults: leader `/dev/ttyUSB0`, follower `/dev/ttyUSB1`, `--front-cam 0 --wrist-cam 1`, RealSense top auto-detected; add `--no-top-cam` without one):
 
 ```bash
-uv run python examples/nexarm/teleoperate.py --robot-port <FOLLOWER_PORT> --leader-port <LEADER_PORT>
+uv run python examples/nexarm/teleoperate.py --leader-port /dev/ttyUSB0 --follower-port /dev/ttyUSB1
 ```
 
-**4.5 Record a dataset** — recording starts immediately, with no recording or reset timeout. Press **→** to end the episode, reset the scene and arm, then press **→** again to record the next episode. Reset movements are not recorded; the follower still follows the leader. Keys: **←** redo, **ESC** finish & upload. Use an interactive terminal; **n** also works in place of **→**.
+The `lerobot-*` CLIs open only the cameras in `--robot.cameras`; drop the `top` entry for front and wrist only. The camera set you record with is the one the policy will need at rollout.
+
+**4.5 Record a dataset** — recording starts immediately, with no recording or reset timeout. Press **→** to end the episode, reset the scene and arm, then press **→** again to record the next episode. Reset movements are not recorded; the follower still follows the leader. Keys: **←** redo, **ESC** finish (and upload, since `--dataset.push_to_hub` defaults to true). Use an interactive terminal; **n** also works in place of **→**. For the stack-bowls collection rig use `./scripts/nexarm/collect.sh` ([`DATA_COLLECTION_GUIDE.md`](./DATA_COLLECTION_GUIDE.md)).
 
 ```bash
 HF_USER=$(NO_COLOR=1 hf auth whoami | awk -F': *' 'NR==1 {print $2}')
 
 uv run lerobot-record \
-  --robot.type=nexarm_follower --robot.port=<FOLLOWER_PORT> \
-  --teleop.type=nexarm_leader  --teleop.port=<LEADER_PORT> \
-  --robot.cameras="{ front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30}, wrist: {type: opencv, index_or_path: 1, width: 640, height: 480, fps: 30}}" \
+  --robot.type=nexarm_follower --robot.port=/dev/ttyUSB1 \
+  --teleop.type=nexarm_leader  --teleop.port=/dev/ttyUSB0 \
+  --robot.cameras="{ front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30}, wrist: {type: opencv, index_or_path: 1, width: 640, height: 480, fps: 30}, top: {type: intelrealsense, serial_number_or_name: <REALSENSE_SERIAL>, width: 640, height: 480, fps: 30}}" \
   --dataset.repo_id=${HF_USER}/nexarm_cube_pick \
   --dataset.single_task="Pick the cube and place it into the tray" \
   --dataset.num_episodes=50 \
@@ -136,18 +128,20 @@ uv run lerobot-record \
   --display_data=true
 ```
 
+`lerobot-record` appends `_YYYYMMDD_HHMMSS` to the repo id (e.g. `${HF_USER}/nexarm_cube_pick_20261011_093000`) and prints the final `Dataset repo_id:` and `Dataset root:` at the end. Use that printed id in §4.6–4.7 (shown as `<YYYYMMDD_HHMMSS>`). Leave `--dataset.root` unset (a fixed root fails on the second run).
+
 **4.6 Replay an episode** (sanity check)
 
 ```bash
-uv run lerobot-replay --robot.type=nexarm_follower --robot.port=<FOLLOWER_PORT> \
-  --dataset.repo_id=${HF_USER}/nexarm_cube_pick --dataset.episode=0
+uv run lerobot-replay --robot.type=nexarm_follower --robot.port=/dev/ttyUSB1 \
+  --dataset.repo_id=${HF_USER}/nexarm_cube_pick_<YYYYMMDD_HHMMSS> --dataset.episode=0
 ```
 
 **4.7 Train** (default: ACT — fastest, lowest memory).
 
 ```bash
 uv run lerobot-train \
-  --dataset.repo_id=${HF_USER}/nexarm_cube_pick \
+  --dataset.repo_id=${HF_USER}/nexarm_cube_pick_<YYYYMMDD_HHMMSS> \
   --policy.type=act \
   --policy.device=cuda \
   --policy.push_to_hub=false \
@@ -157,14 +151,14 @@ uv run lerobot-train \
   --wandb.enable=false
 ```
 
-**4.8 Evaluate & Rollout on the real robot**
+**4.8 Evaluate & Rollout on the real robot** — use the same cameras as the training dataset; `examples/nexarm/rollout.py` exits at startup on a mismatch (add `--no-top-cam` for 2-camera policies).
 
 ```bash
 uv run lerobot-rollout \
   --strategy.type=base \
   --policy.path=outputs/train/act_nexarm/checkpoints/last/pretrained_model \
-  --robot.type=nexarm_follower --robot.port=<FOLLOWER_PORT> \
-  --robot.cameras="{ front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30}, wrist: {type: opencv, index_or_path: 1, width: 640, height: 480, fps: 30}}" \
+  --robot.type=nexarm_follower --robot.port=/dev/ttyUSB1 \
+  --robot.cameras="{ front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30}, wrist: {type: opencv, index_or_path: 1, width: 640, height: 480, fps: 30}, top: {type: intelrealsense, serial_number_or_name: <REALSENSE_SERIAL>, width: 640, height: 480, fps: 30}}" \
   --task="Pick the cube and place it into the tray" --duration=60
 ```
 
@@ -209,14 +203,14 @@ Same grasp, approach vector, and timing. Coherent strategies are much easier to 
 
 ### 5.7 Recommended defaults for your first task
 
-| Setting          | Value                                                                                                                                                                                                                     |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Episodes         | **50** to start, scale to 100–300 after first training                                                                                                                                                                    |
-| Episode length   | 20–45 s (shorter is fine for grasp/place)                                                                                                                                                                                 |
-| Reset time       | 10 s                                                                                                                                                                                                                      |
-| FPS              | 30                                                                                                                                                                                                                        |
-| Cameras          | **3 cameras supported**: fixed front + wrist + top (RealSense; add `--top-cam <serial>`). 2 (front + wrist) also works. Multi-view often outperforms single-view. A single fixed camera also works to keep things simple. |
-| Task description | Short, specific, action-phrased sentence                                                                                                                                                                                  |
+| Setting          | Value                                                                                                                                                                                                                                                                                                        |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Episodes         | **50** to start, scale to 100–300 after first training                                                                                                                                                                                                                                                       |
+| Episode length   | 20–45 s (shorter is fine for grasp/place)                                                                                                                                                                                                                                                                    |
+| Reset time       | No limit (`--dataset.reset_time_s=inf`, as in §4.5); press **→** when the scene is reset                                                                                                                                                                                                                     |
+| FPS              | 30                                                                                                                                                                                                                                                                                                           |
+| Cameras          | **3 cameras by default**: fixed front + wrist + top (RealSense, auto-detected; `--top-cam <serial>` if several). 2 (front + wrist, `--no-top-cam`) also works; keep the same set for training and rollout. Multi-view often outperforms single-view. A single fixed camera also works to keep things simple. |
+| Task description | Short, specific, action-phrased sentence                                                                                                                                                                                                                                                                     |
 
 ### 5.8 Troubleshooting signal
 
@@ -265,7 +259,7 @@ All policies typically train for **5–10 epochs** (see §7).
 
 | Policy group  | Status on NexArm       | Requirements & Compatibility Notes                                                   |
 | ------------- | ---------------------- | ------------------------------------------------------------------------------------ |
-| **ACT**       | **Validated Baseline** | Fully compatible. Standard 2-camera (front + wrist) + 6-DoF raw joint positions.     |
+| **ACT**       | **Validated Baseline** | Fully compatible. front + wrist (+ top) cameras + 6-DoF raw joint positions.         |
 | **TurboVLA**  | **Validated VLA**      | Fully compatible. Real-time 32 Hz VLA with <1GB VRAM. Uses DINOv3 + BERT + ACT head. |
 | **Diffusion** | **Validated Baseline** | Fully compatible. Requires `uv sync --extra diffusion`.                              |
 | **SmolVLA**   | **Validated Baseline** | Compatible VLA. Requires `uv sync --extra smolvla` and `--task` description.         |
@@ -359,19 +353,19 @@ lerobot-train ... --policy.type=smolvla \
 
 Two flavors of evaluation:
 
-### 8.1 Real-robot eval (SO-101, etc.)
+### 8.1 Real-robot eval (NexArm)
 
-Reuse `lerobot-record` with `--policy.path` to run the trained policy on-robot and save the run as an eval dataset. Convention: prefix the dataset with `eval_`.
+Run the trained policy on the robot with a `sentry` rollout, which saves the run as an eval dataset. Convention: prefix the dataset with `eval_` (`lerobot-record` rejects `eval_` names; it is for data collection only).
 
 ```bash
-lerobot-record \
-  --robot.type=so101_follower --robot.port=<FOLLOWER_PORT> --robot.id=my_follower \
-  --robot.cameras="{ front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30}}" \
-  --dataset.repo_id=${HF_USER}/eval_my_task \
-  --dataset.single_task="<same task description used during training>" \
-  --dataset.num_episodes=10 \
-  --policy.path=${HF_USER}/act_my_task
+uv run python examples/nexarm/rollout.py \
+  --follower-port /dev/ttyUSB1 \
+  --policy-path outputs/train/act_nexarm/checkpoints/last/pretrained_model \
+  --strategy sentry --repo-id ${HF_USER}/eval_nexarm_cube_pick \
+  --task "<same task description used during training>" --duration 120
 ```
+
+Cameras default to front, wrist and the RealSense top; add `--no-top-cam` for a 2-camera policy.
 
 Report success rate across episodes. Compare to a teleoperated baseline and to an earlier checkpoint to catch regressions.
 
@@ -430,14 +424,15 @@ Single-task grasp-and-place with 50 clean episodes: ACT should reach **> 70% suc
 
 ### 10.1 Generating & Resuming Datasets (`--resume`)
 
-When generating synthetic demonstration datasets (e.g. for bowl stacking or pick-and-place tasks), avoid overwriting existing data.
+Both generators (`generate_sim_dataset.py` for pick-and-place, `generate_stack_bowls_dataset.py` for bowl stacking) share these rules:
 
-- **Append mode**: Use `--resume` with `LeRobotDataset.resume(...)` to keep previous episodes intact.
-- **Avoid seed collisions**: Track the starting seed with `seed_start = dataset.meta.total_episodes` so newly generated trajectories explore unseen configurations instead of duplicating initial object positions.
+- **New run, new root**: a fresh run on an existing `--root` is an argparse error, so data is never overwritten.
+- **Append mode**: `--resume` reopens the dataset (also with `--workers`/`--gpus`) and continues after the last seed logged in `generation_episodes.jsonl`, so new episodes never repeat earlier layouts. It requires that file; datasets generated before the servo-constant joint mapping change have none and must be regenerated anyway.
+- **Defaults**: domain randomization on (`--no-dr` disables), `robot_type="nexarm_follower"`, `--split eval` for a held-out seed range, `--gpus 0,1` = GPU ids.
 
 ```bash
 # Append 100 new episodes without deleting existing data
-MUJOCO_GL=egl PYTHONPATH=src python examples/nexarm/generate_stack_bowls_dataset.py \
+MUJOCO_GL=egl uv run python examples/nexarm/generate_stack_bowls_dataset.py \
   --root outputs/datasets/nexarm_stack_bowls \
   --resume \
   --episodes 100
@@ -457,7 +452,7 @@ For concave or hollow objects like bowls and cups:
 LeRobot datasets support an arbitrary number of camera streams simultaneously.
 For manipulation and stacking tasks, the recommended 3-camera layout consists of:
 
-1. **`top` / `overhead` (Intel RealSense D435i)**: Mounted directly above the table looking straight down ($Z \approx 0.85$ m). Eliminates line-of-sight occlusions and provides precise $(X, Y)$ concentric alignment. Can record RGB or RGB-D (`use_depth=True`).
+1. **`top` (Intel RealSense D435i)**: Mounted above the table looking straight down (the sim `top` camera sits at $Z = 0.75$ m; match your rig with `calibrate_camera_alignment.py --camera-name top`). Eliminates line-of-sight occlusions and provides precise $(X, Y)$ concentric alignment. Only RGB is recorded into datasets; depth is checked during collection tests but not stored.
 2. **`front`**: Angled overview providing vertical $Z$-height, layer depth, and transit clearance.
 3. **`wrist`**: Gripper-mounted camera (e.g. OAK or mini camera) providing fine-grained finger-to-rim alignment during the final 5 cm of approach.
 

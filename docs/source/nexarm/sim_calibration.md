@@ -22,13 +22,15 @@ This guide makes the MuJoCo twin behave like your physical arm, then generates s
 
 The fit needs episodes where the arm moves freely and moves a lot. A recording of a pick-and-place task works poorly, because contact with the cube biases the fit and several joints barely move.
 
-Record 15–25 episodes with the same follower, leader, fps (30) and settings you use for real data collection. No object is needed, and the cameras are optional because calibration reads only joint data.
+Record 15–25 episodes with the same follower, leader, fps (30) and settings you use for real data collection. No object is needed. `record.py` still opens and records its cameras (front, wrist and, by default, the RealSense top camera; add `--no-top-cam` if you have none), but calibration reads only joint data.
 
 ```bash
 uv run python examples/nexarm/record.py \
-    --follower-port <FOLLOWER_PORT> --leader-port <LEADER_PORT> \
+    --leader-port /dev/ttyUSB0 --follower-port /dev/ttyUSB1 \
     --repo-id <user>/nexarm_sysid --num-episodes 20
 ```
+
+The recorder appends a timestamp to the repo id and prints the final `Dataset repo_id:` (e.g. `<user>/nexarm_sysid_20261011_093000`) and `Dataset root:`. Use that printed id as `<sysid_repo_id>` below.
 
 Per episode, move the leader arm like this:
 
@@ -48,7 +50,7 @@ Tips:
 ```bash
 uv run python - <<'EOF'
 from lerobot.datasets.lerobot_dataset import LeRobotDataset
-ds = LeRobotDataset("<user>/nexarm_sysid")
+ds = LeRobotDataset("<sysid_repo_id>")
 print(ds.meta.total_episodes, "episodes", ds.meta.total_frames, "frames", ds.fps, "fps")
 print(ds.meta.features["action"]["names"])
 EOF
@@ -64,7 +66,7 @@ Confirm that:
 
 ```bash
 MUJOCO_GL=egl uv run python examples/nexarm/calibrate_sim.py \
-    --repo-id <user>/nexarm_sysid \
+    --repo-id <sysid_repo_id> \
     --episodes 20 \
     --out outputs/calibration/nexarm_sim_calibration.json
 ```
@@ -123,9 +125,17 @@ MUJOCO_GL=egl uv run python examples/nexarm/generate_sim_dataset.py \
     --episodes 200 --workers 4 --gpus 0,1,2,3
 ```
 
-This sets the simulated action delay to the fitted value (sampled per episode within ±1), scales the joint dynamics, and centers domain randomization on the fitted values with the fitted spreads. The calibration file's hash is recorded in `generation_report.json`.
+This sets the simulated action delay to the fitted value (sampled per episode within ±1), scales the joint dynamics, and centers domain randomization (on by default in both generators) on the fitted values with the fitted spreads, for the joints it fitted only. The calibration file's hash is recorded in `generation_report.json`. `generate_stack_bowls_dataset.py` accepts the same `--calibration`, `--action-delay-steps` and `--action-delay-range` options.
 
-To use the same calibrated arm in the gym environment or the robot class, set `calibration_path` in `NexArmSimConfig`.
+The file records the `fps` it was fitted at; every loader refuses a run at a different fps (the generators reject it at argument parsing). Precedence everywhere is explicit value > calibration > default: `--action-delay-steps` overrides the calibrated delay.
+
+The same calibration is available in:
+
+- the gym environment: `--env.calibration_path`, `--env.action_delay_steps`, `--env.enable_domain_randomization`,
+- the benchmark: `lerobot-nexarm-sim-benchmark --calibration PATH --action-delay-steps N --dr`,
+- the robot class: `calibration_path` in `NexArmSimConfig`.
+
+Calibrations fitted before the servo-constant joint mapping (`rad = (raw - 2048) * 2π / 4096`) are stale and are refused on load (they carry no matching `joint_mapping`): re-run Step 3, then regenerate any sim data made with them.
 
 Use `--split eval` to generate a held-out evaluation set. Its seeds never overlap with the training seeds.
 
@@ -145,7 +155,7 @@ Policies see images, so wrong camera geometry causes a bigger sim-to-real gap th
 uv run python examples/nexarm/calibrate_camera_alignment.py --cam-index 0 --camera-name front
 ```
 
-The tool overlays the simulated view on the live camera. Keys: `m` switches mode, `+` and `-` change the blend, `s` saves a snapshot, `q` quits. Compare the table edge, the base of the arm and the target zone. If they do not line up, edit the camera `pos`, `quat` or `fovy` in the scene XML (`sim/fusion_export/`) until they do, then repeat for `wrist` and `top`. Check that the resolution and fps match your real cameras.
+The tool overlays the simulated view on the live camera. Keys: `m` switches mode, `+` and `-` change the blend, `s` saves a snapshot, `q` quits. Compare the table edge, the base of the arm and the target zone. If they do not line up, edit the camera `pos`, `quat`/`xyaxes` or `fovy` in the scene XML (`sim/fusion_export/`) until they do, then repeat with `--camera-name wrist` and `--camera-name top`. For `top`, pass the RealSense RGB V4L2 node as `--cam-index` (e.g. `/dev/video4`); the sim top camera looks straight down from 0.75 m. Check that the resolution and fps match your real cameras.
 
 ## Step 8. Match the scene
 

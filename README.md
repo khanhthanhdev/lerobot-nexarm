@@ -68,12 +68,12 @@ For on‑device perception, NexArm integrates a 6 TOPS K230 vision module, allow
 
 ### Components
 
-| Component        | Description                                                                                               |
-| ---------------- | --------------------------------------------------------------------------------------------------------- |
-| **Leader arm**   | ESP32 board driving 6 × HX-30HM servos. Operator freely moves this arm during teleoperation.              |
-| **Follower arm** | ESP32 + AT32F421 co-processor driving 6 × HX-30HM servos. Mirrors the leader or executes policy output.   |
-| **Servos**       | HX-30HM serial bus servos — 12-bit resolution (0–4095), 1 Mbps, high torque.                              |
-| **Cameras**      | 2 × USB cameras: `front` (top-down workspace view) and `wrist` (end-effector close-up), 640×480 @ 30 FPS. |
+| Component        | Description                                                                                             |
+| ---------------- | ------------------------------------------------------------------------------------------------------- |
+| **Leader arm**   | ESP32 board driving 6 × HX-30HM servos. Operator freely moves this arm during teleoperation.            |
+| **Follower arm** | ESP32 + AT32F421 co-processor driving 6 × HX-30HM servos. Mirrors the leader or executes policy output. |
+| **Servos**       | HX-30HM serial bus servos — 12-bit resolution (0–4095), 1 Mbps, high torque.                            |
+| **Cameras**      | `front` and `wrist` USB cameras plus an Intel RealSense D435i `top` camera (RGB), all 640×480 @ 30 FPS. |
 
 ### Joint Layout (6 DOF)
 
@@ -84,7 +84,9 @@ For on‑device perception, NexArm integrates a 6 TOPS K230 vision module, allow
 | 3     | `elbow_flex`    | Elbow                                             |
 | 4     | `wrist_flex`    | Wrist pitch                                       |
 | 5     | `wrist_roll`    | Wrist rotation                                    |
-| 6     | `gripper`       | Open/close, mapped range [1195, 2833]             |
+| 6     | `gripper`       | Raw range [1195, 2833]: 1195 open, 2833 closed    |
+
+Arm joints use the servo constant `rad = (raw - 2048) * 2π / 4096`; the MuJoCo simulation uses the same mapping.
 
 ### Communication Protocol
 
@@ -115,24 +117,13 @@ git clone https://github.com/Hiwonder-official/lerobot-nexarm.git
 cd lerobot-nexarm
 ```
 
-Choose the dependency profile matching your workflow:
+Install the full NexArm profile (simulation data generation, real collection and rollout with the RealSense top camera, training, tests):
 
 ```bash
-# 1. Simulation Only (MuJoCo, Gymnasium, PyTorch, OpenCV, PySerial)
-uv sync --locked
-
-# 2. Physical Hardware & Teleoperation (adds serial protocols + Rerun viz)
-uv sync --locked --extra nexarm --extra viz
-
-# 3. Hardware + Policy Training (adds datasets, wandb, accelerate)
-uv sync --locked --extra nexarm --extra training --extra viz
-
-# 4. Development & Testing (adds pytest, ruff, mypy, pre-commit)
-uv sync --locked --extra nexarm --extra dev --extra test
-
-# 5. Full Stack (all policies, simulation tools, benchmarks)
-uv sync --locked --extra all
+uv sync --locked --extra test --extra dev --extra core_scripts --extra training --extra nexarm --extra intelrealsense
 ```
+
+Add policy extras to that line (TurboVLA: `--extra smolvla --extra groot`), or use `--extra all` for everything. `uv sync` uninstalls extras you do not list. The full table is in [`run.md`, Dependency Profiles](run.md#dependency-profiles).
 
 > **Important**: Always run commands through `uv run <command>` (e.g. `uv run python ...` or `uv run lerobot-train`). Do not manually activate the `.venv` or install packages with `pip`.
 
@@ -161,7 +152,7 @@ _(Log out and log back in for the group membership change to take effect)._
 
 1. Plug the **follower arm** ESP32 into the PC via USB and connect its 12V / 5A power supply.
 2. Plug the **leader arm** ESP32 into the PC via USB (powered via USB).
-3. Plug in both USB cameras (`front` top-down workspace view and `wrist` end-effector view).
+3. Plug in the USB cameras (`front` workspace view and `wrist` end-effector view) and the RealSense D435i `top` camera. The top camera is on by default; without one, pass `--no-top-cam` to the example scripts.
 
 ### Platform Support
 
@@ -193,7 +184,7 @@ uv run python examples/nexarm/simulate.py
 
 ### 6-DOF Cartesian Keyboard Teleoperation
 
-Control the simulated robot's end-effector in 3D Cartesian task space ($X, Y, Z$, Roll, Pitch, Yaw) with real-time Damped Least-Squares (DLS) Inverse Kinematics:
+Control the simulated robot's end-effector in 3D Cartesian task space ($X, Y, Z$, Roll, Pitch, Yaw) with real-time Damped Least-Squares (DLS) Inverse Kinematics (Linux/macOS only; the script needs `termios`):
 
 ```bash
 uv run python examples/nexarm/teleoperate_cartesian.py --robot sim
@@ -211,7 +202,7 @@ uv run python examples/nexarm/teleoperate_cartesian.py --robot sim
 - **`1` / `2` / `3`**: Step size: Fine (2 mm), Medium (5 mm), Coarse (15 mm)
 - **`H`**: Return to Home pose | **`Q`**: Exit
 
-> _Headless / CI mode_: Add `--dry-run` to run 50 headless steps without a GUI:
+> _Headless / CI mode_: Add `--dry-run` to run 5 headless steps without a GUI:
 >
 > ```bash
 > uv run python examples/nexarm/teleoperate_cartesian.py --robot sim --dry-run
@@ -235,15 +226,17 @@ uv run python examples/nexarm/demo_gym_env.py
 
 ### Sim Dataset Generation with Domain Randomization
 
-Generate synthetic demonstration datasets with visual and dynamics domain randomization, plus simulated USB transport latency:
+Generate synthetic demonstration datasets with visual, dynamics and object domain randomization (on by default; `--no-dr` disables it), plus simulated USB transport latency:
 
 ```bash
-uv run python examples/nexarm/generate_sim_dataset.py \
+MUJOCO_GL=egl uv run python examples/nexarm/generate_sim_dataset.py \
   --repo-id local/nexarm_sim2real \
-  --num-episodes 50 \
-  --domain-randomization \
+  --root outputs/datasets/nexarm_sim2real \
+  --episodes 50 \
   --action-delay-steps 2
 ```
+
+Each run needs a new `--root` (`--resume` appends). See [`run.md`, section 2.5](run.md#25-sim-dataset-generation-with-domain-randomization).
 
 ### Rerun 3D Simulation Showcase
 
@@ -267,17 +260,18 @@ Identify which serial port corresponds to the leader arm and which to the follow
 uv run lerobot-find-port
 ```
 
-- **Linux**: Typically `/dev/ttyUSB0` (Leader) and `/dev/ttyUSB1` (Follower).
+- **Linux**: `/dev/ttyUSB0` (Leader) and `/dev/ttyUSB1` (Follower), the default in every script.
 - **Windows**: Typically `COM18` (Leader) and `COM19` (Follower).
 
 > _Tip_: Plug in one arm at a time if you are unsure which port belongs to which arm.
 
 ### Step 2: Find Cameras
 
-Scan and identify the OpenCV indices for the `front` and `wrist` cameras:
+Scan and identify the OpenCV indices for the `front` and `wrist` cameras and the RealSense serial for `top`:
 
 ```bash
 uv run lerobot-find-cameras opencv
+uv run lerobot-find-cameras realsense
 ```
 
 Save test snapshots to confirm views:
@@ -298,6 +292,7 @@ for idx in [0, 1]:
 
 - **`front`**: Top-down view of the entire workspace.
 - **`wrist`**: Close-up view of the gripper and end-effector.
+- **`top`**: RealSense looking down at the table; auto-detected when exactly one is connected (`--top-cam <serial>` otherwise, `--no-top-cam` to disable).
 
 ### Step 3: Leader-Follower Teleoperation
 
@@ -331,9 +326,11 @@ uv run python examples/nexarm/teleoperate.py \
 uv run lerobot-teleoperate \
   --robot.type=nexarm_follower --robot.port=/dev/ttyUSB1 \
   --teleop.type=nexarm_leader  --teleop.port=/dev/ttyUSB0 \
-  --robot.cameras='{"front":{"type":"opencv","index_or_path":0,"width":640,"height":480,"fps":30},"wrist":{"type":"opencv","index_or_path":1,"width":640,"height":480,"fps":30}}' \
+  --robot.cameras='{"front":{"type":"opencv","index_or_path":0,"width":640,"height":480,"fps":30},"wrist":{"type":"opencv","index_or_path":1,"width":640,"height":480,"fps":30},"top":{"type":"intelrealsense","serial_number_or_name":"<REALSENSE_SERIAL>","width":640,"height":480,"fps":30}}' \
   --display_data=true
 ```
+
+Remove the `top` entry to run with front and wrist only.
 
 ### Step 4: 6-DOF Cartesian Hardware Teleoperation
 
@@ -353,7 +350,7 @@ Execute autonomous visual object detection (HSV color tracking), 2D-to-3D worksp
 uv run python examples/nexarm/vision_grasp.py \
   --robot real \
   --port /dev/ttyUSB1 \
-  --camera-index 0
+  --cam-index 0
 ```
 
 ### Step 6: Collect a Dataset
@@ -368,6 +365,8 @@ uv run python examples/nexarm/record.py \
   --num-episodes 50 --episode-time 10 --reset-time 10
 ```
 
+The recorder appends a timestamp to the repo id (e.g. `local/nexarm_pick_20261011_093000`) and prints the final `Dataset repo_id:` and `Dataset root:`; use that id below. For the stack-bowls collection rig use `./scripts/nexarm/collect.sh` ([`DATA_COLLECTION_GUIDE.md`](DATA_COLLECTION_GUIDE.md)).
+
 **Episode Controls:**
 
 - **`Enter`**: Start / confirm next episode.
@@ -378,11 +377,11 @@ uv run python examples/nexarm/record.py \
 
 ```bash
 # Visualize dataset
-uv run lerobot-dataset-viz --repo-id local/nexarm_pick --episode-index 0
+uv run lerobot-dataset-viz --repo-id local/nexarm_pick_<YYYYMMDD_HHMMSS> --episode-index 0
 
 # Replay episode on follower arm
 uv run lerobot-replay --robot.type=nexarm_follower --robot.port=/dev/ttyUSB1 \
-  --dataset.repo_id=local/nexarm_pick --dataset.episode=0
+  --dataset.repo_id=local/nexarm_pick_<YYYYMMDD_HHMMSS> --dataset.episode=0
 ```
 
 ### Step 7: Train a Policy
@@ -391,7 +390,7 @@ Train an ACT (Action Chunking with Transformers) policy on the collected dataset
 
 ```bash
 uv run lerobot-train \
-  --dataset.repo_id=local/nexarm_pick \
+  --dataset.repo_id=local/nexarm_pick_<YYYYMMDD_HHMMSS> \
   --policy.type=act \
   --policy.device=cuda \
   --policy.push_to_hub=false \
@@ -425,6 +424,8 @@ uv run python examples/nexarm/rollout.py \
   --front-cam 0 --wrist-cam 1 --strategy base
 ```
 
+The opened cameras must match the policy's image inputs, or the script exits at startup. Add `--no-top-cam` for a policy trained on front and wrist only (for example on the legacy `thanhkt/nexarm_stack_bowls` dataset).
+
 ---
 
 ## Sim-to-Real Pre-Flight Alignment
@@ -433,20 +434,22 @@ Before deploying a policy trained in simulation onto the real arm, verify that t
 
 ```bash
 uv run python examples/nexarm/calibrate_camera_alignment.py \
-  --camera top \
-  --real-camera-index 0 \
-  --blend-alpha 0.5
+  --camera-name front \
+  --cam-index 0
 ```
 
-- Press **`M`**: Cycle view mode (Alpha Blend $\to$ Side-by-Side $\to$ Canny Edge Overlay).
-- Press **`[` / `]`**: Adjust transparency.
-- Press **`S`**: Save alignment snapshot.
+- `--camera-name` is `front`, `wrist` or `top`; `--cam-index` takes an OpenCV index or device path (for the RealSense, its RGB node such as `/dev/video4`).
+- Press **`m`**: Cycle view mode (Alpha Blend $\to$ Side-by-Side $\to$ Canny Edge Overlay).
+- Press **`+` / `-`**: Adjust transparency.
+- Press **`s`**: Save alignment snapshot; **`q`** quits.
+
+Full procedure: [`docs/source/nexarm/sim_calibration.md`](docs/source/nexarm/sim_calibration.md).
 
 ---
 
 ## Kinematics & Dynamics Python API
 
-Module: [`src/lerobot/motors/nexarm/kinematics_dynamics.py`](file:///home/thanh/code/vinuni/lerobot-nexarm/src/lerobot/motors/nexarm/kinematics_dynamics.py)
+Module: [`src/lerobot/motors/nexarm/kinematics_dynamics.py`](src/lerobot/motors/nexarm/kinematics_dynamics.py)
 
 ```python
 import numpy as np

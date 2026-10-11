@@ -21,8 +21,8 @@ The shortest complete workflow is:
 | ------------------------------------------------- | --------------- | --------------------------------------------------------------------------------- |
 | MuJoCo viewer and actuator sliders                | Ready           | Six controls: five arm joints and the gripper.                                    |
 | Physical NexArm leader to simulated follower      | Ready           | The leader uses the Hiwonder firmware and USB protocol.                           |
-| LeRobot `Robot` interface                         | Ready           | Registered as `--robot.type=nexarm_sim`.                                          |
-| Front and wrist RGB cameras                       | Ready           | Both render at 640 x 480 by default.                                              |
+| LeRobot `Robot` interface                         | Ready           | `--robot.type=nexarm_sim`; reports `robot_type="nexarm_follower"`.                |
+| Front, wrist and top RGB cameras                  | Ready           | All three render at 640 x 480 by default.                                         |
 | Object contact and grasping                       | Ready           | The scene contains a free red cube and jaw collision bodies.                      |
 | LeRobot record, replay, and rollout               | Ready           | Uses the same six action/state feature names as the physical follower.            |
 | Seeded pick/place reset and success detection     | Ready           | `NexArmPickPlaceTask` checks grasp, release, stable placement, drop, and timeout. |
@@ -95,9 +95,11 @@ the same leader serial port at the same time.
   control loop.
 - `../examples/nexarm/pick_place_sim.py` launches the seeded pick/place test.
 
-The model uses a 2 ms physics timestep, or 500 physics steps per second. At the
-default 30 Hz LeRobot control rate, each action advances approximately 17
-MuJoCo steps.
+The model declares a 2 ms physics timestep. The simulator rounds that to a whole
+number of physics steps per control frame and then shrinks the timestep so the
+frame is covered exactly: at the default 30 Hz control rate each action advances
+17 steps of 1/510 s (about 1.96 ms), so simulated time per frame equals the
+1/fps timestamp stored in datasets.
 
 `nexarm_mount` recenters the Fusion assembly around the base axis and provides
 one transform for placing the complete robot in a larger scene. Arm joints use
@@ -109,25 +111,40 @@ self-collision is enabled, while explicit exclusions cover connected link pairs.
 
 The simulated robot exposes the same LeRobot keys as the physical follower:
 
-| LeRobot feature     | MuJoCo joint               | Raw input |      MuJoCo control range |
-| ------------------- | -------------------------- | --------: | ------------------------: |
-| `shoulder_pan.pos`  | `joint_1_base_to_link_1`   |    0-4095 | -2.356194 to 2.356194 rad |
-| `shoulder_lift.pos` | `joint_2_link_1_to_link_2` |    0-4095 | -2.094395 to 2.094395 rad |
-| `elbow_flex.pos`    | `joint_3_link_2_to_link_3` |    0-4095 | -2.356194 to 2.356194 rad |
-| `wrist_flex.pos`    | `joint_4_link_3_to_link_4` |    0-4095 | -1.745329 to 1.745329 rad |
-| `wrist_roll.pos`    | `joint_5_link_4_to_link_5` |    0-4095 | -3.141593 to 3.141593 rad |
-| `gripper.pos`       | `right_jaw_slide_joint`    | 1195-2833 |            -0.0255 to 0 m |
+| LeRobot feature     | MuJoCo joint               | Raw input | MuJoCo joint range (clamp) | Reachable raw |
+| ------------------- | -------------------------- | --------: | -------------------------: | ------------: |
+| `shoulder_pan.pos`  | `joint_1_base_to_link_1`   |    0-4095 |  -2.356194 to 2.356194 rad |      512-3584 |
+| `shoulder_lift.pos` | `joint_2_link_1_to_link_2` |    0-4095 |  -2.094395 to 2.094395 rad |      683-3413 |
+| `elbow_flex.pos`    | `joint_3_link_2_to_link_3` |    0-4095 |  -2.356194 to 2.356194 rad |      512-3584 |
+| `wrist_flex.pos`    | `joint_4_link_3_to_link_4` |    0-4095 |  -1.745329 to 1.745329 rad |      910-3186 |
+| `wrist_roll.pos`    | `joint_5_link_4_to_link_5` |    0-4095 |  -3.141593 to 3.141593 rad |        0-4095 |
+| `gripper.pos`       | `right_jaw_slide_joint`    | 1195-2833 |              0 to 0.0255 m |     1195-2833 |
 
-The conversion is linear:
+Arm joints use the HX-30HM servo constant (4096 ticks per revolution around the
+2048 center), the same scale as the physical follower. The MuJoCo joint range
+only clamps, like a hard stop, so raw values outside "Reachable raw" saturate:
 
 ```text
-ratio = (raw - raw_min) / (raw_max - raw_min)
-control = control_min + ratio * (control_max - control_min)
+angle_rad = clamp((raw - 2048) * 2*pi / 4096, joint_min, joint_max)
+raw       = 2048 + angle_rad * 4096 / (2*pi)
 ```
 
-The five arm joints reset to raw position `2048`. The gripper resets to `2833`,
-which maps to the closed position. Raw gripper position `1195` maps to the open
-position. An equality constraint moves the left jaw in the opposite direction,
+The gripper maps its raw range linearly and inverted onto the jaw slide joint
+(not `gripper_pinion_joint`), so raw `2833` is closed and raw `1195` fully open:
+
+```text
+slide_m = slide_min + (2833 - raw) / (2833 - 1195) * (slide_max - slide_min)
+```
+
+One implementation, `src/lerobot/motors/nexarm/mujoco_mapping.py`
+(`raw_to_joint_position` / `joint_position_to_raw`), is shared by the simulator
+backend and `NexArmKinematicsDynamics`. It reads the MuJoCo joint range, not the
+actuator `ctrlrange`, so kinematics-only models work too. Datasets and
+calibrations produced with the earlier per-joint linear stretch over
+`ctrlrange` encode different angles and must be regenerated.
+
+The five arm joints reset to raw position `2048` (0 rad). The gripper resets to
+`2833`, the closed position. An equality constraint moves the left jaw in the opposite direction,
 giving 51 mm of total additional jaw travel.
 
 The pinion remains in the visual model but is fixed to the gripper body. A
@@ -135,9 +152,11 @@ The pinion remains in the visual model but is fixed to the gripper body. A
 improving manipulation physics, so jaw motion is represented by the two linear
 slides only.
 
-This mapping is interface-compatible, but it has not yet been measured against
-the physical arm at multiple poses. Before sim-to-real deployment, compare real
-and simulated zero positions, endpoints, and direction for every joint.
+The tick scale now matches the servo, but the physical zero and sign of each
+joint (for example `shoulder_lift`) have not been verified against the real arm,
+and the joints are assumed to be direct-drive. Before sim-to-real deployment,
+compare real and simulated zero positions, endpoints, and direction for every
+joint.
 
 ## 1. Install
 
@@ -227,7 +246,7 @@ uv run lerobot-teleoperate \
   --display_data=true
 ```
 
-This path renders the `front` and `wrist` camera observations but does not open
+This path renders the `front`, `wrist` and `top` camera observations but does not open
 the interactive MuJoCo viewer. Use `examples/nexarm/simulate.py` when the main
 goal is visually playing with the scene.
 
@@ -247,12 +266,22 @@ MUJOCO_GL=egl uv run python examples/nexarm/generate_sim_dataset.py \
 ```
 
 Each accepted episode contains the six raw NexArm state values, the six raw
-NexArm actions, and 640 x 480 `front` and `wrist` camera videos at 30 FPS.
-Seeds randomize the cube and target poses, failed IK or manipulation attempts
-are discarded, and the command exits nonzero if it cannot produce the requested
-accepted episode count. `generation_report.json` records the accepted seeds,
-rejection reasons, camera/FPS contract, and model SHA-256 so a dataset can be
-reproduced against the same scene.
+NexArm actions, and 640 x 480 `front`, `wrist` and `top` camera videos at 30 FPS,
+with `robot_type="nexarm_follower"` like a real recording. Seeds randomize the
+cube and target poses, failed IK or manipulation attempts are discarded, and the
+command exits nonzero if it cannot produce the requested accepted episode count.
+`generation_report.json` records the accepted seeds, rejection reasons,
+camera/FPS contract, and model SHA-256 so a dataset can be reproduced against
+the same scene; `generation_episodes.jsonl` logs one line per attempt.
+
+Visual, dynamics and object domain randomization is on by default (`--no-dr`
+disables it). `--calibration PATH` applies a `SimCalibration` from
+`calibrate_sim.py` (its fps must equal `--fps`), `--action-delay-steps N`
+overrides its delay (explicit value > calibration > 0), `--split eval` uses a
+held-out seed range, and `--gpus 0,1` takes comma-separated GPU ids (one worker
+per id by default). `generate_stack_bowls_dataset.py` accepts the same options.
+Datasets and calibrations made before the servo-constant joint mapping above
+encode different angles and must be regenerated.
 
 Use a small image-backed dataset to verify a new machine before committing to
 full-resolution video rendering:
@@ -268,10 +297,12 @@ MUJOCO_GL=egl uv run python examples/nexarm/generate_sim_dataset.py \
   --no-video
 ```
 
-`--no-video` still stores both camera streams, but keeps individual images
-instead of encoding MP4 shards. Output roots must be new directories; this
-prevents an accidental mixture of schemas, resolutions, or partially generated
-runs.
+`--no-video` still stores every camera stream, but keeps individual images
+instead of encoding MP4 shards. A fresh run on an existing `--root` is an
+error, which prevents an accidental mixture of schemas, resolutions, or
+partially generated runs. To extend a dataset, rerun with `--resume` (also with
+`--workers`/`--gpus`): it checks that the features still match and continues
+after the last seed logged in `generation_episodes.jsonl`, which it requires.
 
 ### Record with the physical leader later
 
@@ -287,7 +318,6 @@ uv run lerobot-record \
   --teleop.id=nexarm_leader \
   --teleop.port=/dev/ttyUSB0 \
   --dataset.repo_id=YOUR_HF_USERNAME/nexarm_sim_pick_cube \
-  --dataset.root=outputs/datasets/nexarm_sim_pick_cube \
   --dataset.single_task="Pick up the red cube" \
   --dataset.num_episodes=20 \
   --dataset.episode_time_s=15 \
@@ -297,8 +327,12 @@ uv run lerobot-record \
 ```
 
 The dataset contains six raw joint state values, six raw action values, and the
-front and wrist RGB streams. Keeping `--dataset.root` explicit makes local
-recording, visualization, replay, and backup use the same directory.
+front, wrist and top RGB streams. `lerobot-record` appends `_YYYYMMDD_HHMMSS`
+to the repo id and prints the final `Dataset repo_id:` and `Dataset root:`
+(under `~/.cache/huggingface/lerobot/`); pass those to visualization, replay
+and training. A fixed `--dataset.root` is not timestamped and fails with
+`FileExistsError` on the second run, so leave it unset or make it unique per
+session.
 `NexArmPickPlaceTask.reset(seed=...)` provides
 repeatable cube and target randomization for custom recording loops. The
 standard `lerobot-record` command still calls `NexArmSim.reset()` directly, so
@@ -312,6 +346,10 @@ Install the local dataset viewer:
 uv sync --locked --extra dataset_viz
 ```
 
+The full NexArm profile from [`run.md`](../run.md#dependency-profiles) already
+includes it; add `--extra dataset_viz` to your existing extras rather than
+syncing it alone, because `uv sync` removes extras you do not list.
+
 Open episode 0 in Rerun:
 
 ```bash
@@ -322,7 +360,7 @@ uv run lerobot-dataset-viz \
   --episode-index=0
 ```
 
-Rerun shows both camera streams next to the six state and six action curves, so
+Rerun shows every camera stream next to the six state and six action curves, so
 use it to find blurred frames, control lag, bad demonstrations, and inconsistent
 end states before training. Save a portable Rerun recording instead of opening
 the viewer immediately with:
@@ -399,8 +437,8 @@ uv run lerobot-rollout \
 ```
 
 `base` runs the policy autonomously and exits after `--duration` seconds. It
-does not save a dataset. `--display_data=true` streams the simulated front and
-wrist observations to Rerun; it does not open the interactive MuJoCo viewer.
+does not save a dataset. `--display_data=true` streams the simulated camera
+observations to Rerun; it does not open the interactive MuJoCo viewer.
 `--rerun_save_path` preserves the visual trace so it can be opened again with
 `uv run rerun outputs/rollouts/act_nexarm_sim.rrd`.
 
@@ -435,6 +473,9 @@ Install the policy-specific server dependencies once:
 uv sync --locked --extra dataset --extra pi --extra smolvla
 ```
 
+On a machine with the full NexArm profile, add `--extra pi --extra smolvla` to
+that line instead (see [`run.md`](../run.md#dependency-profiles)).
+
 Pass each trained checkpoint with a unique label. Policies are loaded one at a
 time so large VLA checkpoints do not remain together in GPU memory:
 
@@ -455,6 +496,15 @@ control rate, load time, parameter count, and peak CUDA memory. Add
 `--realtime` when wall-clock control timing matters; without it, MuJoCo runs as
 fast as inference and rendering allow.
 
+`--calibration PATH` loads a `SimCalibration` JSON from
+`examples/nexarm/calibrate_sim.py` (its fps must equal `--fps`, otherwise the
+run is refused), `--action-delay-steps N` overrides its latency (precedence:
+explicit value > calibration > 0), and `--dr` enables per-episode domain
+randomization (off by default for reproducible comparisons). The gym
+environment (`--env.type=nexarm`) exposes the same options as
+`--env.calibration_path`, `--env.action_delay_steps` and
+`--env.enable_domain_randomization`.
+
 Treat success rate as the primary task metric, then use termination reasons to
 separate drops from timeouts and p95 latency to check whether a policy can
 sustain the target control rate. The benchmark intentionally does not encode
@@ -462,7 +512,7 @@ videos because rendering and encoding would distort timing; use a recorded
 `sentry` rollout for qualitative video comparison.
 
 Each checkpoint must have been trained or fine-tuned on the six NexArm action
-features and the configured `front`/`wrist` cameras. A generic base VLA
+features and the configured cameras (`front`, `wrist`, `top` by default). A generic base VLA
 checkpoint does not have the NexArm normalization statistics or action
 contract, so it is not directly comparable.
 
@@ -522,7 +572,7 @@ uv run --locked --extra test pytest tests/robots/test_nexarm_sim.py -q
 The tests verify:
 
 - raw servo value to MuJoCo control conversion and reverse conversion;
-- simulation stepping and both camera outputs;
+- simulation stepping and the front, wrist and top camera outputs;
 - the same six LeRobot features as the physical follower;
 - active damping, friction loss, armature, and collision masks;
 - increasing jaw separation for the documented open command;
@@ -565,12 +615,15 @@ use record or rollout without launching `examples/nexarm/simulate.py`.
 
 ## Remaining work for a high-fidelity simulator
 
-1. Measure the physical follower's raw zero, direction, and reachable raw range
-   for all six joints and store a simulation calibration profile.
-2. Identify HX-30HM torque, velocity, damping, deadband, backlash, and command
-   latency instead of relying on generic position gains.
-3. Add sensor noise, control delay, camera calibration, textures, lighting
-   randomization, and physical friction measurements for sim-to-real training.
+1. Confirm on hardware that the physical follower's raw zero and direction
+   match the simulation for all six joints (especially `shoulder_lift`).
+   `calibrate_sim.py` already fits latency and per-joint gain, damping and
+   friction from real recordings (see `docs/source/nexarm/sim_calibration.md`).
+2. Identify HX-30HM torque, velocity limit (the follower's `motion_speed` cap
+   is not modelled), deadband and backlash instead of relying on generic
+   position gains.
+3. Add sensor noise and physical friction measurements; control delay, camera
+   alignment and visual/dynamics/object randomization already exist.
 4. Implement a Gymnasium environment with deterministic reset, cube
    randomization, reward, termination, and success metrics.
 5. Add automatic episode resets so large simulation datasets do not require

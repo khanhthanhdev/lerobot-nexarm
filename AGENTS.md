@@ -36,6 +36,9 @@ git lfs install && git lfs pull             # Test artifacts
 
 ```bash
 uv run pytest tests -svv --maxfail=10                # All tests
+uv run pytest tests/robots/test_nexarm_follower.py::test_config_defaults -svv  # Single test
+uv run pytest tests -k nexarm -svv                   # All NexArm-related tests (hardware is mocked)
+make test-nexarm-ete                                 # NexArm sim gym integration test
 DEVICE=cuda make test-end-to-end                     # All E2E tests
 uv run pre-commit run --all-files --show-diff-on-failure  # Full quality suite
 ```
@@ -73,9 +76,22 @@ Run the full pre-commit suite before submitting changes. `pyproject.toml` owns R
 - **`benchmarks/`** — Performance benchmarking scripts.
 - **Root files**: `pyproject.toml` (single source of truth for deps, build, tool config), `Makefile` (E2E test targets), `uv.lock`, `CONTRIBUTING.md` & `README.md` (general information).
 
+## Scope of the Fork
+
+Only the hardware layers (`robots/`, `motors/`, `teleoperators/`) were pruned to NexArm (plus keyboard/gamepad teleop). Upstream policies (`act`, `diffusion`, `smolvla`, `pi0*`, `groot`, ...) and simulation envs (`aloha`, `pusht`, `libero`, `metaworld`, ...) are still registered, and the `make test-end-to-end` targets still train on upstream `aloha` datasets.
+
+## Git Submodules and TurboVLA
+
+`TurboVLA/` and `bspline-policy/` are git submodules and are empty after a plain clone; run `git submodule update --init --recursive` before using them. The TurboVLA workflow lives in `examples/nexarm/` (`setup_turbovla.py`, `train_turbovla.py`, `rollout_turbovla.py`, `diagnose_turbovla.py`) and resolves the repo-root `TurboVLA/` directory. Multi-GPU and Slurm launchers are in `scripts/nexarm/`.
+
+## User-Facing Guides
+
+Point to these rather than re-deriving workflows: `run.md` (sim, hardware, teleop, training, sim2real commands), `AGENT_GUIDE.md`, `DATA_COLLECTION_GUIDE.md`, `SERVER_TRAINING_GUIDE.md`, the numbered hardware tutorials in `docs/`, and `sim/README.md` (MuJoCo/URDF/Isaac Lab assets and exporters).
+
 ## Notes
 
 - **Mypy is gradual**: strict only for `lerobot.envs`, `lerobot.configs`, `lerobot.optim`, `lerobot.model`, `lerobot.cameras`, `lerobot.motors`, `lerobot.transport`. Add type annotations when modifying these modules.
 - **Optional dependencies**: many policies, envs, and robots are behind extras (e.g., `lerobot[aloha]`). New imports for optional packages must be guarded or lazy. See `pyproject.toml [project.optional-dependencies]`.
 - **Video decoding**: datasets can store observations as video files. `LeRobotDataset` handles frame extraction, but tests need ffmpeg installed.
 - **Prioritize use of `uv run`** to execute Python commands (not raw `python` or `pip`).
+- **NexArm conventions** (shared constants in `src/lerobot/motors/nexarm/nexarm.py`; keep code and docs consistent): leader `/dev/ttyUSB0`, follower `/dev/ttyUSB1`; gripper raw 1195 = open, 2833 = closed; arm joints `rad = (raw - 2048) * 2π / 4096` in both hardware and sim; sim datasets use `robot_type="nexarm_follower"`; the RealSense `top` camera is on by default (`--no-top-cam` disables it); `lerobot-record` appends `_YYYYMMDD_HHMMSS` to `repo_id`.

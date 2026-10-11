@@ -1,10 +1,20 @@
 # ACT on real NexArm stack-bowl data
 
-Run from the repository root. The launcher uses [thanhkt/nexarm_stack_bowls](https://huggingface.co/datasets/thanhkt/nexarm_stack_bowls), pins its Hub revision, and checks the six joint/gripper channels and both front/wrist cameras. At preparation time it contains 113 episodes, 34,365 frames, and two task labels at 30 FPS. ACT is conditioned on images and joint state; it does not consume the task text.
+Run from the repository root. By default the launcher uses the legacy 2-camera Hub dataset [thanhkt/nexarm_stack_bowls](https://huggingface.co/datasets/thanhkt/nexarm_stack_bowls), pins its Hub revision, and checks `robot_type`, the six joint/gripper channels and the front/wrist cameras (plus `top` when the dataset has it). fps and camera resolution are read from the dataset metadata. ACT is conditioned on images and joint state; it does not consume the task text.
+
+Install the full NexArm profile from [`run.md`, Dependency Profiles](../../run.md#dependency-profiles).
+
+To train on the 3-camera root built by the collection launcher (local only, see [`DATA_COLLECTION_GUIDE.md`](../../DATA_COLLECTION_GUIDE.md)), pass both the id and its directory:
 
 ```bash
-uv sync --locked --extra training --extra evaluation
+uv run python examples/nexarm/train_stack_bowls_act.py \
+  --repo-id thanhkt/nexarm_stack_bowls_top \
+  --dataset-root ~/.cache/huggingface/lerobot/thanhkt/nexarm_stack_bowls_top
+```
 
+A policy trained on the legacy 2-camera dataset needs `--no-top-cam` at rollout (`rollout.py` exits on a camera mismatch); a policy trained on the 3-camera root needs the top camera.
+
+```bash
 # Verify actual AV1 video decoding and action padding using episode 0.
 uv run python examples/nexarm/train_stack_bowls_act.py --check-data
 
@@ -22,7 +32,7 @@ uv run python examples/nexarm/train_stack_bowls_act.py \
 
 `--pretrained` also accepts a Hugging Face ACT model ID. The checkpoint must have matching camera names/shapes and six-dimensional state/actions; ensure its joint order and physical units match this dataset. Checkpoint architecture, including action chunk size, is preserved. LeRobot replaces the normalization statistics with those from the stack-bowl dataset and starts a new optimizer. A complete LeRobot checkpoint includes the saved pre/post processors.
 
-The YAML starts with batch size 2 and eight gradient accumulation steps (effective batch 16) for an 8 GB GPU. Memory use depends on checkpoint architecture; lower batch size if necessary. Fresh ACT uses 100-action chunks, approximately 3.33 seconds at 30 FPS. The trainer holds out the last 10% of episodes per task for loss evaluation, evaluates up to 256 samples every 5,000 steps, and saves resumable checkpoints every 5,000 steps. Dataset normalization statistics are provided by the dataset, rather than recomputed on the training split. Held-out loss does not measure physical stacking success.
+The YAML starts with batch size 2 and eight gradient accumulation steps (effective batch 16) for an 8 GB GPU. Memory use depends on checkpoint architecture; lower batch size if necessary. Fresh ACT uses 100-action chunks (3.33 seconds at 30 FPS). The trainer holds out the last 10% of episodes per task for loss evaluation, evaluates up to 256 samples every 5,000 steps, and saves resumable checkpoints every 5,000 steps. Dataset normalization statistics are provided by the dataset, rather than recomputed on the training split. Held-out loss does not measure physical stacking success.
 
 ```bash
 # Short training smoke test; writes a separate checkpoint.
@@ -42,7 +52,7 @@ uv run lerobot-train \
 
 Use `--repo-id owner/dataset` to select another real NexArm dataset with the same joint and camera contract. `--check-data` with a local root requires the episode data and videos to already exist locally.
 
-Use `--dataset-root /absolute/path/to/dataset` for an existing local copy, or `--revision COMMIT_SHA` to reproduce a particular Hub version. Relative output paths are resolved from your current directory. Hub data is cached under `HF_LEROBOT_HOME/prepared/thanhkt/nexarm_stack_bowls/COMMIT_SHA` to avoid reusing stale recordings. Video files contain multiple episodes, so even `--check-data` can download hundreds of megabytes. Model publishing and W&B are disabled by default.
+Use `--dataset-root /absolute/path/to/dataset` for an existing local copy, or `--revision COMMIT_SHA` to reproduce a particular Hub version. Relative output paths are resolved from your current directory. Hub data is cached under `HF_LEROBOT_HOME/prepared/<repo_id>/COMMIT_SHA` to avoid reusing stale recordings. Video files contain multiple episodes, so even `--check-data` can download hundreds of megabytes. Model publishing and W&B are disabled by default.
 
 ## Three GPUs on one machine
 
@@ -56,7 +66,7 @@ CUDA_VISIBLE_DEVICES=0,1,2 uv run python examples/nexarm/train_stack_bowls_act.p
   --batch_size=2 --gradient_accumulation_steps=3 --num_workers=2
 ```
 
-Replace the checkpoint path with the downloaded NexArm ACT `pretrained_model` directory; omit `--pretrained` for initial training. Add `--dry-run` to inspect the distributed command without starting workers, including on a machine with fewer GPUs. Installation is the same training/evaluation extras shown above.
+Replace the checkpoint path with the downloaded NexArm ACT `pretrained_model` directory; omit `--pretrained` for initial training. Add `--dry-run` to inspect the distributed command without starting workers, including on a machine with fewer GPUs. Installation is the same full profile linked above.
 
 Effective batch size is `batch_size × gradient_accumulation_steps × GPUs`: the example uses `2 × 3 × 3 = 18`, close to the single-GPU preset's 16. Keeping the preset's accumulation of 8 would instead give batch 48 on three GPUs. For larger GPUs, increase batch size and reduce accumulation to keep roughly the same effective batch. `--num_workers` is per GPU, so the example starts six loader workers in total. Use `bf16` instead of `fp16` if every selected GPU supports it.
 
