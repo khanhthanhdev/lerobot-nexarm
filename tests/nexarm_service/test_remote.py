@@ -9,7 +9,6 @@ import io
 import socket
 import sys
 import tarfile
-import threading
 import time
 from pathlib import Path
 
@@ -18,7 +17,6 @@ import pytest
 pytest.importorskip("fastapi", reason="install lerobot[service]")
 pytest.importorskip("serial", reason="pyserial is required (install lerobot[hardware])")
 
-import uvicorn  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from pydantic import ValidationError  # noqa: E402
 
@@ -29,6 +27,7 @@ from lerobot.nexarm_service.models import describe_checkpoint  # noqa: E402
 from lerobot.nexarm_service.remote import RemoteClient, RemoteError, RemoteRunner, ensure_engine  # noqa: E402
 from lerobot.nexarm_service.servers import RemoteServer  # noqa: E402
 from tests.nexarm_service.dataset_factory import make_dataset  # noqa: E402
+from tests.nexarm_service.live import LiveEngine  # noqa: E402
 
 SERVER = RemoteServer(name="gpu1", host="gpu.example.com", user="ubuntu", key_path="/keys/id_ed25519")
 
@@ -187,26 +186,6 @@ def test_dataset_archive_endpoints_round_trip_and_refuse_overwrite(tmp_path, tem
 
 
 # -- a remote engine for real ---------------------------------------------------------------
-class LiveEngine:
-    def __init__(self, app):
-        self.app = app
-        with socket.socket() as s:
-            s.bind(("127.0.0.1", 0))
-            self.port = s.getsockname()[1]
-        self.server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=self.port, log_level="error"))
-        self.thread = threading.Thread(target=self.server.run, daemon=True)
-        self.url = f"http://127.0.0.1:{self.port}"
-
-    def __enter__(self):
-        self.thread.start()
-        assert wait_for(lambda: self.server.started, 20)
-        return self
-
-    def __exit__(self, *exc):
-        self.server.should_exit = True
-        self.thread.join(20)
-
-
 FAKE_TRAINER = """
 import json, pathlib, sys, time
 out = pathlib.Path(sys.argv[1]); sleep_s = float(sys.argv[2])

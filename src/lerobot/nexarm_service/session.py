@@ -125,6 +125,11 @@ class SessionManager:
         with self._lock:
             return self._live is not None
 
+    def current_worker(self) -> Worker | None:
+        """The live session's worker (for the WebSocket handlers that talk to it directly)."""
+        with self._lock:
+            return self._live.worker if self._live is not None else None
+
     def last(self) -> SessionInfo | None:
         return self._last
 

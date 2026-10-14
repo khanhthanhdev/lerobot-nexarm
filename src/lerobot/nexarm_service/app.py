@@ -14,6 +14,7 @@ from typing import Any
 from fastapi import FastAPI
 
 from lerobot.nexarm_service import API_VERSION
+from lerobot.nexarm_service.auth import TokenAuthMiddleware
 from lerobot.nexarm_service.calibration import reset_non_identity_files
 from lerobot.nexarm_service.coaching import CoachingWorker
 from lerobot.nexarm_service.dataset_ops import DatasetOps
@@ -27,9 +28,10 @@ from lerobot.nexarm_service.operations import OperationRunner
 from lerobot.nexarm_service.profiles import ProfileStore, default_home
 from lerobot.nexarm_service.record import RecordingWorker
 from lerobot.nexarm_service.remote import RemoteRunner
+from lerobot.nexarm_service.remote_teleop import HostingWorker, RemoteOperatorWorker
 from lerobot.nexarm_service.replay import ReplayWorker
 from lerobot.nexarm_service.rollout import RolloutApi, RolloutWorker
-from lerobot.nexarm_service.routes import datasets, jobs, sessions, system
+from lerobot.nexarm_service.routes import datasets, jobs, remote, sessions, system
 from lerobot.nexarm_service.session import (
     LEASE_TIMEOUT_S,
     SessionKind,
@@ -52,6 +54,7 @@ def create_app(
     datasets_root: Path | None = None,
     lease_timeout_s: float = LEASE_TIMEOUT_S,
     rollout_api: RolloutApi | None = None,
+    token: str | None = None,
 ) -> FastAPI:
     state = _State(home, hardware, calibration_root, datasets_root, lease_timeout_s, rollout_api)
 
@@ -94,8 +97,11 @@ def create_app(
         setattr(app.state, name, getattr(state, name))
     app.state.reset_calibration = state.reset_calibration
     app.state.request_shutdown = lambda: None  # the CLI replaces this with a uvicorn exit hook
-    for module in (system, sessions, datasets, jobs):
+    for module in (system, sessions, datasets, jobs, remote):
         app.include_router(module.router, prefix=API_PREFIX)
+    app.state.auth_token = token
+    if token:
+        app.add_middleware(TokenAuthMiddleware, token=token)
     return app
 
 
@@ -132,6 +138,8 @@ class _State:
             SessionKind.rollout: lambda profile, params: self._rollout("rollout", profile, params),
             SessionKind.eval: lambda profile, params: self._rollout("eval", profile, params),
             SessionKind.coaching: lambda profile, params: self._rollout("coaching", profile, params),
+            SessionKind.hosting: self._hosting,
+            SessionKind.remote_teleoperation: self._operator,
         }
         self.sessions = SessionManager(self.events, factories, lease_timeout_s=lease_timeout_s)
         self.dataset_ops = DatasetOps(self.dataset_store, self._recording_into)
@@ -176,6 +184,12 @@ class _State:
             self._rollout_api,
         )
         return CoachingWorker(*args) if kind == "coaching" else RolloutWorker(kind, *args)
+
+    def _hosting(self, profile_name: str, params: dict[str, Any]) -> Worker:
+        return HostingWorker(self._profile(profile_name), self.hardware, self.events, params)
+
+    def _operator(self, profile_name: str, params: dict[str, Any]) -> Worker:
+        return RemoteOperatorWorker(self._profile(profile_name), self.hardware, self.events, params)
 
     def _replay(self, profile_name: str, params: dict[str, Any]) -> Worker:
         return ReplayWorker(

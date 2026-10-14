@@ -16,6 +16,7 @@
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -28,6 +29,12 @@ def main(argv: list[str] | None = None) -> None:
         help="bind address; keep 127.0.0.1 unless this engine is an explicit remote role",
     )
     parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument(
+        "--token",
+        default=os.environ.get("NEXARM_ENGINE_TOKEN"),
+        help="bearer token every request must carry; required when --host is not loopback "
+        "(also read from NEXARM_ENGINE_TOKEN)",
+    )
     parser.add_argument("--home", type=Path, default=None, help="state directory (profiles, jobs)")
     parser.add_argument(
         "--dump-openapi",
@@ -56,8 +63,10 @@ def main(argv: list[str] | None = None) -> None:
     import uvicorn
 
     from lerobot.nexarm_service.app import create_app
+    from lerobot.nexarm_service.auth import require_token_for_bind
 
-    app = create_app(args.home)
+    require_token_for_bind(args.host, args.token)
+    app = create_app(args.home, token=args.token)
     server = uvicorn.Server(uvicorn.Config(app, host=args.host, port=args.port, log_level="info"))
     # POST /api/v1/shutdown asks uvicorn to exit gracefully so the lifespan hook releases the arm.
     app.state.request_shutdown = lambda: setattr(server, "should_exit", True)

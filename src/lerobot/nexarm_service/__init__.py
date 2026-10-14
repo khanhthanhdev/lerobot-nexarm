@@ -38,4 +38,6 @@ CAPABILITIES: tuple[str, ...] = (
     "eval",
     "remote_training",
     "coaching",
+    "hosting",
+    "remote_teleoperation",
 )
