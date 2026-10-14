@@ -65,13 +65,17 @@ class RemoteClient:
             return None
         return self._ok(response)["summary"]
 
-    def upload_dataset(self, repo_id: str, archive: Path) -> None:
+    def upload_dataset(self, repo_id: str, archive: Path, replace: bool = False) -> None:
         def body() -> Any:
             with open(archive, "rb") as f:
                 while chunk := f.read(1024 * 1024):
                     yield chunk
 
-        self._ok(self._http.put(f"/datasets/{repo_id}/archive", content=body()))
+        self._ok(
+            self._http.put(
+                f"/datasets/{repo_id}/archive", params={"replace": str(replace).lower()}, content=body()
+            )
+        )
 
     def submit(self, request: dict[str, Any]) -> dict[str, Any]:
         return self._ok(self._http.post("/jobs", json=request))
@@ -187,7 +191,7 @@ class RemoteRunner(JobRunner):
         error: str | None = None
         try:
             error = self._drive(job, sink, output_dir, cancel)
-        except (RemoteError, ConnectionError, httpx.HTTPError, OSError, ValueError) as exc:
+        except Exception as exc:  # any failure must end the job: a runner runs one job at a time
             logger.exception("remote job %s failed", job.id)
             error = f"{type(exc).__name__}: {exc}"
         finally:
@@ -222,22 +226,24 @@ class RemoteRunner(JobRunner):
     def _ensure_dataset(self, client: RemoteClient, repo_id: str, sink: JobSink) -> None:
         local = self._store.summary(repo_id)
         remote = client.dataset(repo_id)
+        replace = False
         if remote is not None:
-            if (remote["total_episodes"], remote["total_frames"]) != (
-                local.total_episodes,
-                local.total_frames,
-            ):
+            if remote.get("fingerprint") and remote["fingerprint"] == local.fingerprint:
+                sink.line(f"[remote] {repo_id} is already on the server; reusing it", parse=False)
+                return
+            if not remote.get("transferred"):
                 raise RemoteError(
-                    f"a different dataset named {repo_id} already exists on the server "
-                    f"({remote['total_episodes']} episodes, {remote['total_frames']} frames); "
-                    "rename or remove it there"
+                    f"a different dataset named {repo_id} already exists on the server and was not uploaded "
+                    "by this app, so it is not replaced; rename or remove it there"
                 )
-            sink.line(f"[remote] {repo_id} is already on the server; reusing it", parse=False)
-            return
+            replace = True
+            sink.line(
+                f"[remote] the copy of {repo_id} on the server is out of date; replacing it", parse=False
+            )
         sink.line(f"[remote] uploading {repo_id} ({local.total_episodes} episodes) …", parse=False)
         archive = pack(self._store.path(repo_id), self._scratch)
         try:
-            client.upload_dataset(repo_id, archive)
+            client.upload_dataset(repo_id, archive, replace=replace)
         finally:
             archive.unlink(missing_ok=True)
         sink.line(f"[remote] uploaded {repo_id}", parse=False)

@@ -26,7 +26,7 @@ import math
 import threading
 import time
 from typing import Any
-from urllib.parse import quote, urlsplit, urlunsplit
+from urllib.parse import urlsplit, urlunsplit
 
 from lerobot.motors.nexarm.nexarm import JOINT_NAMES
 from lerobot.nexarm_service import API_VERSION
@@ -74,7 +74,7 @@ def to_action(ticks: list[float]) -> dict[str, float]:
     return dict(zip(JOINT_KEYS, ticks, strict=True))
 
 
-def ws_url(station: str, token: str | None) -> str:
+def ws_url(station: str) -> str:
     """``host:port``, ``http://host:port`` or ``ws://host:port`` to the operator WebSocket URL."""
     text = station.strip()
     if "://" not in text:
@@ -83,8 +83,7 @@ def ws_url(station: str, token: str | None) -> str:
     scheme = {"http": "ws", "https": "wss", "ws": "ws", "wss": "wss"}.get(parts.scheme)
     if scheme is None or not parts.hostname:
         raise ValueError(f"{station!r} is not a station address (use host:port)")
-    query = f"token={quote(token, safe='')}" if token else ""
-    return urlunsplit((scheme, parts.netloc, WS_PATH, query, ""))
+    return urlunsplit((scheme, parts.netloc, WS_PATH, "", ""))
 
 
 # -- station ----------------------------------------------------------------------------------
@@ -229,7 +228,10 @@ class RemoteOperatorWorker:
         if not station:
             raise ValueError("remote teleoperation needs params.station (host:port of the station's engine)")
         self.error: str | None = None
-        self._url = ws_url(str(station), params.get("token"))
+        self._url = ws_url(str(station))
+        # In a header, not the URL: query strings end up in access logs.
+        token = params.get("token")
+        self._headers = {"Authorization": f"Bearer {token}"} if token else {}
         self._profile = profile
         self._hardware = hardware
         self._events = events
@@ -255,7 +257,9 @@ class RemoteOperatorWorker:
         try:
             self._leader.connect(calibrate=False)
             try:
-                self._ws = self._stack.enter_context(connect(self._url, open_timeout=10, max_size=1 << 20))
+                self._ws = self._stack.enter_context(
+                    connect(self._url, additional_headers=self._headers, open_timeout=10, max_size=1 << 20)
+                )
             except InvalidStatus as exc:
                 raise ConnectionError(
                     f"the station rejected the connection (HTTP {exc.response.status_code}); check the token and "

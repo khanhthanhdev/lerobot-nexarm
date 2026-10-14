@@ -11,6 +11,7 @@ beyond a few open containers.
 """
 
 import collections
+import hashlib
 import json
 import re
 import threading
@@ -26,6 +27,7 @@ from pydantic import BaseModel
 
 REPO_ID_RE = re.compile(r"^[A-Za-z0-9][\w.-]*/[A-Za-z0-9][\w.-]*$")
 _OPEN_CONTAINERS = 4
+TRANSFER_MARKER = "nexarm_transfer.json"
 
 
 class DatasetNotFoundError(KeyError):
@@ -40,6 +42,10 @@ class DatasetSummary(BaseModel):
     total_frames: int
     cameras: list[str]
     excluded_episodes: int = 0
+    # SHA-256 over meta/info.json and the episode metadata: changes whenever the recorded data changes.
+    fingerprint: str = ""
+    # True for a copy that a transfer wrote (remote training); only those may be replaced by another upload.
+    transferred: bool = False
 
 
 class EpisodeSummary(BaseModel):
@@ -66,6 +72,7 @@ class DatasetStore:
         self._curation_dir = curation_dir
         self._containers: collections.OrderedDict[Path, Any] = collections.OrderedDict()
         self._decode_lock = threading.Lock()
+        self._fingerprints: dict[str, tuple[tuple, str]] = {}
 
     # -- locating ------------------------------------------------------------------------------
     def path(self, repo_id: str) -> Path:
@@ -101,7 +108,24 @@ class DatasetStore:
             total_frames=info["total_frames"],
             cameras=[k for k, f in info["features"].items() if f["dtype"] in ("video", "image")],
             excluded_episodes=len(self.excluded(repo_id)),
+            fingerprint=self.fingerprint(repo_id),
+            transferred=(self.path(repo_id) / "meta" / TRANSFER_MARKER).is_file(),
         )
+
+    def fingerprint(self, repo_id: str) -> str:
+        """Content fingerprint used to decide whether two copies of a dataset are the same data."""
+        meta = self.path(repo_id) / "meta"
+        files = [meta / "info.json", *sorted((meta / "episodes").glob("chunk-*/file-*.parquet"))]
+        key = tuple((str(f), f.stat().st_mtime_ns, f.stat().st_size) for f in files)
+        cached = self._fingerprints.get(repo_id)
+        if cached is not None and cached[0] == key:
+            return cached[1]
+        digest = hashlib.sha256()
+        for f in files:
+            digest.update(f.name.encode())
+            digest.update(f.read_bytes())
+        self._fingerprints[repo_id] = (key, digest.hexdigest())
+        return digest.hexdigest()
 
     def info(self, repo_id: str) -> dict[str, Any]:
         return self._info(repo_id)

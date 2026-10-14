@@ -4,6 +4,7 @@
 
 """datasets and operations routes: view, curate, edit, merge, Hub transfer."""
 
+import json
 import shutil
 import uuid
 from typing import Any
@@ -238,11 +239,18 @@ def get_operation(op_id: str, request: Request) -> Operation:
 
 # -- archives (remote training moves datasets between engines) ---------------------------------
 @router.put("/datasets/{owner}/{name}/archive", status_code=201, tags=["datasets"])
-async def upload_archive(owner: str, name: str, request: Request) -> DatasetSummary:
-    """Receive a dataset as a tar.gz body. Refuses a name that already exists; never overwrites."""
+async def upload_archive(owner: str, name: str, request: Request, replace: bool = False) -> DatasetSummary:
+    """Receive a dataset as a tar.gz body.
+
+    A name that already exists is refused, except with ``replace=true`` for a copy an earlier transfer
+    wrote (``transferred`` in its summary): that is the engine's own cache of someone else's data, never
+    a dataset recorded here. The new copy is fully received and checked before the old one is swapped out.
+    """
     from starlette.concurrency import run_in_threadpool
 
     from lerobot.nexarm_service.archive import ArchiveError, extract
+    from lerobot.nexarm_service.dataset_store import TRANSFER_MARKER
+    from lerobot.nexarm_service.jobs import ACTIVE_STATES
 
     state = request.app.state
     repo = f"{owner}/{name}"
@@ -250,21 +258,39 @@ async def upload_archive(owner: str, name: str, request: Request) -> DatasetSumm
         raise HTTPException(422, f"{repo!r} is not a valid repo id")
     target = state.dataset_store.root / repo
     if target.exists():
-        raise HTTPException(409, f"{repo} already exists on this engine")
+        if not replace:
+            raise HTTPException(409, f"{repo} already exists on this engine")
+        if not (target / "meta" / TRANSFER_MARKER).is_file():
+            raise HTTPException(409, f"{repo} was not uploaded by a transfer, so it is not replaced")
+        if any(j.state in ACTIVE_STATES and j.request.dataset_repo_id == repo for j in state.jobs.list()):
+            raise HTTPException(409, f"a training job is using {repo}; replace it after the job ends")
     state.scratch.mkdir(parents=True, exist_ok=True)
     received = state.scratch / f"upload-{uuid.uuid4().hex}.tar.gz"
+    incoming = target.parent / f".incoming-{uuid.uuid4().hex[:8]}"
     try:
         with open(received, "wb") as f:
             async for chunk in request.stream():
                 f.write(chunk)
         try:
-            await run_in_threadpool(extract, received, target)
+            await run_in_threadpool(extract, received, incoming)
+            if not (incoming / "meta" / "info.json").is_file():
+                raise ArchiveError("the archive is not a LeRobot dataset (no meta/info.json)")
+            (incoming / "meta" / TRANSFER_MARKER).write_text(
+                json.dumps({"transferred": True}), encoding="utf-8"
+            )
+            if target.exists():
+                old = target.with_name(f".old-{uuid.uuid4().hex[:8]}")
+                target.rename(old)
+                incoming.rename(target)
+                shutil.rmtree(old, ignore_errors=True)
+            else:
+                incoming.rename(target)
             summary = state.dataset_store.summary(repo)
         except (ArchiveError, DatasetNotFoundError, KeyError) as exc:
-            shutil.rmtree(target, ignore_errors=True)
             raise HTTPException(422, f"rejected the dataset archive: {exc}") from exc
     finally:
         received.unlink(missing_ok=True)
+        shutil.rmtree(incoming, ignore_errors=True)
     return summary
 
 

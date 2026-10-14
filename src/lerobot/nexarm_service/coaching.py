@@ -5,10 +5,17 @@
 """Coaching (DAgger) session: a policy drives the follower, the operator takes over on command, and the
 corrections are recorded into a dataset.
 
-It runs the library's ``dagger`` rollout strategy; the phase machine and recording are the library's. The
-protocol on top (takeover, handback, hold, resume, reset, drop-last) is adapted from MakerMods Lab
-``makermodslab/dagger_protocol.py`` (Apache-2.0, Copyright 2025 The HuggingFace Inc. team) and driven by
-desktop controls instead of keys or a pedal.
+It runs the library's ``dagger`` rollout strategy; the phase machine and recording are the library's, and the
+controls come from the desktop instead of keys or a pedal. The control names (takeover, handback, hold,
+resume, reset, drop-last) follow the vocabulary of MakerMods Lab's ``makermodslab/dagger_protocol.py``
+(Apache-2.0, Copyright 2026 MakerMods); no code is taken from it and the behaviour is simpler:
+
+* ``takeover`` is one command that goes through "paused" to "correcting" with no separate settle step;
+* ``reset`` holds the follower at its rest pose and brings the leader to match; it does not save or discard
+  a correction;
+* ``drop_last`` discards the correction that is still being recorded. MakerMods Lab keeps a finished
+  correction "held" until the next attempt begins so it can still be dropped; here a saved correction is
+  already in the dataset (the library saves it when the phase ends), so it is kept.
 
 Leader arm: while the policy drives, the leader follows it (torque on); during a correction its torque is off
 so the operator can drag it. The leader's start pose is captured and it is returned there, then released,

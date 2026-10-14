@@ -4,10 +4,8 @@
 
 """Remote training: SSH commands, archive transfer, and a full job against a second (real) engine."""
 
-import contextlib
 import io
 import socket
-import sys
 import tarfile
 import time
 from pathlib import Path
@@ -20,16 +18,14 @@ pytest.importorskip("serial", reason="pyserial is required (install lerobot[hard
 from fastapi.testclient import TestClient  # noqa: E402
 from pydantic import ValidationError  # noqa: E402
 
-from lerobot.nexarm_service import archive, local_runner, servers  # noqa: E402
+from lerobot.nexarm_service import archive, servers  # noqa: E402
 from lerobot.nexarm_service.app import API_PREFIX, create_app  # noqa: E402
 from lerobot.nexarm_service.jobs import TrainRequest  # noqa: E402
 from lerobot.nexarm_service.models import describe_checkpoint  # noqa: E402
 from lerobot.nexarm_service.remote import RemoteClient, RemoteError, RemoteRunner, ensure_engine  # noqa: E402
 from lerobot.nexarm_service.servers import RemoteServer  # noqa: E402
 from tests.nexarm_service.dataset_factory import make_dataset  # noqa: E402
-from tests.nexarm_service.live import LiveEngine  # noqa: E402
-
-SERVER = RemoteServer(name="gpu1", host="gpu.example.com", user="ubuntu", key_path="/keys/id_ed25519")
+from tests.nexarm_service.remote_support import SERVER, make_local, remote_request  # noqa: E402
 
 
 def wait_for(predicate, timeout=60.0):
@@ -162,14 +158,6 @@ def test_extract_refuses_traversal_links_and_oversize_and_leaves_nothing_behind(
         archive.extract(packed, tmp_path / "big-out", max_bytes=10)
 
 
-# -- archive endpoints ----------------------------------------------------------------------
-@pytest.fixture(scope="module")
-def template_root(tmp_path_factory):
-    root = tmp_path_factory.mktemp("remote-datasets")
-    make_dataset(root, "me/demo")
-    return root
-
-
 def test_dataset_archive_endpoints_round_trip_and_refuse_overwrite(tmp_path, template_root):
     app = create_app(tmp_path / "home", datasets_root=template_root)
     other = create_app(tmp_path / "other", datasets_root=tmp_path / "other-datasets")
@@ -183,69 +171,6 @@ def test_dataset_archive_endpoints_round_trip_and_refuse_overwrite(tmp_path, tem
         assert not (tmp_path / "other-datasets" / "me" / "junk").exists()
         assert b.put(f"{API_PREFIX}/datasets/me/..%2Fx/archive", content=blob).status_code in (404, 422)
         assert a.get(f"{API_PREFIX}/datasets/me/missing/archive").status_code == 404
-
-
-# -- a remote engine for real ---------------------------------------------------------------
-FAKE_TRAINER = """
-import json, pathlib, sys, time
-out = pathlib.Path(sys.argv[1]); sleep_s = float(sys.argv[2])
-line = "step:{n} smpl:2K ep:8 epch:0.50 loss:{loss} grdn:11.2 lr:1.0e-05 updt_s:0.1 data_s:0.0 smp/s:79"
-for i, loss in enumerate((0.9, 0.5, 0.3), 1):
-    print(line.format(n=i, loss=loss), flush=True)
-    time.sleep(sleep_s)
-ckpt = out / "checkpoints" / "000003" / "pretrained_model"
-ckpt.mkdir(parents=True)
-(ckpt / "config.json").write_text(json.dumps({"type": "act"}))
-(ckpt / "train_config.json").write_text(json.dumps({"dataset": {"repo_id": "me/demo"}}))
-(ckpt / "model.safetensors").write_bytes(b"weights")
-"""
-
-
-@pytest.fixture
-def remote_engine(tmp_path, template_root, monkeypatch):
-    """A second engine whose trainer is a script; records the request it was asked to train."""
-    seen = []
-    sleep_s = {"value": 0.05}
-
-    def fake_command(job, store, output_dir):
-        seen.append(job.request)
-        return [sys.executable, "-u", "-c", FAKE_TRAINER, str(output_dir), str(sleep_s["value"])]
-
-    monkeypatch.setattr(local_runner, "build_train_command", fake_command)
-    app = create_app(tmp_path / "remote-home", datasets_root=tmp_path / "remote-datasets")
-    with LiveEngine(app) as live:
-        live.seen, live.sleep_s = seen, sleep_s
-        yield live
-
-
-def make_local(tmp_path, template_root, remote_url, excluded=()):
-    import shutil
-
-    datasets = tmp_path / "local-datasets"
-    shutil.copytree(template_root / "me", datasets / "me")
-    app = create_app(tmp_path / "local-home", datasets_root=datasets)
-    if excluded:
-        app.state.dataset_store.set_excluded("me/demo", list(excluded))
-    runner = RemoteRunner(
-        app.state.dataset_store,
-        app.state.scratch,
-        connect=lambda server: contextlib.nullcontext(remote_url),
-        poll_s=0.05,
-    )
-    app.state.jobs._runners["remote_engine"] = runner
-    return app, runner
-
-
-def remote_request(**kw):
-    return TrainRequest(
-        dataset_repo_id="me/demo",
-        policy_type="act",
-        steps=3,
-        log_freq=1,
-        runner="remote_engine",
-        server=SERVER,
-        **kw,
-    )
 
 
 def test_a_remote_job_uploads_trains_mirrors_progress_and_returns_the_checkpoint(

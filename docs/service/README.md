@@ -73,3 +73,11 @@ uv run pytest tests/nexarm_service -q      # the engine, with fake hardware (no 
 ## Hardware not yet verified
 
 Soft limits from the URDF; rest capture happening after torque is enabled; the follower ESP32 restart when bridge mode is exited; the leader following a policy through CMD 97/98; a two-machine remote teleop run. The desktop repo keeps the checklist.
+
+## Behaviour changes for existing CLI users
+
+`NexArmLeader` now exposes `feedback_features`, `send_feedback`, `enable_torque` and `disable_torque` (CMD 97 and 98), so the library's actuated-teleop handovers apply to it: `lerobot-rollout --strategy.type=dagger` (and `episodic` with a leader) now drive the leader arm with torque on while the policy runs and free it for a correction, instead of treating it as a passive device. Plain `lerobot-teleoperate` and `lerobot-record` never call `send_feedback` for the NexArm leader and are unchanged.
+
+## Tokens and logs
+
+The desktop and the operator engine send the token in an `Authorization` header. A `?token=` query string is still accepted on WebSocket URLs for clients that cannot set headers, but it shows up in access logs, so prefer the header.

@@ -75,7 +75,7 @@ cat > "$HOME_DIR/start-engine.sh" <<EOF
 export PATH="\$HOME/.local/bin:\$PATH"
 if curl -fs "http://127.0.0.1:$PORT/api/v1/health" >/dev/null 2>&1; then exit 0; fi
 cd "$ENGINE_DIR"
-nohup uv run lerobot-nexarm-service --host 127.0.0.1 --port $PORT --home "$STATE_DIR" > "$HOME_DIR/engine.log" 2>&1 &
+nohup uv run lerobot-nexarm-service --host 127.0.0.1 --port $PORT --home "$STATE_DIR" > "$HOME_DIR/engine.log" 2>&1 < /dev/null &
 for _ in \$(seq 1 60); do
   if curl -fs "http://127.0.0.1:$PORT/api/v1/health" >/dev/null 2>&1; then exit 0; fi
   sleep 1

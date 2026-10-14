@@ -111,10 +111,12 @@ def test_server(server: RemoteServer) -> ServerTest:
 def shutdown(request: Request) -> dict[str, str]:
     """Ask the engine to exit gracefully (the lifespan hook stops any session and releases the arm).
 
-    Loopback callers only: a remote-engine role must not be stoppable from the network.
+    An engine without a token only ever hears from loopback callers (it refuses to bind elsewhere), so
+    this is allowed from any caller that got past the auth middleware: a token holder may stop a station
+    it can reach, and nobody else on the network can.
     """
     host = request.client.host if request.client else ""
-    if host not in ("127.0.0.1", "::1", "localhost", "testclient"):
+    if request.app.state.auth_token is None and host not in ("127.0.0.1", "::1", "localhost", "testclient"):
         raise HTTPException(403, "shutdown is only accepted from the local machine")
     request.app.state.request_shutdown()
     return {"status": "shutting_down"}

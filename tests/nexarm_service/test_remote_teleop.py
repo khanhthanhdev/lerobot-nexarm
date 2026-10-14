@@ -71,13 +71,11 @@ def test_an_engine_without_a_token_stays_open_on_loopback(tmp_path):
 
 # -- protocol -------------------------------------------------------------------------------
 def test_station_urls_are_built_from_host_port_pairs():
-    assert (
-        remote_teleop.ws_url("100.64.0.7:8765", "a b") == "ws://100.64.0.7:8765/api/v1/ws/remote?token=a%20b"
-    )
-    assert remote_teleop.ws_url("http://gpu:9000", None) == "ws://gpu:9000/api/v1/ws/remote"
-    assert remote_teleop.ws_url("https://x.example", "t").startswith("wss://x.example/")
+    assert remote_teleop.ws_url("100.64.0.7:8765") == "ws://100.64.0.7:8765/api/v1/ws/remote"
+    assert remote_teleop.ws_url("http://gpu:9000") == "ws://gpu:9000/api/v1/ws/remote"
+    assert remote_teleop.ws_url("https://x.example").startswith("wss://x.example/")
     with pytest.raises(ValueError):
-        remote_teleop.ws_url("ftp://nope", None)
+        remote_teleop.ws_url("ftp://nope")
 
 
 @pytest.mark.parametrize(
