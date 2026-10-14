@@ -19,11 +19,15 @@ from lerobot.nexarm_service.dataset_ops import DatasetOps
 from lerobot.nexarm_service.dataset_store import DatasetStore
 from lerobot.nexarm_service.events import EventHub
 from lerobot.nexarm_service.hardware_factory import Hardware
+from lerobot.nexarm_service.jobs import JobManager
+from lerobot.nexarm_service.local_runner import LocalRunner
+from lerobot.nexarm_service.models import ModelStore
 from lerobot.nexarm_service.operations import OperationRunner
 from lerobot.nexarm_service.profiles import ProfileStore, default_home
 from lerobot.nexarm_service.record import RecordingWorker
 from lerobot.nexarm_service.replay import ReplayWorker
-from lerobot.nexarm_service.routes import datasets, sessions, system
+from lerobot.nexarm_service.rollout import RolloutApi, RolloutWorker
+from lerobot.nexarm_service.routes import datasets, jobs, sessions, system
 from lerobot.nexarm_service.session import (
     LEASE_TIMEOUT_S,
     SessionKind,
@@ -45,8 +49,9 @@ def create_app(
     calibration_root: Path | None = None,
     datasets_root: Path | None = None,
     lease_timeout_s: float = LEASE_TIMEOUT_S,
+    rollout_api: RolloutApi | None = None,
 ) -> FastAPI:
-    state = _State(home, hardware, calibration_root, datasets_root, lease_timeout_s)
+    state = _State(home, hardware, calibration_root, datasets_root, lease_timeout_s, rollout_api)
 
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -63,6 +68,7 @@ def create_app(
             watchdog.join(timeout=WATCHDOG_PERIOD_S + 1)
             # Engine shutdown must never leave the arm energised and unattended.
             state.sessions.stop_current("engine_shutdown")
+            state.jobs.shutdown()
             state.dataset_store.close()
 
     app = FastAPI(
@@ -71,10 +77,20 @@ def create_app(
         description="Local engine for the NexArm desktop app.",
         lifespan=lifespan,
     )
-    for name in ("events", "profiles", "hardware", "sessions", "dataset_store", "dataset_ops", "operations"):
+    for name in (
+        "events",
+        "profiles",
+        "hardware",
+        "sessions",
+        "dataset_store",
+        "dataset_ops",
+        "operations",
+        "jobs",
+        "models",
+    ):
         setattr(app.state, name, getattr(state, name))
     app.state.reset_calibration = state.reset_calibration
-    for module in (system, sessions, datasets):
+    for module in (system, sessions, datasets, jobs):
         app.include_router(module.router, prefix=API_PREFIX)
     return app
 
@@ -87,8 +103,10 @@ class _State:
         calibration_root: Path | None,
         datasets_root: Path | None,
         lease_timeout_s: float,
+        rollout_api: RolloutApi | None,
     ) -> None:
         home = home or default_home()
+        self._rollout_api = rollout_api
         self.events = EventHub()
         self.profiles = ProfileStore(home)
         self.hardware = hardware or Hardware()
@@ -96,10 +114,14 @@ class _State:
         self.datasets_root = datasets_root or HF_LEROBOT_HOME
         self.dataset_store = DatasetStore(self.datasets_root, home / "curation")
         self.operations = OperationRunner(self.events)
+        self.jobs = JobManager(home, self.events, {"local": LocalRunner(self.dataset_store)})
+        self.models = ModelStore(home, self.jobs, self.dataset_store)
         factories = {
             SessionKind.teleoperation: self._teleop,
             SessionKind.recording: self._recording,
             SessionKind.replay: self._replay,
+            SessionKind.rollout: lambda profile, params: self._rollout("rollout", profile, params),
+            SessionKind.eval: lambda profile, params: self._rollout("eval", profile, params),
         }
         self.sessions = SessionManager(self.events, factories, lease_timeout_s=lease_timeout_s)
         self.dataset_ops = DatasetOps(self.dataset_store, self._recording_into)
@@ -132,6 +154,17 @@ class _State:
     def _recording(self, profile_name: str, params: dict[str, Any]) -> Worker:
         return RecordingWorker(
             self._profile(profile_name), self.hardware, self.events, self.datasets_root, params
+        )
+
+    def _rollout(self, kind: str, profile_name: str, params: dict[str, Any]) -> Worker:
+        return RolloutWorker(
+            kind,
+            self._profile(profile_name),
+            self.events,
+            self.models,
+            self.datasets_root,
+            params,
+            self._rollout_api,
         )
 
     def _replay(self, profile_name: str, params: dict[str, Any]) -> Worker:

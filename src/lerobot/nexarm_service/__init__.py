@@ -32,4 +32,8 @@ CAPABILITIES: tuple[str, ...] = (
     "recording",
     "replay",
     "datasets",
+    "jobs",
+    "models",
+    "rollout",
+    "eval",
 )
