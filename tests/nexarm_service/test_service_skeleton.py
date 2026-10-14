@@ -110,3 +110,18 @@ def test_shutdown_invokes_the_exit_hook(tmp_path):
     with TestClient(app) as c:
         assert c.post(f"{API_PREFIX}/shutdown").status_code == 202
     assert calls == [1]
+
+
+def test_every_event_the_engine_publishes_is_in_the_committed_schema():
+    import json
+    import re
+    from pathlib import Path
+
+    import lerobot.nexarm_service as pkg
+
+    schema = json.loads((Path(__file__).parents[2] / "docs/service/events.json").read_text())
+    published = set()
+    for path in Path(pkg.__file__).parent.rglob("*.py"):
+        published |= set(re.findall(r'\.publish\(\s*"([a-z_]+)"', path.read_text(encoding="utf-8")))
+    assert published, "no publish calls found; the scan pattern is stale"
+    assert published <= set(schema), sorted(published - set(schema))
