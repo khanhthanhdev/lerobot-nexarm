@@ -2,6 +2,8 @@
 
 This guide provides complete, copy-pasteable instructions to set up, prepare datasets, train, and deploy **TurboVLA** for the **Hiwonder NexArm** (6-DOF manipulator) on a remote GPU server or cluster.
 
+> **Using the desktop app?** The NexArm desktop app can do the server steps below for you: add the server in Lab: Train, pick it as the runner, and it uploads the dataset over an SSH tunnel, trains there and brings the checkpoints back. Prepare a fresh server once with `scripts/nexarm-gpu-bootstrap.sh` (see [`docs/service/README.md`](docs/service/README.md)). The manual steps in this guide remain valid for TurboVLA and anything the app does not cover.
+
 ---
 
 ## Architecture Summary

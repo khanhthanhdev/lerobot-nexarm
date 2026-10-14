@@ -56,6 +56,7 @@ For on‑device perception, NexArm integrates a 6 TOPS K230 vision module, allow
   - [Step 6: Collect a Dataset](#step-6-collect-a-dataset)
   - [Step 7: Train a Policy](#step-7-train-a-policy)
   - [Step 8: Run Inference & Rollout](#step-8-run-inference--rollout)
+- [Quickstart Path C: Desktop App and Engine](#quickstart-path-c-desktop-app-and-engine)
 - [Sim-to-Real Pre-Flight Alignment](#sim-to-real-pre-flight-alignment)
 - [Kinematics & Dynamics Python API](#kinematics--dynamics-python-api)
 - [Code Architecture](#code-architecture)
@@ -425,6 +426,19 @@ uv run python examples/nexarm/rollout.py \
 ```
 
 The opened cameras must match the policy's image inputs, or the script exits at startup. Add `--no-top-cam` for a policy trained on front and wrist only (for example on the legacy `thanhkt/nexarm_stack_bowls` dataset).
+
+---
+
+## Quickstart Path C: Desktop App and Engine
+
+The NexArm desktop app (`nexarm-desktop`) has Lab pages for the whole policy loop: record, view and curate datasets, train locally or on a GPU server, deploy, coach a running policy (DAgger) and drive a follower on another machine. They talk to a local engine that this repo provides:
+
+```bash
+uv sync --extra service
+uv run lerobot-nexarm-service        # the app starts it for you if you prefer
+```
+
+The engine runs the hardware sessions, so it owns the robot's USB ports while a session runs; the app releases and re-opens its own connection automatically. Safety behaviour, the API snapshots, remote training and remote teleoperation are described in [`docs/service/README.md`](docs/service/README.md).
 
 ---
 
