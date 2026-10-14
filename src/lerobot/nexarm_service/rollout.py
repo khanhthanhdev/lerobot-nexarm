@@ -19,7 +19,7 @@ from typing import Any
 
 from lerobot.nexarm_service.arm_worker import JOINT_PUBLISH_EVERY, FollowerGuard, joint_update_payload
 from lerobot.nexarm_service.events import EventHub
-from lerobot.nexarm_service.hardware_factory import follower_config
+from lerobot.nexarm_service.hardware_factory import follower_config, leader_config
 from lerobot.nexarm_service.models import ModelStore
 from lerobot.nexarm_service.profiles import RobotProfile
 from lerobot.nexarm_service.safety import clamp_action
@@ -79,6 +79,27 @@ class RolloutApi:
                 push_to_hub=False,
             )
             strategy = EpisodicStrategyConfig()
+        if kind == "coaching":
+            from lerobot.rollout.configs import DAggerStrategyConfig
+
+            repo_id = params.get("repo_id", "")
+            if "/" not in repo_id or repo_id.split("/", 1)[-1].startswith("eval_"):
+                raise ValueError("coaching records corrections into a dataset named owner/name (not eval_*)")
+            if (datasets_root / repo_id).exists():
+                raise ValueError(f"{repo_id} already exists; pick a new dataset name")
+            episodes = int(params.get("num_episodes", 10))
+            dataset = DatasetRecordConfig(
+                repo_id=repo_id,
+                single_task=task,
+                root=datasets_root / repo_id,
+                fps=int(params.get("fps", 30)),
+                num_episodes=episodes,
+                push_to_hub=False,
+            )
+            strategy = DAggerStrategyConfig(
+                num_episodes=episodes, record_autonomous=bool(params.get("record_autonomous", False))
+            )
+            teleop = leader_config(profile)
         return RolloutConfig(
             robot=follower_config(profile, with_cameras=True),
             teleop=teleop,
@@ -148,8 +169,10 @@ class RolloutWorker:
             self._install_safety(robot)
             self._guard = FollowerGuard(robot)
             self._guard.engage()
+            self._after_context()
             self._strategy = self._api.create_strategy(cfg)
             self._strategy.setup(self._ctx)
+            self._after_setup()
         except Exception:
             self._release()
             raise
@@ -181,6 +204,16 @@ class RolloutWorker:
             raise ValueError(f"this session does not support the {action!r} control")
         events[flag] = True
         return self.status()
+
+    # -- hooks for session kinds that need more than the base strategy (coaching) ---------------
+    def _after_context(self) -> None:
+        """Hardware is connected and the rest pose captured; the strategy is not created yet."""
+
+    def _after_setup(self) -> None:
+        """The strategy is set up; its loop has not started."""
+
+    def _before_release(self) -> None:
+        """The loop has stopped; the arm is about to be returned to rest."""
 
     def stop(self) -> None:
         self._shutdown.set()
@@ -214,6 +247,7 @@ class RolloutWorker:
 
     def _release(self) -> None:
         """Rest return and torque-off first, then the strategy's own teardown (disconnect, finalize)."""
+        self._before_release()
         if self._guard is not None:
             self._guard.release()
             self.error = self.error or self._guard.error

@@ -31,6 +31,7 @@ from lerobot.motors.nexarm.nexarm import (
     POSITION_CENTER,
     POSITION_MAX,
     POSITION_MIN,
+    map_follower_to_leader,
     map_leader_to_follower,
 )
 from lerobot.utils.decorators import check_if_already_connected, check_if_not_connected
@@ -56,7 +57,9 @@ class NexArmLeader(Teleoperator):
 
     @property
     def feedback_features(self) -> dict[str, type]:
-        return {}
+        # The leader can be driven to a follower pose (CMD 97 with torque on, CMD 98), which is what
+        # DAgger uses to hand control back and forth without a jerk.
+        return {f"{name}.pos": float for name in JOINT_NAMES}
 
     @property
     def is_connected(self) -> bool:
@@ -109,7 +112,26 @@ class NexArmLeader(Teleoperator):
 
     @check_if_not_connected
     def send_feedback(self, feedback: dict[str, Any]) -> None:
-        pass
+        """Drive the leader arm to a follower-space pose (``<joint>.pos`` ticks). Needs torque enabled."""
+        follower_pos = [float(feedback[f"{name}.pos"]) for name in JOINT_NAMES]
+        if self.calibration:
+            for i, name in enumerate(JOINT_NAMES):
+                if name in self.calibration:
+                    cal = self.calibration[name]
+                    follower_pos[i] -= cal.homing_offset - POSITION_CENTER
+                    if cal.drive_mode == 1:
+                        follower_pos[i] = 4096 - follower_pos[i]
+        self.bus.write_positions(map_follower_to_leader(follower_pos))
+
+    @check_if_not_connected
+    def enable_torque(self) -> None:
+        """Hold the arm (so it can follow send_feedback); the operator cannot move it by hand."""
+        self.bus.set_torque(True)
+
+    @check_if_not_connected
+    def disable_torque(self) -> None:
+        """Free the arm for the operator to drag."""
+        self.bus.set_torque(False)
 
     @check_if_not_connected
     def disconnect(self) -> None:

@@ -302,3 +302,21 @@ class NexArmMotorsBus:
         args = bytes([acc & 0xFF, speed & 0xFF, (speed >> 8) & 0xFF])
         frame = build_frame(SYSTEM_ID, CMD_SET_MOTION_PARAMS, args)
         self._send(frame, expect_reply=False)
+
+
+def map_follower_to_leader(follower_pos: list[int | float]) -> list[int]:
+    """Inverse of :func:`map_leader_to_follower`: where the leader must be for the follower to read ``follower_pos``.
+
+    ID2 (shoulder_lift) is mirrored (4096 - pos). ID6 (gripper) inverts the x4 remap: the follower range
+    [1195, 2833] lands on the leader range [1638, 2048]. Used to drive the leader arm to follow a policy.
+    """
+    result = []
+    for idx, pos in enumerate(follower_pos):
+        p = max(POSITION_MIN, min(POSITION_MAX, float(pos)))
+        if idx == 1:
+            p = 4096 - p
+        elif idx == 5:
+            p = max(GRIPPER_OPEN_POS, min(GRIPPER_CLOSED_POS, p))
+            p = POSITION_CENTER + (p - GRIPPER_CLOSED_POS) / 4
+        result.append(max(POSITION_MIN, min(POSITION_MAX, int(round(p)))))
+    return result

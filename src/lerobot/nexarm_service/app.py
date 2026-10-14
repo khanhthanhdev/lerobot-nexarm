@@ -15,6 +15,7 @@ from fastapi import FastAPI
 
 from lerobot.nexarm_service import API_VERSION
 from lerobot.nexarm_service.calibration import reset_non_identity_files
+from lerobot.nexarm_service.coaching import CoachingWorker
 from lerobot.nexarm_service.dataset_ops import DatasetOps
 from lerobot.nexarm_service.dataset_store import DatasetStore
 from lerobot.nexarm_service.events import EventHub
@@ -130,6 +131,7 @@ class _State:
             SessionKind.replay: self._replay,
             SessionKind.rollout: lambda profile, params: self._rollout("rollout", profile, params),
             SessionKind.eval: lambda profile, params: self._rollout("eval", profile, params),
+            SessionKind.coaching: lambda profile, params: self._rollout("coaching", profile, params),
         }
         self.sessions = SessionManager(self.events, factories, lease_timeout_s=lease_timeout_s)
         self.dataset_ops = DatasetOps(self.dataset_store, self._recording_into)
@@ -165,8 +167,7 @@ class _State:
         )
 
     def _rollout(self, kind: str, profile_name: str, params: dict[str, Any]) -> Worker:
-        return RolloutWorker(
-            kind,
+        args = (
             self._profile(profile_name),
             self.events,
             self.models,
@@ -174,6 +175,7 @@ class _State:
             params,
             self._rollout_api,
         )
+        return CoachingWorker(*args) if kind == "coaching" else RolloutWorker(kind, *args)
 
     def _replay(self, profile_name: str, params: dict[str, Any]) -> Worker:
         return ReplayWorker(

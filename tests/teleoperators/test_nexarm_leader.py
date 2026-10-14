@@ -77,3 +77,54 @@ def test_leader_get_action_maps_positions(leader) -> None:
     assert action["shoulder_lift.pos"] == 3096.0
     # Joint 5 (gripper): 2833 + (2048 - 2048) * 4 = 2833.0
     assert action["gripper.pos"] == 2833.0
+
+
+def test_leader_follow_api_inverts_the_follower_mapping(leader) -> None:
+    from lerobot.common.control_utils import teleop_supports_feedback
+    from lerobot.motors.nexarm.nexarm import (
+        GRIPPER_CLOSED_POS,
+        GRIPPER_OPEN_POS,
+        map_follower_to_leader,
+        map_leader_to_follower,
+    )
+
+    teleop, bus = leader
+    teleop.connect(calibrate=False)
+    assert teleop_supports_feedback(teleop)
+    assert set(teleop.feedback_features) == {f"{n}.pos" for n in JOINT_NAMES}
+
+    # forward then inverse recovers the leader pose, for every leader gripper position it can produce
+    for leader_pose in ([2048, 2048, 1900, 2100, 2048, 2048], [100, 3000, 2048, 1000, 3500, 1700]):
+        follower_pose = map_leader_to_follower(leader_pose)
+        back = map_follower_to_leader(follower_pose)
+        assert back[:5] == leader_pose[:5]
+        assert abs(back[5] - leader_pose[5]) <= 1
+    # the full follower gripper range lands inside the leader's reachable range
+    assert map_follower_to_leader([2048] * 5 + [GRIPPER_CLOSED_POS])[5] == 2048
+    assert map_follower_to_leader([2048] * 5 + [GRIPPER_OPEN_POS])[5] == 1638
+
+    bus.reset_mock()
+    teleop.enable_torque()
+    teleop.send_feedback(
+        {f"{n}.pos": 2048.0 for n in JOINT_NAMES} | {"shoulder_lift.pos": 1500.0, "gripper.pos": 2833.0}
+    )
+    teleop.disable_torque()
+    bus.set_torque.assert_any_call(True)
+    bus.set_torque.assert_any_call(False)
+    written = bus.write_positions.call_args.args[0]
+    assert written == [2048, 4096 - 1500, 2048, 2048, 2048, 2048]
+
+
+def test_leader_feedback_honours_a_stored_offset(leader) -> None:
+    from lerobot.motors import MotorCalibration
+
+    teleop, bus = leader
+    teleop.connect(calibrate=False)
+    teleop.calibration = {
+        "elbow_flex": MotorCalibration(
+            id=3, drive_mode=0, homing_offset=2048 + 50, range_min=0, range_max=4095
+        )
+    }
+    teleop.send_feedback({f"{n}.pos": 2048.0 for n in JOINT_NAMES})
+    # get_action adds the offset, so feedback must subtract it to round-trip
+    assert bus.write_positions.call_args.args[0][2] == 2048 - 50
