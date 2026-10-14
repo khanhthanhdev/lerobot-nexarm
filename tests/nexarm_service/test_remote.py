@@ -333,17 +333,24 @@ def test_cancelling_a_remote_job_cancels_it_on_the_server_too(tmp_path, template
 
 
 def test_losing_the_server_mid_job_fails_the_local_job_with_a_clear_message(
-    tmp_path, template_root, remote_engine
+    tmp_path, template_root, remote_engine, monkeypatch
 ):
+    import httpx
+
     remote_engine.sleep_s["value"] = 30
     app, runner = make_local(tmp_path, template_root, remote_engine.url)
     jobs = app.state.jobs
     job = jobs.submit(remote_request())
     assert wait_for(lambda: jobs.get(job.id).step >= 1)
+
+    def dead(self, job_id):  # the tunnel drops: every later poll fails to connect
+        raise httpx.ConnectError("tunnel closed")
+
+    monkeypatch.setattr(RemoteClient, "job", dead)
+    assert wait_for(lambda: jobs.get(job.id).state == "failed", 30)
+    error = jobs.get(job.id).error
+    assert "lost the connection" in error and "may still be running" in error
     remote_engine.app.state.jobs.shutdown()
-    remote_engine.server.should_exit = True
-    assert wait_for(lambda: jobs.get(job.id).state == "failed", 60)
-    assert "lost the connection" in jobs.get(job.id).error
 
 
 def test_a_remote_job_needs_a_server_and_a_known_runner(tmp_path, template_root):
