@@ -25,6 +25,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from lerobot.nexarm_service.events import EventHub
+from lerobot.nexarm_service.servers import RemoteServer
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +56,10 @@ class TrainRequest(BaseModel):
     use_excluded: bool = True  # leave out episodes the curation list excludes
     extra_args: dict[str, str] = {}  # additional lerobot-train flags, e.g. {"policy.chunk_size": "50"}
     runner: str = "local"
-    server: str | None = None  # remote_engine runner only: a server profile name
+    server: RemoteServer | None = None  # remote_engine runner only: the GPU server to train on
+    # Explicit episode list; the remote runner sends the locally curated list because the server has no
+    # curation file. When set it replaces use_excluded.
+    episodes: list[int] | None = None
 
     def validate_extra_args(self) -> None:
         for key, value in self.extra_args.items():
@@ -106,8 +110,8 @@ class JobSink:
     def __init__(self, manager: JobManager, job_id: str) -> None:
         self._manager, self._job_id = manager, job_id
 
-    def line(self, text: str) -> None:
-        self._manager._on_line(self._job_id, text)
+    def line(self, text: str, parse: bool = True) -> None:
+        self._manager._on_line(self._job_id, text, parse)
 
     def metric(self, values: dict[str, float], step: int | None = None) -> None:
         self._manager._on_metric(self._job_id, values, step)
@@ -183,10 +187,14 @@ class JobManager:
         with self._lock:
             return self._jobs[job_id].model_copy()
 
-    def logs(self, job_id: str, tail: int = 200) -> list[str]:
+    def logs(self, job_id: str, tail: int = 200, offset: int | None = None) -> list[str]:
+        """The last ``tail`` lines, or every line from ``offset`` on (how a remote runner follows the log)."""
         self.get(job_id)
         f = self._job_dir(job_id) / "train.log"
-        return f.read_text(encoding="utf-8", errors="replace").splitlines()[-tail:] if f.is_file() else []
+        if not f.is_file():
+            return []
+        lines = f.read_text(encoding="utf-8", errors="replace").splitlines()
+        return lines[offset:] if offset is not None else lines[-tail:]
 
     def metrics(self, job_id: str) -> list[MetricPoint]:
         self.get(job_id)
@@ -279,10 +287,10 @@ class JobManager:
                 logger.exception("job %s failed to start", job.id)
                 self._on_exit(job.id, f"could not start: {exc}")
 
-    def _on_line(self, job_id: str, text: str) -> None:
+    def _on_line(self, job_id: str, text: str, parse: bool = True) -> None:
         with open(self._job_dir(job_id) / "train.log", "a", encoding="utf-8") as f:
             f.write(text + "\n")
-        values = parse_metric_line(text)
+        values = parse_metric_line(text) if parse else None
         if values is not None:
             self._on_metric(job_id, values, None)
 

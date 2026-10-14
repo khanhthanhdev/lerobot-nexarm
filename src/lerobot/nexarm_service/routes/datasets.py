@@ -4,10 +4,14 @@
 
 """datasets and operations routes: view, curate, edit, merge, Hub transfer."""
 
+import shutil
+import uuid
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
+from starlette.background import BackgroundTask
 
 from lerobot.nexarm_service.dataset_ops import list_hub_datasets
 from lerobot.nexarm_service.dataset_store import (
@@ -15,6 +19,7 @@ from lerobot.nexarm_service.dataset_store import (
     DatasetSummary,
     EpisodeSummary,
     JointsData,
+    valid_repo_id,
 )
 from lerobot.nexarm_service.operations import Operation
 
@@ -229,3 +234,50 @@ def get_operation(op_id: str, request: Request) -> Operation:
         return request.app.state.operations.get(op_id)
     except KeyError as exc:
         raise HTTPException(404, f"no operation {op_id!r}") from exc
+
+
+# -- archives (remote training moves datasets between engines) ---------------------------------
+@router.put("/datasets/{owner}/{name}/archive", status_code=201, tags=["datasets"])
+async def upload_archive(owner: str, name: str, request: Request) -> DatasetSummary:
+    """Receive a dataset as a tar.gz body. Refuses a name that already exists; never overwrites."""
+    from starlette.concurrency import run_in_threadpool
+
+    from lerobot.nexarm_service.archive import ArchiveError, extract
+
+    state = request.app.state
+    repo = f"{owner}/{name}"
+    if not valid_repo_id(repo):
+        raise HTTPException(422, f"{repo!r} is not a valid repo id")
+    target = state.dataset_store.root / repo
+    if target.exists():
+        raise HTTPException(409, f"{repo} already exists on this engine")
+    state.scratch.mkdir(parents=True, exist_ok=True)
+    received = state.scratch / f"upload-{uuid.uuid4().hex}.tar.gz"
+    try:
+        with open(received, "wb") as f:
+            async for chunk in request.stream():
+                f.write(chunk)
+        try:
+            await run_in_threadpool(extract, received, target)
+            summary = state.dataset_store.summary(repo)
+        except (ArchiveError, DatasetNotFoundError, KeyError) as exc:
+            shutil.rmtree(target, ignore_errors=True)
+            raise HTTPException(422, f"rejected the dataset archive: {exc}") from exc
+    finally:
+        received.unlink(missing_ok=True)
+    return summary
+
+
+@router.get("/datasets/{owner}/{name}/archive", tags=["datasets"], response_class=FileResponse)
+def download_archive(owner: str, name: str, request: Request) -> FileResponse:
+    from lerobot.nexarm_service.archive import pack
+
+    state = request.app.state
+    try:
+        path = state.dataset_store.path(f"{owner}/{name}")
+    except DatasetNotFoundError as exc:
+        raise _not_found(exc) from exc
+    archive = pack(path, state.scratch)
+    return FileResponse(
+        archive, media_type="application/gzip", background=BackgroundTask(archive.unlink, True)
+    )

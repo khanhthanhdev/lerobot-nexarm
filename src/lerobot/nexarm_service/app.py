@@ -25,6 +25,7 @@ from lerobot.nexarm_service.models import ModelStore
 from lerobot.nexarm_service.operations import OperationRunner
 from lerobot.nexarm_service.profiles import ProfileStore, default_home
 from lerobot.nexarm_service.record import RecordingWorker
+from lerobot.nexarm_service.remote import RemoteRunner
 from lerobot.nexarm_service.replay import ReplayWorker
 from lerobot.nexarm_service.rollout import RolloutApi, RolloutWorker
 from lerobot.nexarm_service.routes import datasets, jobs, sessions, system
@@ -87,6 +88,7 @@ def create_app(
         "operations",
         "jobs",
         "models",
+        "scratch",
     ):
         setattr(app.state, name, getattr(state, name))
     app.state.reset_calibration = state.reset_calibration
@@ -115,7 +117,12 @@ class _State:
         self.datasets_root = datasets_root or HF_LEROBOT_HOME
         self.dataset_store = DatasetStore(self.datasets_root, home / "curation")
         self.operations = OperationRunner(self.events)
-        self.jobs = JobManager(home, self.events, {"local": LocalRunner(self.dataset_store)})
+        self.scratch = home / "transfer"  # temporary archives for dataset and checkpoint transfers
+        runners = {
+            "local": LocalRunner(self.dataset_store),
+            "remote_engine": RemoteRunner(self.dataset_store, self.scratch),
+        }
+        self.jobs = JobManager(home, self.events, runners)
         self.models = ModelStore(home, self.jobs, self.dataset_store)
         factories = {
             SessionKind.teleoperation: self._teleop,

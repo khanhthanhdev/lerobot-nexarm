@@ -11,6 +11,7 @@ import subprocess
 import sys
 import threading
 from pathlib import Path
+from typing import Any
 
 from lerobot.nexarm_service.dataset_store import DatasetStore
 from lerobot.nexarm_service.jobs import Job, JobRunner, JobSink
@@ -19,6 +20,22 @@ logger = logging.getLogger(__name__)
 
 _TERMINATE_GRACE_S = 15.0
 _LINE_SPLIT = re.compile(r"[\r\n]+")
+
+
+def kept_episodes(request: Any, store: DatasetStore) -> list[int] | None:
+    """The episodes to train on: an explicit list, else everything not excluded; ``None`` means all."""
+    if request.episodes is not None:
+        return list(request.episodes)
+    if not request.use_excluded:
+        return None
+    excluded = set(store.excluded(request.dataset_repo_id))
+    if not excluded:
+        return None
+    total = store.summary(request.dataset_repo_id).total_episodes
+    kept = [e for e in range(total) if e not in excluded]
+    if not kept:
+        raise ValueError("every episode is excluded; nothing to train on")
+    return kept
 
 
 def build_train_command(job: Job, store: DatasetStore, output_dir: Path) -> list[str]:
@@ -41,14 +58,9 @@ def build_train_command(job: Job, store: DatasetStore, output_dir: Path) -> list
     ]
     if request.save_freq:
         command.append(f"--save_freq={request.save_freq}")
-    if request.use_excluded:
-        excluded = set(store.excluded(request.dataset_repo_id))
-        if excluded:
-            total = store.summary(request.dataset_repo_id).total_episodes
-            kept = [e for e in range(total) if e not in excluded]
-            if not kept:
-                raise ValueError("every episode is excluded; nothing to train on")
-            command.append(f"--dataset.episodes=[{','.join(map(str, kept))}]")
+    kept = kept_episodes(request, store)
+    if kept is not None:
+        command.append(f"--dataset.episodes=[{','.join(map(str, kept))}]")
     command.extend(f"--{key}={value}" for key, value in request.extra_args.items())
     return command
 

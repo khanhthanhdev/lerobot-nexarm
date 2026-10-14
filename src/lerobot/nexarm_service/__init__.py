@@ -36,4 +36,5 @@ CAPABILITIES: tuple[str, ...] = (
     "models",
     "rollout",
     "eval",
+    "remote_training",
 )

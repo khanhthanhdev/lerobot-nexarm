@@ -4,10 +4,13 @@
 
 """jobs and models routes: training queue, metrics, checkpoints, model discovery."""
 
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
+from starlette.background import BackgroundTask
 
 from lerobot.nexarm_service.dataset_store import DatasetNotFoundError
 from lerobot.nexarm_service.jobs import Job, MetricPoint, TrainRequest
@@ -57,9 +60,9 @@ def cancel_job(job_id: str, request: Request) -> Job:
 
 
 @router.get("/jobs/{job_id}/logs", tags=["jobs"])
-def job_logs(job_id: str, request: Request, tail: int = 200) -> list[str]:
+def job_logs(job_id: str, request: Request, tail: int = 200, offset: int | None = None) -> list[str]:
     try:
-        return request.app.state.jobs.logs(job_id, tail)
+        return request.app.state.jobs.logs(job_id, tail, offset)
     except KeyError as exc:
         raise _job_missing(job_id) from exc
 
@@ -103,4 +106,26 @@ def import_model(body: ModelImport, request: Request) -> Operation:
     state = request.app.state
     return state.operations.submit(
         f"import model {body.repo_id}", lambda: state.models.import_from_hub(body.repo_id, body.revision)
+    )
+
+
+@router.get("/jobs/{job_id}/checkpoints/{step}/archive", tags=["jobs"], response_class=FileResponse)
+def checkpoint_archive(job_id: str, step: str, request: Request) -> FileResponse:
+    """A checkpoint's ``pretrained_model`` directory as a tar.gz (how remote training returns results)."""
+    from lerobot.nexarm_service.archive import pack
+
+    state = request.app.state
+    try:
+        checkpoints = state.jobs.checkpoints(job_id)
+    except KeyError as exc:
+        raise _job_missing(job_id) from exc
+    match = next(
+        (c for c in checkpoints if str(c["step"]) == step or Path(c["path"]).parent.name == step), None
+    )
+    if match is None:
+        raise HTTPException(404, f"job {job_id} has no checkpoint {step!r}")
+    state.scratch.mkdir(parents=True, exist_ok=True)
+    archive = pack(Path(match["path"]), state.scratch)
+    return FileResponse(
+        archive, media_type="application/gzip", background=BackgroundTask(archive.unlink, True)
     )

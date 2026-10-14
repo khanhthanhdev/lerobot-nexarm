@@ -17,6 +17,7 @@
 import os
 from typing import Any
 
+import httpx
 from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 
@@ -24,6 +25,7 @@ from lerobot import __version__
 from lerobot.nexarm_service import API_VERSION, CAPABILITIES
 from lerobot.nexarm_service.hardware import PortInfo, list_cameras, list_ports
 from lerobot.nexarm_service.profiles import RobotProfile, valid_name
+from lerobot.nexarm_service.servers import RemoteServer
 
 router = APIRouter()
 
@@ -74,6 +76,35 @@ def ports() -> list[PortInfo]:
 @router.get("/cameras", tags=["system"])
 def cameras() -> list[dict[str, Any]]:
     return list_cameras()
+
+
+class ServerTest(BaseModel):
+    ssh_ok: bool
+    engine: Health | None = None
+    detail: str = ""
+
+
+@router.post("/servers/test", tags=["system"])
+def test_server(server: RemoteServer) -> ServerTest:
+    """Open the SSH tunnel to a GPU server and ask its engine for its version; starts nothing remotely."""
+    from lerobot.nexarm_service import servers
+    from lerobot.nexarm_service.remote import RemoteClient, RemoteError
+
+    try:
+        with servers.SshTunnel(server) as url:
+            client = RemoteClient(url)
+            try:
+                info = client.health()
+            except (RemoteError, httpx.HTTPError) as exc:
+                return ServerTest(
+                    ssh_ok=True,
+                    detail=f"SSH works but no engine answers yet ({exc}). It is started automatically on the first remote job, or run ~/.nexarm/start-engine.sh on the server.",
+                )
+            finally:
+                client.close()
+    except (ConnectionError, OSError) as exc:
+        return ServerTest(ssh_ok=False, detail=str(exc))
+    return ServerTest(ssh_ok=True, engine=Health(**info))
 
 
 @router.post("/shutdown", status_code=202, tags=["system"])
