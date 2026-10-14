@@ -18,7 +18,6 @@ from lerobot.motors.nexarm.nexarm import (
     GRIPPER_OPEN_POS,
     JOINT_NAMES,
     POSITION_MAX,
-    POSITION_MIN,
     radians_to_raw,
 )
 
@@ -35,20 +34,23 @@ _URDF_LIMITS_RAD = {
 }
 
 
+# The firmware occasionally returns values pinned near 0 or 4095 on a dropped packet. Reads within this
+# margin of either end are treated as corrupt, so no soft limit may reach into it: an arm legitimately parked
+# there could never be read back and returned to rest.
+CORRUPT_MARGIN = 5
+
+
 def _soft_limits() -> dict[str, tuple[int, int]]:
     limits = {}
     for name, rad in _URDF_LIMITS_RAD.items():
-        low = max(POSITION_MIN, math.ceil(radians_to_raw(-rad)))
-        high = min(POSITION_MAX, math.floor(radians_to_raw(rad)))
+        low = max(CORRUPT_MARGIN + 1, math.ceil(radians_to_raw(-rad)))
+        high = min(POSITION_MAX - CORRUPT_MARGIN - 1, math.floor(radians_to_raw(rad)))
         limits[name] = (low, high)
     limits["gripper"] = (GRIPPER_OPEN_POS, GRIPPER_CLOSED_POS)
     return limits
 
 
 SOFT_LIMITS: dict[str, tuple[int, int]] = _soft_limits()
-
-# The firmware occasionally returns values pinned near 0 or 4095 on a dropped packet.
-CORRUPT_MARGIN = 5
 
 
 def clamp_action(action: Mapping[str, float]) -> dict[str, float]:
@@ -105,19 +107,37 @@ def ramp_to(
     dt: float = 0.03,
     tolerance: int = 12,
     max_steps: int = 400,
+    give_up_s: float = 1.0,
+    clock: Callable[[], float] = time.monotonic,
     sleep: Callable[[float], None] = time.sleep,
 ) -> None:
-    """Move every joint toward ``target`` by at most ``max_step`` ticks per ``dt`` until all are close.
+    """Move every joint toward ``target`` by at most ``max_step`` ticks per ``dt``.
 
-    Software ramp: independent of the servo acceleration setting. Raises if the arm does not arrive
-    within ``max_steps`` ticks (blocked joint, lost link).
+    The ramp starts from one validated read and then steps from its own last command, never from a later
+    raw read: a corrupt read (pinned near 0 or 4095) or a dropped one cannot make a joint jump. Invalid
+    or timed-out reads are skipped; the ramp gives up only after ``give_up_s`` without a valid read, and
+    raises if the target is not reached within ``max_steps`` ticks.
     """
+    command: list[int] | None = None
+    bad_since: float | None = None
     for _ in range(max_steps):
-        current = list(read())
-        deltas = [t - c for t, c in zip(target, current, strict=True)]
+        if command is None:
+            try:
+                current = list(read())
+            except TimeoutError:
+                current = []
+            if not is_valid_read(current):
+                bad_since = clock() if bad_since is None else bad_since
+                if clock() - bad_since > give_up_s:
+                    raise TimeoutError("no valid position read; cannot return the arm to rest")
+                sleep(dt)
+                continue
+            command = current
+        deltas = [t - c for t, c in zip(target, command, strict=True)]
         if all(abs(d) <= tolerance for d in deltas):
             write(list(target))
             return
-        write([c + max(-max_step, min(max_step, d)) for c, d in zip(current, deltas, strict=True)])
+        command = [c + max(-max_step, min(max_step, d)) for c, d in zip(command, deltas, strict=True)]
+        write(list(command))
         sleep(dt)
     raise TimeoutError("arm did not reach the rest pose")

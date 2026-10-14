@@ -90,6 +90,8 @@ class _Live:
         self.info = info
         self.worker = worker
         self.last_heartbeat = now
+        # Held for the whole of worker.start(); stop() waits on it so the two never overlap.
+        self.start_lock = threading.Lock()
 
 
 class SessionManager:
@@ -144,19 +146,21 @@ class SessionManager:
                 raise SessionBusyError(
                     f"a {self._live.info.kind.value} session is already {self._live.info.state.value}"
                 )
-            self._live = _Live(info, worker, self._clock())
+            live = self._live = _Live(info, worker, self._clock())
         self._publish(info)
-        try:
-            worker.start()
-        except Exception as exc:
-            logger.exception("session %s failed to start", info.id)
-            self._finish(info.id, SessionState.failed, reason="start_failed", error=str(exc))
-            raise
-        with self._lock:
-            if self._live is not None and self._live.info.id == info.id:
-                self._live.info.state = SessionState.running
-                self._live.last_heartbeat = self._clock()
-                info = self._live.info.model_copy()
+        with live.start_lock:
+            try:
+                worker.start()
+            except Exception as exc:
+                logger.exception("session %s failed to start", info.id)
+                self._finish(info.id, SessionState.failed, reason="start_failed", error=str(exc))
+                raise
+            with self._lock:
+                # A stop requested while starting has already marked the session stopping; leave it so.
+                if live.info.state == SessionState.starting:
+                    live.info.state = SessionState.running
+                    live.last_heartbeat = self._clock()
+                info = live.info.model_copy()
         self._publish(info)
         return info
 
@@ -174,7 +178,13 @@ class SessionManager:
             live.info.state = SessionState.stopping
             info = live.info.model_copy()
         self._publish(info)
-        return self._stop_worker(session_id, live.worker, reason)
+        # If the worker is still starting (connecting hardware, loading a policy), wait for start() to
+        # return before stopping it: stop() must never overlap start(), or the arm is left energised.
+        with live.start_lock:
+            with self._lock:
+                if self._live is not live:  # start() failed and already released everything
+                    return self._last or info
+            return self._stop_worker(session_id, live.worker, reason)
 
     def control(self, session_id: str, action: str, payload: dict[str, Any]) -> dict[str, Any]:
         """Forward a live control (pause, takeover, ...) to the running worker; ValueError if unsupported."""

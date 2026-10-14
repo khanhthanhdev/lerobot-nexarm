@@ -5,6 +5,7 @@
 """Hardware-free tests for sessions, the lease watchdog, rest return, soft limits and calibration policy."""
 
 import json
+import threading
 import time
 
 import pytest
@@ -17,6 +18,8 @@ from fastapi.testclient import TestClient  # noqa: E402
 from lerobot.motors.nexarm.nexarm import GRIPPER_CLOSED_POS, GRIPPER_OPEN_POS, JOINT_NAMES  # noqa: E402
 from lerobot.nexarm_service import calibration, safety  # noqa: E402
 from lerobot.nexarm_service.app import API_PREFIX, create_app  # noqa: E402
+from lerobot.nexarm_service.events import EventHub  # noqa: E402
+from lerobot.nexarm_service.session import SessionKind, SessionManager  # noqa: E402
 from tests.nexarm_service.fakes import FakeBus, FakeHardware  # noqa: E402
 
 PROFILE = {"name": "bench", "follower_port": "FOLLOWER", "leader_port": "LEADER"}
@@ -46,7 +49,7 @@ def start_teleop(client):
 def test_soft_limits_come_from_urdf_and_gripper_range():
     assert safety.SOFT_LIMITS["gripper"] == (GRIPPER_OPEN_POS, GRIPPER_CLOSED_POS)
     assert safety.SOFT_LIMITS["wrist_flex"] == (911, 3185)  # +-1.74533 rad, rounded inward
-    assert safety.SOFT_LIMITS["wrist_roll"] == (1, 4095)
+    assert safety.SOFT_LIMITS["wrist_roll"] == (6, 4089)
 
 
 def test_clamp_action_limits_every_joint():
@@ -201,3 +204,136 @@ def test_unsupported_kind_is_422_and_unknown_profile_404(tmp_path):
         assert recording.status_code == 422
         missing = client.post(f"{API_PREFIX}/sessions", json={"kind": "teleoperation", "profile": "nope"})
         assert missing.status_code == 404
+
+
+# -- ramp robustness and start/stop ordering ------------------------------------------------
+def scripted_reads(bus, script):
+    """A read() that plays ``script`` first (list = a read, Exception = raised), then follows the bus."""
+    queue = list(script)
+
+    def read():
+        if queue:
+            item = queue.pop(0)
+            if isinstance(item, Exception):
+                raise item
+            return item
+        return bus.read_positions()
+
+    return read
+
+
+def assert_bounded(writes, start, max_step):
+    previous = start
+    for w in writes:
+        assert max(abs(a - b) for a, b in zip(w, previous, strict=True)) <= max_step
+        previous = w
+
+
+def test_ramp_skips_corrupt_and_timed_out_reads_and_never_jumps():
+    bus = FakeBus([2048] * 6)
+    corrupt = [4095, 0, 4095, 0, 4095, 0]
+    read = scripted_reads(bus, [corrupt, TimeoutError("no reply"), [2048] * 6])
+    safety.ramp_to(read, bus.write_positions, [2300] * 6, max_step=50, sleep=lambda _: None)
+    assert bus.positions == [2300] * 6
+    assert_bounded(bus.writes, [2048] * 6, 50)
+
+
+def test_ramp_ignores_reads_after_it_has_started():
+    bus = FakeBus([2048] * 6)
+    reads = {"n": 0}
+
+    def read():
+        reads["n"] += 1
+        return [2048] * 6 if reads["n"] == 1 else [0] * 6  # every later read is corrupt
+
+    safety.ramp_to(read, bus.write_positions, [2548] * 6, max_step=50, sleep=lambda _: None)
+    assert bus.positions == [2548] * 6
+    assert_bounded(bus.writes, [2048] * 6, 50)
+
+
+def test_ramp_gives_up_after_a_sustained_loss_of_valid_reads():
+    now = {"t": 0.0}
+    clock = lambda: now["t"]  # noqa: E731
+
+    def sleep(dt):
+        now["t"] += dt
+
+    bus = FakeBus()
+    with pytest.raises(TimeoutError, match="no valid position read"):
+        safety.ramp_to(
+            lambda: [0] * 6, bus.write_positions, [2048] * 6, give_up_s=1.0, clock=clock, sleep=sleep
+        )
+    assert bus.writes == []  # never commanded anything it could not base on a valid read
+
+
+class BlockingWorker:
+    """start() blocks until released; records the order of start and stop."""
+
+    def __init__(self):
+        self.error = None
+        self.release_start = threading.Event()
+        self.order = []
+
+    def start(self):
+        self.order.append("start-begin")
+        self.release_start.wait(5)
+        self.order.append("start-end")
+
+    def stop(self):
+        self.order.append("stop")
+
+    def alive(self):
+        return True
+
+    def status(self):
+        return {}
+
+    def control(self, action, payload):
+        raise ValueError(action)
+
+
+def test_stop_during_start_waits_for_start_then_stops_the_worker():
+    worker = BlockingWorker()
+    manager = SessionManager(EventHub(), {SessionKind.teleoperation: lambda p, params: worker})
+    results = {}
+    starter = threading.Thread(
+        target=lambda: results.setdefault("start", manager.start(SessionKind.teleoperation, "bench"))
+    )
+    starter.start()
+    assert wait_for(lambda: manager.busy and worker.order == ["start-begin"])
+    sid = manager._live.info.id
+
+    stopper = threading.Thread(target=lambda: results.setdefault("stop", manager.stop(sid)))
+    stopper.start()
+    time.sleep(0.2)
+    assert worker.order == ["start-begin"]  # stop has not overlapped start
+    worker.release_start.set()
+    starter.join(5)
+    stopper.join(5)
+    assert worker.order == ["start-begin", "start-end", "stop"]
+    assert results["stop"].state == "stopped"
+    assert manager.current() is None
+
+
+def test_stop_after_a_failed_start_is_a_no_op():
+    class Failing(BlockingWorker):
+        def start(self):
+            self.order.append("start-begin")
+            self.release_start.wait(5)
+            raise RuntimeError("no port")
+
+    worker = Failing()
+    manager = SessionManager(EventHub(), {SessionKind.teleoperation: lambda p, params: worker})
+    starter = threading.Thread(
+        target=lambda: pytest.raises(RuntimeError, manager.start, SessionKind.teleoperation, "bench")
+    )
+    starter.start()
+    assert wait_for(lambda: manager.busy and worker.order == ["start-begin"])
+    sid = manager._live.info.id
+    stopper = threading.Thread(target=lambda: manager.stop(sid))
+    stopper.start()
+    worker.release_start.set()
+    starter.join(5)
+    stopper.join(5)
+    assert "stop" not in worker.order and manager.current() is None
+    assert manager.last().state == "failed"
