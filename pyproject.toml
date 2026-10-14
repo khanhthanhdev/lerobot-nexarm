@@ -165,7 +165,7 @@ timm-dep = ["timm>=1.0.0,<1.1.0"]
 # commands in the README.
 nexarm = ["lerobot[pyserial-dep]", "lerobot[deepdiff-dep]"]
 # Local engine behind the NexArm desktop app (lerobot-nexarm-service).
-service = ["lerobot[nexarm]", "fastapi>=0.115.0,<1.0.0", "uvicorn>=0.30.0,<1.0.0", "websockets>=13.0,<18.0"]
+service = ["lerobot[nexarm]", "lerobot[dataset]", "fastapi>=0.115.0,<1.0.0", "uvicorn>=0.30.0,<1.0.0", "websockets>=13.0,<18.0"]
 
 gamepad = ["lerobot[pygame-dep]", "hidapi>=0.14.0,<0.15.0"]
 kinematics = ["lerobot[placo-dep]"]

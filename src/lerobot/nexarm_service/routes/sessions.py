@@ -41,9 +41,11 @@ def start_session(body: StartSession, request: Request) -> SessionInfo:
         return state.sessions.start(body.kind, body.profile, body.params)
     except SessionBusyError as exc:
         raise HTTPException(409, str(exc)) from exc
-    except UnsupportedKindError as exc:
+    except (UnsupportedKindError, ValueError) as exc:
         raise HTTPException(422, str(exc)) from exc
-    except (ValueError, RuntimeError, OSError, TimeoutError) as exc:
+    except KeyError as exc:  # a referenced dataset or episode does not exist
+        raise HTTPException(404, f"not found: {exc.args[0]}") from exc
+    except (RuntimeError, OSError, TimeoutError) as exc:
         raise HTTPException(502, f"could not start the session: {exc}") from exc
 
 
@@ -58,6 +60,22 @@ def heartbeat(session_id: str, request: Request) -> SessionInfo:
         return request.app.state.sessions.heartbeat(session_id)
     except SessionNotFoundError as exc:
         raise HTTPException(404, f"no live session {session_id!r}") from exc
+
+
+class SessionControl(BaseModel):
+    action: str
+    payload: dict[str, Any] = {}
+
+
+@router.post("/sessions/{session_id}/control", tags=["sessions"])
+def control_session(session_id: str, body: SessionControl, request: Request) -> dict[str, Any]:
+    """Live controls: recording (exit_early, rerecord, pause, resume, set_task, finish); coaching later."""
+    try:
+        return request.app.state.sessions.control(session_id, body.action, body.payload)
+    except SessionNotFoundError as exc:
+        raise HTTPException(404, f"no live session {session_id!r}") from exc
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
 
 
 @router.delete("/sessions/{session_id}", tags=["sessions"])

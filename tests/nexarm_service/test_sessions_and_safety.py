@@ -197,7 +197,7 @@ def test_unsupported_kind_is_422_and_unknown_profile_404(tmp_path):
     app, client = make_client(tmp_path, FakeHardware())
     with client:
         client.put(f"{API_PREFIX}/profiles/bench", json=PROFILE)
-        recording = client.post(f"{API_PREFIX}/sessions", json={"kind": "recording", "profile": "bench"})
+        recording = client.post(f"{API_PREFIX}/sessions", json={"kind": "rollout", "profile": "bench"})
         assert recording.status_code == 422
         missing = client.post(f"{API_PREFIX}/sessions", json={"kind": "teleoperation", "profile": "nope"})
         assert missing.status_code == 404

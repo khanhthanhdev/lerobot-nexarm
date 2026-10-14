@@ -29,4 +29,7 @@ CAPABILITIES: tuple[str, ...] = (
     "sessions",
     "teleoperation",
     "calibration",
+    "recording",
+    "replay",
+    "datasets",
 )

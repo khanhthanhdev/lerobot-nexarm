@@ -52,6 +52,7 @@ class SessionInfo(BaseModel):
     profile: str
     state: SessionState
     started_at: float
+    params: dict[str, Any] = {}
     stop_reason: str | None = None
     error: str | None = None
     status: dict[str, Any] = {}
@@ -66,6 +67,7 @@ class Worker(Protocol):
     def stop(self) -> None: ...
     def alive(self) -> bool: ...
     def status(self) -> dict[str, Any]: ...
+    def control(self, action: str, payload: dict[str, Any]) -> dict[str, Any]: ...
 
 
 WorkerFactory = Callable[[str, dict[str, Any]], Worker]  # (profile name, params) -> worker
@@ -135,6 +137,7 @@ class SessionManager:
             profile=profile,
             state=SessionState.starting,
             started_at=time.time(),
+            params=params or {},
         )
         with self._lock:
             if self._live is not None:
@@ -172,6 +175,15 @@ class SessionManager:
             info = live.info.model_copy()
         self._publish(info)
         return self._stop_worker(session_id, live.worker, reason)
+
+    def control(self, session_id: str, action: str, payload: dict[str, Any]) -> dict[str, Any]:
+        """Forward a live control (pause, takeover, ...) to the running worker; ValueError if unsupported."""
+        with self._lock:
+            live = self._require(session_id)
+            if live.info.state != SessionState.running:
+                raise ValueError(f"session is {live.info.state.value}, not running")
+            worker = live.worker
+        return worker.control(action, payload)
 
     def stop_current(self, reason: str) -> None:
         info = self.current()

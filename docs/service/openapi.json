@@ -90,6 +90,168 @@
         "title": "CameraProfile",
         "type": "object"
       },
+      "DatasetSummary": {
+        "properties": {
+          "cameras": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Cameras",
+            "type": "array"
+          },
+          "excluded_episodes": {
+            "default": 0,
+            "title": "Excluded Episodes",
+            "type": "integer"
+          },
+          "fps": {
+            "title": "Fps",
+            "type": "integer"
+          },
+          "repo_id": {
+            "title": "Repo Id",
+            "type": "string"
+          },
+          "robot_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Robot Type"
+          },
+          "total_episodes": {
+            "title": "Total Episodes",
+            "type": "integer"
+          },
+          "total_frames": {
+            "title": "Total Frames",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "repo_id",
+          "fps",
+          "robot_type",
+          "total_episodes",
+          "total_frames",
+          "cameras"
+        ],
+        "title": "DatasetSummary",
+        "type": "object"
+      },
+      "DeleteEpisodes": {
+        "properties": {
+          "episodes": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Episodes",
+            "type": "array"
+          },
+          "output_repo_id": {
+            "title": "Output Repo Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "episodes",
+          "output_repo_id"
+        ],
+        "title": "DeleteEpisodes",
+        "type": "object"
+      },
+      "EpisodeSummary": {
+        "properties": {
+          "episode_index": {
+            "title": "Episode Index",
+            "type": "integer"
+          },
+          "excluded": {
+            "title": "Excluded",
+            "type": "boolean"
+          },
+          "length": {
+            "title": "Length",
+            "type": "integer"
+          },
+          "tasks": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tasks",
+            "type": "array"
+          }
+        },
+        "required": [
+          "episode_index",
+          "length",
+          "tasks",
+          "excluded"
+        ],
+        "title": "EpisodeSummary",
+        "type": "object"
+      },
+      "EpisodesBody": {
+        "properties": {
+          "episodes": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Episodes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "episodes"
+        ],
+        "title": "EpisodesBody",
+        "type": "object"
+      },
+      "FeatureSpec": {
+        "properties": {
+          "dtype": {
+            "title": "Dtype",
+            "type": "string"
+          },
+          "names": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Names"
+          },
+          "shape": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Shape",
+            "type": "array"
+          },
+          "values": {
+            "items": {},
+            "title": "Values",
+            "type": "array"
+          }
+        },
+        "required": [
+          "dtype",
+          "shape",
+          "values"
+        ],
+        "title": "FeatureSpec",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -139,6 +301,30 @@
         "title": "Health",
         "type": "object"
       },
+      "ImportBody": {
+        "properties": {
+          "repo_id": {
+            "title": "Repo Id",
+            "type": "string"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision"
+          }
+        },
+        "required": [
+          "repo_id"
+        ],
+        "title": "ImportBody",
+        "type": "object"
+      },
       "JointDelta": {
         "properties": {
           "delta": {
@@ -176,6 +362,185 @@
         ],
         "title": "JointDelta",
         "type": "object"
+      },
+      "JointsData": {
+        "properties": {
+          "action": {
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "title": "Action",
+            "type": "array"
+          },
+          "names": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Names",
+            "type": "array"
+          },
+          "state": {
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "title": "State",
+            "type": "array"
+          },
+          "timestamps": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Timestamps",
+            "type": "array"
+          }
+        },
+        "required": [
+          "names",
+          "timestamps",
+          "action",
+          "state"
+        ],
+        "title": "JointsData",
+        "type": "object"
+      },
+      "MergeBody": {
+        "properties": {
+          "output_repo_id": {
+            "title": "Output Repo Id",
+            "type": "string"
+          },
+          "repo_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Repo Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "repo_ids",
+          "output_repo_id"
+        ],
+        "title": "MergeBody",
+        "type": "object"
+      },
+      "ModifyFeatures": {
+        "properties": {
+          "add": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/FeatureSpec"
+            },
+            "default": {},
+            "title": "Add",
+            "type": "object"
+          },
+          "output_repo_id": {
+            "title": "Output Repo Id",
+            "type": "string"
+          },
+          "remove": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Remove",
+            "type": "array"
+          }
+        },
+        "required": [
+          "output_repo_id"
+        ],
+        "title": "ModifyFeatures",
+        "type": "object"
+      },
+      "NewName": {
+        "properties": {
+          "output_repo_id": {
+            "title": "Output Repo Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "output_repo_id"
+        ],
+        "title": "NewName",
+        "type": "object"
+      },
+      "Operation": {
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          },
+          "started_at": {
+            "title": "Started At",
+            "type": "number"
+          },
+          "state": {
+            "$ref": "#/components/schemas/OperationState"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "state",
+          "started_at"
+        ],
+        "title": "Operation",
+        "type": "object"
+      },
+      "OperationState": {
+        "enum": [
+          "running",
+          "done",
+          "failed"
+        ],
+        "title": "OperationState",
+        "type": "string"
       },
       "PortInfo": {
         "properties": {
@@ -260,6 +625,25 @@
         "title": "RobotProfile",
         "type": "object"
       },
+      "SessionControl": {
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "default": {},
+            "title": "Payload",
+            "type": "object"
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "title": "SessionControl",
+        "type": "object"
+      },
       "SessionInfo": {
         "properties": {
           "error": {
@@ -279,6 +663,12 @@
           },
           "kind": {
             "$ref": "#/components/schemas/SessionKind"
+          },
+          "params": {
+            "additionalProperties": true,
+            "default": {},
+            "title": "Params",
+            "type": "object"
           },
           "profile": {
             "title": "Profile",
@@ -344,6 +734,32 @@
         "title": "SessionState",
         "type": "string"
       },
+      "SplitBody": {
+        "properties": {
+          "splits": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "items": {
+                    "type": "integer"
+                  },
+                  "type": "array"
+                }
+              ]
+            },
+            "title": "Splits",
+            "type": "object"
+          }
+        },
+        "required": [
+          "splits"
+        ],
+        "title": "SplitBody",
+        "type": "object"
+      },
       "StartSession": {
         "properties": {
           "kind": {
@@ -365,6 +781,17 @@
           "profile"
         ],
         "title": "StartSession",
+        "type": "object"
+      },
+      "UploadBody": {
+        "properties": {
+          "private": {
+            "default": true,
+            "title": "Private",
+            "type": "boolean"
+          }
+        },
+        "title": "UploadBody",
         "type": "object"
       },
       "ValidationError": {
@@ -484,6 +911,898 @@
         ]
       }
     },
+    "/api/v1/datasets": {
+      "get": {
+        "operationId": "list_datasets_api_v1_datasets_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DatasetSummary"
+                  },
+                  "title": "Response List Datasets Api V1 Datasets Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Datasets",
+        "tags": [
+          "datasets"
+        ]
+      }
+    },
+    "/api/v1/datasets/hub": {
+      "get": {
+        "operationId": "list_hub_api_v1_datasets_hub_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "author",
+            "required": true,
+            "schema": {
+              "title": "Author",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response List Hub Api V1 Datasets Hub Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Hub",
+        "tags": [
+          "datasets"
+        ]
+      }
+    },
+    "/api/v1/datasets/import": {
+      "post": {
+        "operationId": "import_dataset_api_v1_datasets_import_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Import Dataset",
+        "tags": [
+          "datasets"
+        ]
+      }
+    },
+    "/api/v1/datasets/merge": {
+      "post": {
+        "operationId": "merge_api_v1_datasets_merge_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MergeBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Merge",
+        "tags": [
+          "datasets"
+        ]
+      }
+    },
+    "/api/v1/datasets/{owner}/{name}": {
+      "get": {
+        "operationId": "dataset_info_api_v1_datasets__owner___name__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "owner",
+            "required": true,
+            "schema": {
+              "title": "Owner",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Dataset Info Api V1 Datasets  Owner   Name  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Dataset Info",
+        "tags": [
+          "datasets"
+        ]
+      }
+    },
+    "/api/v1/datasets/{owner}/{name}/delete-episodes": {
+      "post": {
+        "operationId": "delete_episodes_api_v1_datasets__owner___name__delete_episodes_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "owner",
+            "required": true,
+            "schema": {
+              "title": "Owner",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteEpisodes"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Episodes",
+        "tags": [
+          "datasets"
+        ]
+      }
+    },
+    "/api/v1/datasets/{owner}/{name}/drop-excluded": {
+      "post": {
+        "operationId": "drop_excluded_api_v1_datasets__owner___name__drop_excluded_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "owner",
+            "required": true,
+            "schema": {
+              "title": "Owner",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewName"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Drop Excluded",
+        "tags": [
+          "datasets"
+        ]
+      }
+    },
+    "/api/v1/datasets/{owner}/{name}/episodes": {
+      "get": {
+        "operationId": "episodes_api_v1_datasets__owner___name__episodes_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "owner",
+            "required": true,
+            "schema": {
+              "title": "Owner",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/EpisodeSummary"
+                  },
+                  "title": "Response Episodes Api V1 Datasets  Owner   Name  Episodes Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Episodes",
+        "tags": [
+          "datasets"
+        ]
+      }
+    },
+    "/api/v1/datasets/{owner}/{name}/episodes/{episode}/frames/{camera}/{frame}": {
+      "get": {
+        "operationId": "frame_api_v1_datasets__owner___name__episodes__episode__frames__camera___frame__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "owner",
+            "required": true,
+            "schema": {
+              "title": "Owner",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "episode",
+            "required": true,
+            "schema": {
+              "title": "Episode",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "camera",
+            "required": true,
+            "schema": {
+              "title": "Camera",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "frame",
+            "required": true,
+            "schema": {
+              "title": "Frame",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "width",
+            "required": false,
+            "schema": {
+              "default": 640,
+              "title": "Width",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "image/jpeg": {}
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Frame",
+        "tags": [
+          "datasets"
+        ]
+      }
+    },
+    "/api/v1/datasets/{owner}/{name}/episodes/{episode}/joints": {
+      "get": {
+        "operationId": "joints_api_v1_datasets__owner___name__episodes__episode__joints_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "owner",
+            "required": true,
+            "schema": {
+              "title": "Owner",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "episode",
+            "required": true,
+            "schema": {
+              "title": "Episode",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JointsData"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Joints",
+        "tags": [
+          "datasets"
+        ]
+      }
+    },
+    "/api/v1/datasets/{owner}/{name}/excluded": {
+      "get": {
+        "operationId": "get_excluded_api_v1_datasets__owner___name__excluded_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "owner",
+            "required": true,
+            "schema": {
+              "title": "Owner",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "integer"
+                  },
+                  "title": "Response Get Excluded Api V1 Datasets  Owner   Name  Excluded Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Excluded",
+        "tags": [
+          "datasets"
+        ]
+      },
+      "put": {
+        "operationId": "set_excluded_api_v1_datasets__owner___name__excluded_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "owner",
+            "required": true,
+            "schema": {
+              "title": "Owner",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EpisodesBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "integer"
+                  },
+                  "title": "Response Set Excluded Api V1 Datasets  Owner   Name  Excluded Put",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Excluded",
+        "tags": [
+          "datasets"
+        ]
+      }
+    },
+    "/api/v1/datasets/{owner}/{name}/modify-features": {
+      "post": {
+        "operationId": "modify_features_api_v1_datasets__owner___name__modify_features_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "owner",
+            "required": true,
+            "schema": {
+              "title": "Owner",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModifyFeatures"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Modify Features",
+        "tags": [
+          "datasets"
+        ]
+      }
+    },
+    "/api/v1/datasets/{owner}/{name}/rename": {
+      "post": {
+        "operationId": "rename_api_v1_datasets__owner___name__rename_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "owner",
+            "required": true,
+            "schema": {
+              "title": "Owner",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewName"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Rename Api V1 Datasets  Owner   Name  Rename Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rename",
+        "tags": [
+          "datasets"
+        ]
+      }
+    },
+    "/api/v1/datasets/{owner}/{name}/split": {
+      "post": {
+        "operationId": "split_api_v1_datasets__owner___name__split_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "owner",
+            "required": true,
+            "schema": {
+              "title": "Owner",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SplitBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Split",
+        "tags": [
+          "datasets"
+        ]
+      }
+    },
+    "/api/v1/datasets/{owner}/{name}/upload": {
+      "post": {
+        "operationId": "upload_api_v1_datasets__owner___name__upload_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "owner",
+            "required": true,
+            "schema": {
+              "title": "Owner",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload",
+        "tags": [
+          "datasets"
+        ]
+      }
+    },
     "/api/v1/health": {
       "get": {
         "operationId": "health_api_v1_health_get",
@@ -502,6 +1821,73 @@
         "summary": "Health",
         "tags": [
           "system"
+        ]
+      }
+    },
+    "/api/v1/operations": {
+      "get": {
+        "operationId": "list_operations_api_v1_operations_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Operation"
+                  },
+                  "title": "Response List Operations Api V1 Operations Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Operations",
+        "tags": [
+          "datasets"
+        ]
+      }
+    },
+    "/api/v1/operations/{op_id}": {
+      "get": {
+        "operationId": "get_operation_api_v1_operations__op_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "op_id",
+            "required": true,
+            "schema": {
+              "title": "Op Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Operation",
+        "tags": [
+          "datasets"
         ]
       }
     },
@@ -747,6 +2133,61 @@
           }
         },
         "summary": "Stop Session",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}/control": {
+      "post": {
+        "description": "Live controls: recording (exit_early, rerecord, pause, resume, set_task, finish); coaching later.",
+        "operationId": "control_session_api_v1_sessions__session_id__control_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionControl"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Control Session Api V1 Sessions  Session Id  Control Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Control Session",
         "tags": [
           "sessions"
         ]

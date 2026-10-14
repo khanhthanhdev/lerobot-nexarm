@@ -4,6 +4,8 @@
 
 """Hardware fakes shared by the engine tests: an in-memory arm that records every write."""
 
+import numpy as np
+
 from lerobot.motors.nexarm.nexarm import JOINT_NAMES
 
 
@@ -43,9 +45,16 @@ class FakeBus:
 
 
 class FakeFollower:
-    def __init__(self, bus):
+    robot_type = "nexarm_follower"
+    name = "nexarm_follower"
+
+    def __init__(self, bus, with_camera=False):
         self.bus = bus
         self.sent: list[dict] = []
+        self.cameras = {"front": object()} if with_camera else {}
+        joints = {f"{n}.pos": float for n in JOINT_NAMES}
+        self.action_features = dict(joints)
+        self.observation_features = {**joints, **dict.fromkeys(self.cameras, (48, 64, 3))}
 
     @property
     def is_connected(self):
@@ -56,7 +65,10 @@ class FakeFollower:
         self.bus.set_torque(True)
 
     def get_observation(self):
-        return {f"{n}.pos": float(p) for n, p in zip(JOINT_NAMES, self.bus.read_positions(), strict=True)}
+        obs = {f"{n}.pos": float(p) for n, p in zip(JOINT_NAMES, self.bus.read_positions(), strict=True)}
+        for key in self.cameras:
+            obs[key] = np.zeros((48, 64, 3), dtype=np.uint8)
+        return obs
 
     def send_action(self, action):
         self.sent.append(action)
@@ -93,11 +105,12 @@ class FakeHardware:
     def __init__(self, follower_pos=None, leader_action=None, leader_raw=None):
         self.follower_bus = FakeBus(follower_pos)
         self.follower = FakeFollower(self.follower_bus)
+        self.camera_follower = FakeFollower(self.follower_bus, with_camera=True)
         self.leader = FakeLeader(leader_action or {f"{n}.pos": 2048.0 for n in JOINT_NAMES})
         self.buses = {"LEADER": FakeBus(leader_raw), "FOLLOWER": self.follower_bus}
 
     def make_follower(self, profile, with_cameras=False):
-        return self.follower
+        return self.camera_follower if with_cameras else self.follower
 
     def make_leader(self, profile):
         return self.leader
