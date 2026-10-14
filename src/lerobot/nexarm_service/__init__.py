@@ -21,4 +21,12 @@ Install with ``pip install 'lerobot[service]'`` and start with ``lerobot-nexarm-
 API_VERSION = "1"
 
 # Feature flags reported by /health; later phases append to this list as they land.
-CAPABILITIES: tuple[str, ...] = ("profiles", "ports", "cameras", "events")
+CAPABILITIES: tuple[str, ...] = (
+    "profiles",
+    "ports",
+    "cameras",
+    "events",
+    "sessions",
+    "teleoperation",
+    "calibration",
+)

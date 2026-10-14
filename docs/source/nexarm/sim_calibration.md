@@ -14,7 +14,7 @@ This guide makes the MuJoCo twin behave like your physical arm, then generates s
 
 ## Step 0. Before you start
 
-- The arm is calibrated (`lerobot-calibrate`) and teleoperation works.
+- Zero positions are set in the servos (follower: desktop Servo Advanced page; leader: Synchronizer page) and checked with `examples/nexarm/calibrate_arms.py`, which reports leader/follower deltas at the Home pose and keeps the calibration files identity (`lerobot-calibrate` writes the same identity files). Teleoperation works.
 - You can generate simulation data (see `pipeline.md`, section 1a) and `MUJOCO_GL=egl` works on your machine.
 - Decide the follower settings now and keep them. `motion_speed` and `motion_acc` in `examples/nexarm/record.yaml` change how the arm responds, so a calibration only holds for the values used when you recorded. Re-run the calibration if you change them.
 

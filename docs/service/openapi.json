@@ -1,6 +1,58 @@
 {
   "components": {
     "schemas": {
+      "CalibrationCheck": {
+        "properties": {
+          "profile": {
+            "title": "Profile",
+            "type": "string"
+          }
+        },
+        "required": [
+          "profile"
+        ],
+        "title": "CalibrationCheck",
+        "type": "object"
+      },
+      "CalibrationReport": {
+        "properties": {
+          "hint": {
+            "title": "Hint",
+            "type": "string"
+          },
+          "joints": {
+            "items": {
+              "$ref": "#/components/schemas/JointDelta"
+            },
+            "title": "Joints",
+            "type": "array"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "reset_files": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reset Files",
+            "type": "array"
+          },
+          "tolerance_ticks": {
+            "title": "Tolerance Ticks",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "tolerance_ticks",
+          "joints",
+          "ok",
+          "reset_files",
+          "hint"
+        ],
+        "title": "CalibrationReport",
+        "type": "object"
+      },
       "CameraProfile": {
         "properties": {
           "fps": {
@@ -87,6 +139,44 @@
         "title": "Health",
         "type": "object"
       },
+      "JointDelta": {
+        "properties": {
+          "delta": {
+            "title": "Delta",
+            "type": "integer"
+          },
+          "follower": {
+            "title": "Follower",
+            "type": "integer"
+          },
+          "joint": {
+            "title": "Joint",
+            "type": "string"
+          },
+          "leader_mapped": {
+            "title": "Leader Mapped",
+            "type": "integer"
+          },
+          "leader_raw": {
+            "title": "Leader Raw",
+            "type": "integer"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "joint",
+          "leader_raw",
+          "leader_mapped",
+          "follower",
+          "delta",
+          "ok"
+        ],
+        "title": "JointDelta",
+        "type": "object"
+      },
       "PortInfo": {
         "properties": {
           "description": {
@@ -170,6 +260,113 @@
         "title": "RobotProfile",
         "type": "object"
       },
+      "SessionInfo": {
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/SessionKind"
+          },
+          "profile": {
+            "title": "Profile",
+            "type": "string"
+          },
+          "started_at": {
+            "title": "Started At",
+            "type": "number"
+          },
+          "state": {
+            "$ref": "#/components/schemas/SessionState"
+          },
+          "status": {
+            "additionalProperties": true,
+            "default": {},
+            "title": "Status",
+            "type": "object"
+          },
+          "stop_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Reason"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "profile",
+          "state",
+          "started_at"
+        ],
+        "title": "SessionInfo",
+        "type": "object"
+      },
+      "SessionKind": {
+        "enum": [
+          "teleoperation",
+          "recording",
+          "replay",
+          "rollout",
+          "eval",
+          "coaching",
+          "hosting",
+          "remote_teleoperation"
+        ],
+        "title": "SessionKind",
+        "type": "string"
+      },
+      "SessionState": {
+        "enum": [
+          "starting",
+          "running",
+          "stopping",
+          "stopped",
+          "failed"
+        ],
+        "title": "SessionState",
+        "type": "string"
+      },
+      "StartSession": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/SessionKind"
+          },
+          "params": {
+            "additionalProperties": true,
+            "default": {},
+            "title": "Params",
+            "type": "object"
+          },
+          "profile": {
+            "title": "Profile",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "profile"
+        ],
+        "title": "StartSession",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -219,6 +416,48 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/calibration/check": {
+      "post": {
+        "description": "Write identity calibration files and report leader/follower deltas at the vendor Home pose.\n\nBoth arms must be placed at Home by hand first; this only reads positions and never energises\nthe follower.",
+        "operationId": "calibration_check_api_v1_calibration_check_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalibrationCheck"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalibrationReport"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Calibration Check",
+        "tags": [
+          "calibration"
+        ]
+      }
+    },
     "/api/v1/cameras": {
       "get": {
         "operationId": "cameras_api_v1_cameras_get",
@@ -398,6 +637,160 @@
         "summary": "Put Profile",
         "tags": [
           "system"
+        ]
+      }
+    },
+    "/api/v1/sessions": {
+      "post": {
+        "operationId": "start_session_api_v1_sessions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartSession"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionInfo"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Session",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
+    "/api/v1/sessions/current": {
+      "get": {
+        "operationId": "current_session_api_v1_sessions_current_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/SessionInfo"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Current Session Api V1 Sessions Current Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Current Session",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}": {
+      "delete": {
+        "operationId": "stop_session_api_v1_sessions__session_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionInfo"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Stop Session",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}/heartbeat": {
+      "post": {
+        "operationId": "heartbeat_api_v1_sessions__session_id__heartbeat_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionInfo"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Heartbeat",
+        "tags": [
+          "sessions"
         ]
       }
     }
