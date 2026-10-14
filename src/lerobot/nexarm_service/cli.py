@@ -34,7 +34,18 @@ def main(argv: list[str] | None = None) -> None:
         action="store_true",
         help="print the OpenAPI schema (docs/service/openapi.json) and exit",
     )
+    parser.add_argument(
+        "--dump-events",
+        action="store_true",
+        help="print the WebSocket event schema (docs/service/events.json) and exit",
+    )
     args = parser.parse_args(argv)
+
+    if args.dump_events:
+        from lerobot.nexarm_service.events import EVENT_SCHEMAS
+
+        sys.stdout.write(json.dumps(EVENT_SCHEMAS, indent=2, sort_keys=True) + "\n")
+        return
 
     if args.dump_openapi:
         from lerobot.nexarm_service.app import openapi_schema
@@ -46,7 +57,11 @@ def main(argv: list[str] | None = None) -> None:
 
     from lerobot.nexarm_service.app import create_app
 
-    uvicorn.run(create_app(args.home), host=args.host, port=args.port, log_level="info")
+    app = create_app(args.home)
+    server = uvicorn.Server(uvicorn.Config(app, host=args.host, port=args.port, log_level="info"))
+    # POST /api/v1/shutdown asks uvicorn to exit gracefully so the lifespan hook releases the arm.
+    app.state.request_shutdown = lambda: setattr(server, "should_exit", True)
+    server.run()
 
 
 if __name__ == "__main__":

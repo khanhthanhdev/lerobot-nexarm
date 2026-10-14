@@ -87,3 +87,26 @@ def test_openapi_snapshot_is_fresh():
         "docs/service/openapi.json is stale; regenerate with "
         "`lerobot-nexarm-service --dump-openapi > docs/service/openapi.json`"
     )
+
+
+EVENTS_SNAPSHOT = Path(__file__).parents[2] / "docs" / "service" / "events.json"
+
+
+def test_events_snapshot_is_fresh_and_covers_every_event_type():
+    from lerobot.nexarm_service.events import EVENT_SCHEMAS, EVENT_TYPES
+
+    committed = json.loads(EVENTS_SNAPSHOT.read_text(encoding="utf-8"))
+    assert committed == EVENT_SCHEMAS, (
+        "docs/service/events.json is stale; regenerate with "
+        "`lerobot-nexarm-service --dump-events > docs/service/events.json`"
+    )
+    assert set(EVENT_TYPES) | {"hello"} == set(EVENT_SCHEMAS)
+
+
+def test_shutdown_invokes_the_exit_hook(tmp_path):
+    app = create_app(tmp_path)
+    calls = []
+    app.state.request_shutdown = lambda: calls.append(1)
+    with TestClient(app) as c:
+        assert c.post(f"{API_PREFIX}/shutdown").status_code == 202
+    assert calls == [1]

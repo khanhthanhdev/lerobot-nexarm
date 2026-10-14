@@ -90,6 +90,7 @@ def create_app(
     ):
         setattr(app.state, name, getattr(state, name))
     app.state.reset_calibration = state.reset_calibration
+    app.state.request_shutdown = lambda: None  # the CLI replaces this with a uvicorn exit hook
     for module in (system, sessions, datasets, jobs):
         app.include_router(module.router, prefix=API_PREFIX)
     return app

@@ -2961,6 +2961,32 @@
           "sessions"
         ]
       }
+    },
+    "/api/v1/shutdown": {
+      "post": {
+        "description": "Ask the engine to exit gracefully (the lifespan hook stops any session and releases the arm).\n\nLoopback callers only: a remote-engine role must not be stoppable from the network.",
+        "operationId": "shutdown_api_v1_shutdown_post",
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Shutdown Api V1 Shutdown Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Shutdown",
+        "tags": [
+          "system"
+        ]
+      }
     }
   }
 }

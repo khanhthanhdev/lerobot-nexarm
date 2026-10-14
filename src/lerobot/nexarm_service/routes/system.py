@@ -76,6 +76,19 @@ def cameras() -> list[dict[str, Any]]:
     return list_cameras()
 
 
+@router.post("/shutdown", status_code=202, tags=["system"])
+def shutdown(request: Request) -> dict[str, str]:
+    """Ask the engine to exit gracefully (the lifespan hook stops any session and releases the arm).
+
+    Loopback callers only: a remote-engine role must not be stoppable from the network.
+    """
+    host = request.client.host if request.client else ""
+    if host not in ("127.0.0.1", "::1", "localhost", "testclient"):
+        raise HTTPException(403, "shutdown is only accepted from the local machine")
+    request.app.state.request_shutdown()
+    return {"status": "shutting_down"}
+
+
 @router.websocket("/ws/events")
 async def events(ws: WebSocket) -> None:
     await ws.accept()

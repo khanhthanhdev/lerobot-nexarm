@@ -30,6 +30,33 @@ EVENT_TYPES = (
     "coaching_state",
 )
 
+# What each event's ``data`` carries. WebSocket routes do not appear in OpenAPI, so this table is the
+# machine-readable contract for ``WS /api/v1/ws/events`` (snapshot: docs/service/events.json).
+EVENT_SCHEMAS: dict[str, dict[str, str]] = {
+    "hello": {"api_version": "string"},
+    "joint_update": {
+        "ticks": "object: joint name -> raw servo ticks (number)",
+        "radians": "object: joint name -> radians for the five arm joints (number)",
+    },
+    "session_changed": {
+        "id": "string",
+        "kind": "string, absent on the idle event",
+        "state": "starting | running | stopping | stopped | failed | idle",
+        "stop_reason": "string or null",
+        "error": "string or null",
+        "episodes_recorded": "integer, recording sessions only",
+    },
+    "jobs_changed": {"kind": "train | operation", "id": "string", "state": "string"},
+    "job_progress": {
+        "id": "string",
+        "step": "integer",
+        "total_steps": "integer",
+        "loss": "number, when logged",
+        "lr": "number, when logged",
+    },
+    "coaching_state": {"phase": "string", "intervening": "boolean", "corrections": "integer"},
+}
+
 _QUEUE_SIZE = 256
 
 
