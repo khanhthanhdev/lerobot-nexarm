@@ -43,6 +43,7 @@ SWEEPS = ((2.0, 0.5), (0.5, 0.25), (0.25, 0.125))
 class Episode:
     states: np.ndarray  # (T, 6) real observation.state, raw servo units, JOINT_NAMES order
     actions: np.ndarray  # (T, 6) real action
+    episode_index: int = -1
 
 
 class Simulator:
@@ -185,9 +186,24 @@ def fit_calibration(
     return calibration
 
 
+def parse_episode_list(text: str) -> set[int]:
+    """Parse ``"3,10-12"`` into ``{3, 10, 11, 12}``."""
+    episodes: set[int] = set()
+    for part in filter(None, (p.strip() for p in text.split(","))):
+        low, _, high = part.partition("-")
+        episodes.update(range(int(low), int(high or low) + 1))
+    return episodes
+
+
 def load_episodes(
-    repo_id: str, root: Path | None, max_episodes: int, max_frames: int, min_frames: int = 20
+    repo_id: str,
+    root: Path | None,
+    max_episodes: int,
+    max_frames: int,
+    min_frames: int = 20,
+    exclude: set[int] | frozenset[int] = frozenset(),
 ) -> list[Episode]:
+    """The first ``max_episodes`` episodes not in ``exclude``, each cut to ``max_frames``."""
     from lerobot.datasets.lerobot_dataset import LeRobotDataset
 
     dataset = LeRobotDataset(repo_id, root=root)
@@ -197,11 +213,12 @@ def load_episodes(
     actions = np.asarray(table["action"], dtype=np.float64)[:, order]
     states = np.asarray(table["observation.state"], dtype=np.float64)[:, order]
     index = np.asarray(table["episode_index"])
+    kept = [int(e) for e in np.unique(index) if int(e) not in exclude]
     episodes = []
-    for episode_index in np.unique(index)[:max_episodes]:
+    for episode_index in kept[:max_episodes]:
         rows = np.flatnonzero(index == episode_index)[:max_frames]
         if len(rows) >= min_frames:
-            episodes.append(Episode(states=states[rows], actions=actions[rows]))
+            episodes.append(Episode(states=states[rows], actions=actions[rows], episode_index=episode_index))
     return episodes
 
 
@@ -226,6 +243,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--model", type=Path, default=Path("sim/fusion_export/scene.xml"))
     parser.add_argument("--fps", type=int, default=None, help="Defaults to the dataset fps")
     parser.add_argument("--episodes", type=int, default=20)
+    parser.add_argument(
+        "--exclude-episodes",
+        default="",
+        help="Episode indices to skip, e.g. '69-92' for a session with a different setup",
+    )
     parser.add_argument("--max-frames", type=int, default=600, help="Frames used per episode")
     parser.add_argument(
         "--joints",
@@ -237,6 +259,10 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--out", type=Path, default=Path("outputs/calibration/nexarm_sim_calibration.json"))
     args = parser.parse_args(argv)
     args.joints = [j.strip() for j in args.joints.split(",") if j.strip()]
+    try:
+        args.exclude_episodes = parse_episode_list(args.exclude_episodes)
+    except ValueError:
+        parser.error("--exclude-episodes must look like '3,10-12'")
     unknown = set(args.joints) - set(JOINT_NAMES)
     if unknown or not args.joints:
         parser.error(f"--joints must be a non-empty subset of {list(JOINT_NAMES)}")
@@ -249,7 +275,9 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
-    episodes = load_episodes(args.repo_id, args.root, args.episodes, args.max_frames)
+    episodes = load_episodes(
+        args.repo_id, args.root, args.episodes, args.max_frames, exclude=args.exclude_episodes
+    )
     if not episodes:
         raise SystemExit("No usable episodes found in the dataset")
     fit_episodes, holdout = split_episodes(episodes, args.holdout_frac)

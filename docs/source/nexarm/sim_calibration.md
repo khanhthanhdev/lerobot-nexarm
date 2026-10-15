@@ -16,6 +16,21 @@ This guide makes the MuJoCo twin behave like your physical arm, then generates s
 
 - Zero positions are set in the servos (follower: desktop Servo Advanced page; leader: Synchronizer page) and checked with `examples/nexarm/calibrate_arms.py`, which reports leader/follower deltas at the Home pose and keeps the calibration files identity (`lerobot-calibrate` writes the same identity files). Teleoperation works.
 - You can generate simulation data (see `pipeline.md`, section 1a) and `MUJOCO_GL=egl` works on your machine.
+- Check that the sim joint mapping matches your arm. The sim maps raw 2048 onto the exported CAD pose, while the real follower stands straight up at 2048. Until the mapping is fixed, the sim poses real joint values differently from the real arm.
+  1. Measure the per-joint sign and zero offset by posing the un-energised follower by hand:
+
+     ```bash
+     uv run python examples/nexarm/probe_joint_mapping.py --port /dev/ttyUSB1
+     ```
+
+  2. Confirm the result on a recorded episode. This needs OpenGL; use `MUJOCO_GL=egl` on headless Linux.
+
+     ```bash
+     uv run python examples/nexarm/overlay_recorded_frames.py --repo-id <real_repo_id> --episode 0 --mapping outputs/nexarm/joint_mapping_probe.json
+     ```
+
+     The wrist-camera overlays should line up. Fitting dynamics with a wrong mapping gives meaningless numbers.
+
 - Decide the follower settings now and keep them. `motion_speed` and `motion_acc` in `examples/nexarm/record.yaml` change how the arm responds, so a calibration only holds for the values used when you recorded. Re-run the calibration if you change them.
 
 ## Step 1. Record system-identification episodes
@@ -55,6 +70,21 @@ print(ds.meta.total_episodes, "episodes", ds.meta.total_frames, "frames", ds.fps
 print(ds.meta.features["action"]["names"])
 EOF
 ```
+
+Then audit the joint data:
+
+```bash
+uv run python examples/nexarm/audit_real_dataset.py --repo-id <sysid_repo_id> --episode-time-s <episode_time_s>
+```
+
+The audit reports:
+
+- **which episodes have trustworthy timing.** Frames are stamped at a nominal 1/fps, so "Record loop is running slower" warnings inflate speeds. Only episodes that ran their full time limit are used for speeds.
+- **per-joint speeds.** A joint that never saturated was only moved that fast, so its top speed is a lower bound, not a servo limit.
+- **episodes whose command-to-state lag differs from the rest.** These usually come from a session that logged differently; skip them with `--exclude-episodes` in `calibrate_sim.py`.
+- **gripper levels.** If releases stay above the stack-bowls grasp-assist release threshold, raise `assist_release_pos` on `NexArmStackBowlsTask` before replaying real demos in the sim.
+
+To measure servo speed and lag directly with real timestamps, run `examples/nexarm/servo_step_test.py --port /dev/ttyUSB1 --joint elbow_flex`. It compares `motion_speed` 2000 with 0.
 
 Confirm that:
 
@@ -155,7 +185,7 @@ Policies see images, so wrong camera geometry causes a bigger sim-to-real gap th
 uv run python examples/nexarm/calibrate_camera_alignment.py --cam-index 0 --camera-name front
 ```
 
-The tool overlays the simulated view on the live camera. Keys: `m` switches mode, `+` and `-` change the blend, `s` saves a snapshot, `q` quits. Compare the table edge, the base of the arm and the target zone. If they do not line up, edit the camera `pos`, `quat`/`xyaxes` or `fovy` in the scene XML (`sim/fusion_export/`) until they do, then repeat with `--camera-name wrist` and `--camera-name top`. For `top`, pass the RealSense RGB V4L2 node as `--cam-index` (e.g. `/dev/video4`); the sim top camera looks straight down from 0.75 m. Check that the resolution and fps match your real cameras.
+The tool overlays the simulated view on the live camera. Keys: `m` switches mode, `+` and `-` change the blend, `s` saves a snapshot, `q` quits. Compare the table edge, the base of the arm and the target zone. If they do not line up, edit the camera `pos`, `quat`/`xyaxes` or `fovy` in the scene XML (`sim/fusion_export/`) until they do, then repeat with `--camera-name wrist` and `--camera-name top`. For the RealSense `top` camera, `uv run python examples/nexarm/realsense_fovy.py` reads the colour intrinsics and prints the matching `fovy`. For `top`, pass the RealSense RGB V4L2 node as `--cam-index` (e.g. `/dev/video4`); the sim top camera looks straight down from 0.75 m. Check that the resolution and fps match your real cameras.
 
 ## Step 8. Match the scene
 

@@ -11,6 +11,8 @@ from typing import Literal
 import mujoco
 import numpy as np
 
+from lerobot.motors.nexarm.nexarm import GRIPPER_OPEN_POS
+
 from .mujoco_backend import NexArmMujocoBackend
 
 # Grasp-assist hysteresis on the commanded raw gripper target, inside GRIPPER_OPEN_POS..
@@ -63,6 +65,7 @@ class NexArmStackBowlsTask:
         timeout_s: float = 40.0,
         grasp_mode: Literal["contact_assisted", "proximity_assisted"] = "contact_assisted",
         position_jitter_m: float = 0.005,
+        assist_release_pos: float = GRIPPER_ASSIST_RELEASE_POS,
     ) -> None:
         if grasp_mode not in ("contact_assisted", "proximity_assisted"):
             raise ValueError(f"Unknown grasp mode: {grasp_mode}")
@@ -70,6 +73,12 @@ class NexArmStackBowlsTask:
             raise ValueError("position_jitter_m must be between 0 and 0.05 meters")
         if not 0 < success_hold_s < timeout_s:
             raise ValueError("Require 0 < success_hold_s < timeout_s")
+        # Real teleoperated releases often open only to about 1900-2000, so replaying them needs a higher value.
+        if not GRIPPER_OPEN_POS <= assist_release_pos < GRIPPER_ASSIST_ENGAGE_POS:
+            raise ValueError(
+                f"assist_release_pos must be within [{GRIPPER_OPEN_POS}, {GRIPPER_ASSIST_ENGAGE_POS})"
+            )
+        self.assist_release_pos = assist_release_pos
         self.grasp_mode = grasp_mode
         self.position_jitter_m = position_jitter_m
         self.backend = backend
@@ -213,7 +222,7 @@ class NexArmStackBowlsTask:
                 target_bpos = site_pos + site_mat @ self.held_rel_pos
                 self.backend.data.qpos[qadr : qadr + 3] = target_bpos
                 self.backend.data.qvel[dofadr : dofadr + 6] = 0
-        elif gripper_ctrl < GRIPPER_ASSIST_RELEASE_POS:  # commanded towards open
+        elif gripper_ctrl < self.assist_release_pos:  # commanded towards open
             if self.held_bowl is not None:
                 self.held_bowl = None
                 self.held_rel_pos = None

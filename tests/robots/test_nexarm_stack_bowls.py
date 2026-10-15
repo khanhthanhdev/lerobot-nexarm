@@ -107,3 +107,23 @@ def test_stack_requires_release_upright_and_angular_stability(task):
 def test_invalid_jitter(task, jitter):
     with pytest.raises(ValueError, match="position_jitter"):
         NexArmStackBowlsTask(task.backend, position_jitter_m=jitter)
+
+
+def test_assist_release_threshold_is_configurable(task):
+    """Real teleop releases often open only to about 1990, which the default threshold never sees."""
+    backend = task.backend
+    gripper = backend._actuator_ids["gripper"]
+    task.held_bowl, task.held_rel_pos = "red", np.zeros(3)
+    backend.data.ctrl[gripper] = backend.raw_to_control("gripper", 1990)
+    task._on_physics_step()
+    assert task.held_bowl == "red"
+
+    task.assist_release_pos = 2300
+    task._on_physics_step()
+    assert task.held_bowl is None
+
+
+@pytest.mark.parametrize("release", [GRIPPER_OPEN_POS - 1, 2400])
+def test_invalid_assist_release_threshold(task, release):
+    with pytest.raises(ValueError, match="assist_release_pos"):
+        NexArmStackBowlsTask(task.backend, assist_release_pos=release)
