@@ -43,7 +43,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--camera-name", default="front", choices=["front", "wrist", "top"], help="Sim camera name"
     )
-    parser.add_argument("--model", type=Path, default=Path("sim/fusion_export/scene.xml"))
+    parser.add_argument("--model", type=Path, default=Path("sim/description/mjcf/scene.xml"))
     parser.add_argument("--width", type=int, default=640)
     parser.add_argument("--height", type=int, default=480)
     parser.add_argument("--fps", type=int, default=30)

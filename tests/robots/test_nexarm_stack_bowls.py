@@ -10,7 +10,7 @@ from lerobot.motors.nexarm.nexarm import GRIPPER_CLOSED_POS, GRIPPER_OPEN_POS
 from lerobot.robots.nexarm_sim.mujoco_backend import NexArmMujocoBackend
 from lerobot.robots.nexarm_sim.stack_bowls_task import COLORS, NexArmStackBowlsTask
 
-MODEL = Path(__file__).resolve().parents[2] / "sim/fusion_export/bowl_stack_scene.xml"
+MODEL = Path(__file__).resolve().parents[2] / "sim/description/mjcf/bowl_stack_scene.xml"
 
 
 @pytest.fixture
@@ -107,6 +107,36 @@ def test_stack_requires_release_upright_and_angular_stability(task):
 def test_invalid_jitter(task, jitter):
     with pytest.raises(ValueError, match="position_jitter"):
         NexArmStackBowlsTask(task.backend, position_jitter_m=jitter)
+
+
+def test_held_bowl_turns_with_the_gripper(task):
+    """The assist carries the bowl rigidly, so turning the wrist cannot swing the gripper into the bowl."""
+    backend = task.backend
+    model, data = backend.model, backend.data
+    qadr = model.jnt_qposadr[task._joint_ids["red"]]
+    data.qpos[qadr : qadr + 3] = data.site_xpos[task._gripper_frame_site_id] + [0, 0, 0.09]
+    mujoco.mj_forward(model, data)
+    data.ncon = 0
+    red_geom = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, "bowl_red_wall_0")
+    for jaw in (task._left_jaw_geom_id, task._right_jaw_geom_id):
+        con = mujoco.MjContact()
+        con.geom1, con.geom2, con.dist = jaw, red_geom, -0.001
+        mujoco.mj_addContact(model, data, con)
+    data.ctrl[backend._actuator_ids["gripper"]] = backend.raw_to_control("gripper", GRIPPER_CLOSED_POS)
+    task.target_bowl = "red"
+    task._on_physics_step()
+    assert task.held_bowl == "red"
+    relative = task.held_rel_mat.copy()
+
+    roll = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, "joint_5_link_4_to_link_5")
+    data.qpos[model.jnt_qposadr[roll]] += 0.8
+    mujoco.mj_forward(model, data)
+    task._on_physics_step()
+    mujoco.mj_forward(model, data)
+
+    site = data.site_xmat[task._gripper_frame_site_id].reshape(3, 3)
+    bowl = data.xmat[task._body_ids["red"]].reshape(3, 3)
+    np.testing.assert_allclose(site.T @ bowl, relative, atol=1e-9)
 
 
 def test_assist_release_threshold_is_configurable(task):

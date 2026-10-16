@@ -243,3 +243,151 @@ def test_nexarm_env_applies_calibration_latency_and_domain_randomization(tmp_pat
 
     with pytest.raises(ValueError, match="fps"):
         gym.make("NexArmPickPlace-v0", obs_type="state", fps=15, calibration_path=path)
+
+
+def test_nexarm_stack_bowls_env_contract():
+    env = gym.make("NexArmStackBowls-v0", obs_type="state")
+    check_env(env.unwrapped, skip_render_check=True)
+    obs, info = env.reset(seed=4)
+    task = env.unwrapped.task
+    assert obs["environment_state"].shape == (9,)
+    bottom = task.bowl_position(task.current_order[0])
+    np.testing.assert_allclose(obs["environment_state"][:3], bottom, atol=1e-6)
+    assert info["task"] == env.unwrapped.task_description
+    assert all(color in info["task"] for color in ("red", "blue", "black"))
+    env.reset(seed=5)
+    assert env.unwrapped.task_description != info["task"]  # the order follows the seed
+    env.close()
+
+
+def test_nexarm_stack_bowls_env_rewards_a_released_stack():
+    import mujoco
+
+    from lerobot.motors.nexarm.nexarm import GRIPPER_OPEN_POS
+
+    env = gym.make("NexArmStackBowls-v0", obs_type="state")
+    obs, _ = env.reset(seed=0)
+    unwrapped = env.unwrapped
+    backend, task = unwrapped.backend, unwrapped.task
+    for i, color in enumerate(task.current_order):
+        qadr = backend.model.jnt_qposadr[task._joint_ids[color]]
+        backend.data.qpos[qadr : qadr + 7] = [0, -0.2, 0.02 + 0.03 * i, 1, 0, 0, 0]
+    mujoco.mj_forward(backend.model, backend.data)
+    action = obs["agent_pos"].copy()
+    action[-1] = GRIPPER_OPEN_POS
+    rewards, terminated, info = [], False, {}
+    for _ in range(40):
+        _, reward, terminated, _, info = env.step(action)
+        rewards.append(reward)
+        if terminated:
+            break
+    assert terminated and info["success"] and info["reason"] == "success"
+    assert rewards[0] >= 4.0  # both nesting stages
+    assert rewards[-1] >= 9.0  # plus the success bonus
+    env.close()
+
+
+def test_nexarm_env_config_sizes_environment_state_by_task():
+    assert NexArmEnv(obs_type="state").features["environment_state"].shape == (6,)
+    stack = NexArmEnv(task="NexArmStackBowls-v0", obs_type="state")
+    assert stack.features["environment_state"].shape == (9,)
+    env = make_env(stack, n_envs=1)["nexarm"][0]
+    obs, _ = env.reset(seed=0)
+    assert obs["environment_state"].shape == (1, 9)
+    assert len(env.call("task_description")[0]) > 0
+    env.close()
+
+
+ENV_IDS = ["NexArmPickPlace-v0", "NexArmStackBowls-v0"]
+
+
+def _rollout(env_id: str, seed: int, steps: int = 20, **kwargs):
+    env = gym.make(env_id, obs_type="state", **kwargs)
+    env.action_space.seed(seed)
+    obs, _ = env.reset(seed=seed)
+    trace = [np.concatenate([obs["agent_pos"], obs["environment_state"]])]
+    rewards = []
+    for _ in range(steps):
+        obs, reward, *_ = env.step(env.action_space.sample())
+        trace.append(np.concatenate([obs["agent_pos"], obs["environment_state"]]))
+        rewards.append(reward)
+    env.close()
+    return np.array(trace), np.array(rewards)
+
+
+@pytest.mark.parametrize("env_id", ENV_IDS)
+def test_nexarm_env_same_seed_rollouts_are_identical(env_id):
+    """Catches hidden global RNG use and nondeterministic physics, bit for bit."""
+    kwargs = {"enable_domain_randomization": True, "init_qpos_noise_rad": 0.02}
+    first, second = _rollout(env_id, 7, **kwargs), _rollout(env_id, 7, **kwargs)
+    np.testing.assert_array_equal(first[0], second[0])
+    np.testing.assert_array_equal(first[1], second[1])
+    assert not np.array_equal(first[0], _rollout(env_id, 8, **kwargs)[0])
+
+
+@pytest.mark.parametrize("env_id", ENV_IDS)
+@pytest.mark.parametrize("reward_type", ["dense", "sparse"])
+def test_nexarm_env_invariants_under_random_actions(env_id, reward_type):
+    env = gym.make(env_id, obs_type="state", reward_type=reward_type, enable_domain_randomization=True)
+    env.action_space.seed(0)
+    for seed in range(2):
+        obs, _ = env.reset(seed=seed)
+        assert env.observation_space.contains(obs)
+        for _ in range(15):
+            obs, reward, terminated, truncated, info = env.step(env.action_space.sample())
+            assert env.observation_space.contains(obs)
+            assert np.isfinite(reward) and np.all(np.isfinite(obs["environment_state"]))
+            components = info["reward_components"]
+            assert reward == pytest.approx(sum(components.values()))
+            assert all(np.isfinite(value) for value in components.values())
+            if reward_type == "sparse":
+                assert set(components) == {"success"}
+            if terminated or truncated:
+                break
+    env.close()
+
+
+def test_nexarm_env_reward_components_name_each_term():
+    env = gym.make("NexArmPickPlace-v0", obs_type="state")
+    obs, _ = env.reset(seed=0)
+    _, reward, *_, info = env.step(obs["agent_pos"])
+    assert set(info["reward_components"]) == {"reach", "grasp", "lift", "target", "place", "success"}
+    assert info["reward_components"]["reach"] > 0
+    env.close()
+    env = gym.make("NexArmStackBowls-v0", obs_type="state")
+    obs, _ = env.reset(seed=0)
+    *_, info = env.step(obs["agent_pos"])
+    assert set(info["reward_components"]) == {"reach", "grasp", "carry", "stage", "success"}
+    env.close()
+
+
+def test_nexarm_env_initial_pose_noise_is_seeded_and_bounded():
+    from lerobot.motors.nexarm.nexarm import JOINT_NAMES
+    from lerobot.robots.nexarm_sim.mujoco_backend import HOME_POSITIONS
+
+    def start(noise: float, seed: int) -> np.ndarray:
+        env = gym.make("NexArmPickPlace-v0", obs_type="state", init_qpos_noise_rad=noise)
+        backend = env.unwrapped.backend
+        env.reset(seed=seed)
+        joints = np.array(
+            [backend.data.qpos[backend.model.jnt_qposadr[backend._joint_ids[n]]] for n in JOINT_NAMES]
+        )
+        home = np.array([backend.raw_to_control(n, HOME_POSITIONS[n]) for n in JOINT_NAMES])
+        env.close()
+        return joints - home
+
+    home_start = start(0.0, 1)  # the 10 settle steps let gravity sag it slightly
+    offset = start(0.05, 1) - home_start
+    np.testing.assert_array_equal(offset, start(0.05, 1) - home_start)
+    assert np.abs(offset[:-1]).max() > 0.01
+    assert np.abs(offset[:-1]).max() < 0.05 + 0.01
+    assert abs(offset[-1]) < 1e-3  # the gripper starts at home
+
+
+def test_nexarm_env_config_takes_the_task_episode_length():
+    assert "max_episode_steps" not in NexArmEnv().gym_kwargs
+    assert NexArmEnv(episode_length=50).gym_kwargs["max_episode_steps"] == 50
+    assert NexArmEnv(init_qpos_noise_rad=0.02).gym_kwargs["init_qpos_noise_rad"] == 0.02
+    env = gym.make("NexArmStackBowls-v0", **NexArmEnv(obs_type="state").gym_kwargs)
+    assert env.unwrapped.max_episode_steps == 900
+    env.close()

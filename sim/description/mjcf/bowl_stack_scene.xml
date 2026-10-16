@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <mujoco model="NexArm Bowl Stacking Scene">
-  <include file="NexArm-sim.xml" />
+  <include file="nexarm.xml" />
+  <include file="workcell.xml" />
   <statistic center="0 0.2 0.2" extent="0.8" />
   <visual>
     <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0" />
@@ -19,10 +20,8 @@
     <texture type="2d" name="groundplane" builtin="checker" mark="edge" rgb1="0.2 0.3 0.4" rgb2="0.1 0.15 0.2" markrgb="0.8 0.8 0.8" width="300" height="300" />
     <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="5 5" reflectance="0.2" />
 
-    <!-- 3D Meshes for the 3 bowls -->
-    <mesh name="bowl_red" file="bowl_red.stl" scale="0.001 0.001 0.001" />
-    <mesh name="bowl_blue" file="bowl_blue.stl" scale="0.001 0.001 0.001" />
-    <mesh name="bowl_black" file="bowl_black.stl" scale="0.001 0.001 0.001" />
+    <!-- One bowl mesh shared by all three bowls; colour comes from the materials -->
+    <mesh name="bowl" file="bowl.stl" scale="0.001 0.001 0.001" />
 
     <!-- Materials with distinct colors -->
     <material name="mat_bowl_red" rgba="0.88 0.15 0.15 1.0" specular="0.3" shininess="0.5" />
@@ -33,13 +32,13 @@
   <worldbody>
     <light pos="0 0 3" dir="0 0 -1" directional="true" />
     <geom name="floor" type="plane" size="1 1 0.05" rgba="0.8 0.8 0.8 1" friction="1 0.005 0.0001" contype="2" conaffinity="2" />
-    <camera name="front" mode="fixed" pos="0.360630977001 -0.613972762847 0.55" xyaxes="0.857493 0.514496 0 -0.240504 0.400841 0.884016" fovy="55" />
-    <camera name="top" mode="fixed" pos="0.0 -0.24 0.75" xyaxes="1 0 0 0 1 0" fovy="55" />
+    <camera name="front" mode="fixed" pos="-0.032 -0.868756 0.816789" xyaxes="1 0 0 0 0.709822 0.704381" fovy="37.6" />
+    <camera name="top" mode="fixed" pos="-0.0458 -0.349378 0.76965" xyaxes="0 -1 0 1 0 0" fovy="55" />
 
     <!-- bowl_red -->
-    <body name="bowl_red" pos="-0.1000 -0.2400 0.0200">
+    <body name="bowl_red" pos="-0.1100 -0.2700 0.0200">
       <freejoint name="bowl_red_joint" />
-      <geom name="bowl_red_visual" type="mesh" mesh="bowl_red" material="mat_bowl_red" contype="0" conaffinity="0" group="2" />
+      <geom name="bowl_red_visual" type="mesh" mass="0" mesh="bowl" material="mat_bowl_red" contype="0" conaffinity="0" group="2" />
       <geom name="bowl_red_base_col" type="cylinder" size="0.046 0.002" pos="0 0 -0.0168" class="bowl_col" />
       <geom name="bowl_red_wall_0" type="capsule" fromto="0.04800 0.00000 -0.01400 0.06100 0.00000 0.01600" size="0.00550" class="bowl_col" />
       <geom name="bowl_red_wall_1" type="capsule" fromto="0.04708 0.00936 -0.01400 0.05983 0.01190 0.01600" size="0.00550" class="bowl_col" />
@@ -76,9 +75,9 @@
     </body>
 
     <!-- bowl_blue -->
-    <body name="bowl_blue" pos="0.0000 -0.2400 0.0200">
+    <body name="bowl_blue" pos="0.0000 -0.1800 0.0200">
       <freejoint name="bowl_blue_joint" />
-      <geom name="bowl_blue_visual" type="mesh" mesh="bowl_blue" material="mat_bowl_blue" contype="0" conaffinity="0" group="2" />
+      <geom name="bowl_blue_visual" type="mesh" mass="0" mesh="bowl" material="mat_bowl_blue" contype="0" conaffinity="0" group="2" />
       <geom name="bowl_blue_base_col" type="cylinder" size="0.046 0.002" pos="0 0 -0.0168" class="bowl_col" />
       <geom name="bowl_blue_wall_0" type="capsule" fromto="0.04800 0.00000 -0.01400 0.06100 0.00000 0.01600" size="0.00550" class="bowl_col" />
       <geom name="bowl_blue_wall_1" type="capsule" fromto="0.04708 0.00936 -0.01400 0.05983 0.01190 0.01600" size="0.00550" class="bowl_col" />
@@ -115,9 +114,9 @@
     </body>
 
     <!-- bowl_black -->
-    <body name="bowl_black" pos="0.1000 -0.2400 0.0200">
+    <body name="bowl_black" pos="0.1100 -0.2700 0.0200">
       <freejoint name="bowl_black_joint" />
-      <geom name="bowl_black_visual" type="mesh" mesh="bowl_black" material="mat_bowl_black" contype="0" conaffinity="0" group="2" />
+      <geom name="bowl_black_visual" type="mesh" mass="0" mesh="bowl" material="mat_bowl_black" contype="0" conaffinity="0" group="2" />
       <geom name="bowl_black_base_col" type="cylinder" size="0.046 0.002" pos="0 0 -0.0168" class="bowl_col" />
       <geom name="bowl_black_wall_0" type="capsule" fromto="0.04800 0.00000 -0.01400 0.06100 0.00000 0.01600" size="0.00550" class="bowl_col" />
       <geom name="bowl_black_wall_1" type="capsule" fromto="0.04708 0.00936 -0.01400 0.05983 0.01190 0.01600" size="0.00550" class="bowl_col" />

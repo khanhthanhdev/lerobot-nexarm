@@ -26,10 +26,10 @@ The shortest complete workflow is:
 | Object contact and grasping                       | Ready           | The scene contains a free red cube and jaw collision bodies.                      |
 | LeRobot record, replay, and rollout               | Ready           | Uses the same six action/state feature names as the physical follower.            |
 | Seeded pick/place reset and success detection     | Ready           | `NexArmPickPlaceTask` checks grasp, release, stable placement, drop, and timeout. |
-| Gymnasium reward environment                      | Not implemented | The current task wrapper is intentionally smaller than a benchmark environment.   |
+| Gymnasium reward environments                     | Ready           | `NexArmPickPlace-v0` and `NexArmStackBowls-v0` (`--env.type=nexarm`).             |
 | Hiwonder follower firmware in the simulation loop | Not implemented | MuJoCo replaces the follower firmware and servo controller.                       |
 | Calibrated HX-30HM motor dynamics                 | Approximate     | Position gains and friction are stable defaults, not an identified motor model.   |
-| Isaac Sim model                                   | Not implemented | The current implementation is MuJoCo-first.                                       |
+| Isaac Sim model and stack-bowls task              | Ready           | Mirrored from the MJCF; not run on Isaac yet. See `isaac_lab/README.md`.          |
 
 ## Controller and firmware boundary
 
@@ -77,17 +77,29 @@ the same leader serial port at the same time.
 
 ## Model files
 
-- `fusion_export/NexArm-sim.xml` contains the robot, inertias, joints, limits,
+Every model loads from one tree, with no symlinks, from any working directory:
+
+- `description/mjcf/nexarm.xml` contains the robot, inertias, joints, limits,
   six position actuators, the jaw equality constraint, wrist camera, and primitive
   contact geometry.
-- `fusion_export/scene.xml` includes the robot and adds the front camera, floor,
-  lighting, red cube, and green target zone.
-- `fusion_export/meshes/` contains detailed STL visual meshes. These are
-  visual-only because using the complete meshes for contact produced unstable
-  overlapping convex hulls. New Fusion exports use low-refinement meshes to
-  reduce simulator startup and rendering cost.
-- `export_fusion_to_mujoco.py` is executed inside Fusion 360 through Fusion MCP
-  and regenerates the model, scene, and STL files.
+- `description/mjcf/scene.xml` includes the robot and the workcell and adds the
+  front and top cameras, floor, lighting, red cube, and green target zone.
+  `description/mjcf/bowl_stack_scene.xml` is the three-bowl scene.
+- `description/mjcf/workcell.xml` holds the fixtures around the arm (mounting
+  plate, rails, frame, panels), generated from the Fusion workcell.
+- `description/urdf/nexarm.urdf` and `nexarm.urdf.xacro` describe the same robot
+  for Isaac Sim and ROS, with the MJCF collision boxes and joint dynamics.
+- `isaac_lab/nexarm_scene.json` describes the scene around the robot (workcell,
+  cameras, bowls, task) for Isaac Lab. `isaac_lab/build_isaac_assets.py` derives it
+  and the URDF collisions from the MJCF.
+- `assets/meshes/visual/` is the only mesh folder. The MJCF points at it with
+  `meshdir="../../assets/meshes/visual"` and the URDF with relative mesh paths.
+  The meshes are visual-only because using the complete meshes for contact
+  produced unstable overlapping convex hulls. All three bowls share `bowl.stl`.
+- `fusion_export/` is not tracked: it is where a Fusion export stages its meshes
+  and `fusion_extract.json` before `apply_fusion_extract.py` merges them.
+- `run_export.py` extracts meshes, inertials and the workcell from Fusion, and
+  `apply_fusion_extract.py` merges them into the committed models (section 11).
 - `../src/lerobot/robots/nexarm_sim/` contains the LeRobot simulation backend
   and `NexArmSim` robot implementation. `pick_place_task.py` adds the optional
   seeded single-arm task without changing the six-feature robot contract.
@@ -175,10 +187,10 @@ uv sync --locked --extra core_scripts
 Confirm the model loads:
 
 ```bash
-uv run python -c 'import mujoco; m=mujoco.MjModel.from_xml_path("sim/fusion_export/scene.xml"); print(f"actuators={m.nu}, cameras={m.ncam}, geoms={m.ngeom}")'
+uv run python -c 'import mujoco; m=mujoco.MjModel.from_xml_path("sim/description/mjcf/scene.xml"); print(f"actuators={m.nu}, cameras={m.ncam}, geoms={m.ngeom}")'
 ```
 
-Expected output includes six actuators and two cameras.
+Expected output includes six actuators and three cameras (front, top, wrist).
 
 ## 2. Play using MuJoCo sliders
 
@@ -193,7 +205,7 @@ bodies can contact it.
 You can load a different scene explicitly:
 
 ```bash
-uv run python examples/nexarm/simulate.py --model sim/fusion_export/scene.xml --fps 30
+uv run python examples/nexarm/simulate.py --model sim/description/mjcf/scene.xml --fps 30
 ```
 
 For the repeatable single-arm test, use:
@@ -238,7 +250,7 @@ The standard CLI is useful when camera observations should be sent to Rerun:
 uv run lerobot-teleoperate \
   --robot.type=nexarm_sim \
   --robot.id=nexarm_sim \
-  --robot.model_path=sim/fusion_export/scene.xml \
+  --robot.model_path=sim/description/mjcf/scene.xml \
   --robot.fps=30 \
   --teleop.type=nexarm_leader \
   --teleop.id=nexarm_leader \
@@ -312,7 +324,7 @@ Set a Hub-compatible repository ID even when keeping the dataset local:
 uv run lerobot-record \
   --robot.type=nexarm_sim \
   --robot.id=nexarm_sim \
-  --robot.model_path=sim/fusion_export/scene.xml \
+  --robot.model_path=sim/description/mjcf/scene.xml \
   --robot.fps=30 \
   --teleop.type=nexarm_leader \
   --teleop.id=nexarm_leader \
@@ -388,7 +400,7 @@ Hub, paste its repository ID into the
 uv run lerobot-replay \
   --robot.type=nexarm_sim \
   --robot.id=nexarm_sim \
-  --robot.model_path=sim/fusion_export/scene.xml \
+  --robot.model_path=sim/description/mjcf/scene.xml \
   --dataset.repo_id=local/nexarm_sim_pick_place \
   --dataset.root=outputs/datasets/nexarm_sim_pick_place \
   --dataset.episode=0
@@ -428,7 +440,7 @@ uv run lerobot-rollout \
   --policy.path=outputs/train/act_nexarm_sim/checkpoints/last/pretrained_model \
   --robot.type=nexarm_sim \
   --robot.id=nexarm_sim \
-  --robot.model_path=sim/fusion_export/scene.xml \
+  --robot.model_path=sim/description/mjcf/scene.xml \
   --robot.fps=30 \
   --task="Pick up the red cube" \
   --duration=60 \
@@ -451,7 +463,7 @@ uv run lerobot-rollout \
   --policy.path=outputs/train/act_nexarm_sim/checkpoints/last/pretrained_model \
   --robot.type=nexarm_sim \
   --robot.id=nexarm_sim \
-  --robot.model_path=sim/fusion_export/scene.xml \
+  --robot.model_path=sim/description/mjcf/scene.xml \
   --robot.fps=30 \
   --dataset.repo_id=YOUR_HF_USERNAME/eval_nexarm_sim \
   --dataset.root=outputs/datasets/eval_nexarm_sim \
@@ -524,42 +536,69 @@ MUJOCO_GL=egl uv run python examples/nexarm/benchmark_sim.py --policy act=PATH
 
 ## 11. Re-export from Fusion 360
 
-The Fusion design is the source of truth. Moving through Onshape is unnecessary
-for the current pipeline.
+The Fusion design is the source of truth for geometry, mass and the workcell. The
+committed MJCF and URDF are the source of truth for everything tuned by hand
+(actuator gains and force limits, contacts, materials, sensors, keyframes), so the
+export does not regenerate them. It runs in two steps:
 
-The exporter expects these occurrence names:
+1. `sim/exporter/fusion_export_all.py` runs inside Fusion. It stages one STL per
+   robot body and `fusion_extract.json` in `sim/fusion_export/`, all in the arm
+   frame (the `base_link` component frame), whatever the arm's placement in the
+   assembly.
+2. `sim/apply_fusion_extract.py` checks the extract, merges it into
+   `sim/description/` and copies the staged meshes into `sim/assets/meshes/visual/`.
+   It then runs `sim/isaac_lab/build_isaac_assets.py`, which copies the result to the
+   URDF collisions and `sim/isaac_lab/nexarm_scene.json`. Rebuild the Isaac USDs
+   afterwards with `sim/isaac_lab/build_usd.py`.
 
-- `base_link:1`
-- `link_1:1` through `link_5:1`
-- `link_6:1`, `gripper_base:1`, and `pinion_gear:1`
-- `left_jaw:1` and `right_jaw:1`
-- `cam_mount:1`
+With Fusion open on the design and the MCP add-in running:
 
-It expects these movable joint names:
-
-- `joint_1_base_to_link_1` through `joint_5_link_4_to_link_5`
-- `left_jaw_slide_joint`
-- `right_jaw_slide_joint`
-
-The Fusion root component needs a `mujoco/config` JSON attribute containing the
-model and default actuator configuration. Each actuated native joint needs a
-`mujoco/config` attribute such as:
-
-```json
-{ "actuated": true, "actuator": "position" }
+```bash
+uv run python sim/run_export.py                                   # extract + merge into this checkout
+uv run python sim/run_export.py --sim-dir /tmp/trial --skip-apply # extract only, somewhere else
+uv run python sim/apply_fusion_extract.py --check                 # validate an extract without writing
 ```
 
-Run `sim/export_fusion_to_mujoco.py` through the Fusion MCP script runner. It
-writes through the configured WSL UNC path into `sim/fusion_export/`.
+From WSL, `run_export.py` converts the output path with `wslpath` for Fusion.
 
-The primitive collision coordinates currently match this exact CAD export.
-After changing link dimensions, joint origins, jaw geometry, or the camera
-mount, update `COLLISION_SPECS` and camera poses in the exporter, re-export, and
-run the validation tests.
+The design must contain:
 
-The detailed STL files are rendering assets, not collision or inertia sources.
-Repair non-manifold CAD bodies in Fusion before re-exporting if those meshes
-will be converted for another simulator.
+- occurrences ending in `base_link:1`, `link_1:1` … `link_5:1`,
+  `link_6:1+gripper_base:1`, `link_6:1+pinion_gear:1`, `link_6:1+left_jaw:1`,
+  `link_6:1+right_jaw:1` and `cam_mount:1`;
+- joints named `joint1` … `joint5`, `gripper_base_joint`, `left_jaw_joint` and
+  `right_jaw_joint` (the older `joint_1_base_to_link_1`-style names also work),
+  all at value 0;
+- a `workbench` occurrence whose top face is the table surface, and optionally a
+  `d435i` occurrence for the overhead camera (lens along its -Z, sensor bar along
+  its X) and a `C270` mount occurrence for the front webcam.
+
+The merge refuses an extract whose joint axes or axis lines differ from the
+committed MJCF by more than 1 mm (the raw-to-joint mapping and calibrations
+depend on them), or whose centres of mass fall outside their meshes. If it passes,
+it updates every body's mass, centre of mass and inertia in the MJCF, URDF and
+xacro, raises `nexarm_mount` so the tabletop is z = 0, writes `workcell.xml` from
+the box-shaped fixtures (non-box bodies are listed and skipped), includes it in
+every scene, and places the cameras:
+
+- `top` (RealSense D435i) at the Fusion camera, looking straight down. The image
+  has the open front of the enclosure at the top and the back wall at the bottom,
+  as on the real rig.
+- `front` (Logitech C270) on the tilted shelf of the C270 mount at the top left,
+  looking back at the arm down the shelf's slope. The webcam itself is not in the
+  CAD, so its lens sits an assumed 16 mm above and 15 mm ahead of the shelf centre.
+
+Each camera's `fovy` lives in the scene files and is kept by the merge. `front`
+uses 37.6 degrees: the C270's 55-degree diagonal (720p) gives 48.8 degrees
+horizontal, and a 640 x 480 stream of the 4:3 sensor keeps that width.
+
+The merge also refits the arm-link collision boxes from the exported meshes
+(`COLLISION_BOXES` in `apply_fusion_extract.py`): one box for `base_link`,
+`link_1`, `link_4` and `link_5`, an oriented box for `link_3`, three oriented
+boxes for `link_2` and two for `cam_mount`. They enclose every mesh vertex. The
+jaw pads (`finger_collision`) are tuned for grasping and stay hand-maintained.
+Re-run the validation tests after a refit; the scripted stack-bowls and
+pick-place generators should still succeed on fixed seeds.
 
 ## 12. Validate after model or controller changes
 
@@ -587,10 +626,10 @@ uv run --locked --extra dev ruff check src/lerobot/robots/nexarm_sim examples/ne
 ## 13. Troubleshooting
 
 **The model file is missing:** Re-export from Fusion or pass an explicit
-`--robot.model_path`. The default is `sim/fusion_export/scene.xml`.
+`--robot.model_path`. The default is `sim/description/mjcf/scene.xml`.
 
-**The Controls panel is empty:** Load `scene.xml` or `NexArm-sim.xml` from
-`fusion_export/`. A model without the six `<position>` actuators cannot expose
+**The Controls panel is empty:** Load `scene.xml` or `nexarm.xml` from
+`description/mjcf/`. A model without the six `<position>` actuators cannot expose
 control sliders.
 
 **The robot shakes or explodes:** Keep detailed STL geometry visual-only. Check

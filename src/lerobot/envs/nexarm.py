@@ -33,17 +33,27 @@ from lerobot.robots.nexarm_sim.mujoco_backend import (
     resolve_model_path,
 )
 from lerobot.robots.nexarm_sim.pick_place_task import NexArmPickPlaceTask
+from lerobot.robots.nexarm_sim.stack_bowls_task import (
+    NexArmStackBowlsStatus,
+    NexArmStackBowlsTask,
+    get_task_instruction,
+)
 
 DEFAULT_SCENE_PATH = Path("sim/description/mjcf/scene.xml")
-FALLBACK_SCENE_PATH = Path("sim/fusion_export/scene.xml")
+DEFAULT_STACK_BOWLS_SCENE_PATH = Path("sim/description/mjcf/bowl_stack_scene.xml")
 
 
-class NexArmPickPlaceEnv(gym.Env):
-    """Gymnasium environment for the Hiwonder NexArm 6-DoF tabletop pick-and-place task.
+class _NexArmMujocoEnv(gym.Env):
+    """Shared Gymnasium plumbing for the NexArm MuJoCo tasks.
 
-    This environment wraps the high-fidelity MuJoCo physics model of the NexArm robot
-    and complies 100% with the Gymnasium API standards.
+    Actions and ``agent_pos`` use the real follower's units (raw servo ticks, or those ticks normalized to
+    [-1, 1]), and the three cameras match the real rig, so a policy trained here sees the same features as
+    one trained on real recordings. Subclasses create the task and define the environment state and reward.
     """
+
+    default_scene_path: Path = DEFAULT_SCENE_PATH
+    environment_state_dim: int = 6
+    task_description: str = ""
 
     metadata = {
         "render_modes": ["rgb_array", "human"],
@@ -61,12 +71,12 @@ class NexArmPickPlaceEnv(gym.Env):
         observation_height: int = 480,
         max_episode_steps: int = 400,
         reward_type: Literal["dense", "sparse"] = "dense",
-        target_radius_m: float = 0.05,
         success_hold_s: float = 0.5,
         control_mode: Literal["raw", "normalized"] = "raw",
         calibration_path: Path | str | None = None,
         enable_domain_randomization: bool = False,
         action_delay_steps: int | None = None,
+        init_qpos_noise_rad: float = 0.0,
     ) -> None:
         super().__init__()
         self.obs_type = obs_type
@@ -76,17 +86,12 @@ class NexArmPickPlaceEnv(gym.Env):
         self.observation_height = observation_height
         self.max_episode_steps = max_episode_steps
         self.reward_type = reward_type
-        self.target_radius_m = target_radius_m
         self.success_hold_s = success_hold_s
         self.control_mode = control_mode
 
-        if model_path is not None:
-            resolved_path = resolve_model_path(Path(model_path))
-        else:
-            try:
-                resolved_path = resolve_model_path(DEFAULT_SCENE_PATH)
-            except FileNotFoundError:
-                resolved_path = resolve_model_path(FALLBACK_SCENE_PATH)
+        resolved_path = resolve_model_path(
+            Path(model_path) if model_path is not None else self.default_scene_path
+        )
 
         self.backend = NexArmMujocoBackend(
             model_path=resolved_path,
@@ -96,6 +101,7 @@ class NexArmPickPlaceEnv(gym.Env):
             camera_names=("front", "wrist", "top"),
             action_delay_steps=resolve_action_delay_steps(action_delay_steps, None),
             enable_domain_randomization=enable_domain_randomization,
+            init_qpos_noise_rad=init_qpos_noise_rad,
         )
         if calibration_path is not None:
             try:
@@ -107,12 +113,11 @@ class NexArmPickPlaceEnv(gym.Env):
             except BaseException:
                 self.backend.close()
                 raise
-        self.task = NexArmPickPlaceTask(
-            self.backend,
-            target_radius_m=self.target_radius_m,
-            success_hold_s=self.success_hold_s,
-            timeout_s=float(self.max_episode_steps) / float(self.fps),
-        )
+        try:
+            self.task = self._make_task()
+        except BaseException:
+            self.backend.close()
+            raise
 
         # Action Space & Observation Space bounds
         if self.control_mode == "raw":
@@ -201,7 +206,7 @@ class NexArmPickPlaceEnv(gym.Env):
             env_state_space = spaces.Box(
                 low=-10.0,
                 high=10.0,
-                shape=(6,),
+                shape=(self.environment_state_dim,),
                 dtype=np.float32,
             )
             self.observation_space = spaces.Dict(
@@ -215,6 +220,26 @@ class NexArmPickPlaceEnv(gym.Env):
 
         self._step_count = 0
         self._viewer: Any | None = None
+
+    def _make_task(self) -> Any:
+        raise NotImplementedError
+
+    def _environment_state(self) -> np.ndarray:
+        raise NotImplementedError
+
+    def _reward_components(self, status: Any) -> dict[str, float]:
+        """Dense reward terms by name; the dense reward is their sum."""
+        raise NotImplementedError
+
+    def _compute_reward(self, status: Any) -> float:
+        if self.reward_type == "sparse":
+            self._last_reward_components = {"success": 1.0 if status.success else 0.0}
+        else:
+            self._last_reward_components = self._reward_components(status)
+        return float(sum(self._last_reward_components.values()))
+
+    def _info(self, status: Any) -> dict[str, Any]:
+        raise NotImplementedError
 
     def _get_agent_pos(self) -> np.ndarray:
         """Returns joint positions (raw [0, 4095] or normalized [-1.0, 1.0])."""
@@ -246,10 +271,7 @@ class NexArmPickPlaceEnv(gym.Env):
             obs["pixels/top"] = top_img
 
         if self.obs_type == "state":
-            cube_pos = self.task.cube_position
-            target_pos = self.task.target_position
-            env_state = np.concatenate([cube_pos, target_pos]).astype(np.float32)
-            obs["environment_state"] = env_state
+            obs["environment_state"] = self._environment_state().astype(np.float32)
 
         return obs
 
@@ -272,11 +294,81 @@ class NexArmPickPlaceEnv(gym.Env):
                 raw_targets[f"{name}.pos"] = float(np.clip(raw_val, raw_min, raw_max))
         return raw_targets
 
-    def _compute_reward(self, status: Any) -> float:
-        if self.reward_type == "sparse":
-            return 1.0 if status.success else 0.0
+    def reset(
+        self,
+        *,
+        seed: int | None = None,
+        options: dict[str, Any] | None = None,
+    ) -> tuple[dict[str, np.ndarray], dict[str, Any]]:
+        super().reset(seed=seed)
+        int_seed = int(seed) if seed is not None else int(self.np_random.integers(0, 2**31 - 1))
+        status = self.task.reset(seed=int_seed, settle_steps=10)
+        self._step_count = 0
+        return self._get_obs(), self._info(status)
 
-        # Dense shaped reward
+    def step(
+        self,
+        action: np.ndarray,
+    ) -> tuple[dict[str, np.ndarray], float, bool, bool, dict[str, Any]]:
+        self._step_count += 1
+        raw_action = self._action_to_raw(action)
+        # Step through the backend so calibrated action latency applies, then evaluate the task.
+        self.backend.step(raw_action)
+        status = self.task.observe()
+
+        obs = self._get_obs()
+        reward = self._compute_reward(status)
+        terminated = bool(status.terminated)
+        truncated = bool(self._step_count >= self.max_episode_steps)
+        info = self._info(status)
+        info["reward_components"] = dict(self._last_reward_components)
+
+        if self.render_mode == "human":
+            self.render()
+
+        return obs, reward, terminated, truncated, info
+
+    def render(self) -> np.ndarray | None:
+        if self.render_mode == "rgb_array":
+            return self.backend.render("front")
+        elif self.render_mode == "human":
+            if self._viewer is None:
+                import mujoco.viewer
+
+                self._viewer = mujoco.viewer.launch_passive(self.backend.model, self.backend.data)
+            if self._viewer is not None:
+                self._viewer.sync()
+            return None
+        return None
+
+    def close(self) -> None:
+        if self._viewer is not None:
+            self._viewer.close()
+            self._viewer = None
+        self.backend.close()
+
+
+class NexArmPickPlaceEnv(_NexArmMujocoEnv):
+    """Pick the red cube and place it in the green target zone."""
+
+    task_description = "Pick up the red cube and place it in the green target zone."
+
+    def __init__(self, *, target_radius_m: float = 0.05, **kwargs: Any) -> None:
+        self.target_radius_m = target_radius_m
+        super().__init__(**kwargs)
+
+    def _make_task(self) -> NexArmPickPlaceTask:
+        return NexArmPickPlaceTask(
+            self.backend,
+            target_radius_m=self.target_radius_m,
+            success_hold_s=self.success_hold_s,
+            timeout_s=float(self.max_episode_steps) / float(self.fps),
+        )
+
+    def _environment_state(self) -> np.ndarray:
+        return np.concatenate([self.task.cube_position, self.task.target_position])
+
+    def _reward_components(self, status: Any) -> dict[str, float]:
         gripper_pos = self.backend.site_position("gripper_frame")
         cube_pos = self.task.cube_position
         target_pos = self.task.target_position
@@ -306,7 +398,51 @@ class NexArmPickPlaceEnv(gym.Env):
         # 6. Task success bonus
         success_reward = 5.0 if status.success else 0.0
 
-        return reach_reward + grasp_reward + lift_reward + target_reward + place_reward + success_reward
+        return {
+            "reach": reach_reward,
+            "grasp": grasp_reward,
+            "lift": lift_reward,
+            "target": target_reward,
+            "place": place_reward,
+            "success": success_reward,
+        }
+
+    def _info(self, status: Any) -> dict[str, Any]:
+        return {
+            "is_grasped": status.is_grasped,
+            "is_released": status.is_released,
+            "is_inside_target": status.is_inside_target,
+            "success": status.success,
+            "reason": status.reason,
+        }
+
+
+class NexArmStackBowlsEnv(_NexArmMujocoEnv):
+    """Stack the red, blue and black bowls in the order named by the episode's instruction.
+
+    This is the task of the real ``nexarm_stack_bowls`` recordings. Each reset draws the bowl layout and the
+    stacking order from the seed, and ``task_description`` holds the current episode's instruction. The grasp
+    is the simulator's contact assist (both jaws on one bowl), as in the scripted dataset generator.
+    """
+
+    default_scene_path = DEFAULT_STACK_BOWLS_SCENE_PATH
+    # Bottom, middle and top bowl positions, in the order the instruction names them.
+    environment_state_dim = 9
+
+    def __init__(
+        self, *, max_episode_steps: int = 900, position_jitter_m: float = 0.04, **kwargs: Any
+    ) -> None:
+        self.position_jitter_m = position_jitter_m
+        super().__init__(max_episode_steps=max_episode_steps, **kwargs)
+        self.task_description = get_task_instruction(*self.task.current_order)
+
+    def _make_task(self) -> NexArmStackBowlsTask:
+        return NexArmStackBowlsTask(
+            self.backend,
+            success_hold_s=self.success_hold_s,
+            timeout_s=float(self.max_episode_steps) / float(self.fps),
+            position_jitter_m=self.position_jitter_m,
+        )
 
     def reset(
         self,
@@ -314,67 +450,53 @@ class NexArmPickPlaceEnv(gym.Env):
         seed: int | None = None,
         options: dict[str, Any] | None = None,
     ) -> tuple[dict[str, np.ndarray], dict[str, Any]]:
-        super().reset(seed=seed)
-        int_seed = int(seed) if seed is not None else int(self.np_random.integers(0, 2**31 - 1))
-        status = self.task.reset(seed=int_seed, settle_steps=10)
-        self._step_count = 0
-
-        obs = self._get_obs()
-        info = {
-            "is_grasped": status.is_grasped,
-            "is_released": status.is_released,
-            "is_inside_target": status.is_inside_target,
-            "success": status.success,
-            "reason": status.reason,
-        }
+        obs, info = super().reset(seed=seed, options=options)
+        self.task_description = info["task"]
         return obs, info
 
-    def step(
-        self,
-        action: np.ndarray,
-    ) -> tuple[dict[str, np.ndarray], float, bool, bool, dict[str, Any]]:
-        self._step_count += 1
-        raw_action = self._action_to_raw(action)
-        # Step through the backend so calibrated action latency applies, then evaluate the task.
-        self.backend.step(raw_action)
-        status = self.task.observe()
+    def _environment_state(self) -> np.ndarray:
+        return np.concatenate([self.task.bowl_position(color) for color in self.task.current_order])
 
-        obs = self._get_obs()
-        reward = self._compute_reward(status)
-        terminated = bool(status.terminated)
-        truncated = bool(self._step_count >= self.max_episode_steps)
+    def _reward_components(self, status: NexArmStackBowlsStatus) -> dict[str, float]:
+        bottom, middle, top = (self.task.bowl_position(color) for color in self.task.current_order)
 
-        info = {
-            "is_grasped": status.is_grasped,
-            "is_released": status.is_released,
-            "is_inside_target": status.is_inside_target,
-            "success": status.success,
-            "reason": status.reason,
+        def nested(lower: np.ndarray, upper: np.ndarray) -> bool:
+            dz = float(upper[2] - lower[2])
+            return (
+                float(np.linalg.norm(upper[:2] - lower[:2])) < self.task.max_concentric_error_m
+                and self.task.min_nesting_delta_m <= dz <= self.task.max_nesting_delta_m
+            )
+
+        # The bowl to move next: the middle one until it sits in the bottom one, then the top one.
+        middle_done = nested(bottom, middle)
+        mover, base = (top, middle) if middle_done else (middle, bottom)
+        mover_color = self.task.current_order[2 if middle_done else 1]
+
+        gripper_pos = self.backend.site_position("gripper_frame")
+        reach_reward = 1.0 - float(np.tanh(10.0 * np.linalg.norm(gripper_pos - mover)))
+        held = self.task.held_bowl == mover_color
+        grasp_reward = 1.0 if held else 0.0
+        carry_reward = (1.0 - float(np.tanh(5.0 * np.linalg.norm(mover[:2] - base[:2])))) if held else 0.0
+        stage_reward = 2.0 * (int(middle_done) + int(middle_done and nested(middle, top)))
+        success_reward = 5.0 if status.success else 0.0
+        return {
+            "reach": reach_reward,
+            "grasp": grasp_reward,
+            "carry": carry_reward,
+            "stage": stage_reward,
+            "success": success_reward,
         }
 
-        if self.render_mode == "human":
-            self.render()
-
-        return obs, reward, terminated, truncated, info
-
-    def render(self) -> np.ndarray | None:
-        if self.render_mode == "rgb_array":
-            return self.backend.render("front")
-        elif self.render_mode == "human":
-            if self._viewer is None:
-                import mujoco.viewer
-
-                self._viewer = mujoco.viewer.launch_passive(self.backend.model, self.backend.data)
-            if self._viewer is not None:
-                self._viewer.sync()
-            return None
-        return None
-
-    def close(self) -> None:
-        if self._viewer is not None:
-            self._viewer.close()
-            self._viewer = None
-        self.backend.close()
+    def _info(self, status: NexArmStackBowlsStatus) -> dict[str, Any]:
+        return {
+            "held_bowl": self.task.held_bowl or "",
+            "is_concentric": status.is_concentric,
+            "is_nested_height": status.is_nested_height,
+            "is_released": status.is_released,
+            "success": status.success,
+            "reason": status.reason,
+            "task": get_task_instruction(*status.order),
+        }
 
 
 # Register the environment with Gymnasium
@@ -386,4 +508,14 @@ gym.register(
 gym.register(
     id="gym_nexarm/NexArmPickPlace-v0",
     entry_point="lerobot.envs.nexarm:NexArmPickPlaceEnv",
+)
+
+gym.register(
+    id="NexArmStackBowls-v0",
+    entry_point="lerobot.envs.nexarm:NexArmStackBowlsEnv",
+)
+
+gym.register(
+    id="gym_nexarm/NexArmStackBowls-v0",
+    entry_point="lerobot.envs.nexarm:NexArmStackBowlsEnv",
 )

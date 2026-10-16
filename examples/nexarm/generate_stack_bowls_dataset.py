@@ -463,7 +463,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default="front,wrist,top",
         help="Comma-separated list of cameras (e.g. 'front,wrist,top')",
     )
-    parser.add_argument("--model", type=Path, default=Path("sim/fusion_export/bowl_stack_scene.xml"))
+    parser.add_argument("--model", type=Path, default=Path("sim/description/mjcf/bowl_stack_scene.xml"))
     parser.add_argument(
         "--grasp-mode",
         choices=("contact_assisted", "proximity_assisted"),

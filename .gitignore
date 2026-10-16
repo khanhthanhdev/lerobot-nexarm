@@ -183,11 +183,8 @@ outputs/
 sim/*
 !sim/README.md
 !sim/export_fusion_to_mujoco.py
-!sim/fusion_export/
-!sim/fusion_export/*.xml
-!sim/fusion_export/*.urdf
-!sim/fusion_export/meshes/
-!sim/fusion_export/meshes/*.stl
+!sim/apply_fusion_extract.py
+# sim/fusion_export/ is Fusion export staging (meshes + fusion_extract.json), merged into sim/description/.
 !sim/run_export.py
 !sim/test_sim_models.py
 !sim/visualize_rerun.py
@@ -202,3 +199,5 @@ sim/*
 !sim/mobile_nexarm/
 !sim/mobile_nexarm/**
 sim/**/__pycache__/
+# Built by sim/isaac_lab/build_usd.py; rebuilt after each Fusion export.
+sim/isaac_lab/usd/

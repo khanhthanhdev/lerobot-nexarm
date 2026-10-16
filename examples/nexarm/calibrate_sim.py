@@ -240,7 +240,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--repo-id", required=True, help="Real LeRobot dataset recorded on the NexArm")
     parser.add_argument("--root", type=Path, default=None)
-    parser.add_argument("--model", type=Path, default=Path("sim/fusion_export/scene.xml"))
+    parser.add_argument("--model", type=Path, default=Path("sim/description/mjcf/scene.xml"))
     parser.add_argument("--fps", type=int, default=None, help="Defaults to the dataset fps")
     parser.add_argument("--episodes", type=int, default=20)
     parser.add_argument(

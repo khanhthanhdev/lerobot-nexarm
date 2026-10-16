@@ -97,6 +97,7 @@ class NexArmMujocoBackend:
         camera_names: tuple[str, ...],
         action_delay_steps: int = 0,
         enable_domain_randomization: bool = False,
+        init_qpos_noise_rad: float = 0.0,
     ) -> None:
         self.model_path = resolve_model_path(model_path)
         self.model = mujoco.MjModel.from_xml_path(str(self.model_path))
@@ -107,6 +108,8 @@ class NexArmMujocoBackend:
         self.camera_names = camera_names
         self.action_delay_steps = max(0, int(action_delay_steps))
         self.enable_domain_randomization = bool(enable_domain_randomization)
+        # Uniform noise on the five arm joints (not the gripper) around home at every reset.
+        self.init_qpos_noise_rad = float(init_qpos_noise_rad)
         self._action_queue: deque[dict[str, float]] = deque()
         self.dr_ranges = DomainRandomizationRanges()
         self.last_domain_params: dict[str, object] = {}
@@ -328,21 +331,18 @@ class NexArmMujocoBackend:
             self.reset_domain()
             self.last_domain_params = {}
 
-        mujoco.mj_resetData(self.model, self.data)
-        home_action: dict[str, float] = {}
-        for feature_name in JOINT_NAMES:
-            target = self.raw_to_control(feature_name, HOME_POSITIONS[feature_name])
-            actuator_id = self._actuator_ids[feature_name]
-            joint_id = self._joint_ids[feature_name]
-            self.data.ctrl[actuator_id] = target
-            self.data.qpos[self.model.jnt_qposadr[joint_id]] = target
-            home_action[f"{feature_name}.pos"] = HOME_POSITIONS[feature_name]
-
-        self._action_queue.clear()
-        for _ in range(self.action_delay_steps):
-            self._action_queue.append(dict(home_action))
-
-        mujoco.mj_forward(self.model, self.data)
+        start = {f"{name}.pos": float(HOME_POSITIONS[name]) for name in JOINT_NAMES}
+        if self.init_qpos_noise_rad > 0.0:
+            # Drawn after the domain randomization, so zero noise leaves every other draw unchanged.
+            noise_rng = rng if rng is not None else np.random.default_rng()
+            for feature_name in JOINT_NAMES[:-1]:
+                key = f"{feature_name}.pos"
+                noise = noise_rng.uniform(-self.init_qpos_noise_rad, self.init_qpos_noise_rad)
+                start[key] = self.control_to_raw(
+                    feature_name, self.raw_to_control(feature_name, start[key]) + noise
+                )
+        # Teleport to the start pose (clamped to the command range) and hold it.
+        self.set_joint_positions(start)
         for _ in range(settle_steps):
             mujoco.mj_step(self.model, self.data)
 

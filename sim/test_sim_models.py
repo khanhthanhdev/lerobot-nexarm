@@ -41,7 +41,6 @@ except ImportError:
 ROOT_DIR = Path(__file__).resolve().parent.parent
 SIM_DIR = ROOT_DIR / "sim"
 DESC_DIR = SIM_DIR / "description"
-FUSION_DIR = SIM_DIR / "fusion_export"
 ASSETS_DIR = SIM_DIR / "assets" / "meshes" / "visual"
 
 
@@ -151,11 +150,11 @@ def check_xacro_standalone_and_mujoco(xacro_path: Path) -> str:
     if not HAVE_XACRO:
         return "SKIPPED: xacro package not installed"
 
-    # Compile with mesh_dir:=meshes
-    doc = xacro.process_file(str(xacro_path), mappings={"mesh_dir": "meshes"})
+    # Compile against the one mesh folder, relative to the urdf directory
+    doc = xacro.process_file(str(xacro_path), mappings={"mesh_dir": "../../assets/meshes/visual"})
     xml_content = doc.toxml()
-    if "meshes/base_link.stl" not in xml_content:
-        raise ValueError("Standalone XACRO output did not contain relative meshes/ paths")
+    if "../../assets/meshes/visual/base_link.stl" not in xml_content:
+        raise ValueError("Standalone XACRO output did not contain the relative assets/meshes/visual paths")
 
     # MuJoCo load test from the urdf directory context
     orig_cwd = os.getcwd()
@@ -289,12 +288,9 @@ def main() -> int:
     # 1. URDF
     print("\n[1/3] Testing URDF models...")
     urdf_desc = DESC_DIR / "urdf" / "nexarm.urdf"
-    urdf_fusion = FUSION_DIR / "nexarm.urdf"
 
     run_check("URDF", "description/urdf/nexarm.urdf", lambda: check_urdf_file(urdf_desc))
     run_check("URDF", "description/urdf/nexarm.urdf (inertia)", lambda: check_urdf_inertia(urdf_desc))
-    if urdf_fusion.exists():
-        run_check("URDF", "fusion_export/nexarm.urdf", lambda: check_urdf_file(urdf_fusion))
 
     # 2. XACRO
     print("[2/3] Testing XACRO models...")
@@ -313,9 +309,7 @@ def main() -> int:
     print("[3/3] Testing MuJoCo MJCF XML...")
     mjcf_desc_arm = DESC_DIR / "mjcf" / "nexarm.xml"
     mjcf_desc_scene = DESC_DIR / "mjcf" / "scene.xml"
-    mjcf_fusion_arm = FUSION_DIR / "NexArm-sim.xml"
-    mjcf_fusion_scene = FUSION_DIR / "scene.xml"
-    mjcf_root_arm = SIM_DIR / "NexArm-sim.xml"
+    mjcf_desc_bowls = DESC_DIR / "mjcf" / "bowl_stack_scene.xml"
 
     run_check("MJCF", "description/mjcf/nexarm.xml", lambda: check_mjcf_robot(mjcf_desc_arm))
     run_check(
@@ -324,12 +318,9 @@ def main() -> int:
         lambda: check_joint_limits_and_axes(mjcf_desc_arm),
     )
     run_check("MJCF", "description/mjcf/scene.xml", lambda: check_mjcf_scene_and_cameras(mjcf_desc_scene))
-    if mjcf_fusion_arm.exists():
-        run_check("MJCF", "fusion_export/NexArm-sim.xml", lambda: check_mjcf_robot(mjcf_fusion_arm))
-    if mjcf_fusion_scene.exists():
-        run_check("MJCF", "fusion_export/scene.xml", lambda: check_mjcf_scene_and_cameras(mjcf_fusion_scene))
-    if mjcf_root_arm.exists():
-        run_check("MJCF", "sim/NexArm-sim.xml", lambda: check_mjcf_robot(mjcf_root_arm))
+    run_check(
+        "MJCF", "description/mjcf/bowl_stack_scene.xml", lambda: check_mjcf_scene_and_cameras(mjcf_desc_bowls)
+    )
 
     # Print Summary Table
     print("\n" + "=" * 80)

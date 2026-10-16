@@ -22,6 +22,12 @@ GRIPPER_ASSIST_ENGAGE_POS = 2400
 GRIPPER_ASSIST_RELEASE_POS = 1600
 
 COLORS = ("red", "blue", "black")
+# Nominal bowl slots (x, y, z of the bowl body) on the table, before the seeded jitter. They are staggered so that
+# bowls of radius ~62 mm stay at least MIN_BOWL_SEPARATION_M apart.
+BOWL_SLOTS_M = ((-0.11, -0.27, 0.020), (0.00, -0.18, 0.020), (0.11, -0.27, 0.020))
+MIN_BOWL_SEPARATION_M = 0.14
+# The assist attaches a bowl only if its centre is this close to the gripper frame.
+ASSIST_MAX_DISTANCE_M = 0.120
 PERMUTATIONS: list[tuple[str, str, str]] = list(itertools.permutations(COLORS))
 # 6 permutations:
 # 1. ('red', 'blue', 'black')
@@ -97,6 +103,7 @@ class NexArmStackBowlsTask:
 
         self.held_bowl: str | None = None
         self.held_rel_pos: np.ndarray | None = None
+        self.held_rel_mat: np.ndarray | None = None
         self.target_bowl: str | None = None
         self.backend.step_callback = self._on_physics_step
 
@@ -137,20 +144,13 @@ class NexArmStackBowlsTask:
         else:
             self.current_order = order
 
-        # Spawn 3 bowls on table in non-overlapping reachable positions
-        # Workspace: X in [-0.12, 0.12], Y in [-0.28, -0.17]
-        # Bowls have radius ~62mm. Staggering ensures >= 140mm inter-bowl distance.
-        base_positions = [
-            np.array([-0.11, -0.27, 0.020]),
-            np.array([0.00, -0.18, 0.020]),
-            np.array([0.11, -0.27, 0.020]),
-        ]
+        # Spawn 3 bowls on table in non-overlapping reachable positions.
         # Reject overlapping layouts rather than allowing enlarged jitter to spawn collisions.
         for _ in range(1000):
-            positions = np.array(base_positions)
+            positions = np.array(BOWL_SLOTS_M)
             positions[:, :2] += rng.uniform(-self.position_jitter_m, self.position_jitter_m, (3, 2))
             if all(
-                np.linalg.norm(positions[i, :2] - positions[j, :2]) >= 0.14
+                np.linalg.norm(positions[i, :2] - positions[j, :2]) >= MIN_BOWL_SEPARATION_M
                 for i, j in itertools.combinations(range(3), 2)
             ):
                 break
@@ -180,6 +180,7 @@ class NexArmStackBowlsTask:
         self._failure_reason = None
         self.held_bowl = None
         self.held_rel_pos = None
+        self.held_rel_mat = None
         self.target_bowl = None
         return self.status()
 
@@ -211,21 +212,30 @@ class NexArmStackBowlsTask:
                     if d < closest_dist:
                         closest_dist = d
                         closest_c = c
-                if closest_dist < 0.120 and closest_c is not None:
+                if closest_dist < ASSIST_MAX_DISTANCE_M and closest_c is not None:
                     self.held_bowl = closest_c
                     bpos = self.bowl_position(self.held_bowl)
                     self.held_rel_pos = site_mat.T @ (bpos - site_pos)
+                    bowl_mat = self.backend.data.xmat[self._body_ids[self.held_bowl]].reshape(3, 3)
+                    self.held_rel_mat = site_mat.T @ bowl_mat
 
             if self.held_bowl is not None:
                 qadr = int(self.backend.model.jnt_qposadr[self._joint_ids[self.held_bowl]])
                 dofadr = int(self.backend.model.jnt_dofadr[self._joint_ids[self.held_bowl]])
                 target_bpos = site_pos + site_mat @ self.held_rel_pos
                 self.backend.data.qpos[qadr : qadr + 3] = target_bpos
+                # Carry the bowl rigidly: it turns with the gripper, as a held bowl does, so the gripper
+                # never swings into its wall.
+                if self.held_rel_mat is not None:
+                    mujoco.mju_mat2Quat(
+                        self.backend.data.qpos[qadr + 3 : qadr + 7], (site_mat @ self.held_rel_mat).flatten()
+                    )
                 self.backend.data.qvel[dofadr : dofadr + 6] = 0
         elif gripper_ctrl < self.assist_release_pos:  # commanded towards open
             if self.held_bowl is not None:
                 self.held_bowl = None
                 self.held_rel_pos = None
+                self.held_rel_mat = None
 
     def _bowl_jaw_contacts(self) -> dict[str, set[int]]:
         """Return penetrating jaw contacts grouped by bowl (ignores contact margins)."""
