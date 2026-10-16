@@ -2,8 +2,8 @@
   "schema_version": 1,
   "name": "mobile_bi_nexarm",
   "source": {
-    "arm_description": "../fusion_export/NexArm-sim.xml",
-    "mesh_directory": "../fusion_export/meshes"
+    "arm_description": "../description/mjcf/nexarm.xml",
+    "mesh_directory": "../assets/meshes/visual"
   },
   "base": {
     "footprint_m": [0.55, 0.45, 0.18],

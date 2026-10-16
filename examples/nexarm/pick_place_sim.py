@@ -25,7 +25,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Use MuJoCo actuator sliders to place the red cube in the green zone."
     )
-    parser.add_argument("--model", type=Path, default=Path("sim/fusion_export/scene.xml"))
+    parser.add_argument("--model", type=Path, default=Path("sim/description/mjcf/scene.xml"))
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--fps", type=int, default=30)
     parser.add_argument("--timeout", type=float, default=20.0)

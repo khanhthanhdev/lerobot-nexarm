@@ -13,7 +13,7 @@ from examples.nexarm import generate_stack_bowls_dataset as generator, sim_datas
 from lerobot.motors.nexarm.nexarm import JOINT_NAMES
 from lerobot.robots.nexarm_sim import NexArmSim, NexArmSimConfig, NexArmStackBowlsTask, SimCalibration
 
-MODEL_PATH = Path(__file__).resolve().parents[2] / "sim" / "fusion_export" / "bowl_stack_scene.xml"
+MODEL_PATH = Path(__file__).resolve().parents[2] / "sim" / "description" / "mjcf" / "bowl_stack_scene.xml"
 
 
 def _camera_free_config(**kwargs) -> NexArmSimConfig:

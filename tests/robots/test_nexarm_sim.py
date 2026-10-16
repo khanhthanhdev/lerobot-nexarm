@@ -24,7 +24,7 @@ from lerobot.robots.nexarm_sim import (
 )
 from lerobot.robots.nexarm_sim.mujoco_backend import HOME_POSITIONS, RAW_RANGES, NexArmMujocoBackend
 
-MODEL_PATH = Path(__file__).resolve().parents[2] / "sim" / "fusion_export" / "scene.xml"
+MODEL_PATH = Path(__file__).resolve().parents[2] / "sim" / "description" / "mjcf" / "scene.xml"
 
 
 @pytest.fixture

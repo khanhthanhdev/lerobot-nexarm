@@ -549,7 +549,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         metavar="LABEL=PATH",
         help="Repeat for each local checkpoint or Hugging Face repo, e.g. --policy act=outputs/act",
     )
-    parser.add_argument("--model", type=Path, default=Path("sim/fusion_export/scene.xml"))
+    parser.add_argument("--model", type=Path, default=Path("sim/description/mjcf/scene.xml"))
     parser.add_argument("--output-dir", type=Path, default=Path("outputs/nexarm_sim_benchmark"))
     parser.add_argument(
         "--rrd-dir",

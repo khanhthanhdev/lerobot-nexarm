@@ -185,7 +185,7 @@ Policies see images, so wrong camera geometry causes a bigger sim-to-real gap th
 uv run python examples/nexarm/calibrate_camera_alignment.py --cam-index 0 --camera-name front
 ```
 
-The tool overlays the simulated view on the live camera. Keys: `m` switches mode, `+` and `-` change the blend, `s` saves a snapshot, `q` quits. Compare the table edge, the base of the arm and the target zone. If they do not line up, edit the camera `pos`, `quat`/`xyaxes` or `fovy` in the scene XML (`sim/fusion_export/`) until they do, then repeat with `--camera-name wrist` and `--camera-name top`. For the RealSense `top` camera, `uv run python examples/nexarm/realsense_fovy.py` reads the colour intrinsics and prints the matching `fovy`. For `top`, pass the RealSense RGB V4L2 node as `--cam-index` (e.g. `/dev/video4`); the sim top camera looks straight down from 0.75 m. Check that the resolution and fps match your real cameras.
+The tool overlays the simulated view on the live camera. Keys: `m` switches mode, `+` and `-` change the blend, `s` saves a snapshot, `q` quits. Compare the table edge, the base of the arm and the target zone. If they do not line up, edit the camera `pos`, `quat`/`xyaxes` or `fovy` in the scene XML (`sim/description/mjcf/`) until they do, then repeat with `--camera-name wrist` and `--camera-name top`. For the RealSense `top` camera, `uv run python examples/nexarm/realsense_fovy.py` reads the colour intrinsics and prints the matching `fovy`. For `top`, pass the RealSense RGB V4L2 node as `--cam-index` (e.g. `/dev/video4`); the sim top camera looks straight down from 0.75 m. Check that the resolution and fps match your real cameras.
 
 ## Step 8. Match the scene
 

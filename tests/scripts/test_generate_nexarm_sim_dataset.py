@@ -24,7 +24,7 @@ from examples.nexarm.generate_sim_dataset import (
 from lerobot.motors.nexarm.mujoco_mapping import JOINT_MAPPING_VERSION
 from lerobot.robots.nexarm_sim import NexArmPickPlaceTask, NexArmSim, NexArmSimConfig
 
-MODEL_PATH = Path(__file__).resolve().parents[2] / "sim" / "fusion_export" / "scene.xml"
+MODEL_PATH = Path(__file__).resolve().parents[2] / "sim" / "description" / "mjcf" / "scene.xml"
 
 
 def test_scripted_episode_passes_physical_success_gate() -> None:

@@ -89,7 +89,7 @@ class NexArmKinematicsDynamics:
     ) -> None:
         if model_path is None:
             checkout_root = Path(__file__).resolve().parents[4]
-            model_path = checkout_root / "sim" / "fusion_export" / "scene.xml"
+            model_path = checkout_root / "sim" / "description" / "mjcf" / "scene.xml"
         model_path = Path(model_path).resolve()
         if not model_path.is_file():
             raise FileNotFoundError(f"NexArm model file not found: {model_path}")

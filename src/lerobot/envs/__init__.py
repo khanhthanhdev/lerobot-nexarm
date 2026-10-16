@@ -20,7 +20,7 @@
 
 from .configs import AlohaEnv, EnvConfig, HILSerlRobotEnvConfig, HubEnvConfig, NexArmEnv, PushtEnv
 from .factory import make_env, make_env_config, make_env_pre_post_processors
-from .nexarm import NexArmPickPlaceEnv
+from .nexarm import NexArmPickPlaceEnv, NexArmStackBowlsEnv
 from .utils import check_env_attributes_and_types, close_envs, env_to_policy_features, preprocess_observation
 
 __all__ = [
@@ -30,6 +30,7 @@ __all__ = [
     "HubEnvConfig",
     "NexArmEnv",
     "NexArmPickPlaceEnv",
+    "NexArmStackBowlsEnv",
     "PushtEnv",
     "check_env_attributes_and_types",
     "close_envs",

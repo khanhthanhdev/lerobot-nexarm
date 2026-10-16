@@ -23,7 +23,7 @@ from ..config import RobotConfig
 class NexArmSimConfig(RobotConfig):
     """Configuration for the MuJoCo-backed NexArm follower."""
 
-    model_path: Path = Path("sim/fusion_export/scene.xml")
+    model_path: Path = Path("sim/description/mjcf/scene.xml")
     fps: int = 30
     camera_width: int = 640
     camera_height: int = 480

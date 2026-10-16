@@ -225,6 +225,17 @@ Run the registered Gymnasium environment `NexArmPickPlace-v0` with camera render
 uv run python examples/nexarm/demo_gym_env.py
 ```
 
+`NexArmStackBowls-v0` is the real-robot task (stack the red, blue and black bowls in the order of the episode's
+instruction) with the same actions, cameras and options. Select it with `--env.task` to evaluate, or to evaluate
+while training, a policy trained on the real or sim stack-bowls datasets:
+
+```bash
+uv run lerobot-eval --policy.path=outputs/train/act_stack_bowls/checkpoints/last/pretrained_model     --env.type=nexarm --env.task=NexArmStackBowls-v0 --eval.n_episodes=20
+```
+
+The Isaac Lab twin of this task, for parallel training in Isaac Sim, is described in
+[`sim/isaac_lab/README.md`](sim/isaac_lab/README.md).
+
 ### Sim Dataset Generation with Domain Randomization
 
 Generate synthetic demonstration datasets with visual, dynamics and object domain randomization (on by default; `--no-dr` disables it), plus simulated USB transport latency:
@@ -512,7 +523,7 @@ src/lerobot/
 │   ├── nexarm_sim/                  # MuJoCo single-arm simulation & pick-and-place task
 │   └── mobile_bi_nexarm_sim/        # Bimanual mobile robot simulation
 ├── teleoperators/nexarm_leader/     # Leader arm driver (torque disable, joint mirroring)
-└── envs/nexarm.py                   # Gymnasium environment (NexArmPickPlace-v0)
+└── envs/nexarm.py                   # Gymnasium environments (NexArmPickPlace-v0, NexArmStackBowls-v0)
 ```
 
 ---

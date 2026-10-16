@@ -24,7 +24,7 @@ from lerobot.utils.robot_utils import precise_sleep
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Control the NexArm MuJoCo simulation")
-    parser.add_argument("--model", type=Path, default=Path("sim/fusion_export/scene.xml"))
+    parser.add_argument("--model", type=Path, default=Path("sim/description/mjcf/scene.xml"))
     parser.add_argument("--leader-port", help="Optional NexArm leader serial port")
     parser.add_argument("--fps", type=int, default=30)
     return parser.parse_args()

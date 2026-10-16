@@ -1,21 +1,28 @@
-"""Comprehensive exporter from Autodesk Fusion 360 to MuJoCo MJCF, URDF, and STL meshes.
+"""Extract the NexArm robot and its workcell from Autodesk Fusion for MuJoCo.
 
-Executed inside Fusion 360 via the Fusion MCP script runner.
+Executed inside Fusion through the Fusion MCP script runner (see ``sim/run_export.py``). It writes:
+
+- one binary STL per robot body, in the arm frame (the ``base_link`` component frame that every committed
+  mesh, joint position and collision primitive uses);
+- ``fusion_extract.json`` with per-body mass, centre of mass and inertia in that frame, the Fusion joint
+  origins and axes, and the workcell: tabletop height, box-shaped fixtures, and the overhead camera pose.
+
+It does not write MJCF or URDF. The committed models carry hand-tuned actuators, materials, contacts and
+sensors, so ``sim/apply_fusion_extract.py`` merges the extracted values into them instead.
 """
 
 import json
+import math
 import os
-import xml.etree.ElementTree as ET  # nosec B405 - this exporter creates XML for robotics
-from typing import Any
+import struct
 
 import adsk.core
 import adsk.fusion
 
-WSL_BASE = r"\\wsl.localhost\Ubuntu\home\thanh\code\vinuni\lerobot-nexarm\sim"
-OUTPUT_DIR = os.path.join(WSL_BASE, "fusion_export")
-DESCRIPTION_DIR = os.path.join(WSL_BASE, "description")
-ASSETS_DIR = os.path.join(WSL_BASE, "assets", "meshes", "visual")
+# Replaced by sim/run_export.py with the repository's sim/ directory, as Fusion sees it.
+EXPORT_SIM_DIR = ""
 
+# MJCF body name -> (occurrence path suffix, mesh file name).
 BODY_SPECS = {
     "base_link": ("base_link:1", "base_link.stl"),
     "link_1": ("link_1:1", "link_1.stl"),
@@ -23,881 +30,343 @@ BODY_SPECS = {
     "link_3": ("link_3:1", "link_3.stl"),
     "link_4": ("link_4:1", "link_4.stl"),
     "link_5": ("link_5:1", "link_5.stl"),
-    "link_6_gripper_base": (
-        "link_6:1+gripper_base:1",
-        "link_6_gripper_base.stl",
-    ),
-    "link_6_pinion_gear": (
-        "link_6:1+pinion_gear:1",
-        "link_6_pinion_gear.stl",
-    ),
+    "link_6_gripper_base": ("link_6:1+gripper_base:1", "link_6_gripper_base.stl"),
+    "link_6_pinion_gear": ("link_6:1+pinion_gear:1", "link_6_pinion_gear.stl"),
     "link_6_left_jaw": ("link_6:1+left_jaw:1", "link_6_left_jaw.stl"),
     "link_6_right_jaw": ("link_6:1+right_jaw:1", "link_6_right_jaw.stl"),
     "cam_mount": ("cam_mount:1", "cam_mount.stl"),
 }
 
-ARM_JOINTS = [
-    "joint_1_base_to_link_1",
-    "joint_2_link_1_to_link_2",
-    "joint_3_link_2_to_link_3",
-    "joint_4_link_3_to_link_4",
-    "joint_5_link_4_to_link_5",
-]
-
-# Calibrated joint definitions matching NexArm kinematics and physical limits
-JOINT_DEFS = {
-    "joint_1_base_to_link_1": {
-        "fusion_names": ["Revolute 6", "joint_1_base_to_link_1"],
-        "parent": "base_link",
-        "child": "link_1",
-        "type": "revolute",
-        "axis": [0.0, 0.0, -1.0],
-        "range": [-2.35619449019, 2.35619449019],  # +-135 deg
-        "actuated": True,
-        "kp": 100.0,
-        "kv": 0.2,
-    },
-    "joint_2_link_1_to_link_2": {
-        "fusion_names": ["Revolute 1", "joint_2_link_1_to_link_2"],
-        "parent": "link_1",
-        "child": "link_2",
-        "type": "revolute",
-        "axis": [-1.0, 0.0, 0.0],
-        "range": [-2.09439510239, 2.09439510239],
-        "actuated": True,
-        "kp": 100.0,
-        "kv": 0.2,
-    },
-    "joint_3_link_2_to_link_3": {
-        "fusion_names": ["Revolute 7", "joint_3_link_2_to_link_3"],
-        "parent": "link_2",
-        "child": "link_3",
-        "type": "revolute",
-        "axis": [1.0, 0.0, 0.0],
-        "range": [-2.35619449019, 2.35619449019],
-        "actuated": True,
-        "kp": 100.0,
-        "kv": 0.2,
-    },
-    "joint_4_link_3_to_link_4": {
-        "fusion_names": ["Revolute 8", "joint_4_link_3_to_link_4"],
-        "parent": "link_3",
-        "child": "link_4",
-        "type": "revolute",
-        "axis": [1.0, 0.0, 0.0],
-        "range": [-1.74532925199, 1.74532925199],
-        "actuated": True,
-        "kp": 100.0,
-        "kv": 0.2,
-    },
-    "joint_5_link_4_to_link_5": {
-        "fusion_names": ["Revolute 9", "joint_5_link_4_to_link_5"],
-        "parent": "link_4",
-        "child": "link_5",
-        "type": "revolute",
-        "axis": [0.0, -1.0, 0.0],
-        "range": [-3.14159265359, 3.14159265359],
-        "actuated": True,
-        "kp": 100.0,
-        "kv": 0.2,
-    },
-    "right_jaw_slide_joint": {
-        "fusion_names": ["Slider 11", "right_jaw_slide_joint"],
-        "parent": "link_6_gripper_base",
-        "child": "link_6_right_jaw",
-        "type": "prismatic",
-        "axis": [-1.0, 0.0, 0.0],
-        "range": [-0.0255, 0.0],
-        "actuated": True,
-        "kp": 1000.0,
-        "kv": 5.0,
-    },
-    "left_jaw_slide_joint": {
-        "fusion_names": ["Slider 10", "left_jaw_slide_joint"],
-        "parent": "link_6_gripper_base",
-        "child": "link_6_left_jaw",
-        "type": "prismatic",
-        "axis": [-1.0, 0.0, 0.0],
-        "range": [0.0, 0.0255],
-        "actuated": False,
-        "kp": 1000.0,
-        "kv": 5.0,
-    },
-    "gripper_pinion_joint": {
-        "fusion_names": ["Revolute 3", "gripper_pinion_joint"],
-        "parent": "link_6_gripper_base",
-        "child": "link_6_pinion_gear",
-        "type": "revolute",
-        "axis": [0.0, 0.0, -1.0],
-        "range": [-3.14159, 3.14159],
-        "actuated": False,
-        "kp": 100.0,
-        "kv": 0.2,
-    },
+# MJCF joint name -> accepted Fusion joint names (current design first, older exports after).
+JOINT_NAMES = {
+    "joint_1_base_to_link_1": ("joint1", "joint_1_base_to_link_1", "Revolute 6"),
+    "joint_2_link_1_to_link_2": ("joint2", "joint_2_link_1_to_link_2", "Revolute 1"),
+    "joint_3_link_2_to_link_3": ("joint3", "joint_3_link_2_to_link_3", "Revolute 7"),
+    "joint_4_link_3_to_link_4": ("joint4", "joint_4_link_3_to_link_4", "Revolute 8"),
+    "joint_5_link_4_to_link_5": ("joint5", "joint_5_link_4_to_link_5", "Revolute 9"),
+    "gripper_pinion_joint": ("gripper_base_joint", "gripper_pinion_joint", "Revolute 3"),
+    "left_jaw_slide_joint": ("left_jaw_joint", "left_jaw_slide_joint", "Slider 10"),
+    "right_jaw_slide_joint": ("right_jaw_joint", "right_jaw_slide_joint", "Slider 11"),
 }
 
-COLLISION_SPECS = {
-    "base_link": [
-        {"type": "box", "pos": "0.53937 0.06397 0.030", "size": "0.050 0.060 0.030"},
-    ],
-    "link_1": [
-        {"type": "box", "pos": "0.53937 0.06397 0.076", "size": "0.044 0.036 0.040"},
-    ],
-    "link_2": [
-        {
-            "type": "capsule",
-            "fromto": "0.57447 0.06397 0.10645 0.51944 0.19693 0.29168",
-            "size": "0.032",
-        },
-    ],
-    "link_3": [
-        {
-            "type": "capsule",
-            "fromto": "0.51944 0.19693 0.29168 0.51912 0.06552 0.23041",
-            "size": "0.024",
-        },
-    ],
-    "link_4": [
-        {
-            "type": "capsule",
-            "fromto": "0.51912 0.06552 0.23041 0.53937 0.01829 0.23042",
-            "size": "0.024",
-        },
-    ],
-    "link_5": [
-        {
-            "type": "capsule",
-            "fromto": "0.53937 0.01829 0.23042 0.53937 -0.02102 0.23060",
-            "size": "0.022",
-        },
-    ],
-    "link_6_gripper_base": [
-        {"type": "box", "pos": "0.53937 -0.02327 0.22519", "size": "0.052 0.008 0.021"},
-    ],
-    "link_6_left_jaw": [
-        {
-            "type": "box",
-            "pos": "0.52715 -0.057 0.23044",
-            "size": "0.0122 0.010 0.015",
-            "friction": "3 0.01 0.001",
-            "condim": "4",
-        },
-    ],
-    "link_6_right_jaw": [
-        {
-            "type": "box",
-            "pos": "0.55159 -0.057 0.23044",
-            "size": "0.0122 0.010 0.015",
-            "friction": "3 0.01 0.001",
-            "condim": "4",
-        },
-    ],
-}
-
-EXCLUDED_CONTACTS = [
-    ("base_link", "link_1"),
-    ("link_1", "link_2"),
-    ("link_2", "link_3"),
-    ("link_3", "link_4"),
-    ("link_4", "link_5"),
-    ("link_4", "cam_mount"),
-    ("link_5", "cam_mount"),
-    ("link_6_gripper_base", "cam_mount"),
-    ("link_5", "link_6_gripper_base"),
-    ("link_6_gripper_base", "link_6_pinion_gear"),
-    ("link_6_gripper_base", "link_6_left_jaw"),
-    ("link_6_gripper_base", "link_6_right_jaw"),
-    ("link_6_left_jaw", "link_6_right_jaw"),
-]
+TABLE_OCCURRENCE_PREFIX = "workbench"
+TOP_CAMERA_OCCURRENCE_PREFIX = "d435i"
+# Bodies of the top-camera occurrence that are its clamp, not the camera module.
+TOP_CAMERA_CLAMP_MARKER = "clamp"
+FRONT_CAMERA_OCCURRENCE_PREFIX = "c270"
+# The C270 mount holds no camera model. Its lens sits about this far above the shelf face and ahead of the
+# shelf centre (half the webcam's height and depth); verify with examples/nexarm/overlay_recorded_frames.py.
+C270_LENS_ABOVE_SHELF_MM = 16.0
+C270_LENS_FORWARD_MM = 15.0
+# A fixture body becomes a MuJoCo box only if it fills its bounding box this well.
+MIN_BOX_FILL = 0.95
 
 
-def _format(values: list[float] | tuple[float, ...]) -> str:
-    return " ".join(f"{value:.12g}" for value in values)
+def _occurrence(root, suffix):
+    matches = [occ for occ in root.allOccurrences if occ.fullPathName.endswith(suffix)]
+    if len(matches) != 1:
+        found = [occ.fullPathName for occ in matches]
+        raise RuntimeError(f"Expected one occurrence ending in '{suffix}', found {found}")
+    return matches[0]
 
 
-def _point_m(point: adsk.core.Point3D) -> list[float]:
-    return [point.x * 0.01, point.y * 0.01, point.z * 0.01]
+def _top_level(occ):
+    while occ.assemblyContext:
+        occ = occ.assemblyContext
+    return occ
 
 
-def _inertial_attributes(
-    occurrence: adsk.fusion.Occurrence,
-    t_inv: adsk.core.Matrix3D,
-    r_mat: list[list[float]],
-    r_mat_inv: list[list[float]],
-) -> dict[str, Any]:
-    properties = occurrence.physicalProperties
-    mass = properties.mass
-    center = properties.centerOfMass.copy()
-    center.transformBy(t_inv)
-    com = [center.x * 0.01, center.y * 0.01, center.z * 0.01]
+def _mm(point):
+    return [point.x * 10.0, point.y * 10.0, point.z * 10.0]
 
-    # World coordinate values
-    x, y, z = properties.centerOfMass.x, properties.centerOfMass.y, properties.centerOfMass.z
-    (
-        succeeded,
-        ixx_origin,
-        iyy_origin,
-        izz_origin,
-        ixy_origin,
-        iyz_origin,
-        ixz_origin,
-    ) = properties.getXYZMomentsOfInertia()
-    if not succeeded:
-        raise RuntimeError(f"Unable to calculate inertia for {occurrence.name}")
 
-    # Shift tensor from world origin to center of mass, convert to kg*m^2
-    ixx = (ixx_origin - mass * (y * y + z * z)) * 1e-4
-    iyy = (iyy_origin - mass * (x * x + z * z)) * 1e-4
-    izz = (izz_origin - mass * (x * x + y * y)) * 1e-4
-    ixy = (ixy_origin + mass * x * y) * 1e-4
-    ixz = (ixz_origin + mass * x * z) * 1e-4
-    iyz = (iyz_origin + mass * y * z) * 1e-4
+def _to_arm(point, world_to_arm):
+    p = point.copy()
+    p.transformBy(world_to_arm)
+    return _mm(p)
 
-    # Rotate inertia tensor into component coordinate frame: I_comp = R_inv @ I_world @ R
-    i_world = [
-        [ixx, -ixy, -ixz],
-        [-ixy, iyy, -iyz],
-        [-ixz, -iyz, izz],
-    ]
-    a_mat = [[sum(r_mat_inv[i][k] * i_world[k][j] for k in range(3)) for j in range(3)] for i in range(3)]
-    i_comp = [[sum(a_mat[i][k] * r_mat[k][j] for k in range(3)) for j in range(3)] for i in range(3)]
 
-    c_ixx = max(1e-9, i_comp[0][0])
-    c_iyy = max(1e-9, i_comp[1][1])
-    c_izz = max(1e-9, i_comp[2][2])
-    c_ixy = -i_comp[0][1]
-    c_ixz = -i_comp[0][2]
-    c_iyz = -i_comp[1][2]
+def _rotate(vector, matrix):
+    v = vector.copy()
+    v.transformBy(matrix)
+    return [v.x, v.y, v.z]
 
+
+def _rotation(matrix):
+    return [[matrix.getCell(i, j) for j in range(3)] for i in range(3)]
+
+
+def _matmul(a, b):
+    return [[sum(a[i][k] * b[k][j] for k in range(3)) for j in range(3)] for i in range(3)]
+
+
+def _transpose(a):
+    return [[a[j][i] for j in range(3)] for i in range(3)]
+
+
+def _transform_stl(path, matrix):
+    """Rewrite a binary STL (mm) with ``matrix`` applied to every vertex and normal."""
+    with open(path, "rb") as handle:
+        data = handle.read()
+    count = struct.unpack_from("<I", data, 80)[0]
+    rot = _rotation(matrix)
+    tx, ty, tz = (matrix.getCell(i, 3) * 10.0 for i in range(3))
+    out = bytearray(data[:84])
+    for index in range(count):
+        values = struct.unpack_from("<12fH", data, 84 + index * 50)
+        floats = []
+        for offset in range(0, 12, 3):
+            x, y, z = values[offset : offset + 3]
+            rx = rot[0][0] * x + rot[0][1] * y + rot[0][2] * z
+            ry = rot[1][0] * x + rot[1][1] * y + rot[1][2] * z
+            rz = rot[2][0] * x + rot[2][1] * y + rot[2][2] * z
+            if offset:  # vertices translate, the normal does not
+                rx, ry, rz = rx + tx, ry + ty, rz + tz
+            floats.extend((rx, ry, rz))
+        out += struct.pack("<12fH", *floats, values[12])
+    with open(path, "wb") as handle:
+        handle.write(bytes(out))
+
+
+def _is_identity(matrix, tol=1e-9):
+    return all(
+        abs(matrix.getCell(i, j) - (1.0 if i == j else 0.0)) <= tol for i in range(4) for j in range(4)
+    )
+
+
+def _export_mesh(design, occ, path, native_to_arm):
+    opts = design.exportManager.createSTLExportOptions(occ, path)
+    opts.isBinaryFormat = True
+    opts.isOneFilePerBody = False
+    opts.meshRefinement = adsk.fusion.MeshRefinementSettings.MeshRefinementLow
+    opts.unitType = adsk.fusion.DistanceUnits.MillimeterDistanceUnits
+    opts.sendToPrintUtility = False
+    if not design.exportManager.execute(opts):
+        raise RuntimeError(f"Failed to export STL to {path}")
+    # Fusion writes an occurrence's STL in its own component frame and ignores where the assembly places
+    # it, so a link offset inside the assembly would otherwise be lost.
+    if not _is_identity(native_to_arm):
+        _transform_stl(path, native_to_arm)
+
+
+def _inertial(occ, world_to_arm, arm_rot_t, world_rot):
+    props = occ.getPhysicalProperties(adsk.fusion.CalculationAccuracy.HighCalculationAccuracy)
+    mass = props.mass
+    com_world = props.centerOfMass
+    x, y, z = com_world.x, com_world.y, com_world.z
+    ok, ixx_o, iyy_o, izz_o, ixy_o, iyz_o, ixz_o = props.getXYZMomentsOfInertia()
+    if not ok:
+        raise RuntimeError(f"Unable to calculate inertia for {occ.fullPathName}")
+    # Moments about the world origin in kg*cm^2 -> about the centre of mass, world axes, kg*m^2.
+    ixx = (ixx_o - mass * (y * y + z * z)) * 1e-4
+    iyy = (iyy_o - mass * (x * x + z * z)) * 1e-4
+    izz = (izz_o - mass * (x * x + y * y)) * 1e-4
+    ixy = (ixy_o + mass * x * y) * 1e-4
+    ixz = (ixz_o + mass * x * z) * 1e-4
+    iyz = (iyz_o + mass * y * z) * 1e-4
+    tensor_world = [[ixx, -ixy, -ixz], [-ixy, iyy, -iyz], [-ixz, -iyz, izz]]
+    # Arm axes: I_arm = R^T I_world R, where R maps arm axes to world axes.
+    tensor = _matmul(_matmul(arm_rot_t, tensor_world), world_rot)
     return {
-        "mass": mass,
-        "com": com,
-        "inertia": (c_ixx, c_iyy, c_izz, c_ixy, c_ixz, c_iyz),
+        "mass_kg": mass,
+        "com_mm": _to_arm(com_world, world_to_arm),
+        # MuJoCo fullinertia order: ixx iyy izz ixy ixz iyz (tensor elements).
+        "fullinertia": [
+            tensor[0][0],
+            tensor[1][1],
+            tensor[2][2],
+            tensor[0][1],
+            tensor[0][2],
+            tensor[1][2],
+        ],
     }
 
 
-def _write_scene(output_dir: str, model_origin_m: list[float], include_file: str = "NexArm-sim.xml") -> None:
-    scene = ET.Element("mujoco", {"model": "NexArm Scene"})
-    ET.SubElement(scene, "include", {"file": include_file})
-    ET.SubElement(
-        scene,
-        "statistic",
-        {
-            "center": f"0 0.2 {model_origin_m[2] + 0.2:.6g}",
-            "extent": "0.8",
-        },
-    )
-    visual = ET.SubElement(scene, "visual")
-    ET.SubElement(
-        visual, "headlight", {"diffuse": "0.6 0.6 0.6", "ambient": "0.3 0.3 0.3", "specular": "0 0 0"}
-    )
-    ET.SubElement(visual, "rgba", {"haze": "0.15 0.25 0.35 1"})
-    ET.SubElement(visual, "global", {"azimuth": "120", "elevation": "-20"})
+def _joints(root, world_to_arm, arm_rot_t):
+    by_name = {}
+    for joint in list(root.allJoints) + list(root.allAsBuiltJoints):
+        by_name.setdefault(joint.name, joint)
+    result = {}
+    for mjcf_name, fusion_names in JOINT_NAMES.items():
+        joint = next((by_name[n] for n in fusion_names if n in by_name), None)
+        if joint is None:
+            raise RuntimeError(
+                f"No Fusion joint for {mjcf_name}; tried {list(fusion_names)}, found {sorted(by_name)}"
+            )
+        motion = joint.jointMotion
+        if motion.jointType == adsk.fusion.JointTypes.RevoluteJointType:
+            axis, value, kind = motion.rotationAxisVector, motion.rotationValue, "revolute"
+        elif motion.jointType == adsk.fusion.JointTypes.SliderJointType:
+            axis, value, kind = motion.slideDirectionVector, motion.slideValue, "prismatic"
+        else:
+            raise RuntimeError(f"Fusion joint {joint.name} is neither revolute nor slider")
+        if abs(value) > 1e-6:
+            raise RuntimeError(
+                f"Fusion joint {joint.name} is at {value}, not 0; meshes must be exported at the zero pose"
+            )
+        # Joint geometry is reported in the top-level arm assembly's frame; joint axes in world axes.
+        origin = joint.geometry.origin.copy()
+        origin.transformBy(_top_level(joint.assemblyContext).transform2)
+        result[mjcf_name] = {
+            "fusion_name": joint.name,
+            "type": kind,
+            "origin_mm": _to_arm(origin, world_to_arm),
+            "axis": [
+                sum(arm_rot_t[i][k] * c for k, c in enumerate((axis.x, axis.y, axis.z))) for i in range(3)
+            ],
+        }
+    return result
 
-    asset = ET.SubElement(scene, "asset")
-    ET.SubElement(
-        asset,
-        "texture",
-        {
-            "type": "skybox",
-            "builtin": "gradient",
-            "rgb1": "0.3 0.5 0.7",
-            "rgb2": "0 0 0",
-            "width": "512",
-            "height": "3072",
-        },
-    )
-    ET.SubElement(
-        asset,
-        "texture",
-        {
-            "type": "2d",
-            "name": "groundplane",
-            "builtin": "checker",
-            "mark": "edge",
-            "rgb1": "0.2 0.3 0.4",
-            "rgb2": "0.1 0.15 0.2",
-            "markrgb": "0.8 0.8 0.8",
-            "width": "300",
-            "height": "300",
-        },
-    )
-    ET.SubElement(
-        asset,
-        "material",
-        {
-            "name": "groundplane",
-            "texture": "groundplane",
-            "texuniform": "true",
-            "texrepeat": "5 5",
-            "reflectance": "0.2",
-        },
-    )
 
-    worldbody = ET.SubElement(scene, "worldbody")
-    ET.SubElement(worldbody, "light", {"pos": "0 0 3", "dir": "0 0 -1", "directional": "true"})
-    ET.SubElement(
-        worldbody,
-        "geom",
-        {
-            "name": "floor",
-            "type": "plane",
-            "size": "1 1 0.05",
-            "rgba": "0.8 0.8 0.8 1",
-            "friction": "1 0.005 0.0001",
-            "contype": "2",
-            "conaffinity": "2",
-        },
-    )
-    ET.SubElement(
-        worldbody,
-        "camera",
-        {
-            "name": "front",
-            "mode": "fixed",
-            "pos": "0.360630977001 -0.613972762847 0.55",
-            "xyaxes": "0.857493 0.514496 0 -0.240504 0.400841 0.884016",
-            "fovy": "55",
-        },
-    )
-    # Interactive target cube for grasping
-    cube = ET.SubElement(
-        worldbody,
-        "body",
-        {"name": "cube", "pos": "-0.000369022999 -0.243972762847 0.01"},
-    )
-    ET.SubElement(cube, "freejoint", {"name": "cube_joint"})
-    ET.SubElement(
-        cube,
-        "geom",
-        {
-            "name": "cube_collision",
-            "type": "box",
-            "size": "0.01 0.01 0.01",
-            "mass": "0.02",
-            "rgba": "0.85 0.15 0.1 1",
-            "friction": "1.2 0.01 0.001",
-            "contype": "2",
-            "conaffinity": "3",
-        },
-    )
-    # Target zone for placement
-    target = ET.SubElement(
-        worldbody,
-        "body",
-        {"name": "target_zone", "pos": "-0.089369022999 -0.243972762847 0.002"},
-    )
-    ET.SubElement(
-        target,
-        "geom",
-        {
-            "name": "target_zone_visual",
-            "type": "cylinder",
-            "size": "0.05 0.002",
-            "rgba": "0.1 0.8 0.2 0.45",
-            "contype": "0",
-            "conaffinity": "0",
-        },
-    )
+def _bbox_in_arm(bbox, world_to_arm):
+    corners = []
+    for x in (bbox.minPoint.x, bbox.maxPoint.x):
+        for y in (bbox.minPoint.y, bbox.maxPoint.y):
+            for z in (bbox.minPoint.z, bbox.maxPoint.z):
+                corners.append(_to_arm(adsk.core.Point3D.create(x, y, z), world_to_arm))
+    lo = [min(c[i] for c in corners) for i in range(3)]
+    hi = [max(c[i] for c in corners) for i in range(3)]
+    return lo, hi
 
-    ET.indent(scene, space="  ")
-    scene_path = os.path.join(output_dir, "scene.xml")
-    ET.ElementTree(scene).write(scene_path, encoding="utf-8", xml_declaration=True)
+
+def _fixtures(root, arm_top, world_to_arm):
+    boxes, skipped = [], []
+    for occ in root.occurrences:
+        if occ == arm_top or occ.name.lower().startswith(TOP_CAMERA_OCCURRENCE_PREFIX):
+            continue
+        for body in occ.bRepBodies:
+            if not body.isVisible or not body.isSolid:
+                continue
+            lo, hi = _bbox_in_arm(body.boundingBox, world_to_arm)
+            box_volume_cm3 = math.prod((hi[i] - lo[i]) / 10.0 for i in range(3))
+            fill = body.volume / box_volume_cm3 if box_volume_cm3 > 0 else 0.0
+            entry = {
+                "occurrence": occ.name,
+                "body": body.name,
+                "material": body.material.name if body.material else "",
+                "min_mm": lo,
+                "max_mm": hi,
+            }
+            (boxes if fill >= MIN_BOX_FILL else skipped).append(entry)
+    return boxes, skipped
+
+
+def _top_camera(root, world_to_arm, arm_rot_t):
+    matches = [o for o in root.occurrences if o.name.lower().startswith(TOP_CAMERA_OCCURRENCE_PREFIX)]
+    if not matches:
+        return None
+    occ = matches[0]
+    bodies = [b for b in occ.bRepBodies if TOP_CAMERA_CLAMP_MARKER not in b.name.lower()]
+    lo = [math.inf] * 3
+    hi = [-math.inf] * 3
+    for body in bodies:
+        b_lo, b_hi = _bbox_in_arm(body.boundingBox, world_to_arm)
+        lo = [min(lo[i], b_lo[i]) for i in range(3)]
+        hi = [max(hi[i], b_hi[i]) for i in range(3)]
+    transform = occ.transform2
+    # The camera component is modelled with its lens facing -Z and its long (sensor) axis along X.
+    long_axis = [transform.getCell(i, 0) for i in range(3)]
+    view_dir = [-transform.getCell(i, 2) for i in range(3)]
+    to_arm = lambda v: [sum(arm_rot_t[i][k] * v[k] for k in range(3)) for i in range(3)]  # noqa: E731
+    long_axis, view_dir = to_arm(long_axis), to_arm(view_dir)
+    # Lens position: the module's face centre on the viewing side.
+    lens = [(lo[i] + hi[i]) / 2.0 + view_dir[i] * (hi[i] - lo[i]) / 2.0 for i in range(3)]
+    return {
+        "occurrence": occ.name,
+        "lens_mm": lens,
+        "view_dir": view_dir,
+        "long_axis": long_axis,
+        "module_min_mm": lo,
+        "module_max_mm": hi,
+    }
+
+
+def _front_camera(root, world_to_arm, arm_rot_t):
+    """Pose of the webcam resting on the tilted shelf of the C270 mount (the camera itself is not modelled)."""
+    matches = [o for o in root.occurrences if o.name.lower().startswith(FRONT_CAMERA_OCCURRENCE_PREFIX)]
+    if not matches:
+        return None
+    to_arm = lambda v: [sum(arm_rot_t[i][k] * v[k] for k in range(3)) for i in range(3)]  # noqa: E731
+    shelves = []
+    for body in matches[0].bRepBodies:
+        for face in body.faces:
+            if face.geometry.surfaceType != adsk.core.SurfaceTypes.PlaneSurfaceType:
+                continue
+            ok, normal = face.evaluator.getNormalAtPoint(face.pointOnFace)
+            # A shelf faces upward but is tilted; flat tops and vertical walls are not shelves.
+            if ok and 0.2 < normal.z < 0.95:
+                shelves.append((face.area, face, to_arm([normal.x, normal.y, normal.z])))
+    if not shelves:
+        raise RuntimeError(f"{matches[0].name} has no tilted upward face to rest a camera on")
+    _area, face, up = max(shelves, key=lambda s: s[0])
+    # The camera sits on the shelf and looks down its slope: world down projected onto the shelf plane.
+    down = to_arm([0.0, 0.0, -1.0])
+    dot = sum(d * u for d, u in zip(down, up))  # noqa: B905 - Fusion's Python may predate zip(strict=)
+    view = [d - dot * u for d, u in zip(down, up)]  # noqa: B905
+    norm = math.sqrt(sum(v * v for v in view))
+    view = [v / norm for v in view]
+    centre = _to_arm(face.centroid, world_to_arm)
+    lens = [centre[i] + up[i] * C270_LENS_ABOVE_SHELF_MM + view[i] * C270_LENS_FORWARD_MM for i in range(3)]
+    return {"occurrence": matches[0].name, "lens_mm": lens, "view_dir": view, "up": up, "shelf_mm": centre}
 
 
 def run(_context: str):
+    if not EXPORT_SIM_DIR:
+        raise RuntimeError("EXPORT_SIM_DIR is empty; run this through sim/run_export.py")
     app = adsk.core.Application.get()
     design = adsk.fusion.Design.cast(app.activeProduct)
     if not design:
         raise RuntimeError("No active Fusion design found.")
-
     root = design.rootComponent
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-    mesh_dir = os.path.join(OUTPUT_DIR, "meshes")
-    os.makedirs(mesh_dir, exist_ok=True)
-    os.makedirs(ASSETS_DIR, exist_ok=True)
 
-    # 1. Map occurrences
-    all_occs = {occ.fullPathName: occ for occ in root.allOccurrences}
-    all_occs.update({occ.name: occ for occ in root.allOccurrences})
+    occs = {name: _occurrence(root, suffix) for name, (suffix, _) in BODY_SPECS.items()}
+    base = occs["base_link"]
+    arm_top = _top_level(base)
+    world_to_arm = base.transform2.copy()
+    world_to_arm.invert()
+    world_rot = _rotation(base.transform2)
+    arm_rot_t = _transpose(world_rot)
 
-    found_occs = {}
-    for body_name, (needle, _filename) in BODY_SPECS.items():
-        matched = None
-        for name, occ in all_occs.items():
-            if needle in name:
-                matched = occ
-                break
-        if not matched:
-            raise RuntimeError(f"Could not find occurrence for {body_name} (needle: '{needle}')")
-        found_occs[body_name] = matched
+    # Staging only: sim/apply_fusion_extract.py validates the meshes before copying them into sim/assets/.
+    mesh_dirs = [os.path.join(EXPORT_SIM_DIR, "fusion_export", "meshes")]
+    for directory in mesh_dirs:
+        os.makedirs(directory, exist_ok=True)
 
-    # Base occurrence transform and inverse to transform root world coordinates to component frame
-    base_occ = found_occs["base_link"]
-    t_base = base_occ.transform
-    t_inv = t_base.copy()
-    t_inv.invert()
+    bodies = {}
+    for name, (_suffix, filename) in BODY_SPECS.items():
+        occ = occs[name]
+        native_to_arm = occ.transform2.copy()
+        native_to_arm.transformBy(world_to_arm)
+        for directory in mesh_dirs:
+            _export_mesh(design, occ, os.path.join(directory, filename), native_to_arm)
+        bodies[name] = _inertial(occ, world_to_arm, arm_rot_t, world_rot)
+        bodies[name]["mesh"] = filename
+        bodies[name]["mesh_offset_mm"] = [native_to_arm.getCell(i, 3) * 10.0 for i in range(3)]
 
-    r_mat = [
-        [t_base.getCell(0, 0), t_base.getCell(0, 1), t_base.getCell(0, 2)],
-        [t_base.getCell(1, 0), t_base.getCell(1, 1), t_base.getCell(1, 2)],
-        [t_base.getCell(2, 0), t_base.getCell(2, 1), t_base.getCell(2, 2)],
-    ]
-    r_mat_inv = [
-        [r_mat[0][0], r_mat[1][0], r_mat[2][0]],
-        [r_mat[0][1], r_mat[1][1], r_mat[2][1]],
-        [r_mat[0][2], r_mat[1][2], r_mat[2][2]],
-    ]
+    table = [o for o in root.occurrences if o.name.lower().startswith(TABLE_OCCURRENCE_PREFIX)]
+    if len(table) != 1:
+        raise RuntimeError(f"Expected one '{TABLE_OCCURRENCE_PREFIX}' occurrence, found {len(table)}")
+    table_lo, table_hi = _bbox_in_arm(table[0].boundingBox, world_to_arm)
+    boxes, skipped = _fixtures(root, arm_top, world_to_arm)
 
-    # 2. Export STL meshes
-    export_mgr = design.exportManager
-    exported_meshes = []
-    for body_name, (_needle, filename) in BODY_SPECS.items():
-        occ = found_occs[body_name]
-        mesh_path = os.path.join(mesh_dir, filename)
-        opts = export_mgr.createSTLExportOptions(occ, mesh_path)
-        opts.isBinaryFormat = True
-        opts.isOneFilePerBody = False
-        opts.meshRefinement = adsk.fusion.MeshRefinementSettings.MeshRefinementLow
-        opts.unitType = adsk.fusion.DistanceUnits.MillimeterDistanceUnits
-        opts.sendToPrintUtility = False
-        if not export_mgr.execute(opts):
-            raise RuntimeError(f"Failed to export STL for {body_name} to {mesh_path}")
-
-        # Also write to standard assets/meshes/visual directory
-        asset_mesh_path = os.path.join(ASSETS_DIR, filename)
-        opts_asset = export_mgr.createSTLExportOptions(occ, asset_mesh_path)
-        opts_asset.isBinaryFormat = True
-        opts_asset.isOneFilePerBody = False
-        opts_asset.meshRefinement = adsk.fusion.MeshRefinementSettings.MeshRefinementLow
-        opts_asset.unitType = adsk.fusion.DistanceUnits.MillimeterDistanceUnits
-        opts_asset.sendToPrintUtility = False
-        export_mgr.execute(opts_asset)
-
-        exported_meshes.append(filename)
-
-    # 3. Resolve Joint Positions from Fusion 360 geometry transformed by t_inv
-    all_joints = list(root.allJoints)
-    all_as_built = list(root.allAsBuiltJoints)
-    resolved_joint_origins = {}
-    for joint_id, jdef in JOINT_DEFS.items():
-        matched_joint = None
-        for j in all_joints:
-            if j.name in jdef["fusion_names"]:
-                matched_joint = j
-                break
-        if matched_joint:
-            try:
-                pt = matched_joint.geometryOrOriginTwo.origin.copy()
-                pt.transformBy(t_inv)
-                resolved_joint_origins[joint_id] = [pt.x * 0.01, pt.y * 0.01, pt.z * 0.01]
-            except Exception:
-                try:
-                    t = matched_joint.geometryTwoTransform.translation.copy()
-                    t.transformBy(t_inv)
-                    resolved_joint_origins[joint_id] = [t.x * 0.01, t.y * 0.01, t.z * 0.01]
-                except Exception:  # nosec B110
-                    pass
-
-        if joint_id not in resolved_joint_origins:
-            for ab in all_as_built:
-                if ab.name in jdef["fusion_names"] and ab.geometry and hasattr(ab.geometry, "origin"):
-                    try:
-                        pt = ab.geometry.origin.copy()
-                        pt.transformBy(t_inv)
-                        resolved_joint_origins[joint_id] = [pt.x * 0.01, pt.y * 0.01, pt.z * 0.01]
-                        break
-                    except Exception:  # nosec B110
-                        pass
-
-    # Standard fallback coordinates in component frame
-    default_origins = {
-        "joint_1_base_to_link_1": [0.539369022999, 0.0639727628473, 0.049],
-        "joint_2_link_1_to_link_2": [0.574469022999, 0.0639727628473, 0.106444648759],
-        "joint_3_link_2_to_link_3": [0.519438641154, 0.196933979432, 0.291684061805],
-        "joint_4_link_3_to_link_4": [0.519119139885, 0.0655199676701, 0.230405822363],
-        "joint_5_link_4_to_link_5": [0.539369022999, 0.018286208573, 0.230422993883],
-        "right_jaw_slide_joint": [0.539369022999, -0.027946, 0.230436],
-        "left_jaw_slide_joint": [0.539369022999, -0.027946, 0.230436],
-        "gripper_pinion_joint": [0.539369022999, -0.021654, 0.230436],
-    }
-    for k, v in default_origins.items():
-        if k not in resolved_joint_origins:
-            resolved_joint_origins[k] = v
-        else:
-            # Validate against default origin: if CAD joint is extracted in a non-zero pose, fallback to calibrated zero-pose
-            dist = sum((resolved_joint_origins[k][i] - v[i]) ** 2 for i in range(3)) ** 0.5
-            if dist > 0.02:
-                resolved_joint_origins[k] = v
-
-    model_origin_m = list(resolved_joint_origins["joint_1_base_to_link_1"])
-    model_origin_m[2] = 0.0
-
-    # 4. Extract Physical Properties for all bodies in component frame
-    body_physics = {}
-    for body_name, occ in found_occs.items():
-        body_physics[body_name] = _inertial_attributes(occ, t_inv, r_mat, r_mat_inv)
-
-    # 5. Generate MuJoCo MJCF
-    mujoco = ET.Element("mujoco", {"model": "NexArm"})
-    ET.SubElement(
-        mujoco,
-        "compiler",
-        {"angle": "radian", "meshdir": "meshes", "autolimits": "true"},
-    )
-    ET.SubElement(
-        mujoco,
-        "option",
-        {
-            "timestep": "0.002",
-            "integrator": "implicitfast",
-            "gravity": "0 0 -9.81",
-            "cone": "elliptic",
-            "impratio": "10",
-        },
-    )
-
-    defaults = ET.SubElement(mujoco, "default")
-    robot_defaults = ET.SubElement(defaults, "default", {"class": "nexarm"})
-    ET.SubElement(
-        robot_defaults,
-        "joint",
-        {"damping": "0.2", "frictionloss": "0.1", "armature": "0.005"},
-    )
-    ET.SubElement(robot_defaults, "position", {"kp": "100", "kv": "0.2"})
-
-    gripper_defaults = ET.SubElement(defaults, "default", {"class": "gripper"})
-    ET.SubElement(gripper_defaults, "joint", {"damping": "0.01", "frictionloss": "0", "armature": "0"})
-    gripper_actuator_defaults = ET.SubElement(defaults, "default", {"class": "gripper_actuator"})
-    ET.SubElement(gripper_actuator_defaults, "position", {"kp": "1000", "kv": "5"})
-
-    visual_defaults = ET.SubElement(defaults, "default", {"class": "visual"})
-    ET.SubElement(visual_defaults, "geom", {"type": "mesh", "contype": "0", "conaffinity": "0", "group": "2"})
-
-    collision_defaults = ET.SubElement(defaults, "default", {"class": "collision"})
-    ET.SubElement(
-        collision_defaults,
-        "geom",
-        {
-            "contype": "1",
-            "conaffinity": "3",
-            "group": "3",
-            "rgba": "0 0 0 0",
-            "friction": "1.1 0.01 0.001",
-        },
-    )
-
-    assets = ET.SubElement(mujoco, "asset")
-    for body_name, (_needle, filename) in BODY_SPECS.items():
-        ET.SubElement(
-            assets,
-            "mesh",
-            {"name": body_name, "file": filename, "scale": "0.001 0.001 0.001"},
-        )
-
-    worldbody = ET.SubElement(mujoco, "worldbody")
-    mount = ET.SubElement(
-        worldbody,
-        "body",
-        {
-            "name": "nexarm_mount",
-            "pos": _format(tuple(-val for val in model_origin_m)),
-            "childclass": "nexarm",
-        },
-    )
-
-    def _add_mjcf_body(parent_elem, bname, jid=None):
-        phys = body_physics[bname]
-        body_elem = ET.SubElement(parent_elem, "body", {"name": bname, "pos": "0 0 0", "quat": "1 0 0 0"})
-        if jid:
-            jdef = JOINT_DEFS[jid]
-            j_attrs = {
-                "name": jid,
-                "pos": _format(resolved_joint_origins[jid]),
-                "type": "hinge" if jdef["type"] == "revolute" else "slide",
-                "axis": _format(jdef["axis"]),
-                "limited": "true",
-                "range": _format(jdef["range"]),
-            }
-            if "jaw" in jid:
-                j_attrs["class"] = "gripper"
-            ET.SubElement(body_elem, "joint", j_attrs)
-
-        ET.SubElement(body_elem, "geom", {"name": f"{bname}_visual", "class": "visual", "mesh": bname})
-
-        # Inertial
-        ixx, iyy, izz, ixy, ixz, iyz = phys["inertia"]
-        ET.SubElement(
-            body_elem,
-            "inertial",
-            {
-                "mass": f"{phys['mass']:.12g}",
-                "pos": _format(phys["com"]),
-                "fullinertia": _format((ixx, iyy, izz, ixy, ixz, iyz)),
-            },
-        )
-
-        # Collision geoms
-        if bname in COLLISION_SPECS:
-            for idx, col in enumerate(COLLISION_SPECS[bname]):
-                col_attrs = dict(col)
-                col_attrs["name"] = f"{bname}_collision_{idx}"
-                col_attrs["class"] = "collision"
-                ET.SubElement(body_elem, "geom", col_attrs)
-
-        return body_elem
-
-    # Build MuJoCo tree
-    b_base = _add_mjcf_body(mount, "base_link")
-    b_link1 = _add_mjcf_body(b_base, "link_1", "joint_1_base_to_link_1")
-    b_link2 = _add_mjcf_body(b_link1, "link_2", "joint_2_link_1_to_link_2")
-    b_link3 = _add_mjcf_body(b_link2, "link_3", "joint_3_link_2_to_link_3")
-    b_link4 = _add_mjcf_body(b_link3, "link_4", "joint_4_link_3_to_link_4")
-    b_link5 = _add_mjcf_body(b_link4, "link_5", "joint_5_link_4_to_link_5")
-    b_grip = _add_mjcf_body(b_link5, "link_6_gripper_base")
-    _add_mjcf_body(b_grip, "link_6_pinion_gear", "gripper_pinion_joint")
-    _add_mjcf_body(b_grip, "link_6_left_jaw", "left_jaw_slide_joint")
-    _add_mjcf_body(b_grip, "link_6_right_jaw", "right_jaw_slide_joint")
-
-    # Camera mount on link 5 (rotates with wrist roll and gripper)
-    b_cam = _add_mjcf_body(b_link5, "cam_mount")
-    ET.SubElement(
-        b_cam,
-        "camera",
-        {
-            "name": "wrist",
-            "mode": "fixed",
-            "pos": "0.53937 -0.022 0.279",
-            "xyaxes": "-1 0 0 0 -0.656059 0.754710",
-            "fovy": "92.2",
-        },
-    )
-    ET.SubElement(
-        b_grip,
-        "site",
-        {
-            "name": "gripper_frame",
-            "pos": "0.53937 -0.062 0.2304",
-            "size": "0.005",
-            "rgba": "0.1 0.8 0.1 1",
-        },
-    )
-
-    # Contact exclusions
-    contact = ET.SubElement(mujoco, "contact")
-    for b1, b2 in EXCLUDED_CONTACTS:
-        ET.SubElement(contact, "exclude", {"name": f"{b1}_to_{b2}", "body1": b1, "body2": b2})
-
-    # Equality constraint for jaws
-    equality = ET.SubElement(mujoco, "equality")
-    ET.SubElement(
-        equality,
-        "joint",
-        {
-            "name": "gripper_jaws_opposed_1_to_1",
-            "joint1": "right_jaw_slide_joint",
-            "joint2": "left_jaw_slide_joint",
-            "polycoef": "0 -1 0 0 0",
-            "solref": "0.002 1",
-            "solimp": "0.99 0.999 0.0005 0.5 2",
-        },
-    )
-
-    # Actuators
-    actuators = ET.SubElement(mujoco, "actuator")
-    for jid in ARM_JOINTS:
-        jdef = JOINT_DEFS[jid]
-        ET.SubElement(
-            actuators,
-            "position",
-            {
-                "name": f"{jid}_control",
-                "class": "nexarm",
-                "joint": jid,
-                "ctrllimited": "true",
-                "ctrlrange": _format(jdef["range"]),
-            },
-        )
-    ET.SubElement(
-        actuators,
-        "position",
-        {
-            "name": "gripper_control",
-            "class": "gripper_actuator",
-            "joint": "right_jaw_slide_joint",
-            "ctrllimited": "true",
-            "ctrlrange": _format(JOINT_DEFS["right_jaw_slide_joint"]["range"]),
-        },
-    )
-
-    ET.indent(mujoco, space="  ")
-    mjcf_path = os.path.join(OUTPUT_DIR, "NexArm-sim.xml")
-    ET.ElementTree(mujoco).write(mjcf_path, encoding="utf-8", xml_declaration=True)
-    # Also write root sim/NexArm-sim.xml to maintain consistency
-    ET.ElementTree(mujoco).write(
-        os.path.join(WSL_BASE, "NexArm-sim.xml"), encoding="utf-8", xml_declaration=True
-    )
-    _write_scene(OUTPUT_DIR, model_origin_m)
-
-    desc_mjcf_dir = os.path.join(DESCRIPTION_DIR, "mjcf")
-    os.makedirs(desc_mjcf_dir, exist_ok=True)
-    ET.ElementTree(mujoco).write(
-        os.path.join(desc_mjcf_dir, "nexarm.xml"), encoding="utf-8", xml_declaration=True
-    )
-    _write_scene(desc_mjcf_dir, model_origin_m, "nexarm.xml")
-
-    # 6. Generate Standard URDF (nexarm.urdf)
-    urdf = ET.Element("robot", {"name": "nexarm"})
-
-    # Material tags
-    mat_grey = ET.SubElement(urdf, "material", {"name": "dark_grey"})
-    ET.SubElement(mat_grey, "color", {"rgba": "0.2 0.2 0.2 1.0"})
-    mat_black = ET.SubElement(urdf, "material", {"name": "black"})
-    ET.SubElement(mat_black, "color", {"rgba": "0.1 0.1 0.1 1.0"})
-
-    # Kinematic chain for URDF:
-    # link_name -> (parent_link, joint_name_from_parent)
-    urdf_chain = [
-        ("base_link", None, None),
-        ("link_1", "base_link", "joint_1_base_to_link_1"),
-        ("link_2", "link_1", "joint_2_link_1_to_link_2"),
-        ("link_3", "link_2", "joint_3_link_2_to_link_3"),
-        ("link_4", "link_3", "joint_4_link_3_to_link_4"),
-        ("link_5", "link_4", "joint_5_link_4_to_link_5"),
-        ("link_6_gripper_base", "link_5", "joint_5_to_gripper_fixed"),
-        ("link_6_pinion_gear", "link_6_gripper_base", "gripper_pinion_joint"),
-        ("link_6_left_jaw", "link_6_gripper_base", "left_jaw_slide_joint"),
-        ("link_6_right_jaw", "link_6_gripper_base", "right_jaw_slide_joint"),
-        ("cam_mount", "link_5", "joint_5_to_cam_fixed"),
-    ]
-
-    link_frames = {
-        "base_link": [model_origin_m[0], model_origin_m[1], 0.0],
-        "link_1": resolved_joint_origins["joint_1_base_to_link_1"],
-        "link_2": resolved_joint_origins["joint_2_link_1_to_link_2"],
-        "link_3": resolved_joint_origins["joint_3_link_2_to_link_3"],
-        "link_4": resolved_joint_origins["joint_4_link_3_to_link_4"],
-        "link_5": resolved_joint_origins["joint_5_link_4_to_link_5"],
-        "link_6_gripper_base": resolved_joint_origins["joint_5_link_4_to_link_5"],
-        "link_6_pinion_gear": resolved_joint_origins["gripper_pinion_joint"],
-        "link_6_left_jaw": resolved_joint_origins["left_jaw_slide_joint"],
-        "link_6_right_jaw": resolved_joint_origins["right_jaw_slide_joint"],
-        "cam_mount": resolved_joint_origins["joint_5_link_4_to_link_5"],
-    }
-
-    for lname, pname, jname in urdf_chain:
-        link_elem = ET.SubElement(urdf, "link", {"name": lname})
-        phys = body_physics[lname]
-        com = phys["com"]
-        mass = phys["mass"]
-        ixx, iyy, izz, ixy, ixz, iyz = phys["inertia"]
-        l_frame = link_frames[lname]
-
-        # Inertial
-        inertial = ET.SubElement(link_elem, "inertial")
-        ET.SubElement(
-            inertial,
-            "origin",
-            {
-                "xyz": f"{com[0] - l_frame[0]:.6g} {com[1] - l_frame[1]:.6g} {com[2] - l_frame[2]:.6g}",
-                "rpy": "0 0 0",
-            },
-        )
-        ET.SubElement(inertial, "mass", {"value": f"{mass:.6g}"})
-        ET.SubElement(
-            inertial,
-            "inertia",
-            {
-                "ixx": f"{ixx:.6e}",
-                "ixy": f"{ixy:.6e}",
-                "ixz": f"{ixz:.6e}",
-                "iyy": f"{iyy:.6e}",
-                "iyz": f"{iyz:.6e}",
-                "izz": f"{izz:.6e}",
-            },
-        )
-
-        # Visual
-        visual = ET.SubElement(link_elem, "visual")
-        ET.SubElement(
-            visual,
-            "origin",
-            {"xyz": f"{-l_frame[0]:.6g} {-l_frame[1]:.6g} {-l_frame[2]:.6g}", "rpy": "0 0 0"},
-        )
-        geom_v = ET.SubElement(visual, "geometry")
-        ET.SubElement(
-            geom_v, "mesh", {"filename": f"meshes/{BODY_SPECS[lname][1]}", "scale": "0.001 0.001 0.001"}
-        )
-        ET.SubElement(visual, "material", {"name": "dark_grey"})
-
-        # Collision
-        collision = ET.SubElement(link_elem, "collision")
-        ET.SubElement(
-            collision,
-            "origin",
-            {"xyz": f"{-l_frame[0]:.6g} {-l_frame[1]:.6g} {-l_frame[2]:.6g}", "rpy": "0 0 0"},
-        )
-        geom_c = ET.SubElement(collision, "geometry")
-        ET.SubElement(
-            geom_c, "mesh", {"filename": f"meshes/{BODY_SPECS[lname][1]}", "scale": "0.001 0.001 0.001"}
-        )
-
-        # Joint connecting to parent
-        if pname is not None:
-            joint_elem = ET.SubElement(urdf, "joint", {"name": jname})
-            ET.SubElement(joint_elem, "parent", {"link": pname})
-            ET.SubElement(joint_elem, "child", {"link": lname})
-
-            p_frame = link_frames[pname]
-            rel_xyz = [l_frame[i] - p_frame[i] for i in range(3)]
-            rel_xyz_str = f"{rel_xyz[0]:.6g} {rel_xyz[1]:.6g} {rel_xyz[2]:.6g}"
-
-            if jname.endswith("_fixed"):
-                joint_elem.attrib["type"] = "fixed"
-                ET.SubElement(joint_elem, "origin", {"xyz": rel_xyz_str, "rpy": "0 0 0"})
-            else:
-                jdef = JOINT_DEFS[jname]
-                joint_elem.attrib["type"] = jdef["type"]
-                ET.SubElement(joint_elem, "origin", {"xyz": rel_xyz_str, "rpy": "0 0 0"})
-                ET.SubElement(joint_elem, "axis", {"xyz": _format(jdef["axis"])})
-                rmin, rmax = jdef["range"]
-                ET.SubElement(
-                    joint_elem,
-                    "limit",
-                    {
-                        "lower": f"{rmin:.6g}",
-                        "upper": f"{rmax:.6g}",
-                        "effort": "5.0",
-                        "velocity": "3.14",
-                    },
-                )
-                if jname == "left_jaw_slide_joint":
-                    ET.SubElement(
-                        joint_elem,
-                        "mimic",
-                        {"joint": "right_jaw_slide_joint", "multiplier": "-1", "offset": "0"},
-                    )
-
-    ET.indent(urdf, space="  ")
-    urdf_path = os.path.join(OUTPUT_DIR, "nexarm.urdf")
-    ET.ElementTree(urdf).write(urdf_path, encoding="utf-8", xml_declaration=True)
-
-    desc_urdf_dir = os.path.join(DESCRIPTION_DIR, "urdf")
-    os.makedirs(desc_urdf_dir, exist_ok=True)
-    ET.ElementTree(urdf).write(
-        os.path.join(desc_urdf_dir, "nexarm.urdf"), encoding="utf-8", xml_declaration=True
-    )
-
-    result = {
-        "success": True,
+    extract = {
+        "schema": "nexarm_fusion_extract_v1",
         "document": app.activeDocument.name,
-        "outputDirectory": OUTPUT_DIR,
-        "descriptionDirectory": DESCRIPTION_DIR,
-        "assetsDirectory": ASSETS_DIR,
-        "mjcf": mjcf_path,
-        "scene": os.path.join(OUTPUT_DIR, "scene.xml"),
-        "urdf": urdf_path,
-        "exportedMeshCount": len(exported_meshes),
-        "exportedMeshes": exported_meshes,
+        "frame": "arm (base_link component) frame, millimetres",
+        "bodies": bodies,
+        "joints": _joints(root, world_to_arm, arm_rot_t),
+        "workcell": {
+            "table_top_z_mm": table_hi[2],
+            "table_min_mm": table_lo,
+            "table_max_mm": table_hi,
+            "boxes": boxes,
+            "skipped_non_box_bodies": skipped,
+            "top_camera": _top_camera(root, world_to_arm, arm_rot_t),
+            "front_camera": _front_camera(root, world_to_arm, arm_rot_t),
+        },
     }
-    print(json.dumps(result, indent=2))
+    out_path = os.path.join(EXPORT_SIM_DIR, "fusion_export", "fusion_extract.json")
+    with open(out_path, "w", encoding="utf-8") as handle:
+        json.dump(extract, handle, indent=2)
+        handle.write("\n")
+    print(json.dumps({"success": True, "extract": out_path, "meshes": len(bodies)}))

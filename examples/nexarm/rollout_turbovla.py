@@ -227,7 +227,7 @@ def parse_args(argv=None):
         help="Task environment and default prompt (auto: the task_type saved with the checkpoint, "
         "else guessed from checkpoint/model names)",
     )
-    parser.add_argument("--model", type=Path, default=Path("sim/fusion_export/scene.xml"))
+    parser.add_argument("--model", type=Path, default=Path("sim/description/mjcf/scene.xml"))
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--max-steps", type=int, default=500)
     parser.add_argument("--timeout", type=float, default=40.0, help="Episode timeout in seconds")
@@ -473,7 +473,7 @@ def run_sim(args, runner: TurboVLAPolicyRunner):
     if task_type == "stack_bowls" and (
         "bowl" not in str(args.model).lower() or args.model.name == "scene.xml"
     ):
-        args.model = Path("sim/fusion_export/bowl_stack_scene.xml")
+        args.model = Path("sim/description/mjcf/bowl_stack_scene.xml")
 
     # The trained camera views, in order; a scene without one of them cannot run this checkpoint.
     cam_names = tuple(runner.camera_names)

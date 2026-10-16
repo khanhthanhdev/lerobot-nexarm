@@ -124,7 +124,7 @@ uv run python examples/nexarm/simulate.py
 
 Optional flags:
 
-- `--model sim/fusion_export/scene.xml`: Specify a custom MJCF scene model.
+- `--model sim/description/mjcf/scene.xml`: Specify a custom MJCF scene model.
 - `--fps 30`: Target simulation frame rate.
 
 ### 2.2 6-DOF Cartesian Keyboard Teleoperation
@@ -173,6 +173,17 @@ Run the registered Gymnasium environment `NexArmPickPlace-v0` with camera render
 ```bash
 uv run python examples/nexarm/demo_gym_env.py
 ```
+
+`NexArmStackBowls-v0` is the real-robot task (stack the red, blue and black bowls in the order of the episode's
+instruction) with the same actions, cameras and options. Select it with `--env.task` to evaluate, or to evaluate
+while training, a policy trained on the real or sim stack-bowls datasets:
+
+```bash
+uv run lerobot-eval --policy.path=outputs/train/act_stack_bowls/checkpoints/last/pretrained_model     --env.type=nexarm --env.task=NexArmStackBowls-v0 --eval.n_episodes=20
+```
+
+The Isaac Lab twin of this task, for parallel training in Isaac Sim, is described in
+[`sim/isaac_lab/README.md`](sim/isaac_lab/README.md).
 
 ### 2.5 Sim Dataset Generation with Domain Randomization
 
