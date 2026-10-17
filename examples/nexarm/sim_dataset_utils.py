@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from lerobot.motors.nexarm.mujoco_mapping import JOINT_MAPPING_VERSION
+from lerobot.motors.nexarm.mujoco_mapping import load_joint_mapping
 from lerobot.robots.nexarm_sim.calibration import (
     SimCalibration,
     check_calibration_fps,
@@ -165,6 +165,12 @@ def add_generation_args(parser: argparse.ArgumentParser) -> None:
         "--calibration", type=Path, default=None, help="SimCalibration JSON from calibrate_sim.py"
     )
     parser.add_argument(
+        "--joint-mapping",
+        type=Path,
+        default=None,
+        help="Real-to-sim joint mapping JSON from probe_joint_mapping.py; the identity mapping without it",
+    )
+    parser.add_argument(
         "--action-delay-steps",
         type=int,
         default=None,
@@ -226,7 +232,11 @@ def finalize_generation_args(parser: argparse.ArgumentParser, args: argparse.Nam
         args.max_attempts = args.episodes * 3
     if args.max_attempts < args.episodes:
         parser.error("--max-attempts cannot be smaller than --episodes")
-    check_dataset_root(parser, args.root, args.resume)
+    try:
+        args.joint_mapping_version = load_joint_mapping(args.joint_mapping).version
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        parser.error(f"--joint-mapping {args.joint_mapping}: {error}")
+    check_dataset_root(parser, args.root, args.resume, args.joint_mapping_version)
     if args.seed_start is None:
         split_start = EVAL_SEED_OFFSET if args.split == "eval" else 0
         # A single process continues after every logged seed; shards resume inside their own seed blocks.
@@ -244,7 +254,7 @@ def finalize_generation_args(parser: argparse.ArgumentParser, args: argparse.Nam
     args.sim_calibration = None
     if args.calibration is not None:
         try:
-            args.sim_calibration = SimCalibration.load(args.calibration)
+            args.sim_calibration = SimCalibration.load(args.calibration, args.joint_mapping_version)
             check_calibration_fps(args.sim_calibration, args.fps)
         except (OSError, ValueError, TypeError) as error:
             parser.error(f"--calibration {args.calibration}: {error}")
@@ -291,7 +301,7 @@ def base_report(
         "model_path": str(model_path),
         "model_sha256": sha256_file(model_path),
         "repo_id": args.repo_id,
-        "joint_mapping": JOINT_MAPPING_VERSION,
+        "joint_mapping": args.joint_mapping_version,
         "split": args.split,
         "fps": args.fps,
         "camera_width": args.camera_width,
@@ -438,7 +448,9 @@ def recover_interrupted_resume(root: Path) -> None:
         backup.rename(root)
 
 
-def check_dataset_root(parser: argparse.ArgumentParser, root: Path, resume: bool) -> None:
+def check_dataset_root(
+    parser: argparse.ArgumentParser, root: Path, resume: bool, joint_mapping_version: str
+) -> None:
     """A new run needs a fresh root; a resumed run needs a dataset written with the per-attempt log."""
     if not resume:
         if root.exists():
@@ -453,10 +465,11 @@ def check_dataset_root(parser: argparse.ArgumentParser, root: Path, resume: bool
             f"{root} has no {EPISODES_NAME} and {REPORT_NAME}; it predates the shared provenance layout, "
             "so regenerate it instead of resuming"
         )
-    if report.get("joint_mapping") != JOINT_MAPPING_VERSION:
+    if report.get("joint_mapping") != joint_mapping_version:
         parser.error(
             f"{root} was generated with joint mapping {report.get('joint_mapping') or 'servo-range scaling'}; "
-            f"this code uses {JOINT_MAPPING_VERSION}. Appending would mix two angle conventions, so regenerate it"
+            f"this run uses {joint_mapping_version}. Appending would mix two angle conventions, so regenerate it "
+            "or pass the same --joint-mapping"
         )
 
 

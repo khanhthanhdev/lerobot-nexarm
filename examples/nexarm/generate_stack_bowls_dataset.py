@@ -13,9 +13,9 @@ Calibrated to a real arm (see calibrate_sim.py), sharded over 2 GPUs, held-out e
         --episodes 200 --gpus 0,1 --split eval
 
 Domain randomization (visual, dynamics and every bowl's friction/mass/color) is on by default; --no-dr
-disables it. Grasps default to contact-gated assistance (both jaws must touch the bowl).
-This still assists bowl transport and is not a physical grasp benchmark.
-Use --grasp-mode proximity_assisted only to reproduce the legacy shortcut.
+disables it. Grasps are physical by default: the jaws hold each bowl by friction alone. Use
+--grasp-mode contact_assisted to carry a bowl rigidly once both jaws touch it, and proximity_assisted only
+to reproduce the legacy shortcut.
 Provenance goes to ``generation_report.json`` and one line per attempt to ``generation_episodes.jsonl``
 at the dataset root, as in generate_sim_dataset.py.
 """
@@ -54,14 +54,21 @@ from lerobot.robots.nexarm_sim import (
     get_task_instruction,
 )
 from lerobot.robots.nexarm_sim.mujoco_backend import HOME_POSITIONS, MUJOCO_JOINTS, resolve_model_path
-from lerobot.robots.nexarm_sim.stack_bowls_task import PERMUTATIONS
+from lerobot.robots.nexarm_sim.stack_bowls_task import (
+    GRIPPER_ASSIST_ENGAGE_POS,
+    GRIPPER_ASSIST_RELEASE_POS,
+    PERMUTATIONS,
+)
 from lerobot.utils.constants import ACTION, OBS_STR
 from lerobot.utils.feature_utils import build_dataset_frame, hw_to_dataset_features
 
 OPEN_GRIPPER = float(GRIPPER_OPEN_POS)  # wide open: 67.4mm gap
 CLOSED_GRIPPER = float(GRIPPER_CLOSED_POS)  # pinched closed: 16.7mm gap
-BOWL_RIM_RADIUS = 0.061  # Outer rim radius in meters
-BOWL_RIM_Z_OFFSET = 0.0215  # Height of bowl rim above bowl body center
+BOWL_RIM_RADIUS = 0.0615  # Rim wall mid-plane radius in meters
+BOWL_RIM_Z_OFFSET = 0.0185  # Height of the rim top above bowl body center
+# The jaws come down almost vertically onto the thin rim, as in the real demos; fully vertical (90) leaves far
+# bowls out of reach and fails more often.
+GRASP_PITCH_DEG = 80.0
 JAW_CENTER_OFFSET = np.array([0.0, 0.033, 0.0])  # Jaw collision pad center in gripper_frame
 
 
@@ -82,7 +89,7 @@ def solve_ik_jaw(
     backend,
     target_pos: np.ndarray,
     u_rad: np.ndarray,
-    pitch_deg: float = 75.0,
+    pitch_deg: float = GRASP_PITCH_DEG,
     roll_val_rad: float = np.deg2rad(80),
     max_iterations: int = 150,
     tolerance_pos: float = 0.002,
@@ -111,7 +118,8 @@ def solve_ik_jaw(
     target_pos = np.asarray(target_pos, dtype=np.float64)
     u_rad = np.asarray(u_rad, dtype=np.float64) / np.linalg.norm(u_rad)
 
-    candidate_pitches = [pitch_deg, pitch_deg - 5.0, pitch_deg - 10.0, pitch_deg - 15.0]
+    # Steeper is a squarer grip on the rim; far targets fall back to shallower pitches, down to 60 degrees.
+    candidate_pitches = [pitch_deg - step for step in np.arange(0.0, max(pitch_deg - 60.0, 15.0) + 1e-6, 5.0)]
     for p in candidate_pitches:
         theta = np.deg2rad(p)
         target_dir = np.array([np.cos(theta) * u_rad[0], np.cos(theta) * u_rad[1], -np.sin(theta)])
@@ -167,7 +175,7 @@ def solve_ik_held_bowl(
     task: NexArmStackBowlsTask,
     target_bowl_xyz: np.ndarray,
     u_rad: np.ndarray,
-    pitch_deg: float = 75.0,
+    pitch_deg: float = GRASP_PITCH_DEG,
     seed: int = 0,
 ) -> dict[str, float] | None:
     """Iteratively solve IK to position the held bowl center at target_bowl_xyz."""
@@ -199,6 +207,12 @@ def solve_ik_held_bowl(
     return None
 
 
+def _min_jerk(steps: int) -> np.ndarray:
+    """Progress 0..1 over ``steps`` frames with zero start and end velocity, like a teleoperator's bell-shaped move."""
+    t = np.linspace(0.0, 1.0, steps, endpoint=True)
+    return t**3 * (10 - 15 * t + 6 * t**2)
+
+
 def _interpolate_stage(
     robot: NexArmSim,
     task: NexArmStackBowlsTask,
@@ -210,7 +224,7 @@ def _interpolate_stage(
     settle_steps: int = 10,
     record_frame: Callable[[dict[str, object], dict[str, float]], None] | None = None,
 ) -> bool:
-    """Linearly interpolate joints to target solution and hold for settle_steps."""
+    """Move joints to the target solution on a minimum-jerk profile and hold for settle_steps."""
     start = robot.backend.joint_positions()
     target = {f"{name}.pos": HOME_POSITIONS[name] for name in JOINT_NAMES}
     target.update({f"{name}.pos": value for name, value in solution.items()})
@@ -221,7 +235,7 @@ def _interpolate_stage(
     min_steps = int(np.ceil(max_delta / 25.0))
     effective_steps = max(steps, min_steps)
 
-    for alpha in np.linspace(0.0, 1.0, effective_steps, endpoint=True):
+    for alpha in _min_jerk(effective_steps):
         action = {key: float((1 - alpha) * start[key] + alpha * target[key]) for key in target}
         action["gripper.pos"] = float((1 - alpha) * start_gripper + alpha * target_gripper)
         observation = robot.get_observation() if record_frame is not None else {}
@@ -233,6 +247,8 @@ def _interpolate_stage(
 
     # Motor lag can leave a carried bowl centimeters from its IK target. Keep
     # commanding the target before releasing or starting the next motion.
+    arm_keys = [k for k in target if k != "gripper.pos"]  # closed jaws stop on the rim, short of their target
+    previous = robot.backend.joint_positions()
     for settle_index in range(max(settle_steps, robot.config.fps)):
         observation = robot.get_observation() if record_frame is not None else {}
         sent = robot.send_action(target)
@@ -241,10 +257,95 @@ def _interpolate_stage(
         if task.observe().terminated:
             break
         positions = robot.backend.joint_positions()
-        if settle_index + 1 >= settle_steps and max(abs(positions[k] - target[k]) for k in target) < 8.0:
+        arm_error = max(abs(positions[k] - target[k]) for k in arm_keys)
+        # A loaded arm sags a few ticks under gravity and never closes the gap; stopped near the target is there.
+        arm_stopped = max(abs(positions[k] - previous[k]) for k in arm_keys) < 1.0 and arm_error < 25.0
+        previous = positions
+        if settle_index + 1 >= settle_steps and (arm_error < 8.0 or arm_stopped):
             break
 
     return True
+
+
+def _follow_path(
+    robot: NexArmSim,
+    task: NexArmStackBowlsTask,
+    solutions: list[dict[str, float]],
+    gripper: float,
+    *,
+    steps: int,
+    settle_steps: int = 2,
+    record_frame: Callable[[dict[str, object], dict[str, float]], None] | None = None,
+) -> bool:
+    """Sweep through joint waypoints in one minimum-jerk move, without stopping at the intermediate ones.
+
+    Real operators lift a grasped bowl and swing it toward the target in a single motion; stopping at each
+    waypoint would look robotic. Progress is spread along the path by joint distance.
+    """
+    start = robot.backend.joint_positions()
+    keys = [key for key in start if key != "gripper.pos"]
+    points = [np.array([start[key] for key in keys])]
+    for solution in solutions:
+        target = {f"{name}.pos": HOME_POSITIONS[name] for name in JOINT_NAMES}
+        target.update({f"{name}.pos": value for name, value in solution.items()})
+        points.append(np.array([target[key] for key in keys]))
+    lengths = [float(np.abs(b - a).max()) for a, b in zip(points[:-1], points[1:], strict=True)]
+    cumulative = np.concatenate([[0.0], np.cumsum(lengths)])
+    if cumulative[-1] <= 0.0:
+        return True
+    effective_steps = max(steps, int(np.ceil(cumulative[-1] / 25.0)))
+    for alpha in _min_jerk(effective_steps):
+        distance = alpha * cumulative[-1]
+        segment = min(int(np.searchsorted(cumulative, distance, side="right")) - 1, len(lengths) - 1)
+        local = (distance - cumulative[segment]) / max(lengths[segment], 1e-9)
+        joints = points[segment] + np.clip(local, 0.0, 1.0) * (points[segment + 1] - points[segment])
+        action = {key: float(value) for key, value in zip(keys, joints, strict=True)}
+        action["gripper.pos"] = gripper
+        observation = robot.get_observation() if record_frame is not None else {}
+        sent = robot.send_action(action)
+        if record_frame is not None:
+            record_frame(observation, sent)
+        if task.observe().terminated:
+            return True
+    final = {key: float(value) for key, value in zip(keys, points[-1], strict=True)}
+    final["gripper.pos"] = gripper
+    for _ in range(settle_steps):
+        observation = robot.get_observation() if record_frame is not None else {}
+        sent = robot.send_action(final)
+        if record_frame is not None:
+            record_frame(observation, sent)
+        if task.observe().terminated:
+            break
+    return True
+
+
+def _lift_and_carry(
+    robot: NexArmSim,
+    task: NexArmStackBowlsTask,
+    rim: np.ndarray,
+    u_rim: np.ndarray,
+    above_target: np.ndarray,
+    u_target: np.ndarray,
+    *,
+    seed: int,
+    record_frame: Callable[[dict[str, object], dict[str, float]], None] | None = None,
+) -> str | None:
+    """Lift the grasped bowl straight up off its neighbours, then swing it above the target in the same motion.
+
+    Returns the failing waypoint's name, or None on success.
+    """
+    waypoints = []
+    for name, height in (("lift_low", 0.03), ("lift_high", 0.07)):
+        sol = solve_ik_jaw(robot.backend, rim + [0, 0, height], u_rim, seed=seed)
+        if not sol:
+            return name
+        waypoints.append(sol)
+    sol = solve_ik_held_bowl(robot, task, above_target, u_target, seed=seed)
+    if not sol:
+        return "carry"
+    waypoints.append(sol)
+    _follow_path(robot, task, waypoints, CLOSED_GRIPPER, steps=45, settle_steps=4, record_frame=record_frame)
+    return None
 
 
 def generate_episode(
@@ -287,26 +388,17 @@ def generate_episode(
 
     # Grasp rim (pinch fingers to straddle rim wall)
     _interpolate_stage(
-        robot, task, sol, OPEN_GRIPPER, CLOSED_GRIPPER, steps=15, settle_steps=3, record_frame=record_frame
+        robot, task, sol, OPEN_GRIPPER, CLOSED_GRIPPER, steps=10, settle_steps=2, record_frame=record_frame
     )
     if task.held_bowl is None:
         return False, "ik_p1_grasp_missed", task_prompt
 
-    # Lift bowl vertically
-    sol = solve_ik_jaw(robot.backend, rim_m + [0, 0, 0.12], u_m, seed=seed)
-    if not sol:
-        return False, "ik_p1_lift", task_prompt
-    _interpolate_stage(
-        robot, task, sol, CLOSED_GRIPPER, CLOSED_GRIPPER, steps=20, settle_steps=2, record_frame=record_frame
+    # Lift bowl vertically, then carry it above the bottom bowl in the same motion
+    failed = _lift_and_carry(
+        robot, task, rim_m, u_m, pos_b + [0, 0, 0.12], u_b, seed=seed, record_frame=record_frame
     )
-
-    # Carry above bottom bowl
-    sol = solve_ik_held_bowl(robot, task, pos_b + [0, 0, 0.12], u_b, seed=seed)
-    if not sol:
-        return False, "ik_p1_carry", task_prompt
-    _interpolate_stage(
-        robot, task, sol, CLOSED_GRIPPER, CLOSED_GRIPPER, steps=25, settle_steps=2, record_frame=record_frame
-    )
+    if failed:
+        return False, f"ik_p1_{failed}", task_prompt
 
     # Lower into bottom bowl
     sol = solve_ik_held_bowl(robot, task, pos_b + [0, 0, 0.035], u_b, seed=seed)
@@ -365,26 +457,17 @@ def generate_episode(
 
     # Grasp rim
     _interpolate_stage(
-        robot, task, sol, OPEN_GRIPPER, CLOSED_GRIPPER, steps=15, settle_steps=3, record_frame=record_frame
+        robot, task, sol, OPEN_GRIPPER, CLOSED_GRIPPER, steps=10, settle_steps=2, record_frame=record_frame
     )
     if task.held_bowl is None:
         return False, "ik_p2_grasp_missed", task_prompt
 
-    # Lift top bowl
-    sol = solve_ik_jaw(robot.backend, rim_t + [0, 0, 0.12], u_t, seed=seed)
-    if not sol:
-        return False, "ik_p2_lift", task_prompt
-    _interpolate_stage(
-        robot, task, sol, CLOSED_GRIPPER, CLOSED_GRIPPER, steps=20, settle_steps=2, record_frame=record_frame
+    # Lift top bowl, then carry it above the middle bowl in the same motion
+    failed = _lift_and_carry(
+        robot, task, rim_t, u_t, pos_m_now + [0, 0, 0.12], u_m_now, seed=seed, record_frame=record_frame
     )
-
-    # Carry above middle bowl
-    sol = solve_ik_held_bowl(robot, task, pos_m_now + [0, 0, 0.12], u_m_now, seed=seed)
-    if not sol:
-        return False, "ik_p2_carry", task_prompt
-    _interpolate_stage(
-        robot, task, sol, CLOSED_GRIPPER, CLOSED_GRIPPER, steps=25, settle_steps=2, record_frame=record_frame
-    )
+    if failed:
+        return False, f"ik_p2_{failed}", task_prompt
 
     # Re-measure middle bowl position for sub-millimeter concentric placement
     pos_m_now = task.bowl_position(middle)
@@ -466,15 +549,22 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--model", type=Path, default=Path("sim/description/mjcf/bowl_stack_scene.xml"))
     parser.add_argument(
         "--grasp-mode",
-        choices=("contact_assisted", "proximity_assisted"),
-        default="contact_assisted",
-        help="Both modes assist transport; contact_assisted requires both jaws touching the bowl.",
+        choices=("contact_assisted", "proximity_assisted", "physical"),
+        default="physical",
+        help="physical holds bowls by jaw friction alone; the assisted modes carry a grasped bowl rigidly.",
+    )
+    parser.add_argument(
+        "--assist-release-pos",
+        type=float,
+        default=GRIPPER_ASSIST_RELEASE_POS,
+        help="Raw gripper command below which the grasp assist drops a held bowl.",
     )
     parser.add_argument(
         "--position-jitter-m",
         type=float,
-        default=0.005,
-        help="Per-axis bowl position variation around nominal slots, in meters (0 to 0.05).",
+        default=0.04,
+        help="Per-axis bowl position variation around nominal slots, in meters (0 to 0.05). The default "
+        "matches NexArmStackBowls-v0, so policies are evaluated on the layouts they were trained on.",
     )
     parser.add_argument(
         "--order",
@@ -485,6 +575,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     args = parser.parse_args(argv)
     if not np.isfinite(args.position_jitter_m) or not 0 <= args.position_jitter_m <= 0.05:
         parser.error("--position-jitter-m must be between 0 and 0.05")
+    if not GRIPPER_OPEN_POS <= args.assist_release_pos < GRIPPER_ASSIST_ENGAGE_POS:
+        parser.error(f"--assist-release-pos must be within [{GRIPPER_OPEN_POS}, {GRIPPER_ASSIST_ENGAGE_POS})")
     camera_names = [name.strip() for name in args.cameras.split(",")]
     if any(not name for name in camera_names) or len(set(camera_names)) != len(camera_names):
         parser.error("--cameras must contain distinct nonempty names")
@@ -526,6 +618,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             action_delay_steps=args.action_delay_steps,
             enable_domain_randomization=args.domain_randomization,
             calibration_path=args.calibration,
+            joint_mapping_path=args.joint_mapping,
         )
     )
     previous_report = utils.read_report(args.root) if args.resume else None
@@ -552,6 +645,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             robot.backend,
             grasp_mode=args.grasp_mode,
             position_jitter_m=args.position_jitter_m,
+            assist_release_pos=args.assist_release_pos,
         )
         while accepted < args.episodes and attempts < args.max_attempts:
             seed = args.seed_start + attempts
@@ -589,6 +683,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                     "order": task.current_order,
                     "prompt": current_prompt,
                     "grasp_mode": args.grasp_mode,
+                    "assist_engage_pos": task.assist_engage_pos,
+                    "assist_release_pos": task.assist_release_pos,
                     "dr_params": robot.backend.last_domain_params,
                 },
             )
@@ -624,6 +720,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         {
             "cameras": list(args.camera_names),
             "grasp_mode": args.grasp_mode,
+            "assist_engage_pos": GRIPPER_ASSIST_ENGAGE_POS,
+            "assist_release_pos": args.assist_release_pos,
             "position_jitter_m": args.position_jitter_m,
             "order": order,
         }

@@ -197,3 +197,14 @@ def test_saved_calibration_records_the_joint_mapping(tmp_path: Path) -> None:
     path = tmp_path / "calibration.json"
     SimCalibration().save(path)
     assert json.loads(path.read_text(encoding="utf-8"))["joint_mapping"] == JOINT_MAPPING_VERSION
+
+
+def test_calibration_fitted_with_a_probe_mapping_needs_that_mapping(tmp_path: Path) -> None:
+    probe_version = f"{JOINT_MAPPING_VERSION}+probe-0123456789ab"
+    path = tmp_path / "calibration.json"
+    calibration = SimCalibration()
+    calibration.joint_mapping = probe_version
+    calibration.save(path)
+    assert SimCalibration.load(path, joint_mapping_version=probe_version).joint_mapping == probe_version
+    with pytest.raises(ValueError, match="joint mapping"):
+        SimCalibration.load(path)

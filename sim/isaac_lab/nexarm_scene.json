@@ -113,8 +113,8 @@
           0.0,
           0.0255
         ],
-        "stiffness": 300.0,
-        "damping": 10.01,
+        "stiffness": 3000.0,
+        "damping": 30.01,
         "effort": 50.0,
         "armature": 0.0,
         "frictionloss": 0.0
@@ -125,8 +125,8 @@
           0.0,
           0.0255
         ],
-        "stiffness": 300.0,
-        "damping": 10.01,
+        "stiffness": 3000.0,
+        "damping": 30.01,
         "effort": 50.0,
         "armature": 0.0,
         "frictionloss": 0.0
@@ -1265,7 +1265,7 @@
       "pos": [
         -0.032,
         -0.868756,
-        0.816789
+        0.716789
       ],
       "quat": [
         0.924614,
@@ -1291,7 +1291,7 @@
         0.0,
         -0.707107
       ],
-      "fovy_deg": 55.0,
+      "fovy_deg": 43.65,
       "width": 640,
       "height": 480
     },

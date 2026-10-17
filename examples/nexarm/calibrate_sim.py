@@ -27,6 +27,7 @@ from pathlib import Path
 
 import numpy as np
 
+from lerobot.motors.nexarm.mujoco_mapping import IDENTITY_MAPPING, JointMapping, load_joint_mapping
 from lerobot.motors.nexarm.nexarm import JOINT_NAMES
 from lerobot.robots.nexarm_sim import SimCalibration
 from lerobot.robots.nexarm_sim.calibration import MIN_SPREAD
@@ -49,13 +50,14 @@ class Episode:
 class Simulator:
     """MuJoCo backend that can be re-parameterized and replayed cheaply."""
 
-    def __init__(self, model_path: Path, fps: int) -> None:
+    def __init__(self, model_path: Path, fps: int, joint_mapping: JointMapping = IDENTITY_MAPPING) -> None:
         self.backend = NexArmMujocoBackend(
             model_path=model_path,
             fps=fps,
             camera_width=64,
             camera_height=48,
             camera_names=(),
+            joint_mapping=joint_mapping,
         )
         model = self.backend.model
         self._base = (
@@ -241,6 +243,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--repo-id", required=True, help="Real LeRobot dataset recorded on the NexArm")
     parser.add_argument("--root", type=Path, default=None)
     parser.add_argument("--model", type=Path, default=Path("sim/description/mjcf/scene.xml"))
+    parser.add_argument(
+        "--joint-mapping",
+        type=Path,
+        default=None,
+        help="Real-to-sim joint mapping JSON from probe_joint_mapping.py; the identity mapping without it",
+    )
     parser.add_argument("--fps", type=int, default=None, help="Defaults to the dataset fps")
     parser.add_argument("--episodes", type=int, default=20)
     parser.add_argument(
@@ -287,7 +295,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         from lerobot.datasets.lerobot_dataset import LeRobotDataset
 
         fps = int(LeRobotDataset(args.repo_id, root=args.root).fps)
-    sim = Simulator(resolve_model_path(args.model), fps)
+    sim = Simulator(resolve_model_path(args.model), fps, load_joint_mapping(args.joint_mapping))
     print(f"Fitting on {len(fit_episodes)} episode(s), holdout {len(holdout)}, fps {fps}")
 
     before = SimCalibration()
@@ -313,6 +321,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     # Loaders refuse a calibration fitted at another fps and only re-centre DR on the fitted joints.
     calibration.fps = fps
     calibration.fitted_joints = list(args.joints)
+    calibration.joint_mapping = sim.backend.joint_mapping.version
     calibration.save(args.out)
 
     print(f"\naction_delay_steps = {calibration.action_delay_steps}")

@@ -351,6 +351,8 @@ def _bowls(model: mujoco.MjModel) -> dict:
                 "quat": _mat_to_quat(frame[:3, :3]),
             }
             continue
+        if model.geom_conaffinity[geom] == 0:
+            continue  # MuJoCo-only rim plates that only the gripper jaws touch; Isaac grips the capsule proxy
         size = model.geom_size[geom]
         if kind == mujoco.mjtGeom.mjGEOM_CAPSULE:
             shape = {"type": "capsule", "radius": float(size[0]), "half_length": float(size[1])}

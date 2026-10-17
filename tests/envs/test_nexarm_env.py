@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import functools
+
 import gymnasium as gym
 import numpy as np
 import pytest
@@ -282,8 +284,8 @@ def test_nexarm_stack_bowls_env_rewards_a_released_stack():
         if terminated:
             break
     assert terminated and info["success"] and info["reason"] == "success"
-    assert rewards[0] >= 4.0  # both nesting stages
-    assert rewards[-1] >= 9.0  # plus the success bonus
+    assert rewards[0] >= 9.0  # placing both bowls raises the potential from near 0 to 10
+    assert rewards[-1] >= 10.0  # the success bonus
     env.close()
 
 
@@ -391,3 +393,226 @@ def test_nexarm_env_config_takes_the_task_episode_length():
     env = gym.make("NexArmStackBowls-v0", **NexArmEnv(obs_type="state").gym_kwargs)
     assert env.unwrapped.max_episode_steps == 900
     env.close()
+
+
+class _ScriptedEnvRobot:
+    """Lets the stack-bowls dataset generator's scripted expert drive the gym env, one env step per action.
+
+    While a bowl is held, the gripper never opens below ``min_open_while_held``: a real operator's partial
+    opening. With ``freeze_at_top_release`` the expert's final release is replaced by holding the nested top
+    bowl until the episode times out. Actions sent after the episode ends are ignored.
+    """
+
+    def __init__(self, env, *, min_open_while_held: float, freeze_at_top_release: bool = False):
+        from types import SimpleNamespace
+
+        self.env = env
+        self.backend = env.backend
+        self.config = SimpleNamespace(fps=env.fps)
+        self.min_open_while_held = min_open_while_held
+        self.freeze_at_top_release = freeze_at_top_release
+        self.frozen: np.ndarray | None = None
+        self._last_raw_gripper: float | None = None
+        self.rewards: list[float] = []
+        self.infos: list[dict] = []
+        self.done = False
+
+    def get_observation(self) -> dict:
+        return {}
+
+    def send_action(self, action: dict[str, float]) -> dict[str, float]:
+        from lerobot.motors.nexarm.nexarm import JOINT_NAMES
+
+        task = self.env.task
+        command = np.array([action[f"{name}.pos"] for name in JOINT_NAMES], dtype=np.float32)
+        raw_gripper, previous = float(command[-1]), self._last_raw_gripper
+        self._last_raw_gripper = raw_gripper
+        if task.held_bowl is not None:
+            command[-1] = max(command[-1], self.min_open_while_held)
+        _, middle, top = task.current_order
+        if (
+            self.freeze_at_top_release
+            and self.frozen is None
+            and task.held_bowl == top
+            and task.is_nested(middle, top)
+            and previous is not None
+            and raw_gripper < previous
+        ):
+            self.frozen = self._last_command
+        if self.frozen is not None:
+            command = self.frozen
+        self._last_command = command
+        if not self.done:
+            _, reward, terminated, truncated, info = self.env.step(command)
+            self.rewards.append(reward)
+            self.infos.append(info)
+            self.done = terminated or truncated
+        return dict(action)
+
+
+# A seed whose layout the scripted expert stacks; these tests check rewards and stages, not the expert.
+_SOLVED_SEED = 1
+
+
+@functools.cache
+def _scripted_stack_bowls(seed: int, **kwargs) -> _ScriptedEnvRobot:
+    from examples.nexarm.generate_stack_bowls_dataset import generate_episode
+    from lerobot.motors.nexarm.nexarm import JOINT_NAMES
+
+    env_kwargs = {key: kwargs.pop(key) for key in ("assist_release_pos", "grasp_mode") if key in kwargs}
+    env = gym.make("NexArmStackBowls-v0", obs_type="state", **env_kwargs).unwrapped
+    env.reset(seed=seed)
+    robot = _ScriptedEnvRobot(env, **kwargs)
+    try:
+        generate_episode(robot, env.task, seed=seed)
+        if robot.frozen is not None:
+            hold = dict(zip((f"{name}.pos" for name in JOINT_NAMES), robot.frozen.tolist(), strict=True))
+            while not robot.done:
+                robot.send_action(hold)
+    finally:
+        env.close()
+    return robot
+
+
+def test_nexarm_stack_bowls_dense_reward_pays_release_and_success_over_holding():
+    """Holding the nested top bowl until timeout must earn less than letting go, and opening never costs."""
+    released = _scripted_stack_bowls(_SOLVED_SEED, min_open_while_held=1990)
+    assert released.infos[-1]["is_success"]
+    held = [info["held_bowl"] for info in released.infos]
+    release_steps = [i for i in range(1, len(held)) if held[i - 1] and not held[i]]
+    assert len(release_steps) == 2
+    for step in release_steps:
+        # Placing a bowl raises the potential by 1, so letting go pays more than the step before it.
+        assert released.rewards[step] > 0.5
+        assert released.rewards[step] >= released.rewards[step - 1]
+
+    holding = _scripted_stack_bowls(_SOLVED_SEED, min_open_while_held=1990, freeze_at_top_release=True)
+    assert holding.frozen is not None and not holding.infos[-1]["is_success"]
+    assert holding.infos[-1]["held_bowl"]  # still holding the nested top bowl at timeout
+    assert sum(holding.rewards) < sum(released.rewards) - 5.0
+
+
+def test_nexarm_stack_bowls_env_releases_at_real_partial_openings():
+    """Real operators open only to about 1990; the env's default threshold drops the bowl there."""
+    released = _scripted_stack_bowls(_SOLVED_SEED, min_open_while_held=1990)
+    assert released.env.task.grasp_mode == "physical"
+    assert released.env.task.assist_release_pos == 2300
+    assert released.infos[-1]["is_success"]
+
+    assisted = _scripted_stack_bowls(_SOLVED_SEED, min_open_while_held=1990, grasp_mode="contact_assisted")
+    assert assisted.infos[-1]["is_success"]
+    # The rigid assist only lets go below its threshold, so 1600 never drops the bowl at real openings.
+    never_released = _scripted_stack_bowls(
+        _SOLVED_SEED, min_open_while_held=1990, grasp_mode="contact_assisted", assist_release_pos=1600
+    )
+    assert not never_released.infos[-1]["is_success"]
+    assert never_released.infos[-1]["failed_stage"] == "released_middle"
+
+
+def test_nexarm_stack_bowls_physical_grasp_holds_by_friction_alone(monkeypatch):
+    """With no assist the bowl is a free body: it rises with the closed jaws and is never teleported."""
+    import mujoco
+
+    from examples.nexarm.generate_stack_bowls_dataset import generate_episode
+
+    teleports = []  # the assist sets a carried bowl's orientation with mju_mat2Quat
+    original = mujoco.mju_mat2Quat
+    monkeypatch.setattr(mujoco, "mju_mat2Quat", lambda *args: teleports.append(args) or original(*args))
+    env = gym.make("NexArmStackBowls-v0", obs_type="state").unwrapped
+    try:
+        env.reset(seed=_SOLVED_SEED)
+        assert env.task.grasp_mode == "physical"
+        robot = _ScriptedEnvRobot(env, min_open_while_held=0.0)
+        generate_episode(robot, env.task, seed=_SOLVED_SEED)
+    finally:
+        env.close()
+    assert not teleports
+    assert robot.infos[-1]["is_success"]
+    assert robot.infos[-1]["stage/picked_middle"] and robot.infos[-1]["stage/picked_top"]
+
+
+def test_nexarm_stack_bowls_info_reports_stages():
+    from lerobot.robots.nexarm_sim.stack_bowls_task import STAGES
+
+    released = _scripted_stack_bowls(_SOLVED_SEED, min_open_while_held=1990)
+    first, last = released.infos[0], released.infos[-1]
+    assert not any(first[f"stage/{stage}"] for stage in STAGES)
+    assert first["failed_stage"] == "picked_middle"
+    assert all(last[f"stage/{stage}"] for stage in STAGES) and last["failed_stage"] == ""
+
+    holding = _scripted_stack_bowls(_SOLVED_SEED, min_open_while_held=1990, freeze_at_top_release=True)
+    assert holding.infos[-1]["stage/nested_top"] and holding.infos[-1]["failed_stage"] == "released_top"
+
+
+def test_nexarm_env_config_forwards_assist_thresholds_to_stack_bowls_only():
+    cfg = NexArmEnv(task="NexArmStackBowls-v0", obs_type="state", assist_release_pos=2000)
+    assert cfg.gym_kwargs["assist_release_pos"] == 2000
+    assert "assist_engage_pos" not in cfg.gym_kwargs
+    env = gym.make("NexArmStackBowls-v0", **cfg.gym_kwargs)
+    assert env.unwrapped.task.assist_release_pos == 2000
+    env.close()
+    assert "assist_release_pos" not in NexArmEnv().gym_kwargs
+    with pytest.raises(ValueError, match="NexArmStackBowls"):
+        NexArmEnv(assist_release_pos=2000)
+    cfg = NexArmEnv(task="NexArmStackBowls-v0", obs_type="state", grasp_mode="contact_assisted")
+    env = gym.make("NexArmStackBowls-v0", **cfg.gym_kwargs)
+    assert env.unwrapped.task.grasp_mode == "contact_assisted"
+    env.close()
+    with pytest.raises(ValueError, match="NexArmStackBowls"):
+        NexArmEnv(grasp_mode="physical")
+
+
+def test_lerobot_eval_reports_stack_bowls_success_and_stage_rates():
+    import mujoco
+    from torch import nn
+
+    from lerobot.configs.policies import PreTrainedConfig
+    from lerobot.policies import PreTrainedPolicy
+    from lerobot.scripts.lerobot_eval import eval_policy_all
+
+    cfg = NexArmEnv(task="NexArmStackBowls-v0", obs_type="state", episode_length=30)
+    envs = make_env(cfg, n_envs=1)
+    env = envs["nexarm"][0].envs[0].unwrapped
+
+    class StackThenHold(PreTrainedPolicy):
+        """Puts the bowls in a released stack without picking them, then holds the arm still."""
+
+        config_class = PreTrainedConfig
+        name = "stack_then_hold"
+
+        def __init__(self):
+            nn.Module.__init__(self)  # no config: this stub has no weights
+
+        def reset(self):
+            self.stacked = False
+
+        forward = get_optim_params = predict_action_chunk = None
+
+        def select_action(self, observation):
+            backend, task = env.backend, env.task
+            for i, color in enumerate(task.current_order if not self.stacked else ()):
+                qadr = backend.model.jnt_qposadr[task._joint_ids[color]]
+                backend.data.qpos[qadr : qadr + 7] = [0, -0.2, 0.02 + 0.03 * i, 1, 0, 0, 0]
+            mujoco.mj_forward(backend.model, backend.data)
+            self.stacked = True
+            return observation["observation.state"].clone()
+
+    def identity(x):
+        return x
+
+    info = eval_policy_all(
+        envs=envs,
+        policy=StackThenHold(),
+        env_preprocessor=identity,
+        env_postprocessor=identity,
+        preprocessor=identity,
+        postprocessor=identity,
+        n_episodes=1,
+        start_seed=0,
+    )
+    overall = info["overall"]
+    assert overall["pc_success"] == 100.0  # needs info["is_success"], which eval reads
+    assert overall["pc_picked_middle"] == 0.0 and overall["pc_picked_top"] == 0.0
+    assert overall["pc_nested_middle"] == 100.0 and overall["pc_released_top"] == 100.0
+    stages = info["per_task"][0]["metrics"]["stages"]
+    assert stages == [{**dict.fromkeys(stages[0], True), "picked_middle": False, "picked_top": False}]

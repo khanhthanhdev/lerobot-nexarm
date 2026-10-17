@@ -25,8 +25,10 @@ import numpy.typing as npt
 
 from lerobot.motors.nexarm.mujoco_mapping import (
     HOME_POSITIONS,
+    IDENTITY_MAPPING,
     MUJOCO_JOINTS,
     RAW_RANGES,
+    JointMapping,
     joint_position_to_raw,
     raw_to_joint_position,
 )
@@ -98,8 +100,11 @@ class NexArmMujocoBackend:
         action_delay_steps: int = 0,
         enable_domain_randomization: bool = False,
         init_qpos_noise_rad: float = 0.0,
+        joint_mapping: JointMapping = IDENTITY_MAPPING,
     ) -> None:
         self.model_path = resolve_model_path(model_path)
+        # Real-to-sim sign and zero offset per arm joint (examples/nexarm/probe_joint_mapping.py).
+        self.joint_mapping = joint_mapping
         self.model = mujoco.MjModel.from_xml_path(str(self.model_path))
         self.data = mujoco.MjData(self.model)
         self.fps = fps
@@ -171,11 +176,11 @@ class NexArmMujocoBackend:
 
     def raw_to_control(self, feature_name: str, raw_position: float) -> float:
         joint_range = self.model.jnt_range[self._joint_ids[feature_name]]
-        return raw_to_joint_position(feature_name, raw_position, joint_range)
+        return raw_to_joint_position(feature_name, raw_position, joint_range, self.joint_mapping)
 
     def control_to_raw(self, feature_name: str, control_position: float) -> float:
         joint_range = self.model.jnt_range[self._joint_ids[feature_name]]
-        return joint_position_to_raw(feature_name, control_position, joint_range)
+        return joint_position_to_raw(feature_name, control_position, joint_range, self.joint_mapping)
 
     def clamp_action(self, action: Mapping[str, float]) -> dict[str, float]:
         """Validate a raw action and clip every joint to the command range the follower accepts."""

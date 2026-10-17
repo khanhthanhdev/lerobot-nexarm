@@ -19,7 +19,7 @@
     <default class="collision">
       <geom contype="1" conaffinity="3" group="3" rgba="0 0 0 0" friction="1.1 0.01 0.001" />
       <default class="finger_collision">
-        <geom type="box" contype="1" conaffinity="3" group="3" friction="1.5 0.005 0.0001" condim="4" solimp="0.9 0.95 0.001" solref="0.01 1" />
+        <geom type="box" contype="8" conaffinity="11" group="3" friction="1.5 0.005 0.0001" condim="4" solimp="0.9 0.95 0.001" solref="0.01 1" />
       </default>
     </default>
     <default class="site">
@@ -148,7 +148,7 @@
     <position name="joint_3_link_2_to_link_3_control" class="nexarm" joint="joint_3_link_2_to_link_3" kp="40" kv="2.0" forcerange="-2.94 2.94" ctrllimited="true" ctrlrange="-2.35619449019 2.35619449019" />
     <position name="joint_4_link_3_to_link_4_control" class="nexarm" joint="joint_4_link_3_to_link_4" kp="35" kv="1.5" forcerange="-2.94 2.94" ctrllimited="true" ctrlrange="-1.74532925199 1.74532925199" />
     <position name="joint_5_link_4_to_link_5_control" class="nexarm" joint="joint_5_link_4_to_link_5" kp="20" kv="0.8" forcerange="-1.18 1.18" ctrllimited="true" ctrlrange="-3.14159265359 3.14159265359" />
-    <position name="gripper_control" class="gripper_actuator" joint="right_jaw_slide_joint" kp="300" kv="10.0" forcerange="-50.0 50.0" ctrllimited="true" ctrlrange="0 0.0255" />
+    <position name="gripper_control" class="gripper_actuator" joint="right_jaw_slide_joint" kp="3000" kv="30.0" forcerange="-50.0 50.0" ctrllimited="true" ctrlrange="0 0.0255" />
   </actuator>
 
   <sensor>
