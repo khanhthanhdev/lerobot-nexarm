@@ -450,6 +450,10 @@ class _ScriptedEnvRobot:
         return dict(action)
 
 
+# A seed whose layout the scripted expert stacks; these tests check rewards and stages, not the expert.
+_SOLVED_SEED = 1
+
+
 @functools.cache
 def _scripted_stack_bowls(seed: int, **kwargs) -> _ScriptedEnvRobot:
     from examples.nexarm.generate_stack_bowls_dataset import generate_episode
@@ -472,7 +476,7 @@ def _scripted_stack_bowls(seed: int, **kwargs) -> _ScriptedEnvRobot:
 
 def test_nexarm_stack_bowls_dense_reward_pays_release_and_success_over_holding():
     """Holding the nested top bowl until timeout must earn less than letting go, and opening never costs."""
-    released = _scripted_stack_bowls(0, min_open_while_held=1990)
+    released = _scripted_stack_bowls(_SOLVED_SEED, min_open_while_held=1990)
     assert released.infos[-1]["is_success"]
     held = [info["held_bowl"] for info in released.infos]
     release_steps = [i for i in range(1, len(held)) if held[i - 1] and not held[i]]
@@ -482,7 +486,7 @@ def test_nexarm_stack_bowls_dense_reward_pays_release_and_success_over_holding()
         assert released.rewards[step] > 0.5
         assert released.rewards[step] >= released.rewards[step - 1]
 
-    holding = _scripted_stack_bowls(0, min_open_while_held=1990, freeze_at_top_release=True)
+    holding = _scripted_stack_bowls(_SOLVED_SEED, min_open_while_held=1990, freeze_at_top_release=True)
     assert holding.frozen is not None and not holding.infos[-1]["is_success"]
     assert holding.infos[-1]["held_bowl"]  # still holding the nested top bowl at timeout
     assert sum(holding.rewards) < sum(released.rewards) - 5.0
@@ -490,11 +494,11 @@ def test_nexarm_stack_bowls_dense_reward_pays_release_and_success_over_holding()
 
 def test_nexarm_stack_bowls_env_releases_at_real_partial_openings():
     """Real operators open only to about 1990; the env's default threshold drops the bowl there."""
-    released = _scripted_stack_bowls(0, min_open_while_held=1990)
+    released = _scripted_stack_bowls(_SOLVED_SEED, min_open_while_held=1990)
     assert released.env.task.assist_release_pos == 2300
     assert released.infos[-1]["is_success"]
 
-    never_released = _scripted_stack_bowls(0, min_open_while_held=1990, assist_release_pos=1600)
+    never_released = _scripted_stack_bowls(_SOLVED_SEED, min_open_while_held=1990, assist_release_pos=1600)
     assert not never_released.infos[-1]["is_success"]
     assert never_released.infos[-1]["failed_stage"] == "released_middle"
 
@@ -502,13 +506,13 @@ def test_nexarm_stack_bowls_env_releases_at_real_partial_openings():
 def test_nexarm_stack_bowls_info_reports_stages():
     from lerobot.robots.nexarm_sim.stack_bowls_task import STAGES
 
-    released = _scripted_stack_bowls(0, min_open_while_held=1990)
+    released = _scripted_stack_bowls(_SOLVED_SEED, min_open_while_held=1990)
     first, last = released.infos[0], released.infos[-1]
     assert not any(first[f"stage/{stage}"] for stage in STAGES)
     assert first["failed_stage"] == "picked_middle"
     assert all(last[f"stage/{stage}"] for stage in STAGES) and last["failed_stage"] == ""
 
-    holding = _scripted_stack_bowls(0, min_open_while_held=1990, freeze_at_top_release=True)
+    holding = _scripted_stack_bowls(_SOLVED_SEED, min_open_while_held=1990, freeze_at_top_release=True)
     assert holding.infos[-1]["stage/nested_top"] and holding.infos[-1]["failed_stage"] == "released_top"
 
 

@@ -10,8 +10,15 @@
   </visual>
 
   <default>
+    <!-- Bowls nest and rest on a capsule cone (contype 4) that the gripper jaws (contype 8) pass through. The jaws
+         grip bowl_rim instead: 2 mm plates on the real vertical rim (mid-wall radius 61.5 mm, 0.5 to 18.5 mm above
+         the bowl origin, measured from bowl.stl), massless, colliding only with the jaws, with stiff contacts so the
+         squeezed thin wall does not let the jaws sink in. -->
     <default class="bowl_col">
-      <geom mass="0.001818" friction="1.2 0.01 0.001" contype="2" conaffinity="3" group="3" />
+      <geom mass="0.001818" friction="1.2 0.01 0.001" contype="4" conaffinity="7" group="3" />
+    </default>
+    <default class="bowl_rim">
+      <geom mass="0" friction="1.2 0.01 0.001" solref="0.004 1" solimp="0.95 0.99 0.001" contype="8" conaffinity="0" group="3" />
     </default>
   </default>
 
@@ -32,8 +39,8 @@
   <worldbody>
     <light pos="0 0 3" dir="0 0 -1" directional="true" />
     <geom name="floor" type="plane" size="1 1 0.05" rgba="0.8 0.8 0.8 1" friction="1 0.005 0.0001" contype="2" conaffinity="2" />
-    <camera name="front" mode="fixed" pos="-0.032 -0.868756 0.816789" xyaxes="1 0 0 0 0.709822 0.704381" fovy="37.6" />
-    <camera name="top" mode="fixed" pos="-0.0458 -0.349378 0.76965" xyaxes="0 -1 0 1 0 0" fovy="55" />
+    <camera name="front" mode="fixed" pos="-0.032 -0.868756 0.716789" xyaxes="1 0 0 0 0.709822 0.704381" fovy="37.6" />
+    <camera name="top" mode="fixed" pos="-0.0458 -0.349378 0.76965" xyaxes="0 -1 0 1 0 0" fovy="43.65" />
 
     <!-- bowl_red -->
     <body name="bowl_red" pos="-0.1100 -0.2700 0.0200">
@@ -72,6 +79,38 @@
       <geom name="bowl_red_wall_29" type="capsule" fromto="0.03991 -0.02667 -0.01400 0.05072 -0.03389 0.01600" size="0.00550" class="bowl_col" />
       <geom name="bowl_red_wall_30" type="capsule" fromto="0.04435 -0.01837 -0.01400 0.05636 -0.02334 0.01600" size="0.00550" class="bowl_col" />
       <geom name="bowl_red_wall_31" type="capsule" fromto="0.04708 -0.00936 -0.01400 0.05983 -0.01190 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_red_rim_0" type="box" size="0.00100 0.00706 0.00900" pos="0.06150 0.00000 0.00950" xyaxes="1.00000 0.00000 0.00000 -0.00000 1.00000 0.00000" class="bowl_rim" />
+      <geom name="bowl_red_rim_1" type="box" size="0.00100 0.00706 0.00900" pos="0.06032 0.01200 0.00950" xyaxes="0.98079 0.19509 0.00000 -0.19509 0.98079 0.00000" class="bowl_rim" />
+      <geom name="bowl_red_rim_2" type="box" size="0.00100 0.00706 0.00900" pos="0.05682 0.02354 0.00950" xyaxes="0.92388 0.38268 0.00000 -0.38268 0.92388 0.00000" class="bowl_rim" />
+      <geom name="bowl_red_rim_3" type="box" size="0.00100 0.00706 0.00900" pos="0.05114 0.03417 0.00950" xyaxes="0.83147 0.55557 0.00000 -0.55557 0.83147 0.00000" class="bowl_rim" />
+      <geom name="bowl_red_rim_4" type="box" size="0.00100 0.00706 0.00900" pos="0.04349 0.04349 0.00950" xyaxes="0.70711 0.70711 0.00000 -0.70711 0.70711 0.00000" class="bowl_rim" />
+      <geom name="bowl_red_rim_5" type="box" size="0.00100 0.00706 0.00900" pos="0.03417 0.05114 0.00950" xyaxes="0.55557 0.83147 0.00000 -0.83147 0.55557 0.00000" class="bowl_rim" />
+      <geom name="bowl_red_rim_6" type="box" size="0.00100 0.00706 0.00900" pos="0.02354 0.05682 0.00950" xyaxes="0.38268 0.92388 0.00000 -0.92388 0.38268 0.00000" class="bowl_rim" />
+      <geom name="bowl_red_rim_7" type="box" size="0.00100 0.00706 0.00900" pos="0.01200 0.06032 0.00950" xyaxes="0.19509 0.98079 0.00000 -0.98079 0.19509 0.00000" class="bowl_rim" />
+      <geom name="bowl_red_rim_8" type="box" size="0.00100 0.00706 0.00900" pos="0.00000 0.06150 0.00950" xyaxes="0.00000 1.00000 0.00000 -1.00000 0.00000 0.00000" class="bowl_rim" />
+      <geom name="bowl_red_rim_9" type="box" size="0.00100 0.00706 0.00900" pos="-0.01200 0.06032 0.00950" xyaxes="-0.19509 0.98079 0.00000 -0.98079 -0.19509 0.00000" class="bowl_rim" />
+      <geom name="bowl_red_rim_10" type="box" size="0.00100 0.00706 0.00900" pos="-0.02354 0.05682 0.00950" xyaxes="-0.38268 0.92388 0.00000 -0.92388 -0.38268 0.00000" class="bowl_rim" />
+      <geom name="bowl_red_rim_11" type="box" size="0.00100 0.00706 0.00900" pos="-0.03417 0.05114 0.00950" xyaxes="-0.55557 0.83147 0.00000 -0.83147 -0.55557 0.00000" class="bowl_rim" />
+      <geom name="bowl_red_rim_12" type="box" size="0.00100 0.00706 0.00900" pos="-0.04349 0.04349 0.00950" xyaxes="-0.70711 0.70711 0.00000 -0.70711 -0.70711 0.00000" class="bowl_rim" />
+      <geom name="bowl_red_rim_13" type="box" size="0.00100 0.00706 0.00900" pos="-0.05114 0.03417 0.00950" xyaxes="-0.83147 0.55557 0.00000 -0.55557 -0.83147 0.00000" class="bowl_rim" />
+      <geom name="bowl_red_rim_14" type="box" size="0.00100 0.00706 0.00900" pos="-0.05682 0.02354 0.00950" xyaxes="-0.92388 0.38268 0.00000 -0.38268 -0.92388 0.00000" class="bowl_rim" />
+      <geom name="bowl_red_rim_15" type="box" size="0.00100 0.00706 0.00900" pos="-0.06032 0.01200 0.00950" xyaxes="-0.98079 0.19509 0.00000 -0.19509 -0.98079 0.00000" class="bowl_rim" />
+      <geom name="bowl_red_rim_16" type="box" size="0.00100 0.00706 0.00900" pos="-0.06150 0.00000 0.00950" xyaxes="-1.00000 0.00000 0.00000 -0.00000 -1.00000 0.00000" class="bowl_rim" />
+      <geom name="bowl_red_rim_17" type="box" size="0.00100 0.00706 0.00900" pos="-0.06032 -0.01200 0.00950" xyaxes="-0.98079 -0.19509 0.00000 0.19509 -0.98079 0.00000" class="bowl_rim" />
+      <geom name="bowl_red_rim_18" type="box" size="0.00100 0.00706 0.00900" pos="-0.05682 -0.02354 0.00950" xyaxes="-0.92388 -0.38268 0.00000 0.38268 -0.92388 0.00000" class="bowl_rim" />
+      <geom name="bowl_red_rim_19" type="box" size="0.00100 0.00706 0.00900" pos="-0.05114 -0.03417 0.00950" xyaxes="-0.83147 -0.55557 0.00000 0.55557 -0.83147 0.00000" class="bowl_rim" />
+      <geom name="bowl_red_rim_20" type="box" size="0.00100 0.00706 0.00900" pos="-0.04349 -0.04349 0.00950" xyaxes="-0.70711 -0.70711 0.00000 0.70711 -0.70711 0.00000" class="bowl_rim" />
+      <geom name="bowl_red_rim_21" type="box" size="0.00100 0.00706 0.00900" pos="-0.03417 -0.05114 0.00950" xyaxes="-0.55557 -0.83147 0.00000 0.83147 -0.55557 0.00000" class="bowl_rim" />
+      <geom name="bowl_red_rim_22" type="box" size="0.00100 0.00706 0.00900" pos="-0.02354 -0.05682 0.00950" xyaxes="-0.38268 -0.92388 0.00000 0.92388 -0.38268 0.00000" class="bowl_rim" />
+      <geom name="bowl_red_rim_23" type="box" size="0.00100 0.00706 0.00900" pos="-0.01200 -0.06032 0.00950" xyaxes="-0.19509 -0.98079 0.00000 0.98079 -0.19509 0.00000" class="bowl_rim" />
+      <geom name="bowl_red_rim_24" type="box" size="0.00100 0.00706 0.00900" pos="-0.00000 -0.06150 0.00950" xyaxes="-0.00000 -1.00000 0.00000 1.00000 -0.00000 0.00000" class="bowl_rim" />
+      <geom name="bowl_red_rim_25" type="box" size="0.00100 0.00706 0.00900" pos="0.01200 -0.06032 0.00950" xyaxes="0.19509 -0.98079 0.00000 0.98079 0.19509 0.00000" class="bowl_rim" />
+      <geom name="bowl_red_rim_26" type="box" size="0.00100 0.00706 0.00900" pos="0.02354 -0.05682 0.00950" xyaxes="0.38268 -0.92388 0.00000 0.92388 0.38268 0.00000" class="bowl_rim" />
+      <geom name="bowl_red_rim_27" type="box" size="0.00100 0.00706 0.00900" pos="0.03417 -0.05114 0.00950" xyaxes="0.55557 -0.83147 0.00000 0.83147 0.55557 0.00000" class="bowl_rim" />
+      <geom name="bowl_red_rim_28" type="box" size="0.00100 0.00706 0.00900" pos="0.04349 -0.04349 0.00950" xyaxes="0.70711 -0.70711 0.00000 0.70711 0.70711 0.00000" class="bowl_rim" />
+      <geom name="bowl_red_rim_29" type="box" size="0.00100 0.00706 0.00900" pos="0.05114 -0.03417 0.00950" xyaxes="0.83147 -0.55557 0.00000 0.55557 0.83147 0.00000" class="bowl_rim" />
+      <geom name="bowl_red_rim_30" type="box" size="0.00100 0.00706 0.00900" pos="0.05682 -0.02354 0.00950" xyaxes="0.92388 -0.38268 0.00000 0.38268 0.92388 0.00000" class="bowl_rim" />
+      <geom name="bowl_red_rim_31" type="box" size="0.00100 0.00706 0.00900" pos="0.06032 -0.01200 0.00950" xyaxes="0.98079 -0.19509 0.00000 0.19509 0.98079 0.00000" class="bowl_rim" />
     </body>
 
     <!-- bowl_blue -->
@@ -111,6 +150,38 @@
       <geom name="bowl_blue_wall_29" type="capsule" fromto="0.03991 -0.02667 -0.01400 0.05072 -0.03389 0.01600" size="0.00550" class="bowl_col" />
       <geom name="bowl_blue_wall_30" type="capsule" fromto="0.04435 -0.01837 -0.01400 0.05636 -0.02334 0.01600" size="0.00550" class="bowl_col" />
       <geom name="bowl_blue_wall_31" type="capsule" fromto="0.04708 -0.00936 -0.01400 0.05983 -0.01190 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_blue_rim_0" type="box" size="0.00100 0.00706 0.00900" pos="0.06150 0.00000 0.00950" xyaxes="1.00000 0.00000 0.00000 -0.00000 1.00000 0.00000" class="bowl_rim" />
+      <geom name="bowl_blue_rim_1" type="box" size="0.00100 0.00706 0.00900" pos="0.06032 0.01200 0.00950" xyaxes="0.98079 0.19509 0.00000 -0.19509 0.98079 0.00000" class="bowl_rim" />
+      <geom name="bowl_blue_rim_2" type="box" size="0.00100 0.00706 0.00900" pos="0.05682 0.02354 0.00950" xyaxes="0.92388 0.38268 0.00000 -0.38268 0.92388 0.00000" class="bowl_rim" />
+      <geom name="bowl_blue_rim_3" type="box" size="0.00100 0.00706 0.00900" pos="0.05114 0.03417 0.00950" xyaxes="0.83147 0.55557 0.00000 -0.55557 0.83147 0.00000" class="bowl_rim" />
+      <geom name="bowl_blue_rim_4" type="box" size="0.00100 0.00706 0.00900" pos="0.04349 0.04349 0.00950" xyaxes="0.70711 0.70711 0.00000 -0.70711 0.70711 0.00000" class="bowl_rim" />
+      <geom name="bowl_blue_rim_5" type="box" size="0.00100 0.00706 0.00900" pos="0.03417 0.05114 0.00950" xyaxes="0.55557 0.83147 0.00000 -0.83147 0.55557 0.00000" class="bowl_rim" />
+      <geom name="bowl_blue_rim_6" type="box" size="0.00100 0.00706 0.00900" pos="0.02354 0.05682 0.00950" xyaxes="0.38268 0.92388 0.00000 -0.92388 0.38268 0.00000" class="bowl_rim" />
+      <geom name="bowl_blue_rim_7" type="box" size="0.00100 0.00706 0.00900" pos="0.01200 0.06032 0.00950" xyaxes="0.19509 0.98079 0.00000 -0.98079 0.19509 0.00000" class="bowl_rim" />
+      <geom name="bowl_blue_rim_8" type="box" size="0.00100 0.00706 0.00900" pos="0.00000 0.06150 0.00950" xyaxes="0.00000 1.00000 0.00000 -1.00000 0.00000 0.00000" class="bowl_rim" />
+      <geom name="bowl_blue_rim_9" type="box" size="0.00100 0.00706 0.00900" pos="-0.01200 0.06032 0.00950" xyaxes="-0.19509 0.98079 0.00000 -0.98079 -0.19509 0.00000" class="bowl_rim" />
+      <geom name="bowl_blue_rim_10" type="box" size="0.00100 0.00706 0.00900" pos="-0.02354 0.05682 0.00950" xyaxes="-0.38268 0.92388 0.00000 -0.92388 -0.38268 0.00000" class="bowl_rim" />
+      <geom name="bowl_blue_rim_11" type="box" size="0.00100 0.00706 0.00900" pos="-0.03417 0.05114 0.00950" xyaxes="-0.55557 0.83147 0.00000 -0.83147 -0.55557 0.00000" class="bowl_rim" />
+      <geom name="bowl_blue_rim_12" type="box" size="0.00100 0.00706 0.00900" pos="-0.04349 0.04349 0.00950" xyaxes="-0.70711 0.70711 0.00000 -0.70711 -0.70711 0.00000" class="bowl_rim" />
+      <geom name="bowl_blue_rim_13" type="box" size="0.00100 0.00706 0.00900" pos="-0.05114 0.03417 0.00950" xyaxes="-0.83147 0.55557 0.00000 -0.55557 -0.83147 0.00000" class="bowl_rim" />
+      <geom name="bowl_blue_rim_14" type="box" size="0.00100 0.00706 0.00900" pos="-0.05682 0.02354 0.00950" xyaxes="-0.92388 0.38268 0.00000 -0.38268 -0.92388 0.00000" class="bowl_rim" />
+      <geom name="bowl_blue_rim_15" type="box" size="0.00100 0.00706 0.00900" pos="-0.06032 0.01200 0.00950" xyaxes="-0.98079 0.19509 0.00000 -0.19509 -0.98079 0.00000" class="bowl_rim" />
+      <geom name="bowl_blue_rim_16" type="box" size="0.00100 0.00706 0.00900" pos="-0.06150 0.00000 0.00950" xyaxes="-1.00000 0.00000 0.00000 -0.00000 -1.00000 0.00000" class="bowl_rim" />
+      <geom name="bowl_blue_rim_17" type="box" size="0.00100 0.00706 0.00900" pos="-0.06032 -0.01200 0.00950" xyaxes="-0.98079 -0.19509 0.00000 0.19509 -0.98079 0.00000" class="bowl_rim" />
+      <geom name="bowl_blue_rim_18" type="box" size="0.00100 0.00706 0.00900" pos="-0.05682 -0.02354 0.00950" xyaxes="-0.92388 -0.38268 0.00000 0.38268 -0.92388 0.00000" class="bowl_rim" />
+      <geom name="bowl_blue_rim_19" type="box" size="0.00100 0.00706 0.00900" pos="-0.05114 -0.03417 0.00950" xyaxes="-0.83147 -0.55557 0.00000 0.55557 -0.83147 0.00000" class="bowl_rim" />
+      <geom name="bowl_blue_rim_20" type="box" size="0.00100 0.00706 0.00900" pos="-0.04349 -0.04349 0.00950" xyaxes="-0.70711 -0.70711 0.00000 0.70711 -0.70711 0.00000" class="bowl_rim" />
+      <geom name="bowl_blue_rim_21" type="box" size="0.00100 0.00706 0.00900" pos="-0.03417 -0.05114 0.00950" xyaxes="-0.55557 -0.83147 0.00000 0.83147 -0.55557 0.00000" class="bowl_rim" />
+      <geom name="bowl_blue_rim_22" type="box" size="0.00100 0.00706 0.00900" pos="-0.02354 -0.05682 0.00950" xyaxes="-0.38268 -0.92388 0.00000 0.92388 -0.38268 0.00000" class="bowl_rim" />
+      <geom name="bowl_blue_rim_23" type="box" size="0.00100 0.00706 0.00900" pos="-0.01200 -0.06032 0.00950" xyaxes="-0.19509 -0.98079 0.00000 0.98079 -0.19509 0.00000" class="bowl_rim" />
+      <geom name="bowl_blue_rim_24" type="box" size="0.00100 0.00706 0.00900" pos="-0.00000 -0.06150 0.00950" xyaxes="-0.00000 -1.00000 0.00000 1.00000 -0.00000 0.00000" class="bowl_rim" />
+      <geom name="bowl_blue_rim_25" type="box" size="0.00100 0.00706 0.00900" pos="0.01200 -0.06032 0.00950" xyaxes="0.19509 -0.98079 0.00000 0.98079 0.19509 0.00000" class="bowl_rim" />
+      <geom name="bowl_blue_rim_26" type="box" size="0.00100 0.00706 0.00900" pos="0.02354 -0.05682 0.00950" xyaxes="0.38268 -0.92388 0.00000 0.92388 0.38268 0.00000" class="bowl_rim" />
+      <geom name="bowl_blue_rim_27" type="box" size="0.00100 0.00706 0.00900" pos="0.03417 -0.05114 0.00950" xyaxes="0.55557 -0.83147 0.00000 0.83147 0.55557 0.00000" class="bowl_rim" />
+      <geom name="bowl_blue_rim_28" type="box" size="0.00100 0.00706 0.00900" pos="0.04349 -0.04349 0.00950" xyaxes="0.70711 -0.70711 0.00000 0.70711 0.70711 0.00000" class="bowl_rim" />
+      <geom name="bowl_blue_rim_29" type="box" size="0.00100 0.00706 0.00900" pos="0.05114 -0.03417 0.00950" xyaxes="0.83147 -0.55557 0.00000 0.55557 0.83147 0.00000" class="bowl_rim" />
+      <geom name="bowl_blue_rim_30" type="box" size="0.00100 0.00706 0.00900" pos="0.05682 -0.02354 0.00950" xyaxes="0.92388 -0.38268 0.00000 0.38268 0.92388 0.00000" class="bowl_rim" />
+      <geom name="bowl_blue_rim_31" type="box" size="0.00100 0.00706 0.00900" pos="0.06032 -0.01200 0.00950" xyaxes="0.98079 -0.19509 0.00000 0.19509 0.98079 0.00000" class="bowl_rim" />
     </body>
 
     <!-- bowl_black -->
@@ -150,6 +221,38 @@
       <geom name="bowl_black_wall_29" type="capsule" fromto="0.03991 -0.02667 -0.01400 0.05072 -0.03389 0.01600" size="0.00550" class="bowl_col" />
       <geom name="bowl_black_wall_30" type="capsule" fromto="0.04435 -0.01837 -0.01400 0.05636 -0.02334 0.01600" size="0.00550" class="bowl_col" />
       <geom name="bowl_black_wall_31" type="capsule" fromto="0.04708 -0.00936 -0.01400 0.05983 -0.01190 0.01600" size="0.00550" class="bowl_col" />
+      <geom name="bowl_black_rim_0" type="box" size="0.00100 0.00706 0.00900" pos="0.06150 0.00000 0.00950" xyaxes="1.00000 0.00000 0.00000 -0.00000 1.00000 0.00000" class="bowl_rim" />
+      <geom name="bowl_black_rim_1" type="box" size="0.00100 0.00706 0.00900" pos="0.06032 0.01200 0.00950" xyaxes="0.98079 0.19509 0.00000 -0.19509 0.98079 0.00000" class="bowl_rim" />
+      <geom name="bowl_black_rim_2" type="box" size="0.00100 0.00706 0.00900" pos="0.05682 0.02354 0.00950" xyaxes="0.92388 0.38268 0.00000 -0.38268 0.92388 0.00000" class="bowl_rim" />
+      <geom name="bowl_black_rim_3" type="box" size="0.00100 0.00706 0.00900" pos="0.05114 0.03417 0.00950" xyaxes="0.83147 0.55557 0.00000 -0.55557 0.83147 0.00000" class="bowl_rim" />
+      <geom name="bowl_black_rim_4" type="box" size="0.00100 0.00706 0.00900" pos="0.04349 0.04349 0.00950" xyaxes="0.70711 0.70711 0.00000 -0.70711 0.70711 0.00000" class="bowl_rim" />
+      <geom name="bowl_black_rim_5" type="box" size="0.00100 0.00706 0.00900" pos="0.03417 0.05114 0.00950" xyaxes="0.55557 0.83147 0.00000 -0.83147 0.55557 0.00000" class="bowl_rim" />
+      <geom name="bowl_black_rim_6" type="box" size="0.00100 0.00706 0.00900" pos="0.02354 0.05682 0.00950" xyaxes="0.38268 0.92388 0.00000 -0.92388 0.38268 0.00000" class="bowl_rim" />
+      <geom name="bowl_black_rim_7" type="box" size="0.00100 0.00706 0.00900" pos="0.01200 0.06032 0.00950" xyaxes="0.19509 0.98079 0.00000 -0.98079 0.19509 0.00000" class="bowl_rim" />
+      <geom name="bowl_black_rim_8" type="box" size="0.00100 0.00706 0.00900" pos="0.00000 0.06150 0.00950" xyaxes="0.00000 1.00000 0.00000 -1.00000 0.00000 0.00000" class="bowl_rim" />
+      <geom name="bowl_black_rim_9" type="box" size="0.00100 0.00706 0.00900" pos="-0.01200 0.06032 0.00950" xyaxes="-0.19509 0.98079 0.00000 -0.98079 -0.19509 0.00000" class="bowl_rim" />
+      <geom name="bowl_black_rim_10" type="box" size="0.00100 0.00706 0.00900" pos="-0.02354 0.05682 0.00950" xyaxes="-0.38268 0.92388 0.00000 -0.92388 -0.38268 0.00000" class="bowl_rim" />
+      <geom name="bowl_black_rim_11" type="box" size="0.00100 0.00706 0.00900" pos="-0.03417 0.05114 0.00950" xyaxes="-0.55557 0.83147 0.00000 -0.83147 -0.55557 0.00000" class="bowl_rim" />
+      <geom name="bowl_black_rim_12" type="box" size="0.00100 0.00706 0.00900" pos="-0.04349 0.04349 0.00950" xyaxes="-0.70711 0.70711 0.00000 -0.70711 -0.70711 0.00000" class="bowl_rim" />
+      <geom name="bowl_black_rim_13" type="box" size="0.00100 0.00706 0.00900" pos="-0.05114 0.03417 0.00950" xyaxes="-0.83147 0.55557 0.00000 -0.55557 -0.83147 0.00000" class="bowl_rim" />
+      <geom name="bowl_black_rim_14" type="box" size="0.00100 0.00706 0.00900" pos="-0.05682 0.02354 0.00950" xyaxes="-0.92388 0.38268 0.00000 -0.38268 -0.92388 0.00000" class="bowl_rim" />
+      <geom name="bowl_black_rim_15" type="box" size="0.00100 0.00706 0.00900" pos="-0.06032 0.01200 0.00950" xyaxes="-0.98079 0.19509 0.00000 -0.19509 -0.98079 0.00000" class="bowl_rim" />
+      <geom name="bowl_black_rim_16" type="box" size="0.00100 0.00706 0.00900" pos="-0.06150 0.00000 0.00950" xyaxes="-1.00000 0.00000 0.00000 -0.00000 -1.00000 0.00000" class="bowl_rim" />
+      <geom name="bowl_black_rim_17" type="box" size="0.00100 0.00706 0.00900" pos="-0.06032 -0.01200 0.00950" xyaxes="-0.98079 -0.19509 0.00000 0.19509 -0.98079 0.00000" class="bowl_rim" />
+      <geom name="bowl_black_rim_18" type="box" size="0.00100 0.00706 0.00900" pos="-0.05682 -0.02354 0.00950" xyaxes="-0.92388 -0.38268 0.00000 0.38268 -0.92388 0.00000" class="bowl_rim" />
+      <geom name="bowl_black_rim_19" type="box" size="0.00100 0.00706 0.00900" pos="-0.05114 -0.03417 0.00950" xyaxes="-0.83147 -0.55557 0.00000 0.55557 -0.83147 0.00000" class="bowl_rim" />
+      <geom name="bowl_black_rim_20" type="box" size="0.00100 0.00706 0.00900" pos="-0.04349 -0.04349 0.00950" xyaxes="-0.70711 -0.70711 0.00000 0.70711 -0.70711 0.00000" class="bowl_rim" />
+      <geom name="bowl_black_rim_21" type="box" size="0.00100 0.00706 0.00900" pos="-0.03417 -0.05114 0.00950" xyaxes="-0.55557 -0.83147 0.00000 0.83147 -0.55557 0.00000" class="bowl_rim" />
+      <geom name="bowl_black_rim_22" type="box" size="0.00100 0.00706 0.00900" pos="-0.02354 -0.05682 0.00950" xyaxes="-0.38268 -0.92388 0.00000 0.92388 -0.38268 0.00000" class="bowl_rim" />
+      <geom name="bowl_black_rim_23" type="box" size="0.00100 0.00706 0.00900" pos="-0.01200 -0.06032 0.00950" xyaxes="-0.19509 -0.98079 0.00000 0.98079 -0.19509 0.00000" class="bowl_rim" />
+      <geom name="bowl_black_rim_24" type="box" size="0.00100 0.00706 0.00900" pos="-0.00000 -0.06150 0.00950" xyaxes="-0.00000 -1.00000 0.00000 1.00000 -0.00000 0.00000" class="bowl_rim" />
+      <geom name="bowl_black_rim_25" type="box" size="0.00100 0.00706 0.00900" pos="0.01200 -0.06032 0.00950" xyaxes="0.19509 -0.98079 0.00000 0.98079 0.19509 0.00000" class="bowl_rim" />
+      <geom name="bowl_black_rim_26" type="box" size="0.00100 0.00706 0.00900" pos="0.02354 -0.05682 0.00950" xyaxes="0.38268 -0.92388 0.00000 0.92388 0.38268 0.00000" class="bowl_rim" />
+      <geom name="bowl_black_rim_27" type="box" size="0.00100 0.00706 0.00900" pos="0.03417 -0.05114 0.00950" xyaxes="0.55557 -0.83147 0.00000 0.83147 0.55557 0.00000" class="bowl_rim" />
+      <geom name="bowl_black_rim_28" type="box" size="0.00100 0.00706 0.00900" pos="0.04349 -0.04349 0.00950" xyaxes="0.70711 -0.70711 0.00000 0.70711 0.70711 0.00000" class="bowl_rim" />
+      <geom name="bowl_black_rim_29" type="box" size="0.00100 0.00706 0.00900" pos="0.05114 -0.03417 0.00950" xyaxes="0.83147 -0.55557 0.00000 0.55557 0.83147 0.00000" class="bowl_rim" />
+      <geom name="bowl_black_rim_30" type="box" size="0.00100 0.00706 0.00900" pos="0.05682 -0.02354 0.00950" xyaxes="0.92388 -0.38268 0.00000 0.38268 0.92388 0.00000" class="bowl_rim" />
+      <geom name="bowl_black_rim_31" type="box" size="0.00100 0.00706 0.00900" pos="0.06032 -0.01200 0.00950" xyaxes="0.98079 -0.19509 0.00000 0.19509 0.98079 0.00000" class="bowl_rim" />
     </body>
 
   </worldbody>

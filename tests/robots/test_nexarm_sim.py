@@ -224,8 +224,16 @@ def test_robot_defaults_and_collision_masks_are_active(backend: NexArmMujocoBack
         "link_6_right_jaw_collision_0",
     )
     cube = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, "cube_collision")
-    assert model.geom_contype[left_jaw] & model.geom_conaffinity[right_jaw]
-    assert model.geom_contype[left_jaw] & model.geom_conaffinity[cube]
+
+    def collide(a: int, b: int) -> bool:
+        # MuJoCo pairs two geoms when either one's contype matches the other's conaffinity.
+        return bool(
+            model.geom_contype[a] & model.geom_conaffinity[b]
+            or model.geom_contype[b] & model.geom_conaffinity[a]
+        )
+
+    assert collide(left_jaw, right_jaw)
+    assert collide(left_jaw, cube)
 
 
 def test_sim_robot_matches_physical_feature_contract() -> None:

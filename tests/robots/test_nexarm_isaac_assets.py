@@ -209,7 +209,7 @@ def test_scene_cameras_robot_and_bowls_match_the_mjcf(scene):
     mount = data.xpos[mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "nexarm_mount")]
     assert scene.robot["base_pos"][2] == pytest.approx(mount[2], abs=1e-6)
     bowl = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "bowl_red")
-    proxies = [g for g in range(model.ngeom) if model.geom_bodyid[g] == bowl and model.geom_contype[g]]
+    proxies = [g for g in range(model.ngeom) if model.geom_bodyid[g] == bowl and model.geom_conaffinity[g]]
     assert len(scene.bowls["colliders"]) == len(proxies)
     assert scene.bowls["mass"] == pytest.approx(0.06, abs=1e-4)
     workcell = [
@@ -246,7 +246,9 @@ def test_bowl_usd_matches_the_mjcf_proxies(scene, tmp_path):
     origin, frame = data.xpos[body], data.xmat[body].reshape(3, 3)
     expected = []
     for g in range(model.ngeom):
-        if model.geom_bodyid[g] == body and model.geom_contype[g]:
+        if (
+            model.geom_bodyid[g] == body and model.geom_conaffinity[g]
+        ):  # the capsule proxy, not the jaw-only rim plates
             axis = data.geom_xmat[g].reshape(3, 3)[:, 2] * model.geom_size[g, 1]
             centre = data.geom_xpos[g]
             expected.append([*(frame.T @ (centre + axis - origin)), *(frame.T @ (centre - axis - origin))])
