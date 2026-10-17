@@ -128,7 +128,9 @@ class QualityThresholds:
 def arm_raw_limits(backend: NexArmMujocoBackend) -> dict[str, tuple[float, float]]:
     """Raw interval each arm joint can actually reach; commands beyond it saturate at the joint limit."""
     return {
-        name: reachable_raw_range(name, backend.model.jnt_range[backend._joint_ids[name]])
+        name: reachable_raw_range(
+            name, backend.model.jnt_range[backend._joint_ids[name]], backend.joint_mapping
+        )
         for name in ARM_JOINTS
     }
 
@@ -430,6 +432,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             action_delay_steps=args.action_delay_steps,
             enable_domain_randomization=args.domain_randomization,
             calibration_path=args.calibration,
+            joint_mapping_path=args.joint_mapping,
         )
     )
     previous_report = utils.read_report(args.root) if args.resume else None

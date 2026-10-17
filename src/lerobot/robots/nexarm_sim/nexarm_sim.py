@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from functools import cached_property
 
+from lerobot.motors.nexarm.mujoco_mapping import load_joint_mapping
 from lerobot.motors.nexarm.nexarm import JOINT_NAMES
 from lerobot.types import RobotAction, RobotObservation
 from lerobot.utils.decorators import check_if_already_connected, check_if_not_connected
@@ -82,12 +83,13 @@ class NexArmSim(Robot):
             camera_names=self.config.camera_names,
             action_delay_steps=resolve_action_delay_steps(self.config.action_delay_steps, None),
             enable_domain_randomization=self.config.enable_domain_randomization,
+            joint_mapping=load_joint_mapping(self.config.joint_mapping_path),
         )
         if self.config.calibration_path is not None:
             try:
                 apply_calibration(
                     backend,
-                    SimCalibration.load(self.config.calibration_path),
+                    SimCalibration.load(self.config.calibration_path, backend.joint_mapping.version),
                     action_delay_steps=self.config.action_delay_steps,
                 )
             except Exception:

@@ -10,6 +10,7 @@ import numpy as np
 import pytest
 
 from examples.nexarm import generate_stack_bowls_dataset as generator, sim_dataset_utils as utils
+from lerobot.motors.nexarm.mujoco_mapping import JOINT_MAPPING_VERSION
 from lerobot.motors.nexarm.nexarm import JOINT_NAMES
 from lerobot.robots.nexarm_sim import NexArmSim, NexArmSimConfig, NexArmStackBowlsTask, SimCalibration
 
@@ -102,7 +103,7 @@ def test_resume_requires_existing_logged_dataset(tmp_path: Path, module_name: st
     utils.write_report(root, {"joint_mapping": "per_joint_ctrlrange_v0"})
     with pytest.raises(SystemExit):
         parse(["--root", str(root), "--resume"])
-    utils.write_report(root, {"joint_mapping": utils.JOINT_MAPPING_VERSION})
+    utils.write_report(root, {"joint_mapping": JOINT_MAPPING_VERSION})
 
     args = parse(["--root", str(root), "--resume", "--gpus", "3"])
     assert (args.seed_start, args.workers) == (8, 1)
@@ -187,9 +188,9 @@ def test_combine_reports_and_episode_offsets() -> None:
         "rejected_attempts": [{"seed": 0}],
     }
     second = {"requested_episodes": 2, "attempts": 2, "accepted_seeds": [5, 6], "rejected_attempts": []}
-    first["joint_mapping"] = second["joint_mapping"] = utils.JOINT_MAPPING_VERSION
+    first["joint_mapping"] = second["joint_mapping"] = JOINT_MAPPING_VERSION
     merged = utils.combine_reports([first, second])
-    assert merged["joint_mapping"] == utils.JOINT_MAPPING_VERSION
+    assert merged["joint_mapping"] == JOINT_MAPPING_VERSION
     assert merged["attempts"] == 4
     assert merged["accepted_seeds"] == [1, 5, 6]
     assert merged["requested_episodes"] == 3
@@ -232,7 +233,7 @@ def test_generator_writes_follower_dataset_and_shared_provenance(
     # Resuming appends episodes after the logged seeds and keeps one merged report.
     assert generator.main([*base_args, "--resume", "--no-dr"]) == 0
     report = json.loads((root / utils.REPORT_NAME).read_text())
-    assert report["joint_mapping"] == utils.JOINT_MAPPING_VERSION
+    assert report["joint_mapping"] == JOINT_MAPPING_VERSION
     assert report["validation"]["episodes"] == 2
     assert len(report["accepted_seeds"]) == 2
     assert len(set(report["accepted_seeds"])) == 2

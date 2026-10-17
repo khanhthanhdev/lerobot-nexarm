@@ -618,6 +618,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             action_delay_steps=args.action_delay_steps,
             enable_domain_randomization=args.domain_randomization,
             calibration_path=args.calibration,
+            joint_mapping_path=args.joint_mapping,
         )
     )
     previous_report = utils.read_report(args.root) if args.resume else None

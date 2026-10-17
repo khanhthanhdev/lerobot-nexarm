@@ -21,6 +21,7 @@ import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
 
+from lerobot.motors.nexarm.mujoco_mapping import load_joint_mapping
 from lerobot.motors.nexarm.nexarm import JOINT_NAMES
 from lerobot.robots.nexarm_sim.calibration import (
     SimCalibration,
@@ -80,6 +81,7 @@ class _NexArmMujocoEnv(gym.Env):
         enable_domain_randomization: bool = False,
         action_delay_steps: int | None = None,
         init_qpos_noise_rad: float = 0.0,
+        joint_mapping_path: Path | str | None = None,
     ) -> None:
         super().__init__()
         self.obs_type = obs_type
@@ -105,12 +107,13 @@ class _NexArmMujocoEnv(gym.Env):
             action_delay_steps=resolve_action_delay_steps(action_delay_steps, None),
             enable_domain_randomization=enable_domain_randomization,
             init_qpos_noise_rad=init_qpos_noise_rad,
+            joint_mapping=load_joint_mapping(joint_mapping_path),
         )
         if calibration_path is not None:
             try:
                 apply_calibration(
                     self.backend,
-                    SimCalibration.load(calibration_path),
+                    SimCalibration.load(calibration_path, self.backend.joint_mapping.version),
                     action_delay_steps=action_delay_steps,
                 )
             except BaseException:

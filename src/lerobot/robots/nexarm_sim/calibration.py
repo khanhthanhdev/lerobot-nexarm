@@ -91,13 +91,15 @@ class SimCalibration:
         path.write_text(json.dumps(asdict(self), indent=2) + "\n", encoding="utf-8")
 
     @classmethod
-    def load(cls, path: Path | str) -> SimCalibration:
+    def load(cls, path: Path | str, joint_mapping_version: str = JOINT_MAPPING_VERSION) -> SimCalibration:
+        """Load a calibration, refusing one fitted under a joint mapping other than ``joint_mapping_version``."""
         raw = json.loads(Path(path).read_text(encoding="utf-8"))
         joint_mapping = raw.get("joint_mapping")
-        if joint_mapping != JOINT_MAPPING_VERSION:
+        if joint_mapping != joint_mapping_version:
             raise ValueError(
                 f"Calibration {path} was fitted with joint mapping {joint_mapping or 'the pre-servo-constant mapping'} "
-                f"but this code uses {JOINT_MAPPING_VERSION}. Re-run examples/nexarm/calibrate_sim.py."
+                f"but the sim uses {joint_mapping_version}. Re-run examples/nexarm/calibrate_sim.py with the same "
+                "--joint-mapping."
             )
         source = raw.get("source", {})
         fps = raw.get("fps") if raw.get("fps") is not None else source.get("fps")

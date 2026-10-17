@@ -250,6 +250,8 @@ class NexArmEnv(EnvConfig):
     render_mode: str = "rgb_array"
     # SimCalibration JSON from examples/nexarm/calibrate_sim.py; its fps must equal ``fps``.
     calibration_path: str | None = None
+    # Real-to-sim joint mapping JSON from examples/nexarm/probe_joint_mapping.py; None is the identity.
+    joint_mapping_path: str | None = None
     enable_domain_randomization: bool = False
     # None takes the calibrated latency (or 0); an explicit value overrides the calibration.
     action_delay_steps: int | None = None
@@ -325,6 +327,7 @@ class NexArmEnv(EnvConfig):
             "observation_width": self.observation_width,
             "fps": self.fps,
             "calibration_path": self.calibration_path,
+            "joint_mapping_path": self.joint_mapping_path,
             "enable_domain_randomization": self.enable_domain_randomization,
             "action_delay_steps": self.action_delay_steps,
             "init_qpos_noise_rad": self.init_qpos_noise_rad,
