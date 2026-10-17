@@ -34,6 +34,9 @@ from lerobot.robots.nexarm_sim.mujoco_backend import (
 )
 from lerobot.robots.nexarm_sim.pick_place_task import NexArmPickPlaceTask
 from lerobot.robots.nexarm_sim.stack_bowls_task import (
+    GRIPPER_ASSIST_ENGAGE_POS,
+    REAL_TELEOP_ASSIST_RELEASE_POS,
+    STAGES,
     NexArmStackBowlsStatus,
     NexArmStackBowlsTask,
     get_task_instruction,
@@ -413,6 +416,7 @@ class NexArmPickPlaceEnv(_NexArmMujocoEnv):
             "is_released": status.is_released,
             "is_inside_target": status.is_inside_target,
             "success": status.success,
+            "is_success": status.success,
             "reason": status.reason,
         }
 
@@ -422,17 +426,34 @@ class NexArmStackBowlsEnv(_NexArmMujocoEnv):
 
     This is the task of the real ``nexarm_stack_bowls`` recordings. Each reset draws the bowl layout and the
     stacking order from the seed, and ``task_description`` holds the current episode's instruction. The grasp
-    is the simulator's contact assist (both jaws on one bowl), as in the scripted dataset generator.
+    is the simulator's contact assist (both jaws on one bowl), as in the scripted dataset generator. It
+    releases a bowl once the gripper command opens below ``assist_release_pos``; the default lets go at the
+    partial openings real operators use, which the generator's lower threshold never sees.
+
+    The dense reward is potential-based: each shaping term pays the change in its potential, so over an
+    episode the terms sum to the final potential minus the first. Holding a bowl therefore earns nothing per
+    step, and every stage, release included, raises the potential, so only finishing pays more.
     """
 
     default_scene_path = DEFAULT_STACK_BOWLS_SCENE_PATH
     # Bottom, middle and top bowl positions, in the order the instruction names them.
     environment_state_dim = 9
+    # Larger than the most the shaping terms can pay over an episode (two bowls, 5 each).
+    success_reward = 10.0
 
     def __init__(
-        self, *, max_episode_steps: int = 900, position_jitter_m: float = 0.04, **kwargs: Any
+        self,
+        *,
+        max_episode_steps: int = 900,
+        position_jitter_m: float = 0.04,
+        assist_engage_pos: float = GRIPPER_ASSIST_ENGAGE_POS,
+        assist_release_pos: float = REAL_TELEOP_ASSIST_RELEASE_POS,
+        **kwargs: Any,
     ) -> None:
         self.position_jitter_m = position_jitter_m
+        self.assist_engage_pos = assist_engage_pos
+        self.assist_release_pos = assist_release_pos
+        self._last_potential: dict[str, float] | None = None
         super().__init__(max_episode_steps=max_episode_steps, **kwargs)
         self.task_description = get_task_instruction(*self.task.current_order)
 
@@ -442,6 +463,8 @@ class NexArmStackBowlsEnv(_NexArmMujocoEnv):
             success_hold_s=self.success_hold_s,
             timeout_s=float(self.max_episode_steps) / float(self.fps),
             position_jitter_m=self.position_jitter_m,
+            assist_engage_pos=self.assist_engage_pos,
+            assist_release_pos=self.assist_release_pos,
         )
 
     def reset(
@@ -452,40 +475,53 @@ class NexArmStackBowlsEnv(_NexArmMujocoEnv):
     ) -> tuple[dict[str, np.ndarray], dict[str, Any]]:
         obs, info = super().reset(seed=seed, options=options)
         self.task_description = info["task"]
+        self._last_potential = self._potential()
         return obs, info
 
     def _environment_state(self) -> np.ndarray:
         return np.concatenate([self.task.bowl_position(color) for color in self.task.current_order])
 
-    def _reward_components(self, status: NexArmStackBowlsStatus) -> dict[str, float]:
-        bottom, middle, top = (self.task.bowl_position(color) for color in self.task.current_order)
+    def _potential(self) -> dict[str, float]:
+        """Task progress, split into the shaping terms; their sum rises strictly from stage to stage.
 
-        def nested(lower: np.ndarray, upper: np.ndarray) -> bool:
-            dz = float(upper[2] - lower[2])
-            return (
-                float(np.linalg.norm(upper[:2] - lower[:2])) < self.task.max_concentric_error_m
-                and self.task.min_nesting_delta_m <= dz <= self.task.max_nesting_delta_m
-            )
-
-        # The bowl to move next: the middle one until it sits in the bottom one, then the top one.
-        middle_done = nested(bottom, middle)
-        mover, base = (top, middle) if middle_done else (middle, bottom)
-        mover_color = self.task.current_order[2 if middle_done else 1]
-
-        gripper_pos = self.backend.site_position("gripper_frame")
-        reach_reward = 1.0 - float(np.tanh(10.0 * np.linalg.norm(gripper_pos - mover)))
-        held = self.task.held_bowl == mover_color
-        grasp_reward = 1.0 if held else 0.0
-        carry_reward = (1.0 - float(np.tanh(5.0 * np.linalg.norm(mover[:2] - base[:2])))) if held else 0.0
-        stage_reward = 2.0 * (int(middle_done) + int(middle_done and nested(middle, top)))
-        success_reward = 5.0 if status.success else 0.0
+        A bowl is placed once it is nested and let go. Each placed bowl is worth 5: 1 each for reach, grasp
+        and carry, and 2 for stage (nested, then released). The bowl being moved scores reach, grasp and carry
+        in [0, 1] each, plus 1 for stage once nested; a nested bowl keeps full reach, grasp and carry until it
+        is let go, so opening the gripper never lowers the potential.
+        """
+        task = self.task
+        bottom, middle, top = task.current_order
+        placed = 0
+        for lower, upper in ((bottom, middle), (middle, top)):
+            if not (task.is_nested(lower, upper) and task.held_bowl != upper):
+                break
+            placed += 1
+        reach = grasp = carry = stage = 0.0
+        if placed < 2:
+            base, mover = (bottom, middle) if placed == 0 else (middle, top)
+            mover_pos, base_pos = task.bowl_position(mover), task.bowl_position(base)
+            if task.is_nested(base, mover):
+                reach = grasp = carry = stage = 1.0
+            else:
+                gripper_pos = self.backend.site_position("gripper_frame")
+                reach = 1.0 - float(np.tanh(10.0 * np.linalg.norm(gripper_pos - mover_pos)))
+                if task.held_bowl == mover:
+                    grasp = 1.0
+                    carry = 1.0 - float(np.tanh(5.0 * np.linalg.norm(mover_pos[:2] - base_pos[:2])))
         return {
-            "reach": reach_reward,
-            "grasp": grasp_reward,
-            "carry": carry_reward,
-            "stage": stage_reward,
-            "success": success_reward,
+            "reach": placed + reach,
+            "grasp": placed + grasp,
+            "carry": placed + carry,
+            "stage": 2.0 * placed + stage,
         }
+
+    def _reward_components(self, status: NexArmStackBowlsStatus) -> dict[str, float]:
+        potential = self._potential()
+        previous = self._last_potential if self._last_potential is not None else potential
+        self._last_potential = potential
+        components = {name: potential[name] - previous[name] for name in potential}
+        components["success"] = self.success_reward if status.success else 0.0
+        return components
 
     def _info(self, status: NexArmStackBowlsStatus) -> dict[str, Any]:
         return {
@@ -493,9 +529,14 @@ class NexArmStackBowlsEnv(_NexArmMujocoEnv):
             "is_concentric": status.is_concentric,
             "is_nested_height": status.is_nested_height,
             "is_released": status.is_released,
+            "is_arm_static": status.is_arm_static,
             "success": status.success,
+            "is_success": status.success,
             "reason": status.reason,
             "task": get_task_instruction(*status.order),
+            # Each stage latches once reached, so its value at episode end says how far the episode got.
+            **{f"stage/{stage}": status.stages.get(stage, False) for stage in STAGES},
+            "failed_stage": status.failed_stage or "",
         }
 
 

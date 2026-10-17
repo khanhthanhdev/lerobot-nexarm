@@ -54,7 +54,11 @@ from lerobot.robots.nexarm_sim import (
     get_task_instruction,
 )
 from lerobot.robots.nexarm_sim.mujoco_backend import HOME_POSITIONS, MUJOCO_JOINTS, resolve_model_path
-from lerobot.robots.nexarm_sim.stack_bowls_task import PERMUTATIONS
+from lerobot.robots.nexarm_sim.stack_bowls_task import (
+    GRIPPER_ASSIST_ENGAGE_POS,
+    GRIPPER_ASSIST_RELEASE_POS,
+    PERMUTATIONS,
+)
 from lerobot.utils.constants import ACTION, OBS_STR
 from lerobot.utils.feature_utils import build_dataset_frame, hw_to_dataset_features
 
@@ -471,6 +475,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Both modes assist transport; contact_assisted requires both jaws touching the bowl.",
     )
     parser.add_argument(
+        "--assist-release-pos",
+        type=float,
+        default=GRIPPER_ASSIST_RELEASE_POS,
+        help="Raw gripper command below which the grasp assist drops a held bowl.",
+    )
+    parser.add_argument(
         "--position-jitter-m",
         type=float,
         default=0.005,
@@ -485,6 +495,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     args = parser.parse_args(argv)
     if not np.isfinite(args.position_jitter_m) or not 0 <= args.position_jitter_m <= 0.05:
         parser.error("--position-jitter-m must be between 0 and 0.05")
+    if not GRIPPER_OPEN_POS <= args.assist_release_pos < GRIPPER_ASSIST_ENGAGE_POS:
+        parser.error(f"--assist-release-pos must be within [{GRIPPER_OPEN_POS}, {GRIPPER_ASSIST_ENGAGE_POS})")
     camera_names = [name.strip() for name in args.cameras.split(",")]
     if any(not name for name in camera_names) or len(set(camera_names)) != len(camera_names):
         parser.error("--cameras must contain distinct nonempty names")
@@ -552,6 +564,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             robot.backend,
             grasp_mode=args.grasp_mode,
             position_jitter_m=args.position_jitter_m,
+            assist_release_pos=args.assist_release_pos,
         )
         while accepted < args.episodes and attempts < args.max_attempts:
             seed = args.seed_start + attempts
@@ -589,6 +602,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                     "order": task.current_order,
                     "prompt": current_prompt,
                     "grasp_mode": args.grasp_mode,
+                    "assist_engage_pos": task.assist_engage_pos,
+                    "assist_release_pos": task.assist_release_pos,
                     "dr_params": robot.backend.last_domain_params,
                 },
             )
@@ -624,6 +639,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         {
             "cameras": list(args.camera_names),
             "grasp_mode": args.grasp_mode,
+            "assist_engage_pos": GRIPPER_ASSIST_ENGAGE_POS,
+            "assist_release_pos": args.assist_release_pos,
             "position_jitter_m": args.position_jitter_m,
             "order": order,
         }

@@ -245,6 +245,8 @@ def rollout(
     all_rewards = []
     all_successes = []
     all_dones = []
+    # Per-stage flags (``info["stage/<name>"]``) for envs that report how far each episode got.
+    all_stages: dict[str, list[torch.Tensor]] = defaultdict(list)
 
     step = 0
     # Keep track of which environments are done.
@@ -326,6 +328,16 @@ def rollout(
                 )
             else:
                 successes = [False] * env.num_envs
+            # On the step an env ends, SAME_STEP autoreset puts the next episode's info at the top level and
+            # the ended episode's in "final_info", masked by "_<key>".
+            final_info = info.get("final_info")
+            for key in info:
+                if key.startswith("stage/"):
+                    flags = np.asarray(info[key], dtype=bool)
+                    if isinstance(final_info, dict) and key in final_info:
+                        ended = np.asarray(final_info.get(f"_{key}", np.ones_like(flags)), dtype=bool)
+                        flags = np.where(ended, np.asarray(final_info[key], dtype=bool), flags)
+                    all_stages[key.removeprefix("stage/")].append(torch.as_tensor(flags))
 
             if recording_datasets is not None and raw_observation is not None:
                 prev_done = done.copy()
@@ -388,6 +400,9 @@ def rollout(
         "success": torch.stack(all_successes, dim=1),
         "done": torch.stack(all_dones, dim=1),
     }
+    # An env that reports stages reports them every step, so each stacks like the other per-step data.
+    if all_stages and all(len(flags) == len(all_dones) for flags in all_stages.values()):
+        ret["stages"] = {name: torch.stack(flags, dim=1) for name, flags in all_stages.items()}
     if return_observations:
         stacked_observations = {}
         for key in all_observations[0]:
@@ -464,6 +479,7 @@ def eval_policy(
     max_rewards = []
     all_successes = []
     all_seeds = []
+    all_stages: list[dict[str, bool]] = []
     threads = []  # for video saving threads
     n_episodes_rendered = 0  # for saving the correct number of videos
 
@@ -552,6 +568,15 @@ def eval_policy(
         max_rewards.extend(batch_max_rewards.tolist())
         batch_successes = einops.reduce((rollout_data["success"] * mask), "b n -> b", "any")
         all_successes.extend(batch_successes.tolist())
+        # Stages latch, so their value at the first done step says how far each episode got.
+        batch_index = torch.arange(done_indices.shape[0])
+        stage_flags = {
+            name: flags[batch_index, done_indices].tolist()
+            for name, flags in rollout_data.get("stages", {}).items()
+        }
+        all_stages.extend(
+            {name: bool(values[i]) for name, values in stage_flags.items()} for i in range(len(batch_index))
+        )
         if seeds:
             all_seeds.extend(seeds)
         else:
@@ -645,13 +670,15 @@ def eval_policy(
                 "max_reward": max_reward,
                 "success": success,
                 "seed": seed,
+                **({"stages": stages} if stages else {}),
             }
-            for i, (sum_reward, max_reward, success, seed) in enumerate(
+            for i, (sum_reward, max_reward, success, seed, stages) in enumerate(
                 zip(
                     sum_rewards[:n_episodes],
                     max_rewards[:n_episodes],
                     all_successes[:n_episodes],
                     all_seeds[:n_episodes],
+                    all_stages[:n_episodes],
                     strict=True,
                 )
             )
@@ -660,6 +687,7 @@ def eval_policy(
             "avg_sum_reward": float(np.nanmean(sum_rewards[:n_episodes])),
             "avg_max_reward": float(np.nanmean(max_rewards[:n_episodes])),
             "pc_success": float(np.nanmean(all_successes[:n_episodes]) * 100),
+            **_stage_rates(all_stages[:n_episodes]),
             "eval_s": time.time() - start,
             "eval_ep_s": (time.time() - start) / n_episodes,
         },
@@ -808,16 +836,23 @@ def eval_main(cfg: EvalPipelineConfig):
     logging.info("End of eval")
 
 
+def _stage_rates(stages: list[dict[str, bool]]) -> dict[str, float]:
+    """Percent of episodes that reached each stage, as ``pc_<stage>``; empty if the env reports none."""
+    names = list(dict.fromkeys(name for episode in stages for name in episode))
+    return {f"pc_{name}": float(np.mean([ep.get(name, False) for ep in stages]) * 100) for name in names}
+
+
 # ---- typed payload returned by one task eval ----
 class TaskMetrics(TypedDict):
     sum_rewards: list[float]
     max_rewards: list[float]
     successes: list[bool]
+    stages: list[dict[str, bool]]
     video_paths: list[str]
     predicted_video_paths: list[str]
 
 
-ACC_KEYS = ("sum_rewards", "max_rewards", "successes", "video_paths", "predicted_video_paths")
+ACC_KEYS = ("sum_rewards", "max_rewards", "successes", "stages", "video_paths", "predicted_video_paths")
 
 
 def eval_one(
@@ -865,6 +900,7 @@ def eval_one(
         sum_rewards=[ep["sum_reward"] for ep in per_episode],
         max_rewards=[ep["max_reward"] for ep in per_episode],
         successes=[ep["success"] for ep in per_episode],
+        stages=[ep.get("stages", {}) for ep in per_episode],
         video_paths=task_result.get("video_paths", []),
         predicted_video_paths=task_result.get("predicted_video_paths", []),
     )
@@ -985,6 +1021,7 @@ def eval_policy_all(
         _append("sum_rewards", metrics.get("sum_rewards"))
         _append("max_rewards", metrics.get("max_rewards"))
         _append("successes", metrics.get("successes"))
+        _append("stages", metrics.get("stages"))
         for key in ("video_paths", "predicted_video_paths"):
             paths = metrics.get(key, [])
             if paths:
@@ -1059,6 +1096,7 @@ def eval_policy_all(
             "avg_sum_reward": _agg_from_list(acc["sum_rewards"]),
             "avg_max_reward": _agg_from_list(acc["max_rewards"]),
             "pc_success": _agg_from_list(acc["successes"]) * 100 if acc["successes"] else float("nan"),
+            **_stage_rates(acc["stages"]),
             "n_episodes": len(acc["sum_rewards"]),
             "video_paths": list(acc["video_paths"]),
             "predicted_video_paths": list(acc["predicted_video_paths"]),
@@ -1069,6 +1107,7 @@ def eval_policy_all(
         "avg_sum_reward": _agg_from_list(overall["sum_rewards"]),
         "avg_max_reward": _agg_from_list(overall["max_rewards"]),
         "pc_success": _agg_from_list(overall["successes"]) * 100 if overall["successes"] else float("nan"),
+        **_stage_rates(overall["stages"]),
         "n_episodes": len(overall["sum_rewards"]),
         "eval_s": time.time() - start_t,
         "eval_ep_s": (time.time() - start_t) / max(1, len(overall["sum_rewards"])),

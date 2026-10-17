@@ -5,13 +5,13 @@
 from __future__ import annotations
 
 import itertools
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal
 
 import mujoco
 import numpy as np
 
-from lerobot.motors.nexarm.nexarm import GRIPPER_OPEN_POS
+from lerobot.motors.nexarm.nexarm import GRIPPER_CLOSED_POS, GRIPPER_OPEN_POS
 
 from .mujoco_backend import NexArmMujocoBackend
 
@@ -20,6 +20,9 @@ from .mujoco_backend import NexArmMujocoBackend
 # one below the release threshold (towards open) drops it.
 GRIPPER_ASSIST_ENGAGE_POS = 2400
 GRIPPER_ASSIST_RELEASE_POS = 1600
+# Real teleoperated releases open only to a median of 1989 (real-data report, Finding 6), so an env that should
+# let go when a policy trained on real data opens the gripper releases at this higher value.
+REAL_TELEOP_ASSIST_RELEASE_POS = 2300
 
 COLORS = ("red", "blue", "black")
 # Nominal bowl slots (x, y, z of the bowl body) on the table, before the seeded jitter. They are staggered so that
@@ -28,6 +31,12 @@ BOWL_SLOTS_M = ((-0.11, -0.27, 0.020), (0.00, -0.18, 0.020), (0.11, -0.27, 0.020
 MIN_BOWL_SEPARATION_M = 0.14
 # The assist attaches a bowl only if its centre is this close to the gripper frame.
 ASSIST_MAX_DISTANCE_M = 0.120
+# A held bowl counts as picked once its centre is this far above where it rested at reset.
+PICK_LIFT_M = 0.02
+# The arm counts as static when no arm joint moves faster than this.
+ARM_STATIC_MAX_SPEED_RAD_S = 0.1
+# The task's stages, in the order a successful episode reaches them. Each latches once reached.
+STAGES = ("picked_middle", "nested_middle", "released_middle", "picked_top", "nested_top", "released_top")
 PERMUTATIONS: list[tuple[str, str, str]] = list(itertools.permutations(COLORS))
 # 6 permutations:
 # 1. ('red', 'blue', 'black')
@@ -55,6 +64,12 @@ class NexArmStackBowlsStatus:
     is_concentric: bool
     is_nested_height: bool
     is_released: bool
+    # Diagnostic only; success does not require it.
+    is_arm_static: bool = True
+    # Each of STAGES, True once reached in this episode.
+    stages: dict[str, bool] = field(default_factory=dict)
+    # The first of STAGES not yet reached; None once all are.
+    failed_stage: str | None = None
 
 
 class NexArmStackBowlsTask:
@@ -72,6 +87,7 @@ class NexArmStackBowlsTask:
         grasp_mode: Literal["contact_assisted", "proximity_assisted"] = "contact_assisted",
         position_jitter_m: float = 0.005,
         assist_release_pos: float = GRIPPER_ASSIST_RELEASE_POS,
+        assist_engage_pos: float = GRIPPER_ASSIST_ENGAGE_POS,
     ) -> None:
         if grasp_mode not in ("contact_assisted", "proximity_assisted"):
             raise ValueError(f"Unknown grasp mode: {grasp_mode}")
@@ -79,12 +95,13 @@ class NexArmStackBowlsTask:
             raise ValueError("position_jitter_m must be between 0 and 0.05 meters")
         if not 0 < success_hold_s < timeout_s:
             raise ValueError("Require 0 < success_hold_s < timeout_s")
+        if not GRIPPER_OPEN_POS < assist_engage_pos < GRIPPER_CLOSED_POS:
+            raise ValueError(f"assist_engage_pos must be within ({GRIPPER_OPEN_POS}, {GRIPPER_CLOSED_POS})")
         # Real teleoperated releases often open only to about 1900-2000, so replaying them needs a higher value.
-        if not GRIPPER_OPEN_POS <= assist_release_pos < GRIPPER_ASSIST_ENGAGE_POS:
-            raise ValueError(
-                f"assist_release_pos must be within [{GRIPPER_OPEN_POS}, {GRIPPER_ASSIST_ENGAGE_POS})"
-            )
+        if not GRIPPER_OPEN_POS <= assist_release_pos < assist_engage_pos:
+            raise ValueError(f"assist_release_pos must be within [{GRIPPER_OPEN_POS}, {assist_engage_pos})")
         self.assist_release_pos = assist_release_pos
+        self.assist_engage_pos = assist_engage_pos
         self.grasp_mode = grasp_mode
         self.position_jitter_m = position_jitter_m
         self.backend = backend
@@ -96,6 +113,11 @@ class NexArmStackBowlsTask:
 
         # Cache IDs
         self._body_ids = {c: self._required_id(mujoco.mjtObj.mjOBJ_BODY, f"bowl_{c}") for c in COLORS}
+        self._arm_dof_ids = [
+            int(backend.model.jnt_dofadr[joint_id])
+            for name, joint_id in backend._joint_ids.items()
+            if name != "gripper"
+        ]
         self._joint_ids = {c: self._required_id(mujoco.mjtObj.mjOBJ_JOINT, f"bowl_{c}_joint") for c in COLORS}
         self._gripper_frame_site_id = self._required_id(mujoco.mjtObj.mjOBJ_SITE, "gripper_frame")
         self._left_jaw_geom_id = self._required_id(mujoco.mjtObj.mjOBJ_GEOM, "link_6_left_jaw_collision_0")
@@ -111,6 +133,8 @@ class NexArmStackBowlsTask:
         self._start_time: float = 0.0
         self._hold_start_time: float | None = None
         self._failure_reason: str | None = None
+        self._rest_z: dict[str, float] = {}
+        self._stages: dict[str, bool] = dict.fromkeys(STAGES, False)
 
     def _required_id(self, object_type: mujoco.mjtObj, name: str) -> int:
         object_id = mujoco.mj_name2id(self.backend.model, object_type, name)
@@ -182,6 +206,8 @@ class NexArmStackBowlsTask:
         self.held_rel_pos = None
         self.held_rel_mat = None
         self.target_bowl = None
+        self._rest_z = {color: float(self.bowl_position(color)[2]) for color in COLORS}
+        self._stages = dict.fromkeys(STAGES, False)
         return self.status()
 
     def _on_physics_step(self) -> None:
@@ -198,7 +224,7 @@ class NexArmStackBowlsTask:
         site_pos = self.backend.data.site_xpos[site_id].copy()
         site_mat = self.backend.data.site_xmat[site_id].reshape(3, 3).copy()
 
-        if gripper_ctrl > GRIPPER_ASSIST_ENGAGE_POS:  # commanded towards closed
+        if gripper_ctrl > self.assist_engage_pos:  # commanded towards closed
             if self.held_bowl is None:
                 candidate_colors = [self.target_bowl] if self.target_bowl is not None else COLORS
                 closest_c = None
@@ -256,27 +282,55 @@ class NexArmStackBowlsTask:
         """Require no assisted attachment and no jaw contact with any bowl."""
         return self.held_bowl is None and not any(self._bowl_jaw_contacts().values())
 
+    def _is_concentric(self, lower: str, upper: str) -> bool:
+        offset = self.bowl_position(upper)[:2] - self.bowl_position(lower)[:2]
+        return float(np.linalg.norm(offset)) < self.max_concentric_error_m
+
+    def _is_nested_height(self, lower: str, upper: str) -> bool:
+        dz = float(self.bowl_position(upper)[2] - self.bowl_position(lower)[2])
+        return self.min_nesting_delta_m <= dz <= self.max_nesting_delta_m
+
+    def is_nested(self, lower: str, upper: str) -> bool:
+        """Whether bowl ``upper`` sits centred in bowl ``lower`` at the nesting height."""
+        return self._is_concentric(lower, upper) and self._is_nested_height(lower, upper)
+
+    def _is_picked(self, color: str) -> bool:
+        lift = float(self.bowl_position(color)[2]) - self._rest_z.get(color, np.inf)
+        return self.held_bowl == color and lift >= PICK_LIFT_M
+
+    def _update_stages(self, is_released: bool) -> None:
+        bottom, middle, top = self.current_order
+        middle_nested = self.is_nested(bottom, middle)
+        top_nested = middle_nested and self.is_nested(middle, top)
+        reached = {
+            "picked_middle": self._is_picked(middle),
+            "nested_middle": middle_nested,
+            "released_middle": middle_nested
+            and self.held_bowl != middle
+            and not self._bowl_jaw_contacts()[middle],
+            "picked_top": self._is_picked(top),
+            "nested_top": top_nested,
+            "released_top": top_nested and is_released,
+        }
+        for stage, now in reached.items():
+            self._stages[stage] = self._stages[stage] or now
+
+    def _is_arm_static(self) -> bool:
+        speeds = np.abs(self.backend.data.qvel[self._arm_dof_ids])
+        return bool(speeds.max(initial=0.0) < ARM_STATIC_MAX_SPEED_RAD_S)
+
     def status(self) -> NexArmStackBowlsStatus:
         bottom, middle, top = self.current_order
-        pos_b = self.bowl_position(bottom)
-        pos_m = self.bowl_position(middle)
-        pos_t = self.bowl_position(top)
 
         # 1. Concentricity check
-        dist_bm = float(np.linalg.norm(pos_m[:2] - pos_b[:2]))
-        dist_mt = float(np.linalg.norm(pos_t[:2] - pos_m[:2]))
-        is_concentric = dist_bm < self.max_concentric_error_m and dist_mt < self.max_concentric_error_m
+        is_concentric = self._is_concentric(bottom, middle) and self._is_concentric(middle, top)
 
         # 2. Nesting height check
-        dz_bm = float(pos_m[2] - pos_b[2])
-        dz_mt = float(pos_t[2] - pos_m[2])
-        is_nested = (
-            self.min_nesting_delta_m <= dz_bm <= self.max_nesting_delta_m
-            and self.min_nesting_delta_m <= dz_mt <= self.max_nesting_delta_m
-        )
+        is_nested = self._is_nested_height(bottom, middle) and self._is_nested_height(middle, top)
 
         # 3. Gripper release check
         is_released = self._is_gripper_disengaged()
+        self._update_stages(is_released)
 
         # 4. Velocities check (stability)
         vel_b = np.linalg.norm(self.bowl_velocity(bottom))
@@ -320,6 +374,9 @@ class NexArmStackBowlsTask:
             is_concentric=is_concentric,
             is_nested_height=is_nested,
             is_released=is_released,
+            is_arm_static=self._is_arm_static(),
+            stages=dict(self._stages),
+            failed_stage=next((stage for stage in STAGES if not self._stages[stage]), None),
         )
 
     def observe(self) -> NexArmStackBowlsStatus:

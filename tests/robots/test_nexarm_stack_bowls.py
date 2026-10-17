@@ -157,3 +157,38 @@ def test_assist_release_threshold_is_configurable(task):
 def test_invalid_assist_release_threshold(task, release):
     with pytest.raises(ValueError, match="assist_release_pos"):
         NexArmStackBowlsTask(task.backend, assist_release_pos=release)
+
+
+@pytest.mark.parametrize("engage", [GRIPPER_OPEN_POS, GRIPPER_CLOSED_POS])
+def test_invalid_assist_engage_threshold(task, engage):
+    with pytest.raises(ValueError, match="assist_engage_pos"):
+        NexArmStackBowlsTask(task.backend, assist_engage_pos=engage)
+
+
+def test_stages_latch_and_name_the_first_unreached(task):
+    from lerobot.robots.nexarm_sim.stack_bowls_task import STAGES
+
+    backend = task.backend
+    status = task.status()
+    assert not any(status.stages.values()) and status.failed_stage == "picked_middle"
+    assert status.is_arm_static
+
+    # Put the stack together without picking anything: every stage after the picks is reached.
+    qadrs = [backend.model.jnt_qposadr[task._joint_ids[color]] for color in task.current_order]
+    for i, qadr in enumerate(qadrs):
+        backend.data.qpos[qadr : qadr + 7] = [0, -0.2, 0.02 + i * 0.03, 1, 0, 0, 0]
+    mujoco.mj_forward(backend.model, backend.data)
+    backend.data.ncon = 0
+    status = task.status()
+    assert [stage for stage in STAGES if not status.stages[stage]] == ["picked_middle", "picked_top"]
+    assert status.failed_stage == "picked_middle"
+
+    # Knocking the stack apart again does not unlatch them.
+    backend.data.qpos[qadrs[2] : qadrs[2] + 3] = [0.15, -0.25, 0.02]
+    mujoco.mj_forward(backend.model, backend.data)
+    assert task.status().stages["released_top"]
+
+    backend.data.qvel[task._arm_dof_ids[0]] = 1.0
+    assert not task.status().is_arm_static
+    task.reset(seed=3, settle_steps=0)
+    assert not any(task.status().stages.values())

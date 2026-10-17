@@ -74,6 +74,7 @@ def test_gpus_select_one_worker_per_id_and_eval_split_seeds(tmp_path: Path) -> N
         ["--gpus", "a"],
         ["--workers", "0"],
         ["--split", "train", "--seed-start", str(utils.EVAL_SEED_OFFSET)],
+        ["--assist-release-pos", "2400"],
     ],
 )
 def test_invalid_generation_args(tmp_path: Path, extra: list[str]) -> None:
@@ -222,8 +223,10 @@ def test_generator_writes_follower_dataset_and_shared_provenance(
     assert len(report["accepted_seeds"]) == 1
     assert report["validation"]["episodes"] == 1
     assert report["provenance"]["model_sha256"]
+    assert (report["assist_engage_pos"], report["assist_release_pos"]) == (2400, 1600)
     rows = utils.read_jsonl(root / utils.EPISODES_NAME)
     assert sum(row["accepted"] for row in rows) == 1
+    assert all(row["assist_release_pos"] == 1600 for row in rows)
     assert all(row["dr_params"]["objects"] for row in rows)
 
     # Resuming appends episodes after the logged seeds and keeps one merged report.
