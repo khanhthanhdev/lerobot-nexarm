@@ -13,6 +13,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import os
+import sys
 from pathlib import Path
 
 from huggingface_hub import HfApi, snapshot_download
@@ -86,8 +88,18 @@ def update_last_checkpoint(checkpoint_dir: Path) -> Path:
     last_checkpoint_dir = checkpoint_dir.parent / LAST_CHECKPOINT_LINK
     if last_checkpoint_dir.is_symlink():
         last_checkpoint_dir.unlink()
+    elif last_checkpoint_dir.is_junction():
+        os.rmdir(last_checkpoint_dir)  # removes the junction, not the checkpoint it points to
     relative_target = checkpoint_dir.relative_to(checkpoint_dir.parent)
-    last_checkpoint_dir.symlink_to(relative_target)
+    try:
+        last_checkpoint_dir.symlink_to(relative_target)
+    except OSError:
+        if sys.platform != "win32":
+            raise
+        # Windows needs admin rights or Developer Mode for symlinks; a directory junction needs neither.
+        import _winapi
+
+        _winapi.CreateJunction(str(checkpoint_dir.resolve()), str(last_checkpoint_dir))
 
 
 def save_checkpoint(

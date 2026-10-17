@@ -84,12 +84,12 @@ class NexArmStackBowlsTask:
         max_nesting_delta_m: float = 0.038,
         success_hold_s: float = 0.5,
         timeout_s: float = 40.0,
-        grasp_mode: Literal["contact_assisted", "proximity_assisted"] = "contact_assisted",
+        grasp_mode: Literal["contact_assisted", "proximity_assisted", "physical"] = "contact_assisted",
         position_jitter_m: float = 0.005,
         assist_release_pos: float = GRIPPER_ASSIST_RELEASE_POS,
         assist_engage_pos: float = GRIPPER_ASSIST_ENGAGE_POS,
     ) -> None:
-        if grasp_mode not in ("contact_assisted", "proximity_assisted"):
+        if grasp_mode not in ("contact_assisted", "proximity_assisted", "physical"):
             raise ValueError(f"Unknown grasp mode: {grasp_mode}")
         if not np.isfinite(position_jitter_m) or not 0 <= position_jitter_m <= 0.05:
             raise ValueError("position_jitter_m must be between 0 and 0.05 meters")
@@ -211,10 +211,11 @@ class NexArmStackBowlsTask:
         return self.status()
 
     def _on_physics_step(self) -> None:
-        """Assist transport after grasp acquisition; neither mode is unassisted physics.
+        """Track or assist the grasp.
 
-        Contact mode requires both jaws to touch the same bowl. Proximity mode
-        preserves the legacy behavior for comparison, not grasp validation.
+        ``physical`` only tracks it: the bowl is a free body held by jaw friction alone. The assisted modes
+        carry a grasped bowl rigidly. Contact mode requires both jaws to touch the same bowl; proximity
+        mode preserves the legacy behavior for comparison, not grasp validation.
         """
         gripper_ctrl = self.backend.control_to_raw(
             "gripper",
@@ -223,6 +224,10 @@ class NexArmStackBowlsTask:
         site_id = self._gripper_frame_site_id
         site_pos = self.backend.data.site_xpos[site_id].copy()
         site_mat = self.backend.data.site_xmat[site_id].reshape(3, 3).copy()
+
+        if self.grasp_mode == "physical":
+            self._track_physical_grasp(gripper_ctrl, site_pos, site_mat)
+            return
 
         if gripper_ctrl > self.assist_engage_pos:  # commanded towards closed
             if self.held_bowl is None:
@@ -262,6 +267,29 @@ class NexArmStackBowlsTask:
                 self.held_bowl = None
                 self.held_rel_pos = None
                 self.held_rel_mat = None
+
+    def _track_physical_grasp(self, gripper_ctrl: float, site_pos: np.ndarray, site_mat: np.ndarray) -> None:
+        """A bowl is held while the gripper is commanded closed and a jaw still touches it.
+
+        It is grasped when both jaws touch it, and dropped when the command opens or the jaws lose it. The
+        relative pose is re-measured every step, so it follows the bowl as it slips or swings in the jaws.
+        """
+        if gripper_ctrl < self.assist_release_pos:
+            self.held_bowl = None
+        else:
+            contacts = self._bowl_jaw_contacts()
+            if self.held_bowl is not None and not contacts[self.held_bowl]:
+                self.held_bowl = None
+            if self.held_bowl is None and gripper_ctrl > self.assist_engage_pos:
+                candidates = [self.target_bowl] if self.target_bowl is not None else COLORS
+                self.held_bowl = next((c for c in candidates if len(contacts[c]) == 2), None)
+        if self.held_bowl is None:
+            self.held_rel_pos = None
+            self.held_rel_mat = None
+            return
+        body = self._body_ids[self.held_bowl]
+        self.held_rel_pos = site_mat.T @ (self.bowl_position(self.held_bowl) - site_pos)
+        self.held_rel_mat = site_mat.T @ self.backend.data.xmat[body].reshape(3, 3)
 
     def _bowl_jaw_contacts(self) -> dict[str, set[int]]:
         """Return penetrating jaw contacts grouped by bowl (ignores contact margins)."""

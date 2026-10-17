@@ -459,7 +459,7 @@ def _scripted_stack_bowls(seed: int, **kwargs) -> _ScriptedEnvRobot:
     from examples.nexarm.generate_stack_bowls_dataset import generate_episode
     from lerobot.motors.nexarm.nexarm import JOINT_NAMES
 
-    env_kwargs = {key: kwargs.pop(key) for key in ("assist_release_pos",) if key in kwargs}
+    env_kwargs = {key: kwargs.pop(key) for key in ("assist_release_pos", "grasp_mode") if key in kwargs}
     env = gym.make("NexArmStackBowls-v0", obs_type="state", **env_kwargs).unwrapped
     env.reset(seed=seed)
     robot = _ScriptedEnvRobot(env, **kwargs)
@@ -495,12 +495,40 @@ def test_nexarm_stack_bowls_dense_reward_pays_release_and_success_over_holding()
 def test_nexarm_stack_bowls_env_releases_at_real_partial_openings():
     """Real operators open only to about 1990; the env's default threshold drops the bowl there."""
     released = _scripted_stack_bowls(_SOLVED_SEED, min_open_while_held=1990)
+    assert released.env.task.grasp_mode == "physical"
     assert released.env.task.assist_release_pos == 2300
     assert released.infos[-1]["is_success"]
 
-    never_released = _scripted_stack_bowls(_SOLVED_SEED, min_open_while_held=1990, assist_release_pos=1600)
+    assisted = _scripted_stack_bowls(_SOLVED_SEED, min_open_while_held=1990, grasp_mode="contact_assisted")
+    assert assisted.infos[-1]["is_success"]
+    # The rigid assist only lets go below its threshold, so 1600 never drops the bowl at real openings.
+    never_released = _scripted_stack_bowls(
+        _SOLVED_SEED, min_open_while_held=1990, grasp_mode="contact_assisted", assist_release_pos=1600
+    )
     assert not never_released.infos[-1]["is_success"]
     assert never_released.infos[-1]["failed_stage"] == "released_middle"
+
+
+def test_nexarm_stack_bowls_physical_grasp_holds_by_friction_alone(monkeypatch):
+    """With no assist the bowl is a free body: it rises with the closed jaws and is never teleported."""
+    import mujoco
+
+    from examples.nexarm.generate_stack_bowls_dataset import generate_episode
+
+    teleports = []  # the assist sets a carried bowl's orientation with mju_mat2Quat
+    original = mujoco.mju_mat2Quat
+    monkeypatch.setattr(mujoco, "mju_mat2Quat", lambda *args: teleports.append(args) or original(*args))
+    env = gym.make("NexArmStackBowls-v0", obs_type="state").unwrapped
+    try:
+        env.reset(seed=_SOLVED_SEED)
+        assert env.task.grasp_mode == "physical"
+        robot = _ScriptedEnvRobot(env, min_open_while_held=0.0)
+        generate_episode(robot, env.task, seed=_SOLVED_SEED)
+    finally:
+        env.close()
+    assert not teleports
+    assert robot.infos[-1]["is_success"]
+    assert robot.infos[-1]["stage/picked_middle"] and robot.infos[-1]["stage/picked_top"]
 
 
 def test_nexarm_stack_bowls_info_reports_stages():
@@ -526,6 +554,12 @@ def test_nexarm_env_config_forwards_assist_thresholds_to_stack_bowls_only():
     assert "assist_release_pos" not in NexArmEnv().gym_kwargs
     with pytest.raises(ValueError, match="NexArmStackBowls"):
         NexArmEnv(assist_release_pos=2000)
+    cfg = NexArmEnv(task="NexArmStackBowls-v0", obs_type="state", grasp_mode="contact_assisted")
+    env = gym.make("NexArmStackBowls-v0", **cfg.gym_kwargs)
+    assert env.unwrapped.task.grasp_mode == "contact_assisted"
+    env.close()
+    with pytest.raises(ValueError, match="NexArmStackBowls"):
+        NexArmEnv(grasp_mode="physical")
 
 
 def test_lerobot_eval_reports_stack_bowls_success_and_stage_rates():

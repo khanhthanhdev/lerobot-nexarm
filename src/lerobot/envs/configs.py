@@ -259,6 +259,9 @@ class NexArmEnv(EnvConfig):
     # None keeps the env defaults (2400 and 2300; 2300 lets go at real operators' partial openings).
     assist_engage_pos: float | None = None
     assist_release_pos: float | None = None
+    # Stack-bowls grasp: None keeps the env default ("physical", friction only); "contact_assisted" carries
+    # a bowl rigidly once both jaws touch it.
+    grasp_mode: str | None = None
     features: dict[str, PolicyFeature] = field(
         default_factory=lambda: {
             ACTION: PolicyFeature(type=FeatureType.ACTION, shape=(6,)),
@@ -279,9 +282,13 @@ class NexArmEnv(EnvConfig):
     )
 
     def __post_init__(self):
-        assist_set = self.assist_engage_pos is not None or self.assist_release_pos is not None
+        assist_set = any(
+            value is not None for value in (self.assist_engage_pos, self.assist_release_pos, self.grasp_mode)
+        )
         if assist_set and "StackBowls" not in self.gym_id:
-            raise ValueError("assist_engage_pos and assist_release_pos apply only to NexArmStackBowls-v0")
+            raise ValueError(
+                "assist_engage_pos, assist_release_pos and grasp_mode apply only to NexArmStackBowls-v0"
+            )
         if self.obs_type in ("pixels_agent_pos", "state"):
             self.features["agent_pos"] = PolicyFeature(type=FeatureType.STATE, shape=(6,))
         if self.obs_type in ("pixels_agent_pos", "pixels"):
@@ -324,7 +331,7 @@ class NexArmEnv(EnvConfig):
         }
         if self.episode_length is not None:
             kwargs["max_episode_steps"] = self.episode_length
-        for key in ("assist_engage_pos", "assist_release_pos"):
+        for key in ("assist_engage_pos", "assist_release_pos", "grasp_mode"):
             if getattr(self, key) is not None:
                 kwargs[key] = getattr(self, key)
         return kwargs

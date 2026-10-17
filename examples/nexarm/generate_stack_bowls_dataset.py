@@ -13,9 +13,9 @@ Calibrated to a real arm (see calibrate_sim.py), sharded over 2 GPUs, held-out e
         --episodes 200 --gpus 0,1 --split eval
 
 Domain randomization (visual, dynamics and every bowl's friction/mass/color) is on by default; --no-dr
-disables it. Grasps default to contact-gated assistance (both jaws must touch the bowl).
-This still assists bowl transport and is not a physical grasp benchmark.
-Use --grasp-mode proximity_assisted only to reproduce the legacy shortcut.
+disables it. Grasps are physical by default: the jaws hold each bowl by friction alone. Use
+--grasp-mode contact_assisted to carry a bowl rigidly once both jaws touch it, and proximity_assisted only
+to reproduce the legacy shortcut.
 Provenance goes to ``generation_report.json`` and one line per attempt to ``generation_episodes.jsonl``
 at the dataset root, as in generate_sim_dataset.py.
 """
@@ -549,9 +549,9 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--model", type=Path, default=Path("sim/description/mjcf/bowl_stack_scene.xml"))
     parser.add_argument(
         "--grasp-mode",
-        choices=("contact_assisted", "proximity_assisted"),
-        default="contact_assisted",
-        help="Both modes assist transport; contact_assisted requires both jaws touching the bowl.",
+        choices=("contact_assisted", "proximity_assisted", "physical"),
+        default="physical",
+        help="physical holds bowls by jaw friction alone; the assisted modes carry a grasped bowl rigidly.",
     )
     parser.add_argument(
         "--assist-release-pos",
@@ -562,8 +562,9 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--position-jitter-m",
         type=float,
-        default=0.005,
-        help="Per-axis bowl position variation around nominal slots, in meters (0 to 0.05).",
+        default=0.04,
+        help="Per-axis bowl position variation around nominal slots, in meters (0 to 0.05). The default "
+        "matches NexArmStackBowls-v0, so policies are evaluated on the layouts they were trained on.",
     )
     parser.add_argument(
         "--order",

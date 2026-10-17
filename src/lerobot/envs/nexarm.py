@@ -425,10 +425,11 @@ class NexArmStackBowlsEnv(_NexArmMujocoEnv):
     """Stack the red, blue and black bowls in the order named by the episode's instruction.
 
     This is the task of the real ``nexarm_stack_bowls`` recordings. Each reset draws the bowl layout and the
-    stacking order from the seed, and ``task_description`` holds the current episode's instruction. The grasp
-    is the simulator's contact assist (both jaws on one bowl), as in the scripted dataset generator. It
-    releases a bowl once the gripper command opens below ``assist_release_pos``; the default lets go at the
-    partial openings real operators use, which the generator's lower threshold never sees.
+    stacking order from the seed, and ``task_description`` holds the current episode's instruction. By
+    default the grasp is physical: the jaws hold a bowl by friction alone, as in the scripted dataset
+    generator. ``grasp_mode="contact_assisted"`` instead carries a bowl rigidly once both jaws touch it. Either
+    way a bowl counts as released once the gripper command opens below ``assist_release_pos``; the default
+    lets go at the partial openings real operators use.
 
     The dense reward is potential-based: each shaping term pays the change in its potential, so over an
     episode the terms sum to the final potential minus the first. Holding a bowl therefore earns nothing per
@@ -448,9 +449,11 @@ class NexArmStackBowlsEnv(_NexArmMujocoEnv):
         position_jitter_m: float = 0.04,
         assist_engage_pos: float = GRIPPER_ASSIST_ENGAGE_POS,
         assist_release_pos: float = REAL_TELEOP_ASSIST_RELEASE_POS,
+        grasp_mode: str = "physical",
         **kwargs: Any,
     ) -> None:
         self.position_jitter_m = position_jitter_m
+        self.grasp_mode = grasp_mode
         self.assist_engage_pos = assist_engage_pos
         self.assist_release_pos = assist_release_pos
         self._last_potential: dict[str, float] | None = None
@@ -465,6 +468,7 @@ class NexArmStackBowlsEnv(_NexArmMujocoEnv):
             position_jitter_m=self.position_jitter_m,
             assist_engage_pos=self.assist_engage_pos,
             assist_release_pos=self.assist_release_pos,
+            grasp_mode=self.grasp_mode,
         )
 
     def reset(
