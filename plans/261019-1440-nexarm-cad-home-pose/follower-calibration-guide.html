@@ -1,0 +1,373 @@
+<title>NexArm Follower Calibration</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=IBM+Plex+Sans:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column; numbered steps down a left rail, terminal blocks and the pose sketch inline. */
+:root {
+  --bg: #f4f6f7;
+  --surface: #ffffff;
+  --ink: #18222d;
+  --muted: #56636f;
+  --line: #d7dee3;
+  --accent: #0b6a86;
+  --accent-soft: #e2f0f4;
+  --warn: #9a5b00;
+  --warn-soft: #fbf0dc;
+  --term-bg: #16202a;
+  --term-fg: #dce6ec;
+  --term-dim: #8ea1ad;
+  --font-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11181f; --surface: #18222c; --ink: #e3eaef; --muted: #9aa9b4; --line: #2a3742;
+    --accent: #5cc3df; --accent-soft: #15323d; --warn: #f0b45a; --warn-soft: #33270f;
+    --term-bg: #0b1117; --term-fg: #dce6ec; --term-dim: #7f929e; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11181f; --surface: #18222c; --ink: #e3eaef; --muted: #9aa9b4; --line: #2a3742;
+  --accent: #5cc3df; --accent-soft: #15323d; --warn: #f0b45a; --warn-soft: #33270f;
+  --term-bg: #0b1117; --term-fg: #dce6ec; --term-dim: #7f929e; color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 16px/1.6 var(--font-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.page { max-width: 760px; margin: 0 auto; padding-block: 48px 72px; display: grid; gap: 44px; }
+
+header { display: grid; gap: 14px; }
+.eyebrow {
+  font: 600 12px/1 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--accent);
+}
+h1 {
+  font: 800 clamp(30px, 6vw, 44px)/1.08 var(--font-display); margin: 0; letter-spacing: -.01em; text-wrap: balance;
+}
+.lede { margin: 0; color: var(--muted); font-size: 17px; max-width: 62ch; }
+
+.facts {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px;
+  background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
+}
+.facts > div { background: var(--surface); padding: 14px 16px; display: grid; gap: 4px; min-width: 0; }
+.facts dt { font: 600 11px/1.2 var(--font-mono); text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
+.facts dd { margin: 0; font-size: 14.5px; overflow-wrap: anywhere; }
+@media (max-width: 620px) { .facts { grid-template-columns: 1fr; } }
+
+h2 { font: 700 24px/1.2 var(--font-display); margin: 0; text-wrap: balance; }
+h3 { font: 700 17px/1.3 var(--font-display); margin: 0; }
+p { margin: 0; }
+code { font: 14px var(--font-mono); background: var(--accent-soft); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 36px; counter-reset: step; }
+.step { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 0 18px; counter-increment: step; }
+.step::before {
+  content: counter(step); width: 40px; height: 40px; border-radius: 50%;
+  display: grid; place-items: center; font: 700 17px var(--font-display);
+  color: var(--accent); border: 2px solid var(--accent); background: var(--surface);
+}
+.step-body { display: grid; gap: 14px; min-width: 0; padding-top: 6px; }
+.step-body ul, .step-body ol { margin: 0; padding-left: 22px; display: grid; gap: 6px; }
+
+.term {
+  background: var(--term-bg); color: var(--term-fg); border-radius: 8px;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start;
+}
+.term pre {
+  margin: 0; padding: 14px 16px; overflow-x: auto; font: 14px/1.55 var(--font-mono); white-space: pre;
+}
+.term .dim { color: var(--term-dim); }
+.copy {
+  margin: 8px; padding: 6px 10px; border-radius: 6px; border: 1px solid #3a4a57;
+  background: transparent; color: var(--term-fg); font: 500 12px var(--font-mono); cursor: pointer;
+}
+.copy:hover { background: #24313c; }
+.copy:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.note, .caution {
+  border-radius: 8px; padding: 12px 16px; display: grid; gap: 4px; font-size: 15px;
+}
+.note { background: var(--accent-soft); }
+.caution { background: var(--warn-soft); }
+.note strong { color: var(--accent); }
+.caution strong { color: var(--warn); }
+
+.prompts { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--surface); }
+.prompt { display: grid; grid-template-columns: 150px minmax(0, 1fr); border-top: 1px solid var(--line); }
+.prompt:first-child { border-top: 0; }
+.prompt > * { padding: 12px 14px; min-width: 0; }
+.prompt .when { font: 500 13px/1.45 var(--font-mono); color: var(--muted); background: var(--bg); }
+.prompt .do { font-size: 15px; display: grid; gap: 4px; }
+.key { font: 500 13px var(--font-mono); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; background: var(--bg); }
+@media (max-width: 560px) { .prompt { grid-template-columns: 1fr; } }
+
+figure { margin: 0; display: grid; gap: 8px; }
+.poses { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px; overflow-x: auto; }
+.poses svg { display: block; width: 100%; min-width: 460px; height: auto; }
+.poses .link { stroke: var(--ink); stroke-width: 7; stroke-linecap: round; fill: none; }
+.poses .moved { stroke: var(--accent); }
+.poses .joint { fill: var(--surface); stroke: var(--ink); stroke-width: 2.5; }
+.poses .base { fill: var(--muted); }
+.poses .table { stroke: var(--line); stroke-width: 3; }
+.poses .ghost { stroke: var(--line); stroke-width: 7; stroke-linecap: round; stroke-dasharray: 2 9; fill: none; }
+.poses text { fill: var(--muted); font: 13px var(--font-body); }
+.poses .title { fill: var(--ink); font: 700 14px var(--font-display); }
+.poses .arrow { stroke: var(--accent); stroke-width: 2; fill: none; }
+.poses .arrowhead { fill: var(--accent); }
+figcaption { font-size: 13.5px; color: var(--muted); }
+
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+th, td { text-align: left; padding: 10px 14px; border-top: 1px solid var(--line); vertical-align: top; }
+thead th { border-top: 0; font: 600 11px/1.3 var(--font-mono); text-transform: uppercase; letter-spacing: .07em; color: var(--muted); background: var(--bg); }
+td:first-child { font-family: var(--font-mono); font-size: 13px; min-width: 210px; }
+
+section { display: grid; gap: 16px; }
+.limits ul { margin: 0; padding-left: 22px; display: grid; gap: 8px; }
+footer { color: var(--muted); font-size: 13.5px; border-top: 1px solid var(--line); padding-top: 18px; }
+</style>
+
+<div class="page">
+  <header>
+    <div class="eyebrow">Hiwonder NexArm · follower only</div>
+    <h1>Calibrate the simulator to your follower arm</h1>
+    <p class="lede">This measures which way each real joint turns and where its zero sits, so the MuJoCo twin poses the same raw servo values the same way your arm does. You only need the follower arm and about ten minutes.</p>
+    <dl class="facts">
+      <div><dt>You need</dt><dd>Follower on USB, power on, the Hiwonder desktop app</dd></div>
+      <div><dt>Time</dt><dd>About 10 minutes</dd></div>
+      <div><dt>Result</dt><dd><code>outputs/nexarm/joint_mapping_probe.json</code></dd></div>
+    </dl>
+  </header>
+
+  <ol class="steps">
+    <li class="step">
+      <div class="step-body">
+        <h2>Prepare the arm</h2>
+        <ol>
+          <li>Power the follower and connect it by USB.</li>
+          <li>In the Hiwonder desktop app, run <strong>Home</strong>. Every servo goes to raw 2048: the upper arm stands vertical, the elbow bends 90°, and the forearm and gripper point straight out over the table, gripper half open. This gives you a known starting pose.</li>
+          <li><strong>Close the desktop app completely.</strong> It holds the serial port, and the probe cannot connect while it is open.</li>
+          <li>Clear the space around the arm. You will move it by hand.</li>
+        </ol>
+        <p>If you are not sure which port the follower is on, run this and unplug the arm when it asks:</p>
+        <div class="term">
+          <pre>uv run lerobot-find-port</pre>
+          <button class="copy" type="button" data-copy="uv run lerobot-find-port">Copy</button>
+        </div>
+        <p>The follower is usually <code>/dev/ttyUSB1</code> on Linux, or a <code>COM</code> port on Windows.</p>
+      </div>
+    </li>
+
+    <li class="step">
+      <div class="step-body">
+        <h2>Start the probe</h2>
+        <p>Run it from the repository root:</p>
+        <div class="term">
+          <pre>uv run python examples/nexarm/probe_joint_mapping.py --port /dev/ttyUSB1</pre>
+          <button class="copy" type="button" data-copy="uv run python examples/nexarm/probe_joint_mapping.py --port /dev/ttyUSB1">Copy</button>
+        </div>
+        <div class="caution">
+          <strong>Hold the arm before the first Enter.</strong>
+          <span>The first prompt switches the motors off. Without support, the arm drops under its own weight.</span>
+        </div>
+      </div>
+    </li>
+
+    <li class="step">
+      <div class="step-body">
+        <h2>Answer the prompts</h2>
+        <p>The probe uses one reference pose: the arm <strong>straight up</strong>, which is not the app's Home pose. From Home, you get there by raising the forearm 90° until it points at the ceiling; the upper arm is already vertical.</p>
+        <p> From there you turn one joint a quarter turn (90°), answer a question, and return to straight up. Directions are always from the robot's point of view: <em>front</em> is toward the work area, <em>left</em> and <em>right</em> are the robot's own left and right.</p>
+
+        <figure>
+          <div class="poses" role="img" aria-label="Side view: the arm straight up, then the elbow bent a quarter turn so the forearm points front.">
+            <svg viewBox="0 0 560 260" xmlns="http://www.w3.org/2000/svg">
+              <text class="title" x="40" y="24">Reference: straight up</text>
+              <line class="table" x1="20" y1="232" x2="250" y2="232"/>
+              <rect class="base" x="105" y="212" width="50" height="20" rx="3"/>
+              <line class="link" x1="130" y1="210" x2="130" y2="140"/>
+              <line class="link" x1="130" y1="140" x2="130" y2="80"/>
+              <line class="link" x1="130" y1="80" x2="130" y2="44"/>
+              <circle class="joint" cx="130" cy="140" r="7"/>
+              <circle class="joint" cx="130" cy="80" r="7"/>
+              <text x="146" y="178">upper arm</text>
+              <text x="146" y="115">forearm</text>
+              <text x="146" y="60">gripper</text>
+              <text x="24" y="252">back</text>
+              <text x="210" y="252">front →</text>
+
+              <text class="title" x="320" y="24">Example: elbow quarter turn</text>
+              <line class="table" x1="300" y1="232" x2="540" y2="232"/>
+              <rect class="base" x="345" y="212" width="50" height="20" rx="3"/>
+              <line class="link" x1="370" y1="210" x2="370" y2="140"/>
+              <line class="ghost" x1="370" y1="140" x2="370" y2="80"/>
+              <line class="link moved" x1="370" y1="140" x2="430" y2="140"/>
+              <line class="link moved" x1="430" y1="140" x2="466" y2="140"/>
+              <circle class="joint" cx="370" cy="140" r="7"/>
+              <circle class="joint" cx="430" cy="140" r="7"/>
+              <path class="arrow" d="M 390 92 A 50 50 0 0 1 418 120"/>
+              <polygon class="arrowhead" points="423,126 411,121 420,113"/>
+              <text x="440" y="122">answer: f</text>
+              <text x="304" y="252">back</text>
+              <text x="490" y="252">front →</text>
+            </svg>
+          </div>
+          <figcaption>Side view. Only the joint being probed moves; everything else stays straight up. The flex joints can go either way, as long as you report where the link points.</figcaption>
+        </figure>
+
+        <div class="prompts">
+          <div class="prompt">
+            <div class="when">Motors turn off</div>
+            <div class="do">Support the arm with one hand, press <span class="key">Enter</span>.</div>
+          </div>
+          <div class="prompt">
+            <div class="when">Pose straight up</div>
+            <div class="do">Arm facing the work area; upper arm, forearm and gripper all vertical, gripper pointing up. Hold it still, press <span class="key">Enter</span>.</div>
+          </div>
+          <div class="prompt">
+            <div class="when">Wrist camera side</div>
+            <div class="do">Which side of the gripper is the wrist camera on? Type <span class="key">f</span> <span class="key">b</span> <span class="key">l</span> or <span class="key">r</span>.</div>
+          </div>
+          <div class="prompt">
+            <div class="when">shoulder_pan</div>
+            <div class="do">Turn only the base a quarter turn counter-clockwise, seen from above. Then return to straight up.</div>
+          </div>
+          <div class="prompt">
+            <div class="when">shoulder_lift</div>
+            <div class="do">Tilt only the shoulder until the upper arm is horizontal, either way. Say where the upper arm points (<span class="key">f</span>/<span class="key">b</span>/<span class="key">l</span>/<span class="key">r</span>). Return to straight up.</div>
+          </div>
+          <div class="prompt">
+            <div class="when">elbow_flex</div>
+            <div class="do">Bend only the elbow until the forearm is horizontal, either way. Say where the forearm points. Return to straight up.</div>
+          </div>
+          <div class="prompt">
+            <div class="when">wrist_flex</div>
+            <div class="do">Bend only the wrist until the gripper is horizontal, either way. Say where the gripper points. Return to straight up.</div>
+          </div>
+          <div class="prompt">
+            <div class="when">wrist_roll</div>
+            <div class="do">Turn only the wrist a quarter turn counter-clockwise, seen from above. Return to straight up.</div>
+          </div>
+        </div>
+
+        <div class="note">
+          <strong>Your Home pose does not matter.</strong>
+          <span>The probe reads the raw values in the straight-up pose instead of assuming they are 2048. It works whether Home is upright or bent.</span>
+        </div>
+      </div>
+    </li>
+
+    <li class="step">
+      <div class="step-body">
+        <h2>Check the result</h2>
+        <p>The probe prints one line per joint and saves the file. The offsets below are what your arm should give, predicted from the Home pose in the photo of your follower. Your measured offsets should land within a few degrees; signs and tick counts depend on the arm, so treat those as layout only.</p>
+        <div class="term">
+          <pre><span class="dim">qpos = sign * (raw - 2048) * 2*pi/4096 + offset_rad</span>
+shoulder_pan   sign +1  offset    +0.00 deg  quarter turn 1021 ticks
+shoulder_lift  sign -1  offset   -35.70 deg  quarter turn 1030 ticks
+elbow_flex     sign +1  offset   -60.70 deg  quarter turn 1018 ticks
+wrist_flex     sign -1  offset   +24.80 deg  quarter turn 1026 ticks
+wrist_roll     sign +1  offset    +0.00 deg  quarter turn 1024 ticks</pre>
+        </div>
+        <ul>
+          <li><strong>sign</strong> is +1 when the real joint turns the same way as the sim joint, −1 when it is reversed.</li>
+          <li><strong>offset</strong> is the sim angle at raw 2048, so it describes your Home pose. If one is off by about 90° from the values above, that joint's quarter turn or direction answer was wrong: run the probe again. <code>wrist_roll</code> can read 0° or ±90° depending on which side the wrist camera is on.</li>
+          <li><strong>quarter turn</strong> should be close to 1024 ticks (a quarter of 4096). Anything outside 768–1280 prints a warning.</li>
+        </ul>
+        <p>Read every line that starts with <code>WARNING:</code>. If one appears, see Troubleshooting below and run the probe again.</p>
+      </div>
+    </li>
+
+    <li class="step">
+      <div class="step-body">
+        <h2>Use the mapping</h2>
+        <p>Pass the file anywhere sim data is made. Datasets and calibrations remember which mapping they used and refuse to mix with a different one.</p>
+        <div class="term">
+          <pre>MUJOCO_GL=egl uv run python examples/nexarm/generate_sim_dataset.py \
+  --repo-id=local/nexarm_sim_pick_place \
+  --root=outputs/datasets/nexarm_sim_pick_place \
+  --episodes=20 \
+  --joint-mapping outputs/nexarm/joint_mapping_probe.json</pre>
+          <button class="copy" type="button" data-copy="MUJOCO_GL=egl uv run python examples/nexarm/generate_sim_dataset.py --repo-id=local/nexarm_sim_pick_place --root=outputs/datasets/nexarm_sim_pick_place --episodes=20 --joint-mapping outputs/nexarm/joint_mapping_probe.json">Copy</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Where</th><th>Option</th></tr></thead>
+            <tbody>
+              <tr><td>generate_sim_dataset.py</td><td><code>--joint-mapping PATH</code></td></tr>
+              <tr><td>generate_stack_bowls_dataset.py</td><td><code>--joint-mapping PATH</code></td></tr>
+              <tr><td>calibrate_sim.py</td><td><code>--joint-mapping PATH</code></td></tr>
+              <tr><td>lerobot-* with nexarm_sim</td><td><code>--robot.joint_mapping_path=PATH</code></td></tr>
+              <tr><td>lerobot-train / eval with the nexarm env</td><td><code>--env.joint_mapping_path=PATH</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>To check by eye: pose the real arm, note its raw values, set the same values with the sliders in <code>examples/nexarm/simulate.py</code>, and compare the two poses.</p>
+      </div>
+    </li>
+  </ol>
+
+  <section>
+    <h2>Troubleshooting</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Message</th><th>What to do</th></tr></thead>
+        <tbody>
+          <tr><td>Port busy, or no reply from the arm</td><td>Close the Hiwonder desktop app and any other script using the follower, then check the port with <code>lerobot-find-port</code>.</td></tr>
+          <tr><td>&lt;joint&gt; moved only N ticks; redo its quarter turn</td><td>That joint barely moved. Run the probe again and turn the joint a full quarter turn.</td></tr>
+          <tr><td>a quarter turn read N ticks, 1.4x the expected 1024</td><td>The move was not close to 90°. Redo it, judging horizontal and vertical against the table.</td></tr>
+          <tr><td>&lt;joint&gt; tilts left, but the sim joint only tilts front/back here</td><td>The arm was not facing the work area in the straight-up pose. Face it front and run the probe again.</td></tr>
+          <tr><td>raw 2048 is at sim qpos … outside the joint range</td><td>The mapping is valid, but the sim joint limits need re-centring before you rely on that joint near its ends.</td></tr>
+          <tr><td>Sim arm stops short of the real one</td><td>Known issue: the sim's joint limits are centred on the CAD pose, not on your Home pose. With your offsets the sim elbow can only rise about 74° from Home, and shoulder lift and wrist flex lose about 36° and 25° on one side. The joint limits in the sim model need re-centring on Home.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="limits">
+    <h2>What still needs the leader arm</h2>
+    <ul>
+      <li><strong>Leader vs follower alignment</strong> (<code>calibrate_arms.py</code>) compares the two arms. With the follower alone, check its zeros on the desktop app's Servo Advanced page instead.</li>
+      <li><strong>Fitting the sim's motion</strong> (<code>calibrate_sim.py</code>) needs recordings with both commands and measured positions. Desktop-app recordings with the motors off only have positions, so they cannot be used.</li>
+      <li>You can still time each servo on the follower alone. This moves the arm under power, so clear the space first:</li>
+    </ul>
+    <div class="term">
+      <pre>uv run python examples/nexarm/servo_step_test.py --port /dev/ttyUSB1 --joint elbow_flex --delta 600</pre>
+      <button class="copy" type="button" data-copy="uv run python examples/nexarm/servo_step_test.py --port /dev/ttyUSB1 --joint elbow_flex --delta 600">Copy</button>
+    </div>
+  </section>
+
+  <footer>Full sim calibration procedure: <code>docs/source/nexarm/sim_calibration.md</code>. Probe source: <code>examples/nexarm/probe_joint_mapping.py</code>.</footer>
+</div>
+
+<script>
+document.querySelectorAll(".copy").forEach((button) => {
+  button.addEventListener("click", () => {
+    const text = button.dataset.copy;
+    const done = () => { button.textContent = "Copied"; setTimeout(() => { button.textContent = "Copy"; }, 1500); };
+    const fallback = () => {
+      const pre = button.parentElement.querySelector("pre");
+      const range = document.createRange();
+      range.selectNodeContents(pre);
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+      button.textContent = "Selected";
+    };
+    try {
+      navigator.clipboard.writeText(text).then(done, fallback);
+    } catch (error) {
+      fallback();
+    }
+  });
+});
+</script>

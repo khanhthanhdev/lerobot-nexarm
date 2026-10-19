@@ -10,11 +10,15 @@ dependencies: []
 # Phase 0: Real-to-sim joint mapping
 
 ## Goal
+
 The sim poses the arm the way the real follower is posed for the same raw ticks. Every real-data step (replay
 RMS, `calibrate_sim.py`, bowl-layout inference, real-to-sim replays, co-training) depends on this.
 
 ## Context
-- The real follower stands straight up at raw 2048 (vendor Home; user-confirmed).
+
+- ~~The real follower stands straight up at raw 2048 (vendor Home; user-confirmed).~~ Superseded on
+  2026-10-19 by a photo of the follower at Home: upper arm vertical, elbow bent 90°, forearm and gripper
+  horizontal. The CAD is being re-posed to match; see `plans/261019-1440-nexarm-cad-home-pose/plan.md`.
 - The sim maps `rad = (raw - 2048) * 2π / 4096` with no sign or offset, so 2048 lands on the CAD export pose.
   In that pose the upper arm leans back about 35°, the forearm angles forward and down, and the gripper points
   forward.
@@ -24,10 +28,11 @@ RMS, `calibrate_sim.py`, bowl-layout inference, real-to-sim replays, co-training
   the current MJCF range of ±135°, so the joint ranges must be re-centred together with the mapping.
 
 ## Steps
+
 - [ ] User: run `examples/nexarm/probe_joint_mapping.py --port /dev/ttyUSB1` and share
-  `outputs/nexarm/joint_mapping_probe.json`.
+      `outputs/nexarm/joint_mapping_probe.json`.
 - [ ] User (machine with OpenGL): run `examples/nexarm/overlay_recorded_frames.py` with `--mapping` on episodes
-  0, 150 and one from 69–92, and confirm that the wrist overlays line up.
+      0, 150 and one from 69–92, and confirm that the wrist overlays line up.
 - [ ] Apply the mapping in `src/lerobot/motors/nexarm/mujoco_mapping.py`:
   - add the per-joint sign and offset, and bump `JOINT_MAPPING_VERSION` to `servo_4096_v2`;
   - re-centre the MJCF joint ranges, and change the `HOME_POSITIONS` meaning if needed;
@@ -35,10 +40,11 @@ RMS, `calibrate_sim.py`, bowl-layout inference, real-to-sim replays, co-training
     mapping);
   - update the URDF/Isaac joint origins.
 - [ ] Re-run the bowl and pick-place generators and confirm the success rates. Existing sim datasets record
-  `joint_mapping`, so the version check refuses mixing them with v2 data.
+      `joint_mapping`, so the version check refuses mixing them with v2 data.
 - [ ] Re-run `audit_real_dataset.py`, then check that forward kinematics puts real grasps at table height
-  (jaw z within 0.02–0.08 m).
+      (jaw z within 0.02–0.08 m).
 
 ## Risk / rollback
+
 This changes what every sim dataset and policy means in joint space, which the version bump is meant to
 surface. Roll back by reverting the commit; v1 datasets stay valid under v1.
