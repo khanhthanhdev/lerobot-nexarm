@@ -258,7 +258,8 @@ def _interpolate_stage(
         command = _clip_action({key: float((1 - alpha) * start[key] + alpha * target[key]) for key in target})
         _send(robot, command, noise, record_frame)
         if task.observe().terminated:
-            break
+            # Stop here: settling would jump the command straight to the waypoint in one frame.
+            return True
     # Hold the waypoint only until the arm has converged; idle frames teach a policy to stall.
     for step in range(settle_steps):
         _send(robot, target, noise, record_frame)

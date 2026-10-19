@@ -243,7 +243,8 @@ def _interpolate_stage(
         if record_frame is not None:
             record_frame(observation, sent)
         if task.observe().terminated:
-            break
+            # Stop here: settling would jump the command straight to the target in one frame.
+            return True
 
     # Motor lag can leave a carried bowl centimeters from its IK target. Keep
     # commanding the target before releasing or starting the next motion.
