@@ -10,7 +10,7 @@
    was tuned by hand (actuators, contacts, materials, sensors, keyframes);
 4. raises the arm so the Fusion tabletop is the scene floor (z = 0);
 5. writes ``workcell.xml`` (the box-shaped fixtures around the arm), includes it in every scene, and moves the
-   ``top`` camera to the Fusion D435i and the ``front`` camera onto the Fusion C270 mount;
+   ``top`` camera to the Fusion D435i (the ``front`` camera keeps its scene pose);
 6. refits the arm-link collision boxes and copies the staged meshes into ``sim/assets/meshes/visual/``;
 7. runs ``sim/isaac_lab/build_isaac_assets.py``, which mirrors the result to the URDF collisions and the Isaac
    Lab scene description.
@@ -417,8 +417,9 @@ def workcell_xml(extract: dict, mount: np.ndarray) -> str:
     return "\n".join(lines)
 
 
-# Scene camera name -> extract key.
-CAMERAS = {"top": "top_camera", "front": "front_camera"}
+# Scene camera name -> extract key. ``front`` keeps its hand-set scene pose (the Fusion C270 mount does not
+# match the real webcam placement), so the extract's ``front_camera`` is ignored.
+CAMERAS = {"top": "top_camera"}
 
 
 def camera_pose(camera: dict, mount: np.ndarray) -> tuple[np.ndarray, np.ndarray]:

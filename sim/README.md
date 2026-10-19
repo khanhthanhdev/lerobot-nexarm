@@ -166,10 +166,14 @@ slides only.
 
 The tick scale matches the servo, and the joints are assumed to be
 direct-drive. Without a measured mapping the formula above applies with no sign
-or offset, so raw `2048` lands on the exported CAD pose, which need not match
-the real follower's vendor Home pose. Before sim-to-real work, measure each
-joint's sign and zero offset on the real follower (un-energised, posed by hand
-straight up, then a quarter turn per joint; the readings need not be `2048`):
+or offset, so raw `2048` lands on the exported CAD pose. The CAD zero is the
+real follower's Home pose: an L with the upper-arm tube vertical and the forearm
+and gripper horizontal, pointing forward, with the jaws closed (mapping version
+`servo_4096_v2`; `v1` data used an earlier CAD zero with the arm bent differently
+and must be regenerated). The servo signs and small zero errors still differ per
+arm, so before sim-to-real work, measure each joint's sign and zero offset on the
+real follower (un-energised, posed by hand straight up, then a quarter turn per
+joint; the readings need not be `2048`):
 
 ```bash
 uv run python examples/nexarm/probe_joint_mapping.py --port /dev/ttyUSB1
@@ -583,7 +587,8 @@ The design must contain:
   `link_6:1+right_jaw:1` and `cam_mount:1`;
 - joints named `joint1` … `joint5`, `gripper_base_joint`, `left_jaw_joint` and
   `right_jaw_joint` (the older `joint_1_base_to_link_1`-style names also work),
-  all at value 0;
+  all at value 0, with value 0 being the real Home pose (raw `2048` on every arm
+  servo, gripper closed at raw `2833` with the jaws touching);
 - a `workbench` occurrence whose top face is the table surface, and optionally a
   `d435i` occurrence for the overhead camera (lens along its -Z, sensor bar along
   its X) and a `C270` mount occurrence for the front webcam.
@@ -594,14 +599,14 @@ depend on them), or whose centres of mass fall outside their meshes. If it passe
 it updates every body's mass, centre of mass and inertia in the MJCF, URDF and
 xacro, raises `nexarm_mount` so the tabletop is z = 0, writes `workcell.xml` from
 the box-shaped fixtures (non-box bodies are listed and skipped), includes it in
-every scene, and places the cameras:
+every scene, and places the `top` camera (RealSense D435i) at the Fusion camera,
+looking straight down. The image has the open front of the enclosure at the top
+and the back wall at the bottom, as on the real rig.
 
-- `top` (RealSense D435i) at the Fusion camera, looking straight down. The image
-  has the open front of the enclosure at the top and the back wall at the bottom,
-  as on the real rig.
-- `front` (Logitech C270) on the tilted shelf of the C270 mount at the top left,
-  looking back at the arm down the shelf's slope. The webcam itself is not in the
-  CAD, so its lens sits an assumed 16 mm above and 15 mm ahead of the shelf centre.
+The `front` camera (Logitech C270) keeps its pose in the scene files: the top
+left of the enclosure, looking back at the arm. The merge does not move it, even
+though the extract still reports the Fusion C270 mount, because that mount does
+not sit where the real webcam does.
 
 Each camera's `fovy` lives in the scene files and is kept by the merge. `front`
 uses 37.6 degrees: the C270's 55-degree diagonal (720p) gives 48.8 degrees

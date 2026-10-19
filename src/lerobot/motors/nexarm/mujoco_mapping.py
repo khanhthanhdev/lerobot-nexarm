@@ -19,7 +19,8 @@ MuJoCo joint range, so the joint range acts like a hardware limit. The gripper m
 range linearly and inverted onto the jaw slide joint: ``GRIPPER_CLOSED_POS`` is the slide's lower limit
 (jaws closed) and ``GRIPPER_OPEN_POS`` its upper limit (jaws fully open).
 
-By default raw 2048 lands on the exported CAD pose. A :class:`JointMapping` measured on the real follower
+By default raw 2048 lands on the exported CAD pose, which is the real arm's Home pose (``servo_4096_v2``;
+``v1`` used an earlier CAD zero with the arm bent differently). A :class:`JointMapping` measured on the real follower
 with ``examples/nexarm/probe_joint_mapping.py`` adds a per-joint sign and zero offset, so the sim reaches the
 same pose as the real arm for the same raw values.
 """
@@ -45,7 +46,7 @@ from lerobot.motors.nexarm.nexarm import (
 
 # Bumped whenever the raw <-> joint mapping changes meaning. Calibrations and generated datasets record it
 # so data encoded with a different mapping is refused instead of silently mixed.
-JOINT_MAPPING_VERSION = "servo_4096_v1"
+JOINT_MAPPING_VERSION = "servo_4096_v2"
 
 
 @dataclass(frozen=True)

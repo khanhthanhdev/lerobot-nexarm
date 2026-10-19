@@ -1,7 +1,7 @@
 ---
 title: "NexArm CAD zero pose = real Home pose"
 description: "Re-pose the Fusion CAD so raw 2048 means the same arm pose in sim and on the real follower, then rebuild everything that depends on it."
-status: pending
+status: in-progress
 priority: P0
 effort: "CAD session + 4h + robot session"
 branch: main
@@ -41,21 +41,43 @@ From `real-follower-home.jpg`, at raw 2048 on every servo:
 - upper arm vertical;
 - elbow bent 90°, forearm horizontal, pointing toward the work area;
 - wrist straight, gripper horizontal and in line with the forearm;
-- gripper half open (2048 sits between open 1195 and closed 2833);
+- gripper half open at raw 2048 (between open 1195 and closed 2833); the CAD zero is closed (raw 2833,
+  jaws touching), which is the jaw slide's zero;
 - wrist camera on top of the gripper.
 
-Fitting the sim to that pose gives these joint angles relative to the current CAD zero (sim front is -y):
+The pose as built, in the old CAD zero's MuJoCo joint frames (sim front is -y). The earlier fit (−35.7° /
+−60.7° / +24.8°) made the joint-to-joint pivot line vertical; the upper-arm tube is offset from that line, so
+making the tube itself vertical adds about 9.3° to the shoulder and takes it back at the elbow:
 
-| Joint           | MuJoCo joint               | Target qpos at raw 2048 | Change needed in Fusion |
-| --------------- | -------------------------- | ----------------------: | ----------------------- |
-| `shoulder_pan`  | `joint_1_base_to_link_1`   |                    0.0° | none                    |
-| `shoulder_lift` | `joint_2_link_1_to_link_2` |                  −35.7° | upper arm to vertical   |
-| `elbow_flex`    | `joint_3_link_2_to_link_3` |                  −60.7° | forearm to horizontal   |
-| `wrist_flex`    | `joint_4_link_3_to_link_4` |                  +24.8° | gripper in line         |
-| `wrist_roll`    | `joint_5_link_4_to_link_5` |  0.0° (camera side TBC) | check camera side only  |
+| Joint           | MuJoCo joint               | Old-zero qpos of Home | Result                         |
+| --------------- | -------------------------- | --------------------: | ------------------------------ |
+| `shoulder_pan`  | `joint_1_base_to_link_1`   |                  0.0° | unchanged                      |
+| `shoulder_lift` | `joint_2_link_1_to_link_2` |                −45.0° | upper-arm tube vertical        |
+| `elbow_flex`    | `joint_3_link_2_to_link_3` |                −69.9° | forearm horizontal             |
+| `wrist_flex`    | `joint_4_link_3_to_link_4` |                +24.9° | gripper in line                |
+| `wrist_roll`    | `joint_5_link_4_to_link_5` |                  0.0° | camera on top                  |
 
-Signs are in the MuJoCo joint frames; in Fusion just match the photo. Reproduce the numbers with the script in
-"Reproduce the pose fit" below.
+`repose_models.py` (this folder) fits these from the new Fusion extract and prints them.
+
+## Outcome (2026-10-19)
+
+- Fusion `NexArm` v25: every joint at 0 is Home, gripper zero is closed (pinion 0 to −145.5°, slides 0 to
+  25.39 mm). Arm limits are symmetric about Home: ±135° / ±120° / ±135° / ±100° / ±180°, matching the MJCF
+  ranges, so problem 2 needed no range change. `NexArm-Sim-Single-Arm` v3 references v25.
+- `repose_models.py` moved every hand-kept arm-frame value with its link (MJCF joints, finger and gripper
+  collisions, sites, wrist camera, `ready` keyframe; URDF/xacro joint and visual origins) and dropped the
+  ±25.4 mm jaw visual offsets. `apply_fusion_extract.py` then passed its axis-line check unchanged (no
+  override flag needed, problem 3) and merged meshes, inertials, collision boxes and the Isaac scene JSON.
+- `ready` is now `0 -0.0154 0.3197 1.0655` (same physical pose). `JOINT_MAPPING_VERSION` is `servo_4096_v2`.
+- Both generators had a jump-to-target bug when the task ended mid-stage (settling sent the stage's final
+  waypoint in one frame); it surfaced as `quality_jerk_spike` with the new IK branches and is fixed.
+- Not taken from the extract: the Fusion C270 mount is 100 mm higher than the committed `front` camera.
+  Decision (user): keep the sim's `front` pose; the merge no longer moves `front` (`CAMERAS` in
+  `apply_fusion_extract.py`).
+- Still open in problem 5: the Isaac USDs need `build_usd.py` on a machine with Isaac Sim, and
+  `sim/mobile_nexarm/generate_assets.py` refuses to run because `spec.json` already disagreed with the MJCF
+  at HEAD (`joint_3` axis −x vs +x, gripper slide range). The mobile arm is unused, so its CI workflow is
+  manual-only until the spec is updated. The Rerun demo `sim/nexarm_demo.rrd` was rebuilt.
 
 ## Open problems
 
@@ -63,14 +85,14 @@ Status key: **open** needs work, **blocked** waits on another item, **known** ac
 
 | #   | Problem                                                                                                                                                                                                                                                                                                              | Status             | Where                                                                                         |
 | --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | --------------------------------------------------------------------------------------------- |
-| 1   | CAD zero pose is not the real Home pose. At raw 2048 the sim upper arm leans back ~36°, the elbow is folded and the forearm slopes down. Every sim dataset, IK target and policy is posed differently from hardware.                                                                                                 | open (CAD fix)     | Fusion design → `sim/description/`                                                            |
-| 2   | MJCF joint ranges are centred on the CAD pose, not on raw 2048. With the current CAD the sim elbow can rise only ~74° from Home and cannot reach straight up; shoulder lift and wrist flex lose ~36° and ~25° on one side. `probe_joint_mapping.py` does not warn because each offset is inside its range.           | blocked by 1       | `sim/description/mjcf/nexarm.xml` joint `range`                                               |
-| 3   | `sim/apply_fusion_extract.py` refuses any extract whose joint axis lines move more than 1 mm from the committed MJCF. A re-posed CAD moves them on purpose, and there is no override flag.                                                                                                                           | open (needs flag)  | `sim/apply_fusion_extract.py` (check near line 254)                                           |
-| 4   | Values tuned against the old zero pose: the `ready` keyframe (`0 -0.8 -0.9 1.5 0 0`), scripted generator waypoints and IK seeds, the wrist camera placement, and the hard-coded range table in `sim/test_sim_models.py` (lines ~254–280).                                                                            | blocked by 1       | `sim/description/mjcf/nexarm.xml:186`, `examples/nexarm/generate_*`, `sim/test_sim_models.py` |
-| 5   | Derived assets must be rebuilt after the CAD change: URDF/xacro, Isaac scene JSON and USDs, the mobile bimanual assets, and the Rerun demo.                                                                                                                                                                          | blocked by 1       | `sim/isaac_lab/`, `sim/mobile_nexarm/generate_assets.py`, `sim/nexarm_demo.rrd`               |
-| 6   | Joint directions (signs) are still unmeasured on the real arm. The CAD fix sets the zero, not the direction each servo turns.                                                                                                                                                                                        | blocked by 1       | `examples/nexarm/probe_joint_mapping.py` → `outputs/nexarm/joint_mapping_probe.json`          |
+| 1   | CAD zero pose is not the real Home pose. At raw 2048 the sim upper arm leans back ~36°, the elbow is folded and the forearm slopes down. Every sim dataset, IK target and policy is posed differently from hardware.                                                                                                 | fixed              | Fusion design → `sim/description/`                                                            |
+| 2   | MJCF joint ranges are centred on the CAD pose, not on raw 2048. With the current CAD the sim elbow can rise only ~74° from Home and cannot reach straight up; shoulder lift and wrist flex lose ~36° and ~25° on one side. `probe_joint_mapping.py` does not warn because each offset is inside its range.           | fixed              | `sim/description/mjcf/nexarm.xml` joint `range`                                               |
+| 3   | `sim/apply_fusion_extract.py` refuses any extract whose joint axis lines move more than 1 mm from the committed MJCF. A re-posed CAD moves them on purpose, and there is no override flag.                                                                                                                           | fixed (no flag)    | `sim/apply_fusion_extract.py` (check near line 254)                                           |
+| 4   | Values tuned against the old zero pose: the `ready` keyframe (`0 -0.8 -0.9 1.5 0 0`), scripted generator waypoints and IK seeds, the wrist camera placement, and the hard-coded range table in `sim/test_sim_models.py` (lines ~254–280).                                                                            | fixed              | `sim/description/mjcf/nexarm.xml:186`, `examples/nexarm/generate_*`, `sim/test_sim_models.py` |
+| 5   | Derived assets must be rebuilt after the CAD change: URDF/xacro, Isaac scene JSON and USDs, the mobile bimanual assets, and the Rerun demo.                                                                                                                                                                          | fixed (Isaac USD and mobile assets open, see Outcome) | `sim/isaac_lab/`, `sim/mobile_nexarm/generate_assets.py`, `sim/nexarm_demo.rrd`               |
+| 6   | Joint directions (signs) are still unmeasured on the real arm. The CAD fix sets the zero, not the direction each servo turns.                                                                                                                                                                                        | open (needs robot) | `examples/nexarm/probe_joint_mapping.py` → `outputs/nexarm/joint_mapping_probe.json`          |
 | 7   | Fitting the sim's motion (`calibrate_sim.py`) needs recordings with commands and measured positions. Only the leader can produce them today; desktop-app recordings with torque off have positions only. A follower-only recorder (scripted sweeps saved as a LeRobot dataset) would remove the need for the leader. | open (not written) | `examples/nexarm/calibrate_sim.py`                                                            |
-| 8   | Existing sim datasets and sim calibrations encode the old CAD pose. They must be regenerated after the CAD change.                                                                                                                                                                                                   | blocked by 1       | `outputs/datasets/`, `outputs/calibration/`, any Hub sim datasets                             |
+| 8   | Existing sim datasets and sim calibrations encode the old CAD pose. They must be regenerated after the CAD change.                                                                                                                                                                                                   | open (regenerate)  | `outputs/datasets/`, `outputs/calibration/`, any Hub sim datasets                             |
 | 9   | The Isaac Lab model and stack-bowls task have never been run in Isaac. Only the asset sync check passes.                                                                                                                                                                                                             | known              | `sim/isaac_lab/`                                                                              |
 | 10  | The pyupgrade pre-commit hook corrupts the "Reach Undulation" f-string in `examples/nexarm/visualize_rerun_sim.py` (adds a backtick each run). Present on `main` too. Run other hooks with `SKIP=pyupgrade` on that file until fixed.                                                                                | known              | `examples/nexarm/visualize_rerun_sim.py:577`                                                  |
 | 11  | GPU (EGL) rendering differs by a few pixels between identical resets, so camera observations are not bit-deterministic. Physics state is. The gym checker test now checks determinism on the `state` observation only.                                                                                               | known (handled)    | `tests/envs/test_nexarm_env.py`                                                               |

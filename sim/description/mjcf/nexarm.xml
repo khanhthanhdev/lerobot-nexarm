@@ -56,62 +56,62 @@
         <inertial mass="0.307643" pos="0.53937928 0.0645093434 0.0187781864" fullinertia="5.498090e-04 5.570952e-04 7.322669e-04 1.626228e-07 -6.868540e-09 7.496669e-06" />
         <geom name="base_link_collision_0" class="collision" type="box" pos="0.539369 0.063973 0.03" size="0.055675 0.055675 0.035003" />
         <body name="link_1" pos="0 0 0" quat="1 0 0 0">
-          <joint name="joint_1_base_to_link_1" pos="0.539369022999 0.0639727628473 0.049" type="hinge" axis="0 0 -1" limited="true" range="-2.35619449019 2.35619449019" />
+          <joint name="joint_1_base_to_link_1" pos="0.539369023 0.063972763 0.049" type="hinge" axis="0 0 -1" limited="true" range="-2.35619449019 2.35619449019" />
           <geom name="link_1_visual" class="visual" mesh="link_1" material="dark_bracket" />
           <inertial mass="0.28384" pos="0.539393115 0.0635159462 0.0717804084" fullinertia="2.032788e-04 2.487346e-04 2.474501e-04 6.009257e-07 2.280297e-07 1.981360e-06" />
           <geom name="link_1_collision_0" class="collision" type="box" pos="0.539369 0.063973 0.080028" size="0.047488 0.04749 0.036528" />
           <body name="link_2" pos="0 0 0" quat="1 0 0 0">
-            <joint name="joint_2_link_1_to_link_2" pos="0.574469022999 0.0639727628408 0.106445070665" type="hinge" axis="-1 0 0" limited="true" range="-2.09439510239 2.09439510239" armature="0.008" damping="0.15" frictionloss="0.08" />
+            <joint name="joint_2_link_1_to_link_2" pos="0.574469023 0.063972763 0.106445071" type="hinge" axis="-1 0 0" limited="true" range="-2.09439510239 2.09439510239" armature="0.008" damping="0.15" frictionloss="0.08" />
             <geom name="link_2_visual" class="visual" mesh="link_2" material="black_metal" />
-            <inertial mass="0.192568" pos="0.539369024 0.144420872 0.18815068" fullinertia="8.608103e-04 4.948237e-04 4.564760e-04 2.461689e-12 2.787956e-12 4.161846e-04" />
-            <geom name="link_2_collision_0" class="collision" type="box" pos="0.539369 0.203041 0.260294" size="0.04133 0.02225 0.028773" quat="-0.5 0.5 0.5 0.5" />
-            <geom name="link_2_collision_1" class="collision" type="box" pos="0.539369 0.143202 0.185664" size="0.051166 0.015049 0.009973" quat="0.653759 0.269441 0.269441 -0.65376" />
-            <geom name="link_2_collision_2" class="collision" type="box" pos="0.539369 0.080344 0.122816" size="0.03928 0.033153 0.012362" quat="-0.382683 0.92388 0 0" />
+            <inertial mass="0.192568" pos="0.539369024 0.0630835759 0.221105065" fullinertia="8.608103e-04 8.918344e-04 5.946522e-05 -2.307043e-13 3.712060e-12 -1.917386e-05" />
+            <geom name="link_2_collision_0" class="collision" type="box" pos="0.539369 0.063973 0.129598" size="0.03928 0.033153 0.012362" quat="0.707107 0.707107 0 0" />
+            <geom name="link_2_collision_1" class="collision" type="box" pos="0.539369 0.063973 0.218489" size="0.051136 0.015049 0.009799" quat="-0.5 0.5 0.5 0.5" />
+            <geom name="link_2_collision_2" class="collision" type="box" pos="0.539308 0.053231 0.313562" size="0.041343 0.022373 0.029139" quat="0.657056 -0.265533 -0.264351 -0.654131" />
             <body name="link_3" pos="0 0 0" quat="1 0 0 0">
-              <joint name="joint_3_link_2_to_link_3" pos="0.519439024469 0.196934090904 0.291683736154" type="hinge" axis="1 0 0" limited="true" range="-2.35619449019 2.35619449019" />
+              <joint name="joint_3_link_2_to_link_3" pos="0.519439024 0.02717557 0.331474057" type="hinge" axis="1 0 0" limited="true" range="-2.35619449019 2.35619449019" />
               <geom name="link_3_visual" class="visual" mesh="link_3" material="dark_bracket" />
-              <inertial mass="0.196103" pos="0.538277011 0.13326323 0.262070832" fullinertia="5.809189e-04 1.269977e-04 4.868017e-04 6.254772e-07 2.302946e-07 2.142776e-04" />
-              <geom name="link_3_collision_0" class="collision" type="box" pos="0.539755 0.131211 0.261124" size="0.082607 0.02151 0.017304" quat="0.699442 0.110611 -0.19491 0.678643" />
+              <inertial mass="0.196103" pos="0.538277011 -0.0429517469 0.331485295" fullinertia="5.809189e-04 2.711611e-05 5.866832e-04 6.642977e-07 -5.446095e-08 8.987228e-07" />
+              <geom name="link_3_collision_0" class="collision" type="box" pos="0.53998 -0.045223 0.331519" size="0.082621 0.021509 0.017403" quat="0.705774 -0.043399 -0.043399 0.705774" />
               <body name="link_4" pos="0 0 0" quat="1 0 0 0">
-                <joint name="joint_4_link_3_to_link_4" pos="0.519118832515 0.0655199672431 0.230406053572" type="hinge" axis="1 0 0" limited="true" range="-1.74532925199 1.74532925199" />
+                <joint name="joint_4_link_3_to_link_4" pos="0.519118833 -0.11782302 0.331286782" type="hinge" axis="1 0 0" limited="true" range="-1.74532925199 1.74532925199" />
                 <geom name="link_4_visual" class="visual" mesh="link_4" material="black_metal" />
-                <inertial mass="0.0554609" pos="0.539228887 0.0382365361 0.225090332" fullinertia="1.863344e-05 1.669997e-05 2.290469e-05 -1.259432e-07 5.271931e-09 1.604202e-06" />
-                <geom name="link_4_collision_0" class="collision" type="box" pos="0.539369 0.046903 0.227067" size="0.02225 0.028617 0.022741" />
+                <inertial mass="0.0554609" pos="0.539233497 -0.145016313 0.32597125" fullinertia="1.863340e-05 1.670002e-05 2.290469e-05 -1.262205e-07 4.816249e-09 1.604208e-06" />
+                <geom name="link_4_collision_0" class="collision" type="box" pos="0.539371 -0.136348 0.327948" size="0.022254 0.028619 0.022741" />
                 <body name="link_5" pos="0 0 0" quat="1 0 0 0">
-                  <joint name="joint_5_link_4_to_link_5" pos="0.539368637629 0.0182856141095 0.23042272303" type="hinge" axis="0 -1 0" limited="true" range="-3.14159265359 3.14159265359" armature="0.001" damping="0.04" frictionloss="0.02" />
+                  <joint name="joint_5_link_4_to_link_5" pos="0.539368638 -0.165057357 0.331329346" type="hinge" axis="0 -1 0.000548" limited="true" range="-3.14159265359 3.14159265359" armature="0.001" damping="0.04" frictionloss="0.02" />
                   <geom name="link_5_visual" class="visual" mesh="link_5" material="dark_bracket" />
-                  <inertial mass="0.0449343" pos="0.539299725 -0.00124964838 0.225237297" fullinertia="9.635610e-06 9.110346e-06 9.762550e-06 -4.178849e-09 3.262676e-08 6.083347e-07" />
-                  <geom name="link_5_collision_0" class="collision" type="box" pos="0.539369 0.000922 0.222135" size="0.025153 0.020268 0.017796" />
+                  <inertial mass="0.0449343" pos="0.539311323 -0.184502484 0.326118212" fullinertia="9.635606e-06 9.110348e-06 9.762553e-06 -4.247220e-09 3.251408e-08 6.083407e-07" />
+                  <geom name="link_5_collision_0" class="collision" type="box" pos="0.539383 -0.18233 0.323015" size="0.025153 0.020268 0.017796" />
                   <body name="link_6_gripper_base" pos="0 0 0" quat="1 0 0 0">
                     <geom name="link_6_gripper_base_visual" class="visual" mesh="link_6_gripper_base" material="black_metal" />
-                    <inertial mass="0.0304143" pos="0.539368568 -0.0210087518 0.230598914" fullinertia="3.453789e-06 3.877610e-05 3.645799e-05 -7.254020e-12 -9.222489e-15 -3.051565e-08" />
-                    <geom type="box" pos="0.53937 -0.02327 0.22519" size="0.052 0.008 0.021" name="link_6_gripper_base_collision_0" class="collision" />
+                    <inertial mass="0.0304143" pos="0.539383876 -0.204261575 0.331479827" fullinertia="3.453790e-06 3.877610e-05 3.645799e-05 6.237030e-09 -1.323944e-09 -3.051585e-08" />
+                    <geom type="box" pos="0.53937 -0.206616 0.326119" size="0.052 0.008 0.021" name="link_6_gripper_base_collision_0" class="collision" quat="1 -0.000274 0 0" />
                     <body name="link_6_pinion_gear" pos="0 0 0" quat="1 0 0 0">
-                      <joint name="gripper_pinion_joint" pos="0.539368645759 -0.0216536266505 0.230436163963" type="hinge" axis="0 0 -1" limited="true" range="-3.14159 3.14159" />
+                      <joint name="gripper_pinion_joint" pos="0.539368646 -0.204996585 0.331364682" type="hinge" axis="0 -0.000548 -1" limited="true" range="-3.14159 3.14159" />
                       <geom name="link_6_pinion_gear_visual" class="visual" mesh="link_6_pinion_gear" material="gear_brass" />
-                      <inertial mass="0.00313494" pos="0.539368646 -0.0196832597 0.230436259" fullinertia="7.668498e-08 1.431190e-07 7.668498e-08 -1.034726e-17 1.078471e-16 -3.184284e-12" />
+                      <inertial mass="0.00313494" pos="0.539383713 -0.202936083 0.331317171" fullinertia="7.668498e-08 1.431190e-07 7.668498e-08 1.174640e-11 5.084377e-16 -3.183249e-12" />
                     </body>
                     <body name="link_6_left_jaw" pos="0 0 0" quat="1 0 0 0">
-                      <joint name="left_jaw_slide_joint" pos="0.539368648301 -0.0279461316442 0.230435863088" type="slide" axis="-1 0 0" limited="true" range="0 0.0255" class="gripper" />
-                      <geom name="link_6_left_jaw_visual" class="visual" mesh="link_6_left_jaw" pos="0.0254 0 0" material="gripper_jaw" />
-                      <inertial mass="0.0429566" pos="0.529403187 -0.0394122365 0.229771945" fullinertia="8.791686e-06 5.542000e-06 8.695699e-06 -7.457005e-07 -2.700976e-07 -5.317526e-07" />
-                      <geom type="box" pos="0.53099 -0.057 0.23044" size="0.0084 0.010 0.015" name="link_6_left_jaw_collision_0" class="finger_collision" />
+                      <joint name="left_jaw_slide_joint" pos="0.539368648 -0.211289089 0.331367831" type="slide" axis="-1 0 0" limited="true" range="0 0.0255" class="gripper" />
+                      <geom name="link_6_left_jaw_visual" class="visual" mesh="link_6_left_jaw" material="gripper_jaw" />
+                      <inertial mass="0.0429566" pos="0.529416316 -0.222666823 0.330653259" fullinertia="8.791444e-06 5.542263e-06 8.695677e-06 -7.462964e-07 -2.699997e-07 -5.317703e-07" />
+                      <geom type="box" pos="0.53099 -0.240343 0.331388" size="0.0084 0.010 0.015" name="link_6_left_jaw_collision_0" class="finger_collision" quat="1 -0.000274 0 0" />
                     </body>
                     <body name="link_6_right_jaw" pos="0 0 0" quat="1 0 0 0">
-                      <joint name="right_jaw_slide_joint" pos="0.539368644619 -0.0279461316442 0.230435863088" type="slide" axis="1 0 0" limited="true" range="0 0.0255" class="gripper" />
-                      <geom name="link_6_right_jaw_visual" class="visual" mesh="link_6_right_jaw" pos="-0.0254 0 0" material="gripper_jaw" />
-                      <inertial mass="0.0429566" pos="0.54933411 -0.0394122993 0.231095115" fullinertia="8.791889e-06 5.542304e-06 8.695597e-06 7.457261e-07 -2.705361e-07 5.303434e-07" />
-                      <geom type="box" pos="0.54774 -0.057 0.23044" size="0.0084 0.010 0.015" name="link_6_right_jaw_collision_0" class="finger_collision" />
+                      <joint name="right_jaw_slide_joint" pos="0.539368645 -0.211289089 0.331367831" type="slide" axis="1 0 0" limited="true" range="0 0.0255" class="gripper" />
+                      <geom name="link_6_right_jaw_visual" class="visual" mesh="link_6_right_jaw" material="gripper_jaw" />
+                      <inertial mass="0.0429566" pos="0.549358091 -0.222663359 0.331975626" fullinertia="8.792174e-06 5.542041e-06 8.695575e-06 7.451729e-07 -2.706260e-07 5.302655e-07" />
+                      <geom type="box" pos="0.54774 -0.240343 0.331388" size="0.0084 0.010 0.015" name="link_6_right_jaw_collision_0" class="finger_collision" quat="1 -0.000274 0 0" />
                     </body>
-                    <site name="gripper_frame" pos="0.539 -0.09 0.230" size="0.005" rgba="0.1 0.8 0.1 1" class="site" />
-                    <site name="pinch_site" pos="0.53937 -0.057 0.23044" size="0.003" rgba="1 0.2 0.2 1" class="site" />
+                    <site name="gripper_frame" pos="0.539 -0.273343 0.330966" size="0.005" rgba="0.1 0.8 0.1 1" class="site" />
+                    <site name="pinch_site" pos="0.53937 -0.240343 0.331388" size="0.003" rgba="1 0.2 0.2 1" class="site" />
                   </body>
                   <body name="cam_mount" pos="0 0 0" quat="1 0 0 0">
                     <geom name="cam_mount_visual" class="visual" mesh="cam_mount" material="accent_blue" />
-                    <inertial mass="0.0999996" pos="0.53937 -0.00264677515 0.285809169" fullinertia="3.482002e-05 3.731782e-05 1.562260e-05 -1.101286e-17 -1.847278e-17 6.007577e-06" />
-                    <geom name="cam_mount_collision_0" class="collision" type="box" pos="0.53937 -0.013146 0.251498" size="0.020592 0.0095 0.005632" quat="0.593941 0.38371 0.38371 -0.593941" />
-                    <geom name="cam_mount_collision_1" class="collision" type="box" pos="0.53937 -0.003657 0.290058" size="0.016031 0.020751 0.0275" quat="0.561259 -0.430103 -0.561259 0.430103" />
-                    <camera name="wrist" mode="fixed" pos="0.53937 -0.022 0.279" xyaxes="-1 0 0 0 -0.656059 0.754710" fovy="92.2" />
+                    <inertial mass="0.0999996" pos="0.539384285 -0.185899597 0.386690081" fullinertia="3.482002e-05 3.731782e-05 1.562260e-05 6.836185e-10 -2.890032e-10 6.007577e-06" />
+                    <geom name="cam_mount_collision_0" class="collision" type="box" pos="0.539385 -0.186909 0.390939" size="0.016031 0.020751 0.0275" quat="0.561232 -0.430044 -0.561286 0.430161" />
+                    <geom name="cam_mount_collision_1" class="collision" type="box" pos="0.539385 -0.1964 0.35238" size="0.020592 0.009501 0.005633" quat="0.593952 0.383717 0.383703 -0.593931" />
+                    <camera name="wrist" mode="fixed" pos="0.53937 -0.205316 0.379929" xyaxes="-1 0 0 0 -0.655645 0.75507" fovy="92.2" />
                   </body>
                 </body>
               </body>
@@ -183,7 +183,7 @@
 
   <keyframe>
     <key name="home" qpos="0 0 0 0 0 0 0 0" ctrl="0 0 0 0 0 0" />
-    <key name="ready" qpos="0 -0.8 -0.9 1.5 0 0 0 0" ctrl="0 -0.8 -0.9 1.5 0 0" />
+    <key name="ready" qpos="0 -0.0154 0.3197 1.0655 0 0 0 0" ctrl="0 -0.0154 0.3197 1.0655 0 0" />
     <key name="open" qpos="0 0 0 0 0 0 0.0255 0.0255" ctrl="0 0 0 0 0 0.0255" />
   </keyframe>
 </mujoco>

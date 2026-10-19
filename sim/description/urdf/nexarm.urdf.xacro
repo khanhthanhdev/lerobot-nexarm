@@ -89,9 +89,9 @@
     <!-- Link 2 -->
     <link name="${prefix}link_2">
       <inertial>
-        <origin xyz="-0.035099976 0.0804480723 0.0817056804" rpy="0 0 0"/>
+        <origin xyz="-0.035099976 -0.000889224108 0.114660065" rpy="0 0 0"/>
         <mass value="0.192568"/>
-        <inertia ixx="8.608103e-04" ixy="2.461689e-12" ixz="2.787956e-12" iyy="4.948237e-04" iyz="4.161846e-04" izz="4.564760e-04"/>
+        <inertia ixx="8.608103e-04" ixy="-2.307043e-13" ixz="3.712060e-12" iyy="8.918344e-04" iyz="-1.917386e-05" izz="5.946522e-05"/>
       </inertial>
       <visual>
         <origin xyz="-0.574469 -0.0639728 -0.106445" rpy="0 0 0"/>
@@ -101,21 +101,21 @@
         <material name="${prefix}dark_grey"/>
       </visual>
       <collision name="link_2_collision_0">
-        <origin xyz="-0.0351 0.139068 0.153849" rpy="0 -1.5708 -1.5708"/>
+        <origin xyz="-0.0351 0 0.023153" rpy="1.5708 0 0"/>
         <geometry>
-          <box size="0.08266 0.0445 0.057546"/>
+          <box size="0.07856 0.066306 0.024724"/>
         </geometry>
       </collision>
       <collision name="link_2_collision_1">
-        <origin xyz="-0.0351 0.079229 0.079219" rpy="-1e-06 0.781857 -1.5708"/>
+        <origin xyz="-0.0351 0 0.112044" rpy="0 -1.5708 -1.5708"/>
         <geometry>
-          <box size="0.102332 0.030098 0.019946"/>
+          <box size="0.102272 0.030098 0.019598"/>
         </geometry>
       </collision>
       <collision name="link_2_collision_2">
-        <origin xyz="-0.0351 0.016371 0.016371" rpy="-2.3562 0 0"/>
+        <origin xyz="-0.035161 -0.010742 0.207117" rpy="-0.00431 -0.768106 -1.56459"/>
         <geometry>
-          <box size="0.07856 0.066306 0.024724"/>
+          <box size="0.082686 0.044746 0.058278"/>
         </geometry>
       </collision>
     </link>
@@ -124,7 +124,7 @@
     <joint name="${prefix}joint_3_link_2_to_link_3" type="revolute">
       <parent link="${prefix}link_2"/>
       <child link="${prefix}link_3"/>
-      <origin xyz="-0.05503 0.132961 0.185239" rpy="0 0 0"/>
+      <origin xyz="-0.05503 -0.036797 0.225029" rpy="0 0 0"/>
       <axis xyz="1 0 0"/>
       <limit lower="-2.35619" upper="2.35619" effort="5.0" velocity="3.14"/>
       <dynamics damping="0.08" friction="0.04"/>
@@ -133,21 +133,21 @@
     <!-- Link 3 -->
     <link name="${prefix}link_3">
       <inertial>
-        <origin xyz="0.0188380115 -0.0636707702 -0.0296131681" rpy="0 0 0"/>
+        <origin xyz="0.0188380115 -0.0701267469 1.12946518e-05" rpy="0 0 0"/>
         <mass value="0.196103"/>
-        <inertia ixx="5.809189e-04" ixy="6.254772e-07" ixz="2.302946e-07" iyy="1.269977e-04" iyz="2.142776e-04" izz="4.868017e-04"/>
+        <inertia ixx="5.809189e-04" ixy="6.642977e-07" ixz="-5.446095e-08" iyy="2.711611e-05" iyz="8.987228e-07" izz="5.866832e-04"/>
       </inertial>
       <visual>
-        <origin xyz="-0.519439 -0.196934 -0.291684" rpy="0 0 0"/>
+        <origin xyz="-0.519439 -0.027175 -0.331474" rpy="0 0 0"/>
         <geometry>
           <mesh filename="${mesh_dir}/link_3.stl" scale="0.001 0.001 0.001"/>
         </geometry>
         <material name="${prefix}dark_grey"/>
       </visual>
       <collision name="link_3_collision_0">
-        <origin xyz="0.020316 -0.065723 -0.03056" rpy="-0.121478 -0.436519 1.56759"/>
+        <origin xyz="0.020541 -0.072398 4.5e-05" rpy="-0.122828 0 1.5708"/>
         <geometry>
-          <box size="0.165214 0.04302 0.034608"/>
+          <box size="0.165242 0.043018 0.034806"/>
         </geometry>
       </collision>
     </link>
@@ -156,7 +156,7 @@
     <joint name="${prefix}joint_4_link_3_to_link_4" type="revolute">
       <parent link="${prefix}link_3"/>
       <child link="${prefix}link_4"/>
-      <origin xyz="-0.00032 -0.131414 -0.061278" rpy="0 0 0"/>
+      <origin xyz="-0.00032 -0.144999 -0.000188" rpy="0 0 0"/>
       <axis xyz="1 0 0"/>
       <limit lower="-1.74533" upper="1.74533" effort="5.0" velocity="3.14"/>
       <dynamics damping="0.08" friction="0.04"/>
@@ -165,21 +165,21 @@
     <!-- Link 4 -->
     <link name="${prefix}link_4">
       <inertial>
-        <origin xyz="0.0201098869 -0.0272834639 -0.00531566762" rpy="0 0 0"/>
+        <origin xyz="0.0201144972 -0.027193313 -0.00531575039" rpy="0 0 0"/>
         <mass value="0.0554609"/>
-        <inertia ixx="1.863344e-05" ixy="-1.259432e-07" ixz="5.271931e-09" iyy="1.669997e-05" iyz="1.604202e-06" izz="2.290469e-05"/>
+        <inertia ixx="1.863340e-05" ixy="-1.262205e-07" ixz="4.816249e-09" iyy="1.670002e-05" iyz="1.604208e-06" izz="2.290469e-05"/>
       </inertial>
       <visual>
-        <origin xyz="-0.519119 -0.06552 -0.230406" rpy="0 0 0"/>
+        <origin xyz="-0.519119 0.117823 -0.331287" rpy="0 0 0"/>
         <geometry>
           <mesh filename="${mesh_dir}/link_4.stl" scale="0.001 0.001 0.001"/>
         </geometry>
         <material name="${prefix}dark_grey"/>
       </visual>
       <collision name="link_4_collision_0">
-        <origin xyz="0.02025 -0.018617 -0.003339" rpy="0 0 0"/>
+        <origin xyz="0.020252 -0.018525 -0.003339" rpy="0 0 0"/>
         <geometry>
-          <box size="0.0445 0.057234 0.045482"/>
+          <box size="0.044508 0.057238 0.045482"/>
         </geometry>
       </collision>
     </link>
@@ -188,8 +188,8 @@
     <joint name="${prefix}joint_5_link_4_to_link_5" type="revolute">
       <parent link="${prefix}link_4"/>
       <child link="${prefix}link_5"/>
-      <origin xyz="0.02025 -0.047234 0.000017" rpy="0 0 0"/>
-      <axis xyz="0 -1 0"/>
+      <origin xyz="0.02025 -0.047234 4.3e-05" rpy="0 0 0"/>
+      <axis xyz="0 -1 0.000548"/>
       <limit lower="-3.14159" upper="3.14159" effort="5.0" velocity="3.14"/>
       <dynamics damping="0.04" friction="0.02"/>
     </joint>
@@ -197,19 +197,19 @@
     <!-- Link 5 -->
     <link name="${prefix}link_5">
       <inertial>
-        <origin xyz="-6.92754246e-05 -0.0195356484 -0.00518570298" rpy="0 0 0"/>
+        <origin xyz="-5.7677464e-05 -0.0194454844 -0.005211788" rpy="0 0 0"/>
         <mass value="0.0449343"/>
-        <inertia ixx="9.635610e-06" ixy="-4.178849e-09" ixz="3.262676e-08" iyy="9.110346e-06" iyz="6.083347e-07" izz="9.762550e-06"/>
+        <inertia ixx="9.635606e-06" ixy="-4.247220e-09" ixz="3.251408e-08" iyy="9.110348e-06" iyz="6.083407e-07" izz="9.762553e-06"/>
       </inertial>
       <visual>
-        <origin xyz="-0.539369 -0.018286 -0.230423" rpy="0 0 0"/>
+        <origin xyz="-0.539369 0.165057 -0.33133" rpy="0 0 0"/>
         <geometry>
           <mesh filename="${mesh_dir}/link_5.stl" scale="0.001 0.001 0.001"/>
         </geometry>
         <material name="${prefix}dark_grey"/>
       </visual>
       <collision name="link_5_collision_0">
-        <origin xyz="0 -0.017364 -0.008288" rpy="0 0 0"/>
+        <origin xyz="1.4e-05 -0.017273 -0.008315" rpy="0 0 0"/>
         <geometry>
           <box size="0.050306 0.040536 0.035592"/>
         </geometry>
@@ -225,19 +225,19 @@
 
     <link name="${prefix}link_6_gripper_base">
       <inertial>
-        <origin xyz="-4.32065537e-07 -0.0392947518 0.000175914126" rpy="0 0 0"/>
+        <origin xyz="1.4875552e-05 -0.0392045753 0.000149826622" rpy="0 0 0"/>
         <mass value="0.0304143"/>
-        <inertia ixx="3.453789e-06" ixy="-7.254020e-12" ixz="-9.222489e-15" iyy="3.877610e-05" iyz="-3.051565e-08" izz="3.645799e-05"/>
+        <inertia ixx="3.453790e-06" ixy="6.237030e-09" ixz="-1.323944e-09" iyy="3.877610e-05" iyz="-3.051585e-08" izz="3.645799e-05"/>
       </inertial>
       <visual>
-        <origin xyz="-0.539369 -0.018286 -0.230423" rpy="0 0 0"/>
+        <origin xyz="-0.539369 0.165057 -0.33133" rpy="0 0 0"/>
         <geometry>
           <mesh filename="${mesh_dir}/link_6_gripper_base.stl" scale="0.001 0.001 0.001"/>
         </geometry>
         <material name="${prefix}dark_grey"/>
       </visual>
       <collision name="link_6_gripper_base_collision_0">
-        <origin xyz="1e-06 -0.041556 -0.005233" rpy="0 0 0"/>
+        <origin xyz="1e-06 -0.041559 -0.005211" rpy="-0.000548 0 0"/>
         <geometry>
           <box size="0.104 0.016 0.042"/>
         </geometry>
@@ -249,27 +249,27 @@
     <joint name="${prefix}gripper_frame_joint" type="fixed">
       <parent link="${prefix}link_6_gripper_base"/>
       <child link="${prefix}gripper_frame"/>
-      <origin xyz="-0.000369 -0.108286 -0.000423" rpy="0 0 0"/>
+      <origin xyz="-0.000369 -0.108286 -0.000364" rpy="0 0 0"/>
     </joint>
 
     <!-- Pinion Gear -->
     <joint name="${prefix}gripper_pinion_joint" type="revolute">
       <parent link="${prefix}link_6_gripper_base"/>
       <child link="${prefix}link_6_pinion_gear"/>
-      <origin xyz="0 -0.03994 0.000013" rpy="0 0 0"/>
-      <axis xyz="0 0 -1"/>
+      <origin xyz="0 -0.03994 3.5e-05" rpy="0 0 0"/>
+      <axis xyz="0 -0.000548 -1"/>
       <limit lower="-3.14159" upper="3.14159" effort="5.0" velocity="3.14"/>
       <dynamics damping="0.08" friction="0.04"/>
     </joint>
 
     <link name="${prefix}link_6_pinion_gear">
       <inertial>
-        <origin xyz="-3.54122733e-07 0.00197074032 2.58524064e-07" rpy="0 0 0"/>
+        <origin xyz="1.47125783e-05 0.00206091688 -4.78289993e-05" rpy="0 0 0"/>
         <mass value="0.00313494"/>
-        <inertia ixx="7.668498e-08" ixy="-1.034726e-17" ixz="1.078471e-16" iyy="1.431190e-07" iyz="-3.184284e-12" izz="7.668498e-08"/>
+        <inertia ixx="7.668498e-08" ixy="1.174640e-11" ixz="5.084377e-16" iyy="1.431190e-07" iyz="-3.183249e-12" izz="7.668498e-08"/>
       </inertial>
       <visual>
-        <origin xyz="-0.539369 0.021654 -0.230436" rpy="0 0 0"/>
+        <origin xyz="-0.539369 0.204997 -0.331365" rpy="0 0 0"/>
         <geometry>
           <mesh filename="${mesh_dir}/link_6_pinion_gear.stl" scale="0.001 0.001 0.001"/>
         </geometry>
@@ -281,7 +281,7 @@
     <joint name="${prefix}left_jaw_slide_joint" type="prismatic">
       <parent link="${prefix}link_6_gripper_base"/>
       <child link="${prefix}link_6_left_jaw"/>
-      <origin xyz="0 -0.046232 0.000013" rpy="0 0 0"/>
+      <origin xyz="0 -0.046232 3.8e-05" rpy="0 0 0"/>
       <axis xyz="-1 0 0"/>
       <limit lower="0" upper="0.0255" effort="5.0" velocity="3.14"/>
       <mimic joint="${prefix}right_jaw_slide_joint" multiplier="1" offset="0"/>
@@ -290,19 +290,19 @@
 
     <link name="${prefix}link_6_left_jaw">
       <inertial>
-        <origin xyz="-0.0099658129 -0.0114662365 -0.000664055093" rpy="0 0 0"/>
+        <origin xyz="-0.00995268442 -0.0113778227 -0.00071474072" rpy="0 0 0"/>
         <mass value="0.0429566"/>
-        <inertia ixx="8.791686e-06" ixy="-7.457005e-07" ixz="-2.700976e-07" iyy="5.542000e-06" iyz="-5.317526e-07" izz="8.695699e-06"/>
+        <inertia ixx="8.791444e-06" ixy="-7.462964e-07" ixz="-2.699997e-07" iyy="5.542263e-06" iyz="-5.317703e-07" izz="8.695677e-06"/>
       </inertial>
       <visual>
-        <origin xyz="-0.513969 0.027946 -0.230436" rpy="0 0 0"/>
+        <origin xyz="-0.539369 0.211289 -0.331368" rpy="0 0 0"/>
         <geometry>
           <mesh filename="${mesh_dir}/link_6_left_jaw.stl" scale="0.001 0.001 0.001"/>
         </geometry>
         <material name="${prefix}black"/>
       </visual>
       <collision name="link_6_left_jaw_collision_0">
-        <origin xyz="-0.008379 -0.029054 4e-06" rpy="0 0 0"/>
+        <origin xyz="-0.008379 -0.029054 2e-05" rpy="-0.000548 0 0"/>
         <geometry>
           <box size="0.0168 0.02 0.03"/>
         </geometry>
@@ -313,7 +313,7 @@
     <joint name="${prefix}right_jaw_slide_joint" type="prismatic">
       <parent link="${prefix}link_6_gripper_base"/>
       <child link="${prefix}link_6_right_jaw"/>
-      <origin xyz="0 -0.046232 0.000013" rpy="0 0 0"/>
+      <origin xyz="0 -0.046232 3.8e-05" rpy="0 0 0"/>
       <axis xyz="1 0 0"/>
       <limit lower="0" upper="0.0255" effort="5.0" velocity="3.14"/>
       <dynamics damping="0.01" friction="0"/>
@@ -321,19 +321,19 @@
 
     <link name="${prefix}link_6_right_jaw">
       <inertial>
-        <origin xyz="0.00996510983 -0.0114662993 0.000659115243" rpy="0 0 0"/>
+        <origin xyz="0.00998909129 -0.0113743594 0.00060762641" rpy="0 0 0"/>
         <mass value="0.0429566"/>
-        <inertia ixx="8.791889e-06" ixy="7.457261e-07" ixz="-2.705361e-07" iyy="5.542304e-06" iyz="5.303434e-07" izz="8.695597e-06"/>
+        <inertia ixx="8.792174e-06" ixy="7.451729e-07" ixz="-2.706260e-07" iyy="5.542041e-06" iyz="5.302655e-07" izz="8.695575e-06"/>
       </inertial>
       <visual>
-        <origin xyz="-0.564769 0.027946 -0.230436" rpy="0 0 0"/>
+        <origin xyz="-0.539369 0.211289 -0.331368" rpy="0 0 0"/>
         <geometry>
           <mesh filename="${mesh_dir}/link_6_right_jaw.stl" scale="0.001 0.001 0.001"/>
         </geometry>
         <material name="${prefix}black"/>
       </visual>
       <collision name="link_6_right_jaw_collision_0">
-        <origin xyz="0.008371 -0.029054 4e-06" rpy="0 0 0"/>
+        <origin xyz="0.008371 -0.029054 2e-05" rpy="-0.000548 0 0"/>
         <geometry>
           <box size="0.0168 0.02 0.03"/>
         </geometry>
@@ -350,27 +350,27 @@
 
       <link name="${prefix}cam_mount">
         <inertial>
-          <origin xyz="1.00000001e-06 -0.0209327752 0.0553861692" rpy="0 0 0"/>
+          <origin xyz="1.52846825e-05 -0.0208425974 0.0553600813" rpy="0 0 0"/>
           <mass value="0.0999996"/>
-          <inertia ixx="3.482002e-05" ixy="-1.101286e-17" ixz="-1.847278e-17" iyy="3.731782e-05" iyz="6.007577e-06" izz="1.562260e-05"/>
+          <inertia ixx="3.482002e-05" ixy="6.836185e-10" ixz="-2.890032e-10" iyy="3.731782e-05" iyz="6.007577e-06" izz="1.562260e-05"/>
         </inertial>
         <visual>
-          <origin xyz="-0.539369 -0.018286 -0.230423" rpy="0 0 0"/>
+          <origin xyz="-0.539369 0.165057 -0.33133" rpy="0 0 0"/>
           <geometry>
             <mesh filename="${mesh_dir}/cam_mount.stl" scale="0.001 0.001 0.001"/>
           </geometry>
           <material name="${prefix}dark_grey"/>
         </visual>
         <collision name="cam_mount_collision_0">
-          <origin xyz="1e-06 -0.031432 0.021075" rpy="0 1.14717 -1.5708"/>
+          <origin xyz="1.6e-05 -0.021852 0.059609" rpy="-1.57075 -0.263071 1.57096"/>
           <geometry>
-            <box size="0.041184 0.019 0.011264"/>
+            <box size="0.032062 0.041502 0.055"/>
           </geometry>
         </collision>
         <collision name="cam_mount_collision_1">
-          <origin xyz="1e-06 -0.021943 0.059635" rpy="-1.5708 -0.26307 1.5708"/>
+          <origin xyz="1.6e-05 -0.031343 0.02105" rpy="8e-05 1.14717 -1.57071"/>
           <geometry>
-            <box size="0.032062 0.041502 0.055"/>
+            <box size="0.041184 0.019002 0.011266"/>
           </geometry>
         </collision>
       </link>
