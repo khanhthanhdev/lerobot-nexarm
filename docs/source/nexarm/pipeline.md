@@ -57,6 +57,9 @@ Check a recorded episode with `examples/nexarm/export_episode_video.py` (side-by
 
 ## 2. Training
 
+For simulation datasets trained on several GPUs (generation, TurboVLA with `torchrun`, ACT with Accelerate,
+evaluation), follow [`sim_training.md`](sim_training.md).
+
 Train from the dataset you collected. The merged real root is local only, so pass its directory (or your `--merge-root`):
 
 ```bash
