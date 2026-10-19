@@ -452,7 +452,7 @@ class NexArmStackBowlsEnv(_NexArmMujocoEnv):
         position_jitter_m: float = 0.04,
         assist_engage_pos: float = GRIPPER_ASSIST_ENGAGE_POS,
         assist_release_pos: float = REAL_TELEOP_ASSIST_RELEASE_POS,
-        grasp_mode: str = "physical",
+        grasp_mode: Literal["contact_assisted", "proximity_assisted", "physical"] = "physical",
         **kwargs: Any,
     ) -> None:
         self.position_jitter_m = position_jitter_m

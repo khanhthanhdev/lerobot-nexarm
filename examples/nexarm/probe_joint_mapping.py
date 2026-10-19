@@ -3,9 +3,10 @@
 """Measure how the real follower's raw servo angles map onto the MuJoCo model's joints.
 
 The sim maps ``rad = (raw - 2048) * 2*pi / 4096`` onto each joint with no sign or offset, so raw 2048 lands on
-the exported CAD pose. The real follower stands straight up at 2048 (the vendor Home pose). This guided check
-records the real arm at Home and after a quarter turn of each joint. It then derives a per-joint sign and
-zero offset that make the sim pose match the real one:
+the exported CAD pose, which need not match the real arm's pose at 2048 (the vendor Home pose). This guided check
+records the real arm posed straight up by hand, which the sim can reproduce exactly, and after a quarter turn of
+each joint. It then derives a per-joint sign and zero offset that make the sim pose match the real one at any
+raw value:
 
     qpos = sign * (raw - 2048) * 2*pi / 4096 + offset_rad
 
@@ -47,12 +48,15 @@ QUARTER_TURN_TICKS = TICKS_PER_REVOLUTION / 4
 JAW_CENTER_OFFSET = np.array([0.0, 0.033, 0.0])  # jaw pad centre in gripper_frame, as in the bowl generator
 
 PROMPTS = {
-    "home": "Pose the arm at the vendor Home pose: every link straight up, gripper pointing up.",
-    "shoulder_lift": "From Home, tilt only the shoulder a quarter turn (upper arm horizontal), either way.",
-    "elbow_flex": "From Home, bend only the elbow a quarter turn (forearm horizontal), either way.",
-    "wrist_flex": "From Home, bend only the wrist a quarter turn (gripper horizontal), either way.",
-    "shoulder_pan": "From Home, turn only the base a quarter turn counter-clockwise, seen from above.",
-    "wrist_roll": "From Home, turn only the wrist a quarter turn counter-clockwise, seen from above.",
+    "upright": (
+        "Pose the arm straight up by hand: arm facing the work area, upper arm, forearm and gripper all "
+        "vertical, gripper pointing up. This is not the vendor Home pose."
+    ),
+    "shoulder_lift": "From upright, tilt only the shoulder a quarter turn (upper arm horizontal), either way.",
+    "elbow_flex": "From upright, bend only the elbow a quarter turn (forearm horizontal), either way.",
+    "wrist_flex": "From upright, bend only the wrist a quarter turn (gripper horizontal), either way.",
+    "shoulder_pan": "From upright, turn only the base a quarter turn counter-clockwise, seen from above.",
+    "wrist_roll": "From upright, turn only the wrist a quarter turn counter-clockwise, seen from above.",
 }
 # The link whose direction the user reports after each flex move.
 FLEX_LINK = {"shoulder_lift": "upper arm", "elbow_flex": "forearm", "wrist_flex": "gripper"}
@@ -127,15 +131,17 @@ def rotate_direction(name: str, quarter_turns: int) -> str:
 
 def solve_mapping(
     sim: SimArm,
-    home_raw: Sequence[float],
+    upright_raw: Sequence[float],
     moved_raw: Mapping[str, Sequence[float]],
     flex_directions: Mapping[str, str],
     camera_side: str,
 ) -> dict:
     """Per-joint sign and zero offset from the probe readings.
 
-    ``moved_raw[joint]`` is the reading after the quarter turn of that joint, ``flex_directions[joint]`` is
-    where the moved link points, and ``camera_side`` is where the wrist camera sits at Home.
+    ``upright_raw`` is the reading with the arm posed straight up, ``moved_raw[joint]`` the reading after the
+    quarter turn of that joint, ``flex_directions[joint]`` where the moved link points, and ``camera_side``
+    where the wrist camera sits in the upright pose. The offset maps ``upright_raw`` onto the sim's upright
+    qpos, so it holds whatever pose the arm takes at raw 2048.
     """
     upright = sim.upright_offsets()
     sim.forward(upright)
@@ -143,7 +149,7 @@ def solve_mapping(
     joints: dict[str, dict] = {}
     warnings: list[str] = []
     for index, name in enumerate(ARM_JOINTS):
-        delta = float(moved_raw[name][index] - home_raw[index])
+        delta = float(moved_raw[name][index] - upright_raw[index])
         if abs(delta) < QUARTER_TURN_TICKS / 4:
             raise ValueError(f"{name} moved only {delta:+.0f} ticks; redo its quarter turn")
         axis = sim.axis(index)
@@ -164,11 +170,13 @@ def solve_mapping(
             # Counter-clockwise seen from above is a positive rotation about +z.
             sim_sign = float(np.sign(axis @ up))
         sign = int(np.sign(delta) * sim_sign)
-        joints[name] = {"sign": sign, "offset_rad": float(upright[index]), "quarter_turn_ticks": abs(delta)}
+        upright_rad = (upright_raw[index] - POSITION_CENTER) * 2 * np.pi / TICKS_PER_REVOLUTION
+        offset = float(upright[index] - sign * upright_rad)
+        joints[name] = {"sign": sign, "offset_rad": offset, "quarter_turn_ticks": abs(delta)}
         low, high = sim.model.jnt_range[sim.joint_ids[index]]
-        if not low <= upright[index] <= high:
+        if not low <= offset <= high:
             warnings.append(
-                f"{name}: Home is at sim qpos {upright[index]:+.2f} rad, outside the joint range "
+                f"{name}: raw 2048 is at sim qpos {offset:+.2f} rad, outside the joint range "
                 f"[{low:+.2f}, {high:+.2f}]; re-centre the range on the new zero when applying this mapping"
             )
         ratio = abs(delta) / QUARTER_TURN_TICKS
@@ -178,7 +186,7 @@ def solve_mapping(
                 f"{QUARTER_TURN_TICKS:.0f}; check the pose, or the servo scale differs"
             )
 
-    # Pan and roll both turn about vertical at Home, so the wrist camera side fixes the roll zero.
+    # Pan and roll both turn about vertical when upright, so the wrist camera side fixes the roll zero.
     camera = sim.data.cam_xpos[sim.camera_id] - sim.jaw()
     sim_camera_side = direction_of(camera)
     order = ("front", "left", "back", "right")
@@ -188,16 +196,13 @@ def solve_mapping(
     roll_axis_up = float(np.sign(sim.axis(4) @ up))
     joints["wrist_roll"]["offset_rad"] += roll_axis_up * quarter_turns * np.pi / 2
 
-    home_error = [float(r - POSITION_CENTER) for r in home_raw[: len(ARM_JOINTS)]]
-    if max(abs(e) for e in home_error) > 60:
-        warnings.append(f"Home read {home_error} ticks from 2048; zero the servos with calibrate_arms.py")
     return {
         "formula": "qpos = sign * (raw - 2048) * 2*pi/4096 + offset_rad",
         "joints": joints,
-        "home_error_ticks": dict(zip(ARM_JOINTS, home_error, strict=True)),
+        "upright_raw_ticks": dict(zip(ARM_JOINTS, map(float, upright_raw[: len(ARM_JOINTS)]), strict=True)),
         "sim_upright_qpos": upright.tolist(),
         "sim_camera_side_at_upright": sim_camera_side,
-        "camera_side_at_home": camera_side,
+        "camera_side_at_upright": camera_side,
         "warnings": warnings,
     }
 
@@ -217,18 +222,20 @@ def ask_direction(question: str, ask: Callable[[str], str]) -> str:
 
 
 def run_probe(bus, ask: Callable[[str], str] = input) -> tuple[list[float], dict, dict, str]:
-    """Interactive readings: Home, then a quarter turn per joint, returning to Home in between."""
-    ask(PROMPTS["home"] + " Press Enter.")
-    home = read_average(bus)
-    camera_side = ask_direction("At Home, which side of the gripper is the wrist camera on?", ask)
+    """Interactive readings: upright, then a quarter turn per joint, returning to upright in between."""
+    ask("Support the arm with one hand: its motors turn off when you press Enter.")
+    bus.set_torque(False)
+    ask(PROMPTS["upright"] + " Press Enter.")
+    upright = read_average(bus)
+    camera_side = ask_direction("When upright, which side of the gripper is the wrist camera on?", ask)
     moved, directions = {}, {}
     for name in ("shoulder_pan", *FLEX_JOINTS, "wrist_roll"):
         ask(PROMPTS[name] + " Press Enter.")
         moved[name] = read_average(bus)
         if name in FLEX_JOINTS:
             directions[name] = ask_direction(f"Which way does the {FLEX_LINK[name]} point now?", ask)
-        ask("Return the arm to Home. Press Enter.")
-    return home, moved, directions, camera_side
+        ask("Return the arm to upright. Press Enter.")
+    return upright, moved, directions, camera_side
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -246,9 +253,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
     sim = SimArm(resolve_model_path(args.model))
     with follower_bus(args.port, args.baudrate) as bus:
-        home, moved, directions, camera_side = run_probe(bus)
-    result = solve_mapping(sim, home, moved, directions, camera_side)
-    result["readings"] = {"home": home, "moved": moved, "flex_directions": directions}
+        upright, moved, directions, camera_side = run_probe(bus)
+    result = solve_mapping(sim, upright, moved, directions, camera_side)
+    result["readings"] = {"upright": upright, "moved": moved, "flex_directions": directions}
 
     print(f"\n{result['formula']}")
     for name, joint in result["joints"].items():

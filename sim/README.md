@@ -164,11 +164,26 @@ The pinion remains in the visual model but is fixed to the gripper body. A
 improving manipulation physics, so jaw motion is represented by the two linear
 slides only.
 
-The tick scale now matches the servo, but the physical zero and sign of each
-joint (for example `shoulder_lift`) have not been verified against the real arm,
-and the joints are assumed to be direct-drive. Before sim-to-real deployment,
+The tick scale matches the servo, and the joints are assumed to be
+direct-drive. Without a measured mapping the formula above applies with no sign
+or offset, so raw `2048` lands on the exported CAD pose, which need not match
+the real follower's vendor Home pose. Before sim-to-real work, measure each
+joint's sign and zero offset on the real follower (un-energised, posed by hand
+straight up, then a quarter turn per joint; the readings need not be `2048`):
+
+```bash
+uv run python examples/nexarm/probe_joint_mapping.py --port /dev/ttyUSB1
+```
+
+It writes `outputs/nexarm/joint_mapping_probe.json`, which changes the arm
+mapping to `qpos = sign * (raw - 2048) * 2*pi / 4096 + offset_rad`. Pass it with
+`--joint-mapping` to `generate_sim_dataset.py`, `generate_stack_bowls_dataset.py`
+and `calibrate_sim.py`, `--robot.joint_mapping_path` to `nexarm_sim`, or
+`--env.joint_mapping_path` to the `nexarm` env. Each mapping gets its own
+version, so calibrations and datasets made under a different mapping are
+refused instead of mixed. No measured mapping is committed yet; until one is,
 compare real and simulated zero positions, endpoints, and direction for every
-joint.
+joint before deployment.
 
 ## 1. Install
 

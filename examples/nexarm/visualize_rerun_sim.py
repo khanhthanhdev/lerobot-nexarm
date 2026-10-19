@@ -64,8 +64,15 @@ from lerobot.robots.nexarm_sim import (
     NexArmSimConfig,
 )
 
+try:  # imported as a package module (tests) or run as a script
+    from examples.nexarm.generate_sim_dataset import generate_episode
+except ModuleNotFoundError:
+    from generate_sim_dataset import generate_episode  # type: ignore[no-redef]
+
 DEFAULT_MODEL_PATH = Path("sim/description/mjcf/scene.xml")
 DEFAULT_URDF_PATH = Path("sim/description/urdf/nexarm.urdf")
+# Seeds tried, starting at --seed, to find a scripted pick-and-place that succeeds.
+PICK_PLACE_SEED_ATTEMPTS = 20
 
 # Calibrated physical specifications for Hiwonder NexArm
 JOINT_SPECS = [
@@ -716,22 +723,35 @@ def run_pick_place_demo(
     seed: int,
     step_offset: int = 0,
 ) -> int:
-    """Run pick-and-place simulation task logging object manipulation in Rerun."""
-    task = NexArmPickPlaceTask(sim.backend, timeout_s=duration_s)
-    task.reset(seed=seed, settle_steps=25)
+    """Run the scripted IK pick-and-place from ``generate_sim_dataset.py`` and log it to Rerun.
+
+    The first seed from ``seed`` on whose dry run succeeds is replayed with logging, so the recording shows a
+    complete grasp and placement. ``duration_s`` is unused: the scripted stages set the episode length.
+    """
+    task = NexArmPickPlaceTask(sim.backend)
+    for demo_seed in range(seed, seed + PICK_PLACE_SEED_ATTEMPTS):
+        success, reason = generate_episode(sim, task, seed=demo_seed)
+        if success:
+            break
+        print(f"  seed={demo_seed} rejected ({reason}); trying the next seed")
+    else:
+        print(
+            f"  No successful seed in [{seed}, {seed + PICK_PLACE_SEED_ATTEMPTS}); logging the last attempt"
+        )
+
     renderer = mujoco.Renderer(sim.backend.model, height=480, width=640)
     trail_points: list[list[float]] = []
+    step = step_offset
+    print(f"\n[Mode: pick_place] Running scripted pick-and-place (seed={demo_seed})...")
 
-    total_steps = int(duration_s * fps)
-    print(f"\n[Mode: pick_place] Running pick-and-place simulation for {duration_s:.1f}s (seed={seed})...")
-
-    for step in range(total_steps):
-        global_step = step_offset + step
+    def log_frame(observation: dict[str, object], action: dict[str, float]) -> None:
+        nonlocal step
         sim_time = float(sim.backend.data.time)
-        recording.set_time("step", sequence=global_step)
+        recording.set_time("step", sequence=step)
         recording.set_time("simulation_time", duration=sim_time)
+        step += 1
 
-        task_status = task.step()
+        task_status = task.observe()
 
         if task_status.success:
             state_label = "SUCCESS (Placed & Held)"
@@ -746,10 +766,10 @@ def run_pick_place_demo(
 
         status_md = f"""# 📦 NexArm Autonomous Pick & Place Task
 - **Task State**: `{state_label}`
-- **Simulation Time**: `{sim_time:.2f}s / {duration_s:.1f}s`
+- **Simulation Time**: `{sim_time:.2f}s`
 - **Object Grasped**: `{"YES" if task_status.is_grasped else "NO"}`
 - **Inside Target**: `{"YES" if task_status.is_inside_target else "NO"}`
-- **Gripper Jaws**: `{"CLOSED (Grasping)" if task_status.is_grasped else "OPEN (51mm)"}`
+- **Gripper Command**: `{"CLOSED" if action["gripper.pos"] > GRIPPER_MID_POS else "OPEN"}`
 """
         recording.log("status/info", rr.TextDocument(status_md, media_type=rr.MediaType.MARKDOWN))
 
@@ -757,9 +777,10 @@ def run_pick_place_demo(
         log_cameras(recording, renderer, sim.backend.data)
         log_joint_telemetry(recording, tree, sim.backend.model, sim.backend.data)
 
+    success, reason = generate_episode(sim, task, seed=demo_seed, record_frame=log_frame)
     renderer.close()
-    print("✓ Pick-and-place demo complete.")
-    return step_offset + total_steps
+    print(f"✓ Pick-and-place demo complete: {'success' if success else reason}.")
+    return step
 
 
 def run_all_demos(

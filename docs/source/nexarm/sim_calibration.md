@@ -16,8 +16,8 @@ This guide makes the MuJoCo twin behave like your physical arm, then generates s
 
 - Zero positions are set in the servos (follower: desktop Servo Advanced page; leader: Synchronizer page) and checked with `examples/nexarm/calibrate_arms.py`, which reports leader/follower deltas at the Home pose and keeps the calibration files identity (`lerobot-calibrate` writes the same identity files). Teleoperation works.
 - You can generate simulation data (see `pipeline.md`, section 1a) and `MUJOCO_GL=egl` works on your machine.
-- Check that the sim joint mapping matches your arm. The sim maps raw 2048 onto the exported CAD pose, while the real follower stands straight up at 2048. Until the mapping is fixed, the sim poses real joint values differently from the real arm.
-  1. Measure the per-joint sign and zero offset by posing the un-energised follower by hand:
+- Check that the sim joint mapping matches your arm. The sim maps raw 2048 onto the exported CAD pose, which need not match the real follower's vendor Home pose (raw 2048). Until the mapping is fixed, the sim poses real joint values differently from the real arm.
+  1. Measure the per-joint sign and zero offset by posing the un-energised follower by hand. The probe uses a straight-up pose as its reference and reads where it is, so it works whatever shape Home has. Close any app that holds the follower's serial port (such as the Hiwonder desktop app) first:
 
      ```bash
      uv run python examples/nexarm/probe_joint_mapping.py --port /dev/ttyUSB1

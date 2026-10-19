@@ -42,7 +42,7 @@ class RateLimitedBus:
         pass
 
     def set_torque(self, enable):
-        pass
+        self.torque = enable
 
     def write_motion_params(self, acc, speed=0):
         self.motion_params.append((acc, speed))
@@ -112,11 +112,11 @@ def test_upright_offsets_stand_the_arm_straight_up(sim_arm):
         assert link[2] > 0 and abs(link[1]) < 1e-4
 
 
-def _probe_readings(sim_arm, signs):
+def _probe_readings(sim_arm, signs, upright_raw=None):
     """Readings a user would produce if the true mapping had these per-joint signs (qpos = sign * raw)."""
     sim_arm.forward(sim_arm.upright_offsets())
     up = np.array([0.0, 0.0, 1.0])
-    home = [2048.0] * 6
+    home = list(upright_raw) if upright_raw is not None else [2048.0] * 6
     moved, directions = {}, {}
     for index, name in enumerate(probe.ARM_JOINTS):
         raw = list(home)
@@ -142,6 +142,22 @@ def test_solve_mapping_recovers_signs(sim_arm):
     assert result["joints"]["wrist_roll"]["offset_rad"] == pytest.approx(result["sim_upright_qpos"][4])
 
 
+def test_solve_mapping_uses_the_measured_upright_reading(sim_arm):
+    # Vendor Home (raw 2048) bends the arm, so posing it straight up reads elsewhere, e.g. elbow at 3072.
+    signs = {"shoulder_pan": 1, "shoulder_lift": 1, "elbow_flex": -1, "wrist_flex": 1, "wrist_roll": 1}
+    upright_raw = [2048.0, 2048.0, 3072.0, 1900.0, 2048.0, 2048.0]
+    upright, moved, directions = _probe_readings(sim_arm, signs, upright_raw)
+    sim_arm.forward(sim_arm.upright_offsets())
+    camera_side = probe.direction_of(sim_arm.data.cam_xpos[sim_arm.camera_id] - sim_arm.jaw())
+    result = probe.solve_mapping(sim_arm, upright, moved, directions, camera_side)
+    # The mapping must put the upright reading on the sim's upright pose, not raw 2048.
+    np.testing.assert_allclose(
+        probe.mapped_qpos(upright_raw, result["joints"]), result["sim_upright_qpos"], atol=1e-9
+    )
+    elbow = result["joints"]["elbow_flex"]
+    assert elbow["offset_rad"] == pytest.approx(result["sim_upright_qpos"][2] + np.pi / 2)
+
+
 def test_solve_mapping_turns_the_roll_zero_to_the_reported_camera_side(sim_arm):
     signs = dict.fromkeys(probe.ARM_JOINTS, 1)
     home, moved, directions = _probe_readings(sim_arm, signs)
@@ -163,9 +179,10 @@ def test_solve_mapping_rejects_sideways_tilts_and_tiny_moves(sim_arm):
 
 def test_run_probe_reads_each_pose():
     bus = RateLimitedBus([2048] * 6, rate=0)
-    answers = iter(["", "f"] + ["", ""] + ["", "f", ""] * 3 + ["", ""])
-    home, moved, directions, camera_side = probe.run_probe(bus, ask=lambda _: next(answers))
-    assert home == [2048.0] * 6 and camera_side == "front"
+    answers = iter(["", "", "f"] + ["", ""] + ["", "f", ""] * 3 + ["", ""])
+    upright, moved, directions, camera_side = probe.run_probe(bus, ask=lambda _: next(answers))
+    assert upright == [2048.0] * 6 and camera_side == "front"
+    assert bus.torque is False
     assert set(moved) == set(probe.ARM_JOINTS) and set(directions) == set(probe.FLEX_JOINTS)
 
 
