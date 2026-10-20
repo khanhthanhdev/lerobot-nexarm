@@ -66,23 +66,96 @@ OPEN_GRIPPER = float(GRIPPER_OPEN_POS)  # wide open: 67.4mm gap
 CLOSED_GRIPPER = float(GRIPPER_CLOSED_POS)  # pinched closed: 16.7mm gap
 BOWL_RIM_RADIUS = 0.0615  # Rim wall mid-plane radius in meters
 BOWL_RIM_Z_OFFSET = 0.0185  # Height of the rim top above bowl body center
+BOWL_RIM_OUTER_RADIUS = 0.0625  # Outside face of the rim wall
+# Grasp points tried around the rim, nearest the far side first, and the gap the open jaws must keep from any
+# other bowl's rim there. The jaws meet the wall obliquely off the far side, yet forcing every grasp to any one
+# angle from 20 to 40 degrees either way still stacks 58-62 of 64 seeds, as many as the far side does.
+GRASP_RIM_ANGLES_RAD = np.deg2rad([0.0, 10.0, -10.0, 20.0, -20.0, 30.0, -30.0, 40.0, -40.0])
+JAW_CLEARANCE_M = 0.005
 # The jaws come down almost vertically onto the thin rim, as in the real demos; fully vertical (90) leaves far
 # bowls out of reach and fails more often.
 GRASP_PITCH_DEG = 80.0
 JAW_CENTER_OFFSET = np.array([0.0, 0.033, 0.0])  # Jaw collision pad center in gripper_frame
+# The arm sags about 1.4 cm below its IK target at the rim. The descent aims that much higher and then re-aims
+# on the measured jaw height, so the jaws never dip below the rim, where an open jaw can hook a neighbor bowl.
+RIM_DESCENT_SAG_M = 0.014
+RIM_DESCENT_ATTEMPTS = 4
+RIM_DESCENT_TOLERANCE_M = 0.003
+# Like a teleoperator, the expert moves in straight segments: up to a transit height, across, then down. In
+# transit, the carried bowl's bottom (or the open jaws' tips) clears the highest rim of every other bowl by this
+# much. Held by its rim top, the bowl hangs low in the jaws, so higher transits leave far placements out of reach.
+TRANSIT_CLEARANCE_M = 0.065
+JAW_TIP_BELOW_CENTER_M = 0.015  # Open jaw tips below the jaw pad center
+CARTESIAN_SPACING_M = 0.02  # IK waypoint spacing along a straight segment
+CARTESIAN_SPEED_M = 0.006  # Travel per frame along a segment
+# Carried bowl center above the bowl it goes onto at release.
+RELEASE_HEIGHT_M = 0.025
 
 
-def _get_rim_and_unit_vector(bowl_pos: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """Compute the radial outward rim point and 2D unit direction from robot base."""
+def _get_rim_and_unit_vector(bowl_pos: np.ndarray, angle_rad: float = 0.0) -> tuple[np.ndarray, np.ndarray]:
+    """Compute a rim point and the 2D radial unit direction from the robot base to it.
+
+    ``angle_rad`` turns the point around the bowl from the far side, the rim point straight out from the base.
+    """
     u = bowl_pos[:2] / np.linalg.norm(bowl_pos[:2])
+    cos, sin = np.cos(angle_rad), np.sin(angle_rad)
+    outward = np.array([cos * u[0] - sin * u[1], sin * u[0] + cos * u[1]])
     rim_point = np.array(
         [
-            bowl_pos[0] + BOWL_RIM_RADIUS * u[0],
-            bowl_pos[1] + BOWL_RIM_RADIUS * u[1],
+            bowl_pos[0] + BOWL_RIM_RADIUS * outward[0],
+            bowl_pos[1] + BOWL_RIM_RADIUS * outward[1],
             bowl_pos[2] + BOWL_RIM_Z_OFFSET,
         ]
     )
-    return rim_point, u
+    return rim_point, rim_point[:2] / np.linalg.norm(rim_point[:2])
+
+
+def _open_jaw_room(backend, solution: dict[str, float], centers: list[np.ndarray]) -> float:
+    """Horizontal gap between the open jaws at ``solution`` and the nearest rim of bowls centered at ``centers``."""
+    model = backend.model
+    data = mujoco.MjData(model)
+    data.qpos[:] = _solution_qpos(backend, solution)
+    data.qpos[model.jnt_qposadr[backend._joint_ids["gripper"]]] = backend.raw_to_control(
+        "gripper", OPEN_GRIPPER
+    )
+    mujoco.mj_kinematics(model, data)
+    room = np.inf
+    for name in ("link_6_left_jaw_collision_0", "link_6_right_jaw_collision_0"):
+        geom = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, name)
+        frame, center, half = data.geom_xmat[geom].reshape(3, 3), data.geom_xpos[geom], model.geom_size[geom]
+        for bowl_center in centers:
+            # Alternate projections between the jaw box and the bowl's vertical axis to find their closest points.
+            point = center.copy()
+            for _ in range(50):
+                on_axis = np.array([bowl_center[0], bowl_center[1], point[2]])
+                point = center + frame @ np.clip(frame.T @ (on_axis - center), -half, half)
+            room = min(room, float(np.linalg.norm(point[:2] - bowl_center[:2])) - BOWL_RIM_OUTER_RADIUS)
+    return room
+
+
+def _grasp_rim(
+    robot: NexArmSim, task: NexArmStackBowlsTask, source: str, *, seed: int
+) -> tuple[np.ndarray, np.ndarray]:
+    """Rim point to grasp ``source`` at, and the radial direction the jaws close along.
+
+    The far side, straight out from the base, is the default. When the open outer jaw would land on another
+    bowl's rim there (a finished stack beside the top bowl, say), the grasp moves around the rim, away from it,
+    by the smallest angle that clears it, as an operator grabs a bowl where there is room for the fingers.
+    """
+    bowl = task.bowl_position(source)
+    others = [task.bowl_position(c) for c in task.current_order if c != source]
+    best, best_room = _get_rim_and_unit_vector(bowl), -np.inf
+    for angle in GRASP_RIM_ANGLES_RAD:
+        rim, u = _get_rim_and_unit_vector(bowl, angle)
+        sol = solve_ik_jaw(robot.backend, rim, u, seed=seed)
+        if not sol:
+            continue
+        room = _open_jaw_room(robot.backend, sol, others)
+        if room >= JAW_CLEARANCE_M:
+            return rim, u
+        if room > best_room:
+            best, best_room = (rim, u), room
+    return best
 
 
 def solve_ik_jaw(
@@ -96,12 +169,16 @@ def solve_ik_jaw(
     tolerance_dir: float = 0.05,
     restarts: int = 5,
     seed: int = 0,
+    init_qpos: np.ndarray | None = None,
+    point_offset: np.ndarray = JAW_CENTER_OFFSET,
 ) -> dict[str, float] | None:
     """Solve IK positioning the jaw collision center with radial rim straddle orientation.
 
     The gripper pitches downward at `pitch_deg` (with adaptive shallow fallbacks if needed)
     and rotates `wrist_roll` by ~80 degrees so the jaw closing axis is strictly radial
-    across the thin rim wall.
+    across the thin rim wall. ``init_qpos`` starts the search there instead of at the current state, so the
+    waypoints of one path solve to neighbouring joint configurations. ``point_offset`` (gripper frame) picks
+    another point to position, such as a held bowl's center.
     """
     model = backend.model
     data = backend.data
@@ -127,7 +204,7 @@ def solve_ik_jaw(
 
         for restart in range(restarts + 1):
             working = mujoco.MjData(model)
-            working.qpos[:] = data.qpos
+            working.qpos[:] = data.qpos if init_qpos is None else init_qpos
             working.qpos[roll_qpos] = roll_val_rad
             if restart:
                 for k in arm4:
@@ -138,7 +215,7 @@ def solve_ik_jaw(
                 mujoco.mj_forward(model, working)
                 site_pos = working.site_xpos[site_id]
                 site_mat = working.site_xmat[site_id].reshape(3, 3)
-                current_jaw = site_pos + site_mat @ JAW_CENTER_OFFSET
+                current_jaw = site_pos + site_mat @ point_offset
                 approach_dir = -site_mat[:, 1]
                 pos_err = target_pos - current_jaw
                 dir_err = np.cross(approach_dir, target_dir)
@@ -177,34 +254,70 @@ def solve_ik_held_bowl(
     u_rad: np.ndarray,
     pitch_deg: float = GRASP_PITCH_DEG,
     seed: int = 0,
+    init_qpos: np.ndarray | None = None,
 ) -> dict[str, float] | None:
-    """Iteratively solve IK to position the held bowl center at target_bowl_xyz."""
+    """Solve IK placing the held bowl's center, which moves rigidly with the gripper, at target_bowl_xyz."""
     if task.held_rel_pos is None:
         return None
+    return solve_ik_jaw(
+        robot.backend,
+        target_bowl_xyz,
+        u_rad,
+        pitch_deg=pitch_deg,
+        seed=seed,
+        init_qpos=init_qpos,
+        point_offset=task.held_rel_pos,
+    )
 
-    site_id = mujoco.mj_name2id(robot.backend.model, mujoco.mjtObj.mjOBJ_SITE, "gripper_frame")
-    target_jaw = target_bowl_xyz.copy()
 
-    for _ in range(6):
-        sol = solve_ik_jaw(robot.backend, target_jaw, u_rad, pitch_deg=pitch_deg, seed=seed)
-        if sol is None:
+def _solution_qpos(backend, solution: dict[str, float], base: np.ndarray | None = None) -> np.ndarray:
+    """Full qpos with the solved joints set, the rest taken from ``base`` (default: the current state)."""
+    qpos = np.array(backend.data.qpos if base is None else base, dtype=np.float64)
+    for k, v in solution.items():
+        qpos[backend.model.jnt_qposadr[backend._joint_ids[k]]] = backend.raw_to_control(k, v)
+    return qpos
+
+
+def _jaw_center(backend) -> np.ndarray:
+    site_id = mujoco.mj_name2id(backend.model, mujoco.mjtObj.mjOBJ_SITE, "gripper_frame")
+    site_mat = backend.data.site_xmat[site_id].reshape(3, 3)
+    return backend.data.site_xpos[site_id] + site_mat @ JAW_CENTER_OFFSET
+
+
+def _descend_to_rim(
+    robot: NexArmSim,
+    task: NexArmStackBowlsTask,
+    rim: np.ndarray,
+    u_rim: np.ndarray,
+    *,
+    seed: int = 0,
+    record_frame: Callable[[dict[str, object], dict[str, float]], None] | None = None,
+) -> dict[str, float] | None:
+    """Lower the open jaws onto the rim, re-aiming until the gravity-sagged arm really holds them there.
+
+    Uncorrected, the closing inner jaw lands on the bowl's curved wall instead of straddling the vertical rim.
+    """
+    target = rim + [0, 0, RIM_DESCENT_SAG_M]
+    sol = None
+    for attempt in range(RIM_DESCENT_ATTEMPTS):
+        sol = solve_ik_jaw(robot.backend, target, u_rim, seed=seed)
+        if not sol:
             return None
-        working = mujoco.MjData(robot.backend.model)
-        working.qpos[:] = robot.backend.data.qpos
-        for k, v in sol.items():
-            working.qpos[robot.backend.model.jnt_qposadr[robot.backend._joint_ids[k]]] = (
-                robot.backend.raw_to_control(k, v)
-            )
-        mujoco.mj_forward(robot.backend.model, working)
-        site_pos = working.site_xpos[site_id].copy()
-        site_mat = working.site_xmat[site_id].reshape(3, 3).copy()
-        pred_bowl_pos = site_pos + site_mat @ task.held_rel_pos
-        err = target_bowl_xyz - pred_bowl_pos
-        if np.linalg.norm(err) < 0.002:
-            return sol
-        target_jaw += err
-
-    return None
+        _interpolate_stage(
+            robot,
+            task,
+            sol,
+            OPEN_GRIPPER,
+            OPEN_GRIPPER,
+            steps=15 if attempt == 0 else 5,
+            settle_steps=2,
+            record_frame=record_frame,
+        )
+        sag = rim[2] - _jaw_center(robot.backend)[2]
+        if abs(sag) < RIM_DESCENT_TOLERANCE_M:
+            break
+        target[2] += sag
+    return sol
 
 
 def _min_jerk(steps: int) -> np.ndarray:
@@ -320,32 +433,178 @@ def _follow_path(
     return True
 
 
-def _lift_and_carry(
+def _transit_height(task: NexArmStackBowlsTask, *, held: bool) -> float:
+    """Jaw center height (or, when ``held``, carried bowl center height) that clears every other bowl's rim."""
+    tops = [task.bowl_position(c)[2] + BOWL_RIM_Z_OFFSET for c in task.current_order if c != task.held_bowl]
+    below = BOWL_RIM_Z_OFFSET if held else JAW_TIP_BELOW_CENTER_M
+    return max(tops) + TRANSIT_CLEARANCE_M + below
+
+
+def _approach_direction(backend) -> np.ndarray:
+    """Horizontal direction the jaws currently point along, which the IK keeps radial."""
+    site_id = mujoco.mj_name2id(backend.model, mujoco.mjtObj.mjOBJ_SITE, "gripper_frame")
+    approach = -backend.data.site_xmat[site_id].reshape(3, 3)[:, 1]
+    return approach[:2] / np.linalg.norm(approach[:2])
+
+
+def _move_straight(
     robot: NexArmSim,
     task: NexArmStackBowlsTask,
-    rim: np.ndarray,
-    u_rim: np.ndarray,
-    above_target: np.ndarray,
-    u_target: np.ndarray,
+    start: np.ndarray,
+    end: np.ndarray,
+    u_start: np.ndarray,
+    u_end: np.ndarray,
+    gripper: float,
     *,
     seed: int,
     record_frame: Callable[[dict[str, object], dict[str, float]], None] | None = None,
-) -> str | None:
-    """Lift the grasped bowl straight up off its neighbours, then swing it above the target in the same motion.
+) -> dict[str, float] | None:
+    """Move the jaw center, or the carried bowl's center while one is held, along the straight line start->end.
 
-    Returns the failing waypoint's name, or None on success.
+    The line is cut into IK waypoints, each solved from the previous one so the joints stay on one branch, and
+    swept in one minimum-jerk motion. The jaw direction turns from ``u_start`` to ``u_end`` along the way.
+    Returns the final waypoint's solution, or None if any waypoint is out of reach.
     """
-    waypoints = []
-    for name, height in (("lift_low", 0.03), ("lift_high", 0.07)):
-        sol = solve_ik_jaw(robot.backend, rim + [0, 0, height], u_rim, seed=seed)
+    count = max(1, int(np.ceil(np.linalg.norm(end - start) / CARTESIAN_SPACING_M)))
+    qpos = robot.backend.data.qpos.copy()
+    solutions = []
+    for fraction in np.arange(1, count + 1) / count:
+        point = start + fraction * (end - start)
+        u = (1 - fraction) * u_start + fraction * u_end
+        if task.held_bowl is None:
+            sol = solve_ik_jaw(robot.backend, point, u, seed=seed, init_qpos=qpos)
+        else:
+            sol = solve_ik_held_bowl(robot, task, point, u, seed=seed, init_qpos=qpos)
         if not sol:
-            return name
-        waypoints.append(sol)
-    sol = solve_ik_held_bowl(robot, task, above_target, u_target, seed=seed)
+            return None
+        qpos = _solution_qpos(robot.backend, sol, qpos)
+        solutions.append(sol)
+    steps = max(12, int(np.ceil(np.linalg.norm(end - start) / CARTESIAN_SPEED_M)))
+    _follow_path(robot, task, solutions, gripper, steps=steps, settle_steps=2, record_frame=record_frame)
+    return solutions[-1]
+
+
+def _pick_and_place(
+    robot: NexArmSim,
+    task: NexArmStackBowlsTask,
+    source: str,
+    target: str,
+    *,
+    from_home: bool,
+    seed: int,
+    record_frame: Callable[[dict[str, object], dict[str, float]], None] | None = None,
+) -> str | None:
+    """Stack ``source`` onto ``target`` in straight segments, the way the real demos were teleoperated.
+
+    Open jaws: up to the transit height, across to above the source rim, straight down onto it; grasp. Carried
+    bowl: straight up to the transit height, across to above the target, straight down to release height;
+    release. Open jaws: straight back up. Returns the failing step's name, or None on success.
+    """
+    task.target_bowl = source
+    rim, u_rim = _grasp_rim(robot, task, source, seed=seed)
+
+    # Open jaws to above the source rim. From home, which is high and clear of the bowls, go there directly.
+    transit = _transit_height(task, held=False)
+    above_rim = np.array([rim[0], rim[1], transit])
+    if from_home:
+        sol = solve_ik_jaw(robot.backend, above_rim, u_rim, seed=seed)
+        if not sol:
+            return "approach"
+        _interpolate_stage(
+            robot, task, sol, OPEN_GRIPPER, OPEN_GRIPPER, steps=20, settle_steps=2, record_frame=record_frame
+        )
+    else:
+        jaw = _jaw_center(robot.backend)
+        u_jaw = _approach_direction(robot.backend)
+        up = np.array([jaw[0], jaw[1], max(jaw[2], transit)])
+        if up[2] > jaw[2] + 1e-3 and not _move_straight(
+            robot, task, jaw, up, u_jaw, u_jaw, OPEN_GRIPPER, seed=seed, record_frame=record_frame
+        ):
+            return "rise"
+        if not _move_straight(
+            robot, task, up, above_rim, u_jaw, u_rim, OPEN_GRIPPER, seed=seed, record_frame=record_frame
+        ):
+            return "approach"
+
+    # Straight down onto the rim, then re-aim for the arm's sag.
+    if not _move_straight(
+        robot,
+        task,
+        above_rim,
+        rim + [0, 0, RIM_DESCENT_SAG_M],
+        u_rim,
+        u_rim,
+        OPEN_GRIPPER,
+        seed=seed,
+        record_frame=record_frame,
+    ):
+        return "descend"
+    sol = _descend_to_rim(robot, task, rim, u_rim, seed=seed, record_frame=record_frame)
     if not sol:
+        return "pre_grasp"
+
+    # Grasp rim (pinch fingers to straddle rim wall)
+    _interpolate_stage(
+        robot, task, sol, OPEN_GRIPPER, CLOSED_GRIPPER, steps=10, settle_steps=2, record_frame=record_frame
+    )
+    if task.held_bowl is None:
+        return "grasp_missed"
+
+    # Carried bowl: straight up off its neighbours, across above the target, straight down to release height.
+    picked = task.bowl_position(source)
+    carry_z = _transit_height(task, held=True)
+    lifted = np.array([picked[0], picked[1], carry_z])
+    if not _move_straight(
+        robot, task, picked, lifted, u_rim, u_rim, CLOSED_GRIPPER, seed=seed, record_frame=record_frame
+    ):
+        return "lift"
+    target_pos = task.bowl_position(target)
+    _, u_target = _get_rim_and_unit_vector(target_pos)
+    above_target = np.array([target_pos[0], target_pos[1], carry_z])
+    if not _move_straight(
+        robot,
+        task,
+        lifted,
+        above_target,
+        u_rim,
+        u_target,
+        CLOSED_GRIPPER,
+        seed=seed,
+        record_frame=record_frame,
+    ):
         return "carry"
-    waypoints.append(sol)
-    _follow_path(robot, task, waypoints, CLOSED_GRIPPER, steps=45, settle_steps=4, record_frame=record_frame)
+    # Re-measure the target for a concentric placement.
+    release = task.bowl_position(target) + [0, 0, RELEASE_HEIGHT_M]
+    sol = _move_straight(
+        robot,
+        task,
+        above_target,
+        release,
+        u_target,
+        u_target,
+        CLOSED_GRIPPER,
+        seed=seed,
+        record_frame=record_frame,
+    )
+    if not sol:
+        return "lower"
+    # Motor lag leaves the loaded arm short of the last waypoint; hold it there before letting go.
+    _interpolate_stage(
+        robot, task, sol, CLOSED_GRIPPER, CLOSED_GRIPPER, steps=5, settle_steps=3, record_frame=record_frame
+    )
+
+    # Release
+    _interpolate_stage(
+        robot, task, sol, CLOSED_GRIPPER, OPEN_GRIPPER, steps=15, settle_steps=3, record_frame=record_frame
+    )
+
+    # Open jaws straight back up out of the stack.
+    jaw = _jaw_center(robot.backend)
+    up = np.array([jaw[0], jaw[1], _transit_height(task, held=False)])
+    if not _move_straight(
+        robot, task, jaw, up, u_target, u_target, OPEN_GRIPPER, seed=seed, record_frame=record_frame
+    ):
+        return "retreat"
     return None
 
 
@@ -362,68 +621,12 @@ def generate_episode(
     bottom, middle, top = task.current_order
     task_prompt = get_task_instruction(bottom, middle, top)
 
-    site_id = mujoco.mj_name2id(robot.backend.model, mujoco.mjtObj.mjOBJ_SITE, "gripper_frame")
-
     # --- Phase 1: Stack Middle onto Bottom ---
-    pos_m = task.bowl_position(middle)
-    pos_b = task.bowl_position(bottom)
-    rim_m, u_m = _get_rim_and_unit_vector(pos_m)
-    _, u_b = _get_rim_and_unit_vector(pos_b)
-    task.target_bowl = middle
-
-    # Approach from +0.08m above rim
-    sol = solve_ik_jaw(robot.backend, rim_m + [0, 0, 0.08], u_m, seed=seed)
-    if not sol:
-        return False, "ik_p1_approach", task_prompt
-    _interpolate_stage(
-        robot, task, sol, OPEN_GRIPPER, OPEN_GRIPPER, steps=20, settle_steps=2, record_frame=record_frame
-    )
-
-    # Descend to rim
-    sol = solve_ik_jaw(robot.backend, rim_m, u_m, seed=seed)
-    if not sol:
-        return False, "ik_p1_pre_grasp", task_prompt
-    _interpolate_stage(
-        robot, task, sol, OPEN_GRIPPER, OPEN_GRIPPER, steps=15, settle_steps=2, record_frame=record_frame
-    )
-
-    # Grasp rim (pinch fingers to straddle rim wall)
-    _interpolate_stage(
-        robot, task, sol, OPEN_GRIPPER, CLOSED_GRIPPER, steps=10, settle_steps=2, record_frame=record_frame
-    )
-    if task.held_bowl is None:
-        return False, "ik_p1_grasp_missed", task_prompt
-
-    # Lift bowl vertically, then carry it above the bottom bowl in the same motion
-    failed = _lift_and_carry(
-        robot, task, rim_m, u_m, pos_b + [0, 0, 0.12], u_b, seed=seed, record_frame=record_frame
+    failed = _pick_and_place(
+        robot, task, middle, bottom, from_home=True, seed=seed, record_frame=record_frame
     )
     if failed:
         return False, f"ik_p1_{failed}", task_prompt
-
-    # Lower into bottom bowl
-    sol = solve_ik_held_bowl(robot, task, pos_b + [0, 0, 0.035], u_b, seed=seed)
-    if not sol:
-        return False, "ik_p1_lower", task_prompt
-    _interpolate_stage(
-        robot, task, sol, CLOSED_GRIPPER, CLOSED_GRIPPER, steps=15, settle_steps=3, record_frame=record_frame
-    )
-
-    # Release
-    _interpolate_stage(
-        robot, task, sol, CLOSED_GRIPPER, OPEN_GRIPPER, steps=15, settle_steps=3, record_frame=record_frame
-    )
-
-    # Retreat upward along reverse approach angle
-    site_pos = robot.backend.data.site_xpos[site_id].copy()
-    site_mat = robot.backend.data.site_xmat[site_id].reshape(3, 3).copy()
-    jaw_curr = site_pos + site_mat @ JAW_CENTER_OFFSET
-    sol = solve_ik_jaw(robot.backend, jaw_curr + [0, 0, 0.08], u_b, seed=seed)
-    if not sol:
-        return False, "ik_p1_retreat", task_prompt
-    _interpolate_stage(
-        robot, task, sol, OPEN_GRIPPER, OPEN_GRIPPER, steps=15, settle_steps=2, record_frame=record_frame
-    )
 
     # Settle between phases
     current_joints = robot.backend.joint_positions()
@@ -434,66 +637,9 @@ def generate_episode(
             record_frame(observation, sent)
 
     # --- Phase 2: Stack Top onto Middle ---
-    pos_t = task.bowl_position(top)
-    pos_m_now = task.bowl_position(middle)
-    rim_t, u_t = _get_rim_and_unit_vector(pos_t)
-    _, u_m_now = _get_rim_and_unit_vector(pos_m_now)
-    task.target_bowl = top
-
-    # Approach top bowl (transit across table)
-    sol = solve_ik_jaw(robot.backend, rim_t + [0, 0, 0.08], u_t, seed=seed)
-    if not sol:
-        return False, "ik_p2_approach", task_prompt
-    _interpolate_stage(
-        robot, task, sol, OPEN_GRIPPER, OPEN_GRIPPER, steps=25, settle_steps=2, record_frame=record_frame
-    )
-
-    # Descend to rim
-    sol = solve_ik_jaw(robot.backend, rim_t, u_t, seed=seed)
-    if not sol:
-        return False, "ik_p2_pre_grasp", task_prompt
-    _interpolate_stage(
-        robot, task, sol, OPEN_GRIPPER, OPEN_GRIPPER, steps=15, settle_steps=2, record_frame=record_frame
-    )
-
-    # Grasp rim
-    _interpolate_stage(
-        robot, task, sol, OPEN_GRIPPER, CLOSED_GRIPPER, steps=10, settle_steps=2, record_frame=record_frame
-    )
-    if task.held_bowl is None:
-        return False, "ik_p2_grasp_missed", task_prompt
-
-    # Lift top bowl, then carry it above the middle bowl in the same motion
-    failed = _lift_and_carry(
-        robot, task, rim_t, u_t, pos_m_now + [0, 0, 0.12], u_m_now, seed=seed, record_frame=record_frame
-    )
+    failed = _pick_and_place(robot, task, top, middle, from_home=False, seed=seed, record_frame=record_frame)
     if failed:
         return False, f"ik_p2_{failed}", task_prompt
-
-    # Re-measure middle bowl position for sub-millimeter concentric placement
-    pos_m_now = task.bowl_position(middle)
-    sol = solve_ik_held_bowl(robot, task, pos_m_now + [0, 0, 0.035], u_m_now, seed=seed)
-    if not sol:
-        return False, "ik_p2_lower", task_prompt
-    _interpolate_stage(
-        robot, task, sol, CLOSED_GRIPPER, CLOSED_GRIPPER, steps=15, settle_steps=3, record_frame=record_frame
-    )
-
-    # Release
-    _interpolate_stage(
-        robot, task, sol, CLOSED_GRIPPER, OPEN_GRIPPER, steps=15, settle_steps=3, record_frame=record_frame
-    )
-
-    # Retreat upward along reverse approach angle
-    site_pos = robot.backend.data.site_xpos[site_id].copy()
-    site_mat = robot.backend.data.site_xmat[site_id].reshape(3, 3).copy()
-    jaw_curr = site_pos + site_mat @ JAW_CENTER_OFFSET
-    sol = solve_ik_jaw(robot.backend, jaw_curr + [0, 0, 0.08], u_m_now, seed=seed)
-    if not sol:
-        return False, "ik_p2_retreat", task_prompt
-    _interpolate_stage(
-        robot, task, sol, OPEN_GRIPPER, OPEN_GRIPPER, steps=15, settle_steps=2, record_frame=record_frame
-    )
 
     task.target_bowl = None
 
