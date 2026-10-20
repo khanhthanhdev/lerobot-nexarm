@@ -405,6 +405,7 @@ def test_domain_randomization_covers_every_task_object() -> None:
     try:
         model = backend.model
         wall = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, "bowl_red_wall_0")
+        rim = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, "bowl_red_rim_0")
         visual = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, "bowl_red_visual")
         body = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "bowl_red")
         nominal_friction = float(model.geom_friction[wall, 0])
@@ -414,7 +415,10 @@ def test_domain_randomization_covers_every_task_object() -> None:
         backend.reset(rng=np.random.default_rng(5))
         objects = backend.last_domain_params["objects"]
         assert set(objects) == {"bowl_red", "bowl_blue", "bowl_black"}
-        assert model.geom_friction[wall, 0] == pytest.approx(objects["bowl_red"]["friction"])
+        # The jaws grip the rim shell; bowl-on-bowl surfaces stay below the wedge-lock friction.
+        assert model.geom_friction[rim, 0] == pytest.approx(objects["bowl_red"]["friction"])
+        assert model.geom_friction[wall, 0] == pytest.approx(objects["bowl_red"]["contact_friction"])
+        assert objects["bowl_red"]["contact_friction"] < 0.43
         assert model.body_mass[body] == pytest.approx(nominal_mass * objects["bowl_red"]["mass_scale"])
         # Bowl colors name the task (material colors), so they are not jittered.
         np.testing.assert_array_equal(model.geom_rgba[visual], nominal_visual_rgba)

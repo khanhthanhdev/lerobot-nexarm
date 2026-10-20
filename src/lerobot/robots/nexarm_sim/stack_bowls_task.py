@@ -122,6 +122,21 @@ class NexArmStackBowlsTask:
         self._gripper_frame_site_id = self._required_id(mujoco.mjtObj.mjOBJ_SITE, "gripper_frame")
         self._left_jaw_geom_id = self._required_id(mujoco.mjtObj.mjOBJ_GEOM, "link_6_left_jaw_collision_0")
         self._right_jaw_geom_id = self._required_id(mujoco.mjtObj.mjOBJ_GEOM, "link_6_right_jaw_collision_0")
+        # The thin rim and wall shell each bowl offers only to the jaws (it collides with nothing else).
+        model = backend.model
+        self._jaw_only_geom_ids = {
+            c: [
+                g
+                for g in range(model.ngeom)
+                if model.geom_bodyid[g] == self._body_ids[c]
+                and model.geom_contype[g]
+                and not model.geom_conaffinity[g]
+            ]
+            for c in COLORS
+        }
+        self._jaw_only_contype = {
+            c: model.geom_contype[ids].copy() for c, ids in self._jaw_only_geom_ids.items()
+        }
 
         self.held_bowl: str | None = None
         self.held_rel_pos: np.ndarray | None = None
@@ -205,6 +220,8 @@ class NexArmStackBowlsTask:
         self.held_bowl = None
         self.held_rel_pos = None
         self.held_rel_mat = None
+        for color in COLORS:
+            self._set_jaw_contacts(color, enabled=True)
         self.target_bowl = None
         self._rest_z = {color: float(self.bowl_position(color)[2]) for color in COLORS}
         self._stages = dict.fromkeys(STAGES, False)
@@ -249,6 +266,9 @@ class NexArmStackBowlsTask:
                     self.held_rel_pos = site_mat.T @ (bpos - site_pos)
                     bowl_mat = self.backend.data.xmat[self._body_ids[self.held_bowl]].reshape(3, 3)
                     self.held_rel_mat = site_mat.T @ bowl_mat
+                    # The assist stands in for the grip. Pinned to the gripper, the bowl would turn any jaw overlap
+                    # with its shell into a constant force that holds the arm off its target.
+                    self._set_jaw_contacts(self.held_bowl, enabled=False)
 
             if self.held_bowl is not None:
                 qadr = int(self.backend.model.jnt_qposadr[self._joint_ids[self.held_bowl]])
@@ -264,6 +284,7 @@ class NexArmStackBowlsTask:
                 self.backend.data.qvel[dofadr : dofadr + 6] = 0
         elif gripper_ctrl < self.assist_release_pos:  # commanded towards open
             if self.held_bowl is not None:
+                self._set_jaw_contacts(self.held_bowl, enabled=True)
                 self.held_bowl = None
                 self.held_rel_pos = None
                 self.held_rel_mat = None
@@ -290,6 +311,10 @@ class NexArmStackBowlsTask:
         body = self._body_ids[self.held_bowl]
         self.held_rel_pos = site_mat.T @ (self.bowl_position(self.held_bowl) - site_pos)
         self.held_rel_mat = site_mat.T @ self.backend.data.xmat[body].reshape(3, 3)
+
+    def _set_jaw_contacts(self, color: str, *, enabled: bool) -> None:
+        ids = self._jaw_only_geom_ids[color]
+        self.backend.model.geom_contype[ids] = self._jaw_only_contype[color] if enabled else 0
 
     def _bowl_jaw_contacts(self) -> dict[str, set[int]]:
         """Return penetrating jaw contacts grouped by bowl (ignores contact margins)."""

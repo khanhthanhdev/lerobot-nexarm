@@ -192,3 +192,61 @@ def test_stages_latch_and_name_the_first_unreached(task):
     assert not task.status().is_arm_static
     task.reset(seed=3, settle_steps=0)
     assert not any(task.status().stages.values())
+
+
+@pytest.mark.parametrize(
+    ("where", "bowl_local_point", "touches"),
+    [
+        ("floor", (0, 0, -0.0175), "bowl_red_floor"),
+        ("lower wall", (0.0493, 0, -0.0155), "bowl_red_shell_0_0"),
+        ("rim", (0.0615, 0, 0.010), "bowl_red_rim_0"),
+        ("open interior", (0, 0, 0.012), None),
+    ],
+)
+def test_jaws_cannot_pass_through_the_bowl(task, where, bowl_local_point, touches):
+    model, data = task.backend.model, task.backend.data
+    jaw = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, "link_6_left_jaw_collision_0")
+    qadr = model.jnt_qposadr[task._joint_ids["red"]]
+    data.qpos[qadr : qadr + 3] = data.geom_xpos[jaw] - np.array(bowl_local_point)
+    data.qpos[qadr + 3 : qadr + 7] = [1, 0, 0, 0]
+    mujoco.mj_forward(model, data)
+
+    touched = set()
+    for con in data.contact[: data.ncon]:
+        if jaw in (con.geom1, con.geom2):
+            other = con.geom2 if con.geom1 == jaw else con.geom1
+            touched.add(mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_GEOM, other))
+    touched = {name for name in touched if name.startswith("bowl_red")}
+    if touches is None:
+        assert not touched, where  # the inner jaw still fits inside the bowl
+    else:
+        assert touches in touched, where
+
+
+def test_pressed_bowls_do_not_wedge_lock():
+    """A bowl pressed into another and lifted out must not drag (then fling) the lower bowl with it."""
+    model = mujoco.MjModel.from_xml_path(str(MODEL))
+    data = mujoco.MjData(model)
+    blue, red = (
+        model.jnt_qposadr[task_id]
+        for task_id in (
+            mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, f"bowl_{c}_joint") for c in ("blue", "red")
+        )
+    )
+    blue_body, red_body = (
+        mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, f"bowl_{c}") for c in ("blue", "red")
+    )
+    data.qpos[red : red + 3] = data.qpos[blue : blue + 3] + [0, 0, 0.03]
+    for _ in range(500):
+        mujoco.mj_step(model, data)
+    rest_z = data.xpos[blue_body][2]
+
+    data.xfrc_applied[red_body, 2] = -20.0  # pressed in about as hard as the arm can
+    for _ in range(500):
+        mujoco.mj_step(model, data)
+    data.xfrc_applied[red_body, 2] = 3.0  # then lifted straight out
+    rise = 0.0
+    for _ in range(500):
+        mujoco.mj_step(model, data)
+        rise = max(rise, data.xpos[blue_body][2] - rest_z)
+    assert rise < 0.005

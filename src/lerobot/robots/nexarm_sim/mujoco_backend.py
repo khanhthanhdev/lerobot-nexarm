@@ -77,6 +77,10 @@ class DomainRandomizationRanges:
     light_scale: tuple[float, float] = (0.75, 1.35)
     object_bodies: tuple[str, ...] | None = None
     object_friction: tuple[float, float] = (0.8, 2.2)
+    # Objects with a jaw-only grip shell (the bowls) get ``object_friction`` on that shell only; their other
+    # surfaces touch other objects and take this lower range. Nested bowls wedge-lock above ~0.43 (the tangent of
+    # their wall angle), and pulling a locked pair apart flings the lower bowl.
+    object_contact_friction: tuple[float, float] = (0.2, 0.4)
     object_mass_scale: tuple[float, float] = (0.8, 1.25)
     object_rgb_jitter: float = 0.12
     joint_damping_scale: dict[str, tuple[float, float]] = field(
@@ -256,10 +260,14 @@ class NexArmMujocoBackend:
             friction = float(rng.uniform(*ranges.object_friction))
             mass_scale = float(rng.uniform(*ranges.object_mass_scale))
             rgb_delta = rng.uniform(-ranges.object_rgb_jitter, ranges.object_rgb_jitter, size=3)
+            geom_ids = np.flatnonzero(self.model.geom_bodyid == body_id)
+            jaw_only = (self.model.geom_contype[geom_ids] > 0) & (self.model.geom_conaffinity[geom_ids] == 0)
+            contact_friction = float(rng.uniform(*ranges.object_contact_friction)) if jaw_only.any() else None
             colored = False
-            for geom_id in np.flatnonzero(self.model.geom_bodyid == body_id):
+            for geom_id, grip_shell in zip(geom_ids, jaw_only, strict=True):
                 if self.model.geom_contype[geom_id] or self.model.geom_conaffinity[geom_id]:
-                    self.model.geom_friction[geom_id, 0] = friction
+                    use_grip = contact_friction is None or grip_shell
+                    self.model.geom_friction[geom_id, 0] = friction if use_grip else contact_friction
                 # Material colors (e.g. the bowl colors named in the task prompt) stay fixed;
                 # only visible geoms colored by their own rgba are jittered.
                 if self.model.geom_matid[geom_id] < 0 and self.model.geom_group[geom_id] < 3:
@@ -271,6 +279,7 @@ class NexArmMujocoBackend:
             self.model.body_inertia[body_id] = self._nominal_body_inertia[body_id] * mass_scale
             objects[body_name] = {
                 "friction": friction,
+                "contact_friction": contact_friction,
                 "mass_scale": mass_scale,
                 "rgb_delta": rgb_delta.tolist() if colored else None,
             }

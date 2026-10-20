@@ -352,7 +352,10 @@ def _bowls(model: mujoco.MjModel) -> dict:
             }
             continue
         if model.geom_conaffinity[geom] == 0:
-            continue  # MuJoCo-only rim plates that only the gripper jaws touch; Isaac grips the capsule proxy
+            # MuJoCo-only rim shell that only the gripper jaws touch. Isaac grips the capsule proxy, so the proxy
+            # takes the shell's grip friction rather than MuJoCo's low bowl-on-bowl friction.
+            friction = float(model.geom_friction[geom, 0])
+            continue
         size = model.geom_size[geom]
         if kind == mujoco.mjtGeom.mjGEOM_CAPSULE:
             shape = {"type": "capsule", "radius": float(size[0]), "half_length": float(size[1])}
@@ -362,7 +365,6 @@ def _bowls(model: mujoco.MjModel) -> dict:
             raise ValueError(f"Unsupported bowl collider type {kind}")
         shape.update(pos=_round(local[:3, 3]), quat=_mat_to_quat(local[:3, :3]))
         colliders.append(shape)
-        friction = float(model.geom_friction[geom, 0])
     colors = {}
     for color in COLORS:
         body = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, f"bowl_{color}")
