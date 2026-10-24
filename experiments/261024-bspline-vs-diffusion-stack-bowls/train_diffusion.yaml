@@ -1,0 +1,23 @@
+# Diffusion baseline on the NexArm stack-bowls sim dataset. Load with:
+#   uv run lerobot-train --config_path experiments/261024-bspline-vs-diffusion-stack-bowls/train_diffusion.yaml
+dataset:
+  repo_id: local/nexarm_stack_bowls
+  root: outputs/datasets/nexarm_stack_bowls
+  # revision: <commit hash or tag of the dataset version you trained on>
+
+policy:
+  type: diffusion
+  push_to_hub: false
+
+output_dir: experiments/261024-bspline-vs-diffusion-stack-bowls/outputs/train_diffusion
+job_name: 261024-diffusion-stack-bowls
+seed: 1000
+batch_size: 64
+steps: 100000
+save_freq: 25000
+log_freq: 100
+env_eval_freq: 0
+
+wandb:
+  enable: true
+  project: lerobot-nexarm
