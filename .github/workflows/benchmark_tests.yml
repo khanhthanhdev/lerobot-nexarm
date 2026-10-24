@@ -65,8 +65,6 @@ jobs:
   # ── LIBERO ────────────────────────────────────────────────────────────────
   # Isolated image: lerobot[libero] only (hf-libero, dm-control, mujoco chain)
   libero-integration-test:
-    # Disabled for this fork: these jobs require the upstream GPU runner and secrets.
-    if: ${{ false }}
     permissions:
       contents: read
     name: Libero — build image + 1-episode eval
@@ -231,8 +229,6 @@ jobs:
   # ── METAWORLD ─────────────────────────────────────────────────────────────
   # Isolated image: lerobot[metaworld] only (metaworld==3.0.0, mujoco>=3 chain)
   metaworld-integration-test:
-    # Disabled for this fork: these jobs require the upstream GPU runner and secrets.
-    if: ${{ false }}
     permissions:
       contents: read
     name: MetaWorld — build image + 1-episode eval
@@ -339,8 +335,6 @@ jobs:
   # Build takes ~20 min on first run; subsequent runs hit the layer cache.
   # Requires an NVIDIA GPU runner with CUDA 12.1 drivers.
   robotwin-integration-test:
-    # Disabled for this fork: these jobs require the upstream GPU runner and secrets.
-    if: ${{ false }}
     permissions:
       contents: read
     name: RoboTwin 2.0 — build image + 1-episode eval
@@ -456,8 +450,6 @@ jobs:
   # clones (no `lerobot[robocasa]` extra — robocasa's setup.py pins
   # `lerobot==0.3.3`, which would shadow this repo's lerobot).
   robocasa-integration-test:
-    # Disabled for this fork: these jobs require the upstream GPU runner and secrets.
-    if: ${{ false }}
     permissions:
       contents: read
     name: RoboCasa365 — build image + 1-episode eval
@@ -565,8 +557,6 @@ jobs:
   # defaults (image/wrist_image). The image is layered on
   # huggingface/lerobot-gpu, which already ships [libero] as part of [all].
   robocerebra-integration-test:
-    # Disabled for this fork: these jobs require the upstream GPU runner and secrets.
-    if: ${{ false }}
     permissions:
       contents: read
     name: RoboCerebra — build image + 1-episode eval
@@ -679,8 +669,6 @@ jobs:
   # Isolated image: mani-skill/SAPIEN/Vulkan chain with gymnasium and numpy
   # overrides (robomme can't be a pyproject extra due to numpy<2 pin).
   robomme-integration-test:
-    # Disabled for this fork: these jobs require the upstream GPU runner and secrets.
-    if: ${{ false }}
     permissions:
       contents: read
     name: RoboMME — build image + 1-episode eval
@@ -792,8 +780,6 @@ jobs:
   # Isolated image: LIBERO-plus fork cloned into /home/user_lerobot on top of
   # huggingface/lerobot-gpu (see docker/Dockerfile.benchmark.libero_plus).
   libero-plus-integration-test:
-    # Disabled for this fork: these jobs require the upstream GPU runner and secrets.
-    if: ${{ false }}
     permissions:
       contents: read
     name: LIBERO-plus — build image + 1-episode eval
@@ -907,8 +893,6 @@ jobs:
   # ── VLABENCH ─────────────────────────────────────────────────────────────
   # Isolated image: lerobot[vlabench] only (VLABench, mujoco==3.2.2, dm-control chain)
   vlabench-integration-test:
-    # Disabled for this fork: these jobs require the upstream GPU runner and secrets.
-    if: ${{ false }}
     permissions:
       contents: read
     name: VLABench — build image + 1-episode eval
