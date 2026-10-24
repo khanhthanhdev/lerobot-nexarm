@@ -61,7 +61,7 @@ lerobot-nexarm/
 | 05  | [TurboVLA policy plugin, inference](./phase-05-turbovla-policy-inference.md)             | P1       | 2-3d       | 04         | in-progress |
 | 06  | [TurboVLA training and LIBERO benchmark](./phase-06-turbovla-training-and-benchmark.md)  | P2       | 3-5d + GPU | 05         | in-progress |
 | 07  | [B-spline Policy port](./phase-07-bspline-policy-port.md)                                | P2       | 3-5d + GPU | 03         | in-progress |
-| 08  | [NexArm plugins on upstream LeRobot](./phase-08-nexarm-plugins-on-upstream-lerobot.md)   | P2       | 3-5d       | 02, 05     | pending     |
+| 08  | [NexArm plugins on upstream LeRobot](./phase-08-nexarm-plugins-on-upstream-lerobot.md)   | P2       | 3-5d       | 02, 05     | in-progress |
 | 09  | [Tools/examples split and docs sweep](./phase-09-tools-examples-split-and-docs.md)       | P2       | 1d         | 06, 07, 08 | pending     |
 
 Phase 07 can run alongside 04-06. Phase 08 can start once phase 05 has shown the plugin pattern works.
