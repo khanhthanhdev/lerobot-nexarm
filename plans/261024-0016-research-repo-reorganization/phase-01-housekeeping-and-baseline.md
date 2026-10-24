@@ -42,3 +42,7 @@ Start from a clean, tagged state with a recorded test baseline, so every later p
 
 ## Risk / Rollback
 None. This phase only adds commits, a remote and a tag.
+
+## Execution notes (2026-10-24)
+- Done: pointer commit, plans/reports commit, `upstream` remote, `pre-reorg` tag (`c96f8b20`, pushed), Windows baseline in `plans/reports/baseline-261024-0808-nexarm-tests.md`. The Linux baseline is still open.
+- Correction: the Context line above was backwards. `5082ece` is the newer commit (the Transformers 5 BERT fix) and `98ee1be` is its parent. The pointer commit `70e23238` recorded `98ee1be`, so `pre-reorg` points at the older TurboVLA commit. `main` was restored to `5082ece` in `67f23b1e`.
