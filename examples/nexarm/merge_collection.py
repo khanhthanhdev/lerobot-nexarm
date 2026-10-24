@@ -5,8 +5,8 @@ import argparse
 from pathlib import Path
 
 from lerobot.datasets import LeRobotDataset
-from lerobot.datasets.collection_merge import merge_collection_session
 from lerobot.utils.constants import HF_LEROBOT_HOME
+from lerobot_robot_nexarm.collection_merge import merge_collection_session
 
 
 def main():

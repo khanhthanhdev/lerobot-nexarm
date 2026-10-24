@@ -505,7 +505,7 @@ Import the kinematics/dynamics solver backed by MuJoCo:
 
 ```python
 import numpy as np
-from lerobot.motors.nexarm import NexArmKinematicsDynamics
+from lerobot_robot_nexarm.motors import NexArmKinematicsDynamics
 
 kd = NexArmKinematicsDynamics()
 
@@ -540,7 +540,7 @@ print("Gravity torques (Nm):", tau_g)
 Directly query and command the 6 HX-30HM servos via `NexArmMotorsBus`:
 
 ```python
-from lerobot.motors.nexarm import NexArmMotorsBus
+from lerobot_robot_nexarm.motors import NexArmMotorsBus
 
 bus = NexArmMotorsBus(port="/dev/ttyUSB1")
 bus.connect()
@@ -648,7 +648,7 @@ Then keep `--dataset.repo_id="${HF_USER}/nexarm_stack_bowls"` in your normal com
 1. **Follower Serial Firmware Desync (5.0 Hz Telemetry)**:
    - When the physical follower arm is in default/standalone mode (not in LeRobot bridge mode), its AT32 coprocessor broadcasts telemetry packets (`CMD_GET_CUR_COORDS = 11`) at exactly **5.0 Hz (every 200 ms)**.
    - If `read_positions()` accepted these unrequested telemetry frames without verifying the reply command ID (`CMD_READ_POS = 96`), every read would block for ~200 ms, throttling the record loop to 5.0 Hz and confusing Cartesian coordinates with servo positions.
-   - The driver has been updated in [`src/lerobot/motors/nexarm/nexarm.py`](src/lerobot/motors/nexarm/nexarm.py) to filter incoming packets strictly for the expected command reply (`CMD_READ_POS`), and `rtscts=False` prevents Linux serial driver write blocking on CH340 USB converters.
+   - The driver has been updated in [`packages/lerobot_robot_nexarm/src/lerobot_robot_nexarm/motors/nexarm.py`](packages/lerobot_robot_nexarm/src/lerobot_robot_nexarm/motors/nexarm.py) to filter incoming packets strictly for the expected command reply (`CMD_READ_POS`), and `rtscts=False` prevents Linux serial driver write blocking on CH340 USB converters.
 
 2. **USB 2.0 Camera Bandwidth Contention (YUYV vs MJPG)**:
    - By default on Linux, OpenCV requests raw uncompressed `YUYV` (4:2:2). Two 640x480 @ 30 FPS cameras streaming uncompressed video consume ~37 MB/s, which exceeds single USB 2.0 controller bandwidth and causes the UVC driver to throttle or drop frames down to 5–15 FPS.

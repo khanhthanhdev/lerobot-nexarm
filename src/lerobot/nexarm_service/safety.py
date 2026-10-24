@@ -13,7 +13,7 @@ import math
 import time
 from collections.abc import Callable, Mapping, Sequence
 
-from lerobot.motors.nexarm.nexarm import (
+from lerobot_robot_nexarm.motors.nexarm import (
     GRIPPER_CLOSED_POS,
     GRIPPER_OPEN_POS,
     JOINT_NAMES,

@@ -11,9 +11,9 @@ touching serial ports.
 from typing import Any
 
 from lerobot.cameras.opencv import OpenCVCameraConfig
-from lerobot.motors.nexarm import NexArmMotorsBus
 from lerobot.nexarm_service.profiles import CameraProfile, RobotProfile
-from lerobot.robots.nexarm_follower import NexArmFollower, NexArmFollowerConfig
+from lerobot_robot_nexarm.motors import NexArmMotorsBus
+from lerobot_robot_nexarm.nexarm_follower import NexArmFollower, NexArmFollowerConfig
 from lerobot_teleoperator_nexarm import NexArmLeader, NexArmLeaderConfig
 
 

@@ -25,9 +25,9 @@ from pathlib import Path
 import mujoco
 import numpy as np
 
-from lerobot.motors.nexarm.mujoco_mapping import MUJOCO_JOINTS, raw_to_joint_position
-from lerobot.motors.nexarm.nexarm import JOINT_NAMES
-from lerobot.robots.nexarm_sim.mujoco_backend import resolve_model_path
+from lerobot_robot_nexarm.motors.mujoco_mapping import MUJOCO_JOINTS, raw_to_joint_position
+from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES
+from lerobot_robot_nexarm.nexarm_sim.mujoco_backend import resolve_model_path
 
 try:  # imported as a package module (tests) or run as a script
     from examples.nexarm.probe_joint_mapping import ARM_JOINTS, mapped_qpos

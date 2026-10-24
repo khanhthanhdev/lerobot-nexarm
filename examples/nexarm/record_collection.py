@@ -48,9 +48,9 @@ from lerobot.teleoperators import make_teleoperator_from_config
 from lerobot.utils.feature_utils import combine_feature_dicts
 from lerobot.utils.import_utils import register_third_party_plugins
 from lerobot.utils.keyboard_input import init_keyboard_listener
-from lerobot.utils.recording_session import run_manual_session, show_recording_status
 from lerobot.utils.utils import init_logging, log_say
 from lerobot.utils.visualization_utils import init_visualization, shutdown_visualization
+from lerobot_robot_nexarm.recording_session import run_manual_session, show_recording_status
 
 
 @dataclass
@@ -99,7 +99,7 @@ def _merge_root(cfg: CollectionRecordConfig) -> Path | None:
 
 
 def _check_mergeable(cfg: CollectionRecordConfig, robot: Robot, features: dict) -> None:
-    from lerobot.datasets.collection_merge import check_session_mergeable
+    from lerobot_robot_nexarm.collection_merge import check_session_mergeable
 
     check_session_mergeable(
         cfg.root_repo_id,
@@ -259,7 +259,7 @@ def _record_manual(cfg: CollectionRecordConfig, processors: Processors) -> LeRob
 
 
 def _merge(cfg: CollectionRecordConfig, dataset: LeRobotDataset) -> None:
-    from lerobot.datasets.collection_merge import merge_collection_session
+    from lerobot_robot_nexarm.collection_merge import merge_collection_session
 
     if cfg.manual_control:
         show_recording_status(dataset.num_episodes, "MERGING DATA...", cfg.root_repo_id)

@@ -23,7 +23,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from lerobot.robots.nexarm_sim.mujoco_backend import NexArmMujocoBackend, resolve_model_path
+from lerobot_robot_nexarm.nexarm_sim.mujoco_backend import NexArmMujocoBackend, resolve_model_path
 
 try:  # imported as a package module (tests) or run as a script
     from examples.nexarm.camera_config import camera_source

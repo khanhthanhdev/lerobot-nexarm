@@ -13,10 +13,10 @@ import logging
 import threading
 from typing import Any
 
-from lerobot.motors.nexarm.nexarm import JOINT_NAMES, raw_to_radians
 from lerobot.nexarm_service.events import EventHub
 from lerobot.nexarm_service.profiles import RobotProfile
 from lerobot.nexarm_service.safety import capture_rest, ramp_to
+from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES, raw_to_radians
 
 logger = logging.getLogger(__name__)
 

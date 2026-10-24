@@ -17,14 +17,14 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from lerobot.motors.nexarm.nexarm import (
+from lerobot.utils.constants import HF_LEROBOT_CALIBRATION, ROBOTS, TELEOPERATORS
+from lerobot_robot_nexarm.motors.nexarm import (
     JOINT_NAMES,
     POSITION_CENTER,
     POSITION_MAX,
     POSITION_MIN,
     map_leader_to_follower,
 )
-from lerobot.utils.constants import HF_LEROBOT_CALIBRATION, ROBOTS, TELEOPERATORS
 
 logger = logging.getLogger(__name__)
 

@@ -55,9 +55,6 @@ from lerobot.processor import (
 from lerobot.robots import (  # noqa: F401
     RobotConfig,
     make_robot_from_config,
-    mobile_bi_nexarm_sim,
-    nexarm_follower,
-    nexarm_sim,
     so_follower,
 )
 from lerobot.robots.robot import Robot

@@ -13,7 +13,7 @@ from typing import Any
 import numpy as np
 import numpy.typing as npt
 
-from lerobot.motors.nexarm.mujoco_mapping import joint_position_to_raw, raw_to_joint_position
+from lerobot_robot_nexarm.motors.mujoco_mapping import joint_position_to_raw, raw_to_joint_position
 
 ARM_FEATURES = (
     "shoulder_pan",
@@ -33,7 +33,7 @@ DEFAULT_CAMERAS = ("front", "left_wrist")
 
 
 def checkout_root() -> Path:
-    return Path(__file__).resolve().parents[4]
+    return Path(__file__).resolve().parents[5]
 
 
 def default_spec_path() -> Path:

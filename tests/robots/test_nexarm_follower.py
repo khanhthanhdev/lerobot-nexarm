@@ -16,9 +16,9 @@ import pytest
 
 pytest.importorskip("serial", reason="pyserial is required (install lerobot[hardware])")
 
-from lerobot.motors.nexarm.nexarm import JOINT_NAMES  # noqa: E402
-from lerobot.robots.nexarm_follower import NexArmFollower, NexArmFollowerConfig  # noqa: E402
 from lerobot.utils.errors import DeviceAlreadyConnectedError, DeviceNotConnectedError  # noqa: E402
+from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES  # noqa: E402
+from lerobot_robot_nexarm.nexarm_follower import NexArmFollower, NexArmFollowerConfig  # noqa: E402
 
 
 def make_bus(positions: list[int] | None = None) -> MagicMock:
@@ -34,8 +34,8 @@ def make_bus(positions: list[int] | None = None) -> MagicMock:
 def follower(tmp_path):
     bus = make_bus()
     with (
-        patch("lerobot.robots.nexarm_follower.nexarm_follower.NexArmMotorsBus", return_value=bus),
-        patch("lerobot.robots.nexarm_follower.nexarm_follower.time.sleep"),
+        patch("lerobot_robot_nexarm.nexarm_follower.nexarm_follower.NexArmMotorsBus", return_value=bus),
+        patch("lerobot_robot_nexarm.nexarm_follower.nexarm_follower.time.sleep"),
     ):
         config = NexArmFollowerConfig(port="/dev/null", id="test", calibration_dir=tmp_path)
         robot = NexArmFollower(config)

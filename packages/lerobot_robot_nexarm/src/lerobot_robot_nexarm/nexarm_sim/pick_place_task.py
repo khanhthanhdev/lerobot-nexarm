@@ -9,7 +9,7 @@ from dataclasses import dataclass
 import mujoco
 import numpy as np
 
-from lerobot.motors.nexarm.nexarm import GRIPPER_CLOSED_POS, GRIPPER_OPEN_POS
+from lerobot_robot_nexarm.motors.nexarm import GRIPPER_CLOSED_POS, GRIPPER_OPEN_POS
 
 from .mujoco_backend import NexArmMujocoBackend
 

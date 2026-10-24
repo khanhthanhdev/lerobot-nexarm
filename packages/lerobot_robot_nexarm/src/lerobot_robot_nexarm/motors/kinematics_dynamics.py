@@ -31,14 +31,14 @@ import mujoco
 import numpy as np
 import numpy.typing as npt
 
-from lerobot.motors.nexarm.mujoco_mapping import (
+from lerobot_robot_nexarm.motors.mujoco_mapping import (
     HOME_POSITIONS,
     MUJOCO_JOINTS,
     RAW_RANGES,
     joint_position_to_raw,
     raw_to_joint_position,
 )
-from lerobot.motors.nexarm.nexarm import JOINT_NAMES
+from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES
 
 __all__ = [
     "HOME_POSITIONS",
@@ -88,7 +88,7 @@ class NexArmKinematicsDynamics:
         site_name: str = "gripper_frame",
     ) -> None:
         if model_path is None:
-            checkout_root = Path(__file__).resolve().parents[4]
+            checkout_root = Path(__file__).resolve().parents[5]
             model_path = checkout_root / "sim" / "description" / "mjcf" / "scene.xml"
         model_path = Path(model_path).resolve()
         if not model_path.is_file():

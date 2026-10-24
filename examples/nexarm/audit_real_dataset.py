@@ -30,8 +30,8 @@ from pathlib import Path
 
 import numpy as np
 
-from lerobot.motors.nexarm.nexarm import JOINT_NAMES
-from lerobot.robots.nexarm_sim.stack_bowls_task import GRIPPER_ASSIST_RELEASE_POS
+from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES
+from lerobot_robot_nexarm.nexarm_sim.stack_bowls_task import GRIPPER_ASSIST_RELEASE_POS
 
 try:  # imported as a package module (tests) or run as a script
     from examples.nexarm.calibrate_sim import Episode, load_episodes, parse_episode_list

@@ -36,15 +36,15 @@ from pathlib import Path
 
 import numpy as np
 
-from lerobot.motors.nexarm import NexArmMotorsBus
-from lerobot.motors.nexarm.nexarm import (
+from lerobot_robot_nexarm.motors import NexArmMotorsBus
+from lerobot_robot_nexarm.motors.nexarm import (
     GRIPPER_CLOSED_POS,
     GRIPPER_OPEN_POS,
     JOINT_NAMES,
     POSITION_MAX,
     POSITION_MIN,
 )
-from lerobot.robots.nexarm_follower.config_nexarm_follower import NexArmFollowerConfig
+from lerobot_robot_nexarm.nexarm_follower.config_nexarm_follower import NexArmFollowerConfig
 
 # A step has started once the joint covers this share of it, which ignores servo jitter around the start.
 MOVE_START_FRACTION = 0.02

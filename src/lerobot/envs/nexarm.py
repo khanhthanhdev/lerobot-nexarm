@@ -21,20 +21,20 @@ import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
 
-from lerobot.motors.nexarm.mujoco_mapping import load_joint_mapping
-from lerobot.motors.nexarm.nexarm import JOINT_NAMES
-from lerobot.robots.nexarm_sim.calibration import (
+from lerobot_robot_nexarm.motors.mujoco_mapping import load_joint_mapping
+from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES
+from lerobot_robot_nexarm.nexarm_sim.calibration import (
     SimCalibration,
     apply_calibration,
     resolve_action_delay_steps,
 )
-from lerobot.robots.nexarm_sim.mujoco_backend import (
+from lerobot_robot_nexarm.nexarm_sim.mujoco_backend import (
     RAW_RANGES,
     NexArmMujocoBackend,
     resolve_model_path,
 )
-from lerobot.robots.nexarm_sim.pick_place_task import NexArmPickPlaceTask
-from lerobot.robots.nexarm_sim.stack_bowls_task import (
+from lerobot_robot_nexarm.nexarm_sim.pick_place_task import NexArmPickPlaceTask
+from lerobot_robot_nexarm.nexarm_sim.stack_bowls_task import (
     GRIPPER_ASSIST_ENGAGE_POS,
     REAL_TELEOP_ASSIST_RELEASE_POS,
     STAGES,

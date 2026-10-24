@@ -16,8 +16,8 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from lerobot.motors.nexarm.mujoco_mapping import load_joint_mapping
-from lerobot.robots.nexarm_sim.calibration import (
+from lerobot_robot_nexarm.motors.mujoco_mapping import load_joint_mapping
+from lerobot_robot_nexarm.nexarm_sim.calibration import (
     SimCalibration,
     check_calibration_fps,
     resolve_action_delay_steps,

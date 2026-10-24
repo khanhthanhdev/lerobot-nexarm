@@ -43,11 +43,11 @@ import numpy as np
 import torch
 
 from lerobot.configs import FeatureType, PreTrainedConfig
-from lerobot.motors.nexarm.nexarm import JOINT_NAMES
-from lerobot.robots.nexarm_sim import NexArmPickPlaceTask, NexArmSim, NexArmSimConfig
 from lerobot.utils.constants import ACTION, OBS_STATE, OBS_STR
 from lerobot.utils.feature_utils import build_dataset_frame
 from lerobot.utils.robot_utils import precise_sleep
+from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES
+from lerobot_robot_nexarm.nexarm_sim import NexArmPickPlaceTask, NexArmSim, NexArmSimConfig
 
 logger = logging.getLogger(__name__)
 

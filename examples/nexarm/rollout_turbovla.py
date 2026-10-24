@@ -44,9 +44,10 @@ import numpy as np
 import torch
 from PIL import Image
 
-# Import NexArm robot interfaces
-from lerobot.motors.nexarm.nexarm import GRIPPER_CLOSED_POS, GRIPPER_OPEN_POS, JOINT_NAMES
 from lerobot.utils.robot_utils import precise_sleep
+
+# Import NexArm robot interfaces
+from lerobot_robot_nexarm.motors.nexarm import GRIPPER_CLOSED_POS, GRIPPER_OPEN_POS, JOINT_NAMES
 
 try:  # imported as a package module (tests) or run as a script
     from examples.nexarm.camera_config import (
@@ -458,7 +459,7 @@ class TurboVLAPolicyRunner:
 
 
 def run_sim(args, runner: TurboVLAPolicyRunner):
-    from lerobot.robots.nexarm_sim import (
+    from lerobot_robot_nexarm.nexarm_sim import (
         NexArmPickPlaceTask,
         NexArmSim,
         NexArmSimConfig,
@@ -478,7 +479,7 @@ def run_sim(args, runner: TurboVLAPolicyRunner):
     cam_names = tuple(runner.camera_names)
     import mujoco
 
-    from lerobot.robots.nexarm_sim.mujoco_backend import resolve_model_path
+    from lerobot_robot_nexarm.nexarm_sim.mujoco_backend import resolve_model_path
 
     resolved_model_path = resolve_model_path(args.model)
     _temp_model = mujoco.MjModel.from_xml_path(str(resolved_model_path))
@@ -509,7 +510,7 @@ def run_sim(args, runner: TurboVLAPolicyRunner):
         task.reset(seed=args.seed, settle_steps=25)
         # Training covers every bowl order, so the prompt must describe this episode's order.
         if args.task is None or "Stack the bowls" in args.task:
-            from lerobot.robots.nexarm_sim.stack_bowls_task import get_task_instruction
+            from lerobot_robot_nexarm.nexarm_sim.stack_bowls_task import get_task_instruction
 
             args.task = get_task_instruction(*task.current_order)
     else:
@@ -582,7 +583,7 @@ def run_sim(args, runner: TurboVLAPolicyRunner):
 
 
 def run_real(args, runner: TurboVLAPolicyRunner):
-    from lerobot.robots.nexarm_follower import NexArmFollower, NexArmFollowerConfig
+    from lerobot_robot_nexarm.nexarm_follower import NexArmFollower, NexArmFollowerConfig
 
     check_policy_cameras(camera_names(args), runner.camera_names, str(args.checkpoint))
     task_type = resolve_task_type(args.task_type, runner.checkpoint_config, [str(args.checkpoint)])

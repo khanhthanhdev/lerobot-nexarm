@@ -14,8 +14,8 @@ from examples.nexarm import (
 from examples.nexarm.calibrate_sim import Episode, parse_episode_list
 from examples.nexarm.overlay_recorded_frames import pose_model, side_by_side
 from examples.nexarm.realsense_fovy import fovy_deg, principal_point_offset_px
-from lerobot.motors.nexarm.mujoco_mapping import MUJOCO_JOINTS
-from lerobot.motors.nexarm.nexarm import JOINT_NAMES
+from lerobot_robot_nexarm.motors.mujoco_mapping import MUJOCO_JOINTS
+from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES
 
 SCENE = Path(__file__).resolve().parents[2] / "sim/description/mjcf/scene.xml"
 

@@ -15,11 +15,11 @@ from lerobot_policy_turbovla.processor_turbovla import (  # noqa: E402
 )
 
 from lerobot.configs import FeatureType, PolicyFeature, PreTrainedConfig  # noqa: E402
-from lerobot.motors.nexarm.nexarm import GRIPPER_CLOSED_POS, GRIPPER_OPEN_POS  # noqa: E402
 from lerobot.policies.factory import get_policy_class, make_pre_post_processors  # noqa: E402
 from lerobot.processor import PolicyProcessorPipeline  # noqa: E402
 from lerobot.utils.constants import ACTION, OBS_STATE  # noqa: E402
 from lerobot.utils.import_utils import register_third_party_plugins  # noqa: E402
+from lerobot_robot_nexarm.motors.nexarm import GRIPPER_CLOSED_POS, GRIPPER_OPEN_POS  # noqa: E402
 
 CAMERAS = ["observation.images.wrist", "observation.images.front"]
 

@@ -7,8 +7,9 @@ import pytest
 
 from examples.nexarm import record_collection as wrapper
 from lerobot.configs.dataset import DatasetRecordConfig
-from lerobot.datasets import LeRobotDataset, collection_merge
+from lerobot.datasets import LeRobotDataset
 from lerobot.scripts import lerobot_record
+from lerobot_robot_nexarm import collection_merge
 from tests.mocks.mock_robot import MockRobotConfig
 from tests.mocks.mock_teleop import MockTeleopConfig
 

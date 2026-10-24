@@ -15,10 +15,10 @@ from huggingface_hub import HfApi, snapshot_download
 
 from lerobot.configs import FeatureType, PreTrainedConfig
 from lerobot.datasets import LeRobotDataset, LeRobotDatasetMetadata
-from lerobot.motors.nexarm.nexarm import JOINT_NAMES as MOTOR_NAMES
 from lerobot.policies.act import ACTConfig
 from lerobot.utils.constants import HF_LEROBOT_HOME
 from lerobot.utils.feature_utils import dataset_to_policy_features
+from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES as MOTOR_NAMES
 
 # Existing 2-camera real dataset; pass --repo-id thanhkt/nexarm_stack_bowls_top for the 3-camera root.
 REPO_ID = "thanhkt/nexarm_stack_bowls"

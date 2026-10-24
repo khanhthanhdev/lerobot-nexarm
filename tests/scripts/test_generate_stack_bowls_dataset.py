@@ -10,9 +10,9 @@ import numpy as np
 import pytest
 
 from examples.nexarm import generate_stack_bowls_dataset as generator, sim_dataset_utils as utils
-from lerobot.motors.nexarm.mujoco_mapping import JOINT_MAPPING_VERSION
-from lerobot.motors.nexarm.nexarm import JOINT_NAMES
-from lerobot.robots.nexarm_sim import NexArmSim, NexArmSimConfig, NexArmStackBowlsTask, SimCalibration
+from lerobot_robot_nexarm.motors.mujoco_mapping import JOINT_MAPPING_VERSION
+from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES
+from lerobot_robot_nexarm.nexarm_sim import NexArmSim, NexArmSimConfig, NexArmStackBowlsTask, SimCalibration
 
 MODEL_PATH = Path(__file__).resolve().parents[2] / "sim" / "description" / "mjcf" / "bowl_stack_scene.xml"
 

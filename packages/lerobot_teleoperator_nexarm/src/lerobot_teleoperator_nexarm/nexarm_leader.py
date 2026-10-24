@@ -25,8 +25,10 @@ import logging
 from typing import Any
 
 from lerobot.motors import MotorCalibration
-from lerobot.motors.nexarm import NexArmMotorsBus
-from lerobot.motors.nexarm.nexarm import (
+from lerobot.teleoperators.teleoperator import Teleoperator
+from lerobot.utils.decorators import check_if_already_connected, check_if_not_connected
+from lerobot_robot_nexarm.motors import NexArmMotorsBus
+from lerobot_robot_nexarm.motors.nexarm import (
     JOINT_NAMES,
     POSITION_CENTER,
     POSITION_MAX,
@@ -34,8 +36,6 @@ from lerobot.motors.nexarm.nexarm import (
     map_follower_to_leader,
     map_leader_to_follower,
 )
-from lerobot.teleoperators.teleoperator import Teleoperator
-from lerobot.utils.decorators import check_if_already_connected, check_if_not_connected
 
 from .config_nexarm_leader import NexArmLeaderConfig
 

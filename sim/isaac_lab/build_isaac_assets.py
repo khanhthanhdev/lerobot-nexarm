@@ -262,13 +262,13 @@ def _rgba(model: mujoco.MjModel, geom: int) -> list[float]:
 
 def _actions(model: mujoco.MjModel) -> list[dict]:
     """Per follower feature: the joints it drives and the affine raw-tick -> joint-target map the MuJoCo backend uses."""
-    from lerobot.motors.nexarm.mujoco_mapping import (
+    from lerobot_robot_nexarm.motors.mujoco_mapping import (
         HOME_POSITIONS,
         MUJOCO_JOINTS,
         RAW_RANGES,
         raw_to_joint_position,
     )
-    from lerobot.motors.nexarm.nexarm import JOINT_NAMES
+    from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES
 
     actions = []
     for feature in JOINT_NAMES:
@@ -332,7 +332,7 @@ def _drives(model: mujoco.MjModel) -> dict[str, dict]:
 
 
 def _bowls(model: mujoco.MjModel) -> dict:
-    from lerobot.robots.nexarm_sim.stack_bowls_task import COLORS
+    from lerobot_robot_nexarm.nexarm_sim.stack_bowls_task import COLORS
 
     first = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, f"bowl_{COLORS[0]}")
     colliders, visual = [], None
@@ -386,7 +386,7 @@ def build_scene(
     sim_dir: Path = SIM_DIR,
 ) -> tuple[dict, dict[str, list[dict]], dict[str, tuple[float, float]]]:
     """Return the scene description, the URDF collision boxes and the URDF joint dynamics."""
-    from lerobot.robots.nexarm_sim import stack_bowls_task as task
+    from lerobot_robot_nexarm.nexarm_sim import stack_bowls_task as task
 
     model = mujoco.MjModel.from_xml_path(str(sim_dir / STACK_SCENE))
     data = mujoco.MjData(model)

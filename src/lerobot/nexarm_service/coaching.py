@@ -28,9 +28,9 @@ import threading
 import time
 from typing import Any
 
-from lerobot.motors.nexarm.nexarm import JOINT_NAMES
 from lerobot.nexarm_service.rollout import RolloutWorker
 from lerobot.nexarm_service.safety import capture_rest, ramp_to
+from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES
 
 logger = logging.getLogger(__name__)
 

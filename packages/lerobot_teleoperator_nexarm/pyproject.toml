@@ -10,10 +10,13 @@ license = "Apache-2.0"
 requires-python = ">=3.12"
 dependencies = [
     "lerobot[pyserial-dep,deepdiff-dep]",
+    # The NexArm servo driver.
+    "lerobot_robot_nexarm",
 ]
 
 [tool.uv.sources]
 lerobot = { workspace = true }
+lerobot_robot_nexarm = { workspace = true }
 
 [tool.setuptools.packages.find]
 where = ["src"]

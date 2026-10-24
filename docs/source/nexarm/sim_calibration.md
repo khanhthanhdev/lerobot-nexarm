@@ -195,7 +195,7 @@ Measure these on your real setup and update the scene XML if they differ:
 - table height and the target zone size,
 - background and table color.
 
-Then adjust the visual randomization range in `DomainRandomizationRanges` (`src/lerobot/robots/nexarm_sim/mujoco_backend.py`) so it covers the lighting and color you actually see.
+Then adjust the visual randomization range in `DomainRandomizationRanges` (`packages/lerobot_robot_nexarm/src/lerobot_robot_nexarm/nexarm_sim/mujoco_backend.py`) so it covers the lighting and color you actually see.
 
 ## Step 9. Train and iterate
 

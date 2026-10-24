@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from examples.nexarm import rollout_turbovla as rollout
-from lerobot.motors.nexarm.nexarm import GRIPPER_CLOSED_POS, GRIPPER_OPEN_POS
+from lerobot_robot_nexarm.motors.nexarm import GRIPPER_CLOSED_POS, GRIPPER_OPEN_POS
 
 
 def write_config(directory, payload):
@@ -62,7 +62,7 @@ def test_task_type_and_prompt_precedence():
 
 
 def test_default_prompts_match_training_data():
-    from lerobot.robots.nexarm_sim.stack_bowls_task import get_task_instruction
+    from lerobot_robot_nexarm.nexarm_sim.stack_bowls_task import get_task_instruction
 
     assert get_task_instruction("red", "blue", "black") == rollout.REAL_STACK_BOWLS_TASK
 

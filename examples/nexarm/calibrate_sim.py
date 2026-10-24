@@ -27,11 +27,11 @@ from pathlib import Path
 
 import numpy as np
 
-from lerobot.motors.nexarm.mujoco_mapping import IDENTITY_MAPPING, JointMapping, load_joint_mapping
-from lerobot.motors.nexarm.nexarm import JOINT_NAMES
-from lerobot.robots.nexarm_sim import SimCalibration
-from lerobot.robots.nexarm_sim.calibration import MIN_SPREAD
-from lerobot.robots.nexarm_sim.mujoco_backend import NexArmMujocoBackend, resolve_model_path
+from lerobot_robot_nexarm.motors.mujoco_mapping import IDENTITY_MAPPING, JointMapping, load_joint_mapping
+from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES
+from lerobot_robot_nexarm.nexarm_sim import SimCalibration
+from lerobot_robot_nexarm.nexarm_sim.calibration import MIN_SPREAD
+from lerobot_robot_nexarm.nexarm_sim.mujoco_backend import NexArmMujocoBackend, resolve_model_path
 
 PARAMS = ("kp_scale", "damping_scale", "frictionloss_scale")
 MAX_SPREAD = 0.5

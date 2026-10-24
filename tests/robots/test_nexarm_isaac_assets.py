@@ -14,8 +14,8 @@ import mujoco
 import numpy as np
 import pytest
 
-from lerobot.motors.nexarm.nexarm import JOINT_NAMES
-from lerobot.robots.nexarm_sim.mujoco_backend import RAW_RANGES, NexArmMujocoBackend
+from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES
+from lerobot_robot_nexarm.nexarm_sim.mujoco_backend import RAW_RANGES, NexArmMujocoBackend
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SIM = REPO_ROOT / "sim"

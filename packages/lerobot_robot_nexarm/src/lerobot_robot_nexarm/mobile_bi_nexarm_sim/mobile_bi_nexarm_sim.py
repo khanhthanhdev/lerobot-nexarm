@@ -7,9 +7,9 @@ from __future__ import annotations
 from functools import cached_property
 
 from lerobot.lerobot_types import RobotAction, RobotObservation
+from lerobot.robots.robot import Robot
 from lerobot.utils.decorators import check_if_already_connected, check_if_not_connected
 
-from ..robot import Robot
 from .config_mobile_bi_nexarm_sim import MobileBiNexArmSimConfig
 from .contract import load_contract
 from .mujoco_backend import MobileBiNexArmMujocoBackend, TaskStatus

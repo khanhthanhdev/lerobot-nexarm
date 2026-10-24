@@ -29,11 +29,11 @@ from functools import cached_property
 from lerobot.cameras import make_cameras_from_configs
 from lerobot.lerobot_types import RobotAction, RobotObservation
 from lerobot.motors import MotorCalibration
-from lerobot.motors.nexarm import NexArmMotorsBus
-from lerobot.motors.nexarm.nexarm import JOINT_NAMES, POSITION_CENTER, POSITION_MAX, POSITION_MIN
+from lerobot.robots.robot import Robot
 from lerobot.utils.decorators import check_if_already_connected, check_if_not_connected
+from lerobot_robot_nexarm.motors import NexArmMotorsBus
+from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES, POSITION_CENTER, POSITION_MAX, POSITION_MIN
 
-from ..robot import Robot
 from .config_nexarm_follower import NexArmFollowerConfig
 
 logger = logging.getLogger(__name__)

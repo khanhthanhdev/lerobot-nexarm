@@ -17,11 +17,11 @@ from __future__ import annotations
 from functools import cached_property
 
 from lerobot.lerobot_types import RobotAction, RobotObservation
-from lerobot.motors.nexarm.mujoco_mapping import load_joint_mapping
-from lerobot.motors.nexarm.nexarm import JOINT_NAMES
+from lerobot.robots.robot import Robot
 from lerobot.utils.decorators import check_if_already_connected, check_if_not_connected
+from lerobot_robot_nexarm.motors.mujoco_mapping import load_joint_mapping
+from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES
 
-from ..robot import Robot
 from .calibration import SimCalibration, apply_calibration, resolve_action_delay_steps
 from .config_nexarm_sim import NexArmSimConfig
 from .mujoco_backend import NexArmMujocoBackend

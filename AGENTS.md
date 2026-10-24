@@ -10,10 +10,10 @@ This is the **Hiwonder NexArm** fork of LeRobot — focused exclusively on the H
 
 | Path                                       | What it does                                                                                 |
 | ------------------------------------------ | -------------------------------------------------------------------------------------------- |
-| `src/lerobot/motors/nexarm/`               | CommProtocol UART framing, 6-servo sync read/write, torque, bridge mode (CMD 56/68/96/97/98) |
-| `src/lerobot/robots/nexarm_follower/`      | `NexArmFollowerConfig` + `NexArmFollower` — connect, observe, send_action                    |
-| `src/lerobot/robots/nexarm_sim/`           | `NexArmSimConfig` + `NexArmSim` — single-arm MuJoCo simulation environment                   |
-| `src/lerobot/robots/mobile_bi_nexarm_sim/` | `MobileBiNexArmSimConfig` + `MobileBiNexArmSim` — bimanual mobile robot simulation           |
+| `packages/lerobot_robot_nexarm/src/lerobot_robot_nexarm/motors/`               | CommProtocol UART framing, 6-servo sync read/write, torque, bridge mode (CMD 56/68/96/97/98) |
+| `packages/lerobot_robot_nexarm/src/lerobot_robot_nexarm/nexarm_follower/`      | `NexArmFollowerConfig` + `NexArmFollower` — connect, observe, send_action                    |
+| `packages/lerobot_robot_nexarm/src/lerobot_robot_nexarm/nexarm_sim/`           | `NexArmSimConfig` + `NexArmSim` — single-arm MuJoCo simulation environment                   |
+| `packages/lerobot_robot_nexarm/src/lerobot_robot_nexarm/mobile_bi_nexarm_sim/` | `MobileBiNexArmSimConfig` + `MobileBiNexArmSim` — bimanual mobile robot simulation           |
 | `src/lerobot/teleoperators/nexarm_leader/` | `NexArmLeaderConfig` + `NexArmLeader` — read positions, leader→follower joint mapping        |
 | `src/lerobot/envs/nexarm.py`               | Gym environment for NexArm simulation                                                        |
 | `sim/`                                     | MuJoCo MJCF, URDF description, Isaac Lab configs, meshes, and exporters                      |
@@ -95,4 +95,4 @@ Point to these rather than re-deriving workflows: `run.md` (sim, hardware, teleo
 - **Optional dependencies**: many policies, envs, and robots are behind extras (e.g., `lerobot[aloha]`, see `pyproject.toml`). Guard optional imports with `TYPE_CHECKING or _foo_available` at module top + a `require_package(...)` check at use time. Reuse the `_foo_available` flags in `utils/import_utils.py`; don't call `is_package_available`.
 - **Video decoding**: datasets can store observations as video files. `LeRobotDataset` handles frame extraction, but tests need ffmpeg installed.
 - **Prioritize use of `uv run`** to execute Python commands (not raw `python` or `pip`).
-- **NexArm conventions** (shared constants in `src/lerobot/motors/nexarm/nexarm.py`; keep code and docs consistent): leader `/dev/ttyUSB0`, follower `/dev/ttyUSB1`; gripper raw 1195 = open, 2833 = closed; arm joints `rad = (raw - 2048) * 2π / 4096` in both hardware and sim; sim datasets use `robot_type="nexarm_follower"`; the RealSense `top` camera is on by default (`--no-top-cam` disables it); `lerobot-record` appends `_YYYYMMDD_HHMMSS` to `repo_id`.
+- **NexArm conventions** (shared constants in `packages/lerobot_robot_nexarm/src/lerobot_robot_nexarm/motors/nexarm.py`; keep code and docs consistent): leader `/dev/ttyUSB0`, follower `/dev/ttyUSB1`; gripper raw 1195 = open, 2833 = closed; arm joints `rad = (raw - 2048) * 2π / 4096` in both hardware and sim; sim datasets use `robot_type="nexarm_follower"`; the RealSense `top` camera is on by default (`--no-top-cam` disables it); `lerobot-record` appends `_YYYYMMDD_HHMMSS` to `repo_id`.

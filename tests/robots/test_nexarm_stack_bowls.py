@@ -6,9 +6,9 @@ import mujoco
 import numpy as np
 import pytest
 
-from lerobot.motors.nexarm.nexarm import GRIPPER_CLOSED_POS, GRIPPER_OPEN_POS
-from lerobot.robots.nexarm_sim.mujoco_backend import NexArmMujocoBackend
-from lerobot.robots.nexarm_sim.stack_bowls_task import COLORS, NexArmStackBowlsTask
+from lerobot_robot_nexarm.motors.nexarm import GRIPPER_CLOSED_POS, GRIPPER_OPEN_POS
+from lerobot_robot_nexarm.nexarm_sim.mujoco_backend import NexArmMujocoBackend
+from lerobot_robot_nexarm.nexarm_sim.stack_bowls_task import COLORS, NexArmStackBowlsTask
 
 MODEL = Path(__file__).resolve().parents[2] / "sim/description/mjcf/bowl_stack_scene.xml"
 
@@ -166,7 +166,7 @@ def test_invalid_assist_engage_threshold(task, engage):
 
 
 def test_stages_latch_and_name_the_first_unreached(task):
-    from lerobot.robots.nexarm_sim.stack_bowls_task import STAGES
+    from lerobot_robot_nexarm.nexarm_sim.stack_bowls_task import STAGES
 
     backend = task.backend
     status = task.status()

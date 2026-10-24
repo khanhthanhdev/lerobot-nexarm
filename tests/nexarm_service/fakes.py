@@ -6,7 +6,7 @@
 
 import numpy as np
 
-from lerobot.motors.nexarm.nexarm import JOINT_NAMES
+from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES
 
 
 class FakeBus:

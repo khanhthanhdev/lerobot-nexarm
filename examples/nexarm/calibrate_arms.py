@@ -13,12 +13,12 @@ Place both arms by hand at the vendor Home pose (every joint at 2048 ticks), the
 
 import argparse
 
-from lerobot.motors.nexarm import NexArmMotorsBus
 from lerobot.nexarm_service.calibration import (
     DEFAULT_TOLERANCE_TICKS,
     build_report,
     reset_non_identity_files,
 )
+from lerobot_robot_nexarm.motors import NexArmMotorsBus
 
 
 def parse_args():

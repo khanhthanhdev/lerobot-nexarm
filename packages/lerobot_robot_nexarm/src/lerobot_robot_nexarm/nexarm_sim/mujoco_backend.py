@@ -23,7 +23,7 @@ import mujoco
 import numpy as np
 import numpy.typing as npt
 
-from lerobot.motors.nexarm.mujoco_mapping import (
+from lerobot_robot_nexarm.motors.mujoco_mapping import (
     HOME_POSITIONS,
     IDENTITY_MAPPING,
     MUJOCO_JOINTS,
@@ -32,7 +32,7 @@ from lerobot.motors.nexarm.mujoco_mapping import (
     joint_position_to_raw,
     raw_to_joint_position,
 )
-from lerobot.motors.nexarm.nexarm import JOINT_NAMES
+from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES
 
 __all__ = [
     "HOME_POSITIONS",
@@ -53,7 +53,7 @@ def resolve_model_path(model_path: Path | str) -> Path:
     elif model_path.exists():
         resolved = model_path.resolve()
     else:
-        checkout_root = Path(__file__).resolve().parents[4]
+        checkout_root = Path(__file__).resolve().parents[5]
         resolved = checkout_root / model_path
     if not resolved.is_file():
         raise FileNotFoundError(

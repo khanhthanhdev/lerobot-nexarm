@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from lerobot.utils import keyboard_input as ki
-from lerobot.utils.recording_session import run_manual_session
+from lerobot_robot_nexarm.recording_session import run_manual_session
 
 
 def fake_dataset():
@@ -32,7 +32,7 @@ def test_manual_wait_save_before_reset_and_no_reset_frames(monkeypatch):
         assert dataset.episode_buffer["size"] == 0
         events["exit_early"] = True
 
-    monkeypatch.setattr("lerobot.utils.recording_session.time.sleep", initial_wait)
+    monkeypatch.setattr("lerobot_robot_nexarm.recording_session.time.sleep", initial_wait)
 
     def run_phase(target):
         calls.append(target)
@@ -57,7 +57,7 @@ def test_quit_during_recording_saves_unless_discarded(monkeypatch, discard):
     dataset = fake_dataset()
     events = {"exit_early": True, "rerecord_episode": False, "stop_recording": False}
     monkeypatch.setattr(
-        "lerobot.utils.recording_session.time.sleep", lambda _: events.update(exit_early=True)
+        "lerobot_robot_nexarm.recording_session.time.sleep", lambda _: events.update(exit_early=True)
     )
 
     def run_phase(target):
@@ -73,7 +73,7 @@ def test_quit_when_ready_never_records(monkeypatch):
     dataset = fake_dataset()
     events = {"exit_early": False, "rerecord_episode": False, "stop_recording": False}
     monkeypatch.setattr(
-        "lerobot.utils.recording_session.time.sleep", lambda _: events.update(stop_recording=True)
+        "lerobot_robot_nexarm.recording_session.time.sleep", lambda _: events.update(stop_recording=True)
     )
     run_manual_session(
         dataset, events, 2, lambda _: pytest.fail("unexpected recording"), show=lambda *_: None
@@ -85,7 +85,7 @@ def test_discard_then_reset_then_record(monkeypatch):
     dataset = fake_dataset()
     events = {"exit_early": False, "rerecord_episode": False, "stop_recording": False}
     monkeypatch.setattr(
-        "lerobot.utils.recording_session.time.sleep", lambda _: events.update(exit_early=True)
+        "lerobot_robot_nexarm.recording_session.time.sleep", lambda _: events.update(exit_early=True)
     )
     calls = []
 
@@ -139,7 +139,7 @@ def test_manual_session_writes_real_dataset(monkeypatch, tmp_path):
     )
     events = {"exit_early": False, "rerecord_episode": False, "stop_recording": False}
     monkeypatch.setattr(
-        "lerobot.utils.recording_session.time.sleep", lambda _: events.update(exit_early=True)
+        "lerobot_robot_nexarm.recording_session.time.sleep", lambda _: events.update(exit_early=True)
     )
     phases = []
 

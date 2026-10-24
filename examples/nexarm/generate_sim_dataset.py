@@ -37,17 +37,17 @@ except ModuleNotFoundError:
 if TYPE_CHECKING:
     from lerobot.datasets.lerobot_dataset import LeRobotDataset
 
-from lerobot.motors.nexarm.mujoco_mapping import reachable_raw_range
-from lerobot.motors.nexarm.nexarm import GRIPPER_CLOSED_POS, GRIPPER_OPEN_POS, JOINT_NAMES
-from lerobot.robots.nexarm_sim import NexArmPickPlaceTask, NexArmSim, NexArmSimConfig
-from lerobot.robots.nexarm_sim.mujoco_backend import (
+from lerobot.utils.constants import ACTION, OBS_STR
+from lerobot.utils.feature_utils import build_dataset_frame, hw_to_dataset_features
+from lerobot_robot_nexarm.motors.mujoco_mapping import reachable_raw_range
+from lerobot_robot_nexarm.motors.nexarm import GRIPPER_CLOSED_POS, GRIPPER_OPEN_POS, JOINT_NAMES
+from lerobot_robot_nexarm.nexarm_sim import NexArmPickPlaceTask, NexArmSim, NexArmSimConfig
+from lerobot_robot_nexarm.nexarm_sim.mujoco_backend import (
     HOME_POSITIONS,
     RAW_RANGES,
     NexArmMujocoBackend,
     resolve_model_path,
 )
-from lerobot.utils.constants import ACTION, OBS_STR
-from lerobot.utils.feature_utils import build_dataset_frame, hw_to_dataset_features
 
 DEFAULT_TASK = "Pick up the red cube, place it in the green target zone, and release it."
 OPEN_GRIPPER = float(GRIPPER_OPEN_POS)

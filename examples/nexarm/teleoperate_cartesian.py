@@ -28,10 +28,10 @@ import tty
 
 import numpy as np
 
-from lerobot.motors.nexarm import NexArmKinematicsDynamics
-from lerobot.motors.nexarm.kinematics_dynamics import HOME_POSITIONS, JOINT_NAMES
-from lerobot.motors.nexarm.nexarm import GRIPPER_CLOSED_POS, GRIPPER_MID_POS, GRIPPER_OPEN_POS
-from lerobot.robots.nexarm_sim import NexArmSim, NexArmSimConfig
+from lerobot_robot_nexarm.motors import NexArmKinematicsDynamics
+from lerobot_robot_nexarm.motors.kinematics_dynamics import HOME_POSITIONS, JOINT_NAMES
+from lerobot_robot_nexarm.motors.nexarm import GRIPPER_CLOSED_POS, GRIPPER_MID_POS, GRIPPER_OPEN_POS
+from lerobot_robot_nexarm.nexarm_sim import NexArmSim, NexArmSimConfig
 
 
 def parse_args() -> argparse.Namespace:
@@ -135,7 +135,7 @@ def main() -> int:
         robot = NexArmSim(config)
         robot.connect()
     else:
-        from lerobot.robots.nexarm_follower import NexArmFollower, NexArmFollowerConfig
+        from lerobot_robot_nexarm.nexarm_follower import NexArmFollower, NexArmFollowerConfig
 
         config = NexArmFollowerConfig(port=args.port, id="cartesian_teleop")
         robot = NexArmFollower(config)

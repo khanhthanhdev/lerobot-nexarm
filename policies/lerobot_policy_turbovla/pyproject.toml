@@ -11,12 +11,15 @@ license = "Apache-2.0"
 requires-python = ">=3.12"
 dependencies = [
     "lerobot",
+    # NexArm gripper constants for the gripper post-processor.
+    "lerobot_robot_nexarm",
     # Pinned by commit in the workspace root's [tool.uv.sources].
     "turbovla",
 ]
 
 [tool.uv.sources]
 lerobot = { workspace = true }
+lerobot_robot_nexarm = { workspace = true }
 
 [tool.setuptools.packages.find]
 where = ["src"]

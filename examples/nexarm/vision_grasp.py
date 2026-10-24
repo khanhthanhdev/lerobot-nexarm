@@ -26,10 +26,10 @@ import time
 import cv2
 import numpy as np
 
-from lerobot.motors.nexarm import NexArmKinematicsDynamics
-from lerobot.motors.nexarm.kinematics_dynamics import HOME_POSITIONS, JOINT_NAMES
-from lerobot.motors.nexarm.nexarm import GRIPPER_CLOSED_POS, GRIPPER_OPEN_POS
-from lerobot.robots.nexarm_sim import NexArmPickPlaceTask, NexArmSim, NexArmSimConfig
+from lerobot_robot_nexarm.motors import NexArmKinematicsDynamics
+from lerobot_robot_nexarm.motors.kinematics_dynamics import HOME_POSITIONS, JOINT_NAMES
+from lerobot_robot_nexarm.motors.nexarm import GRIPPER_CLOSED_POS, GRIPPER_OPEN_POS
+from lerobot_robot_nexarm.nexarm_sim import NexArmPickPlaceTask, NexArmSim, NexArmSimConfig
 
 OPEN_GRIPPER = float(GRIPPER_OPEN_POS)
 CLOSED_GRIPPER = float(GRIPPER_CLOSED_POS)
@@ -108,7 +108,7 @@ def main() -> int:
         task = NexArmPickPlaceTask(robot.backend)
         task.reset(seed=args.seed, settle_steps=20)
     else:
-        from lerobot.robots.nexarm_follower import NexArmFollower, NexArmFollowerConfig
+        from lerobot_robot_nexarm.nexarm_follower import NexArmFollower, NexArmFollowerConfig
 
         config = NexArmFollowerConfig(port=args.port, id="vision_grasp_demo")
         robot = NexArmFollower(config)

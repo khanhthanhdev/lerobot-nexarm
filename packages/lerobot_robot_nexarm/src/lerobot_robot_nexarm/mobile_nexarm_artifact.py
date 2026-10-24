@@ -17,7 +17,7 @@ import cv2
 import numpy as np
 import numpy.typing as npt
 
-from lerobot.robots.mobile_bi_nexarm_sim.contract import STATE_ACTION_NAMES
+from lerobot_robot_nexarm.mobile_bi_nexarm_sim.contract import STATE_ACTION_NAMES
 
 SCHEMA_VERSION = 1
 TRAJECTORY_FILE = "trajectory.npz"

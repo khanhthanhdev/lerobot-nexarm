@@ -171,8 +171,8 @@ def test_nexarm_env_lerobot_factory():
 
 
 def test_nexarm_env_control_modes():
-    from lerobot.motors.nexarm.nexarm import JOINT_NAMES
-    from lerobot.robots.nexarm_sim.mujoco_backend import RAW_RANGES
+    from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES
+    from lerobot_robot_nexarm.nexarm_sim.mujoco_backend import RAW_RANGES
 
     # 1. Raw mode (default)
     env_raw = gym.make("NexArmPickPlace-v0", obs_type="state", control_mode="raw")
@@ -224,9 +224,9 @@ def test_nexarm_env_config_forwards_calibration_and_domain_randomization():
 
 
 def test_nexarm_env_applies_calibration_latency_and_domain_randomization(tmp_path):
-    from lerobot.motors.nexarm.nexarm import JOINT_NAMES
-    from lerobot.robots.nexarm_sim import SimCalibration
-    from lerobot.robots.nexarm_sim.mujoco_backend import HOME_POSITIONS
+    from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES
+    from lerobot_robot_nexarm.nexarm_sim import SimCalibration
+    from lerobot_robot_nexarm.nexarm_sim.mujoco_backend import HOME_POSITIONS
 
     path = tmp_path / "calibration.json"
     SimCalibration(action_delay_steps=2, fps=30).save(path)
@@ -272,7 +272,7 @@ def test_nexarm_stack_bowls_env_contract():
 def test_nexarm_stack_bowls_env_rewards_a_released_stack():
     import mujoco
 
-    from lerobot.motors.nexarm.nexarm import GRIPPER_OPEN_POS
+    from lerobot_robot_nexarm.motors.nexarm import GRIPPER_OPEN_POS
 
     env = gym.make("NexArmStackBowls-v0", obs_type="state")
     obs, _ = env.reset(seed=0)
@@ -371,8 +371,8 @@ def test_nexarm_env_reward_components_name_each_term():
 
 
 def test_nexarm_env_initial_pose_noise_is_seeded_and_bounded():
-    from lerobot.motors.nexarm.nexarm import JOINT_NAMES
-    from lerobot.robots.nexarm_sim.mujoco_backend import HOME_POSITIONS
+    from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES
+    from lerobot_robot_nexarm.nexarm_sim.mujoco_backend import HOME_POSITIONS
 
     def start(noise: float, seed: int) -> np.ndarray:
         env = gym.make("NexArmPickPlace-v0", obs_type="state", init_qpos_noise_rad=noise)
@@ -428,7 +428,7 @@ class _ScriptedEnvRobot:
         return {}
 
     def send_action(self, action: dict[str, float]) -> dict[str, float]:
-        from lerobot.motors.nexarm.nexarm import JOINT_NAMES
+        from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES
 
         task = self.env.task
         command = np.array([action[f"{name}.pos"] for name in JOINT_NAMES], dtype=np.float32)
@@ -464,7 +464,7 @@ _SOLVED_SEED = 1
 @functools.cache
 def _scripted_stack_bowls(seed: int, **kwargs) -> _ScriptedEnvRobot:
     from examples.nexarm.generate_stack_bowls_dataset import generate_episode
-    from lerobot.motors.nexarm.nexarm import JOINT_NAMES
+    from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES
 
     env_kwargs = {key: kwargs.pop(key) for key in ("assist_release_pos", "grasp_mode") if key in kwargs}
     env = gym.make("NexArmStackBowls-v0", obs_type="state", **env_kwargs).unwrapped
@@ -539,7 +539,7 @@ def test_nexarm_stack_bowls_physical_grasp_holds_by_friction_alone(monkeypatch):
 
 
 def test_nexarm_stack_bowls_info_reports_stages():
-    from lerobot.robots.nexarm_sim.stack_bowls_task import STAGES
+    from lerobot_robot_nexarm.nexarm_sim.stack_bowls_task import STAGES
 
     released = _scripted_stack_bowls(_SOLVED_SEED, min_open_while_held=1990)
     first, last = released.infos[0], released.infos[-1]

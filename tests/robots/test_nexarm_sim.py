@@ -8,8 +8,8 @@ import mujoco
 import numpy as np
 import pytest
 
-from lerobot.motors.nexarm.mujoco_mapping import reachable_raw_range
-from lerobot.motors.nexarm.nexarm import (
+from lerobot_robot_nexarm.motors.mujoco_mapping import reachable_raw_range
+from lerobot_robot_nexarm.motors.nexarm import (
     GRIPPER_CLOSED_POS,
     GRIPPER_OPEN_POS,
     JOINT_NAMES,
@@ -17,12 +17,12 @@ from lerobot.motors.nexarm.nexarm import (
     POSITION_MIN,
     raw_to_radians,
 )
-from lerobot.robots.nexarm_sim import (
+from lerobot_robot_nexarm.nexarm_sim import (
     NexArmPickPlaceTask,
     NexArmSim,
     NexArmSimConfig,
 )
-from lerobot.robots.nexarm_sim.mujoco_backend import HOME_POSITIONS, RAW_RANGES, NexArmMujocoBackend
+from lerobot_robot_nexarm.nexarm_sim.mujoco_backend import HOME_POSITIONS, RAW_RANGES, NexArmMujocoBackend
 
 MODEL_PATH = Path(__file__).resolve().parents[2] / "sim" / "description" / "mjcf" / "scene.xml"
 

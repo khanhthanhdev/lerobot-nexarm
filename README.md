@@ -166,7 +166,7 @@ _(Log out and log back in for the group membership change to take effect)._
 ### Verify Installation
 
 ```bash
-uv run python -c "from lerobot.robots.nexarm_sim import NexArmSim; from lerobot.robots.nexarm_follower import NexArmFollower; print('NexArm installation OK!')"
+uv run python -c "from lerobot_robot_nexarm.nexarm_sim import NexArmSim; from lerobot_robot_nexarm.nexarm_follower import NexArmFollower; print('NexArm installation OK!')"
 ```
 
 ---
@@ -474,11 +474,11 @@ Full procedure: [`docs/source/nexarm/sim_calibration.md`](docs/source/nexarm/sim
 
 ## Kinematics & Dynamics Python API
 
-Module: [`src/lerobot/motors/nexarm/kinematics_dynamics.py`](src/lerobot/motors/nexarm/kinematics_dynamics.py)
+Module: [`packages/lerobot_robot_nexarm/src/lerobot_robot_nexarm/motors/kinematics_dynamics.py`](packages/lerobot_robot_nexarm/src/lerobot_robot_nexarm/motors/kinematics_dynamics.py)
 
 ```python
 import numpy as np
-from lerobot.motors.nexarm import NexArmKinematicsDynamics
+from lerobot_robot_nexarm.motors import NexArmKinematicsDynamics
 
 kd = NexArmKinematicsDynamics()
 

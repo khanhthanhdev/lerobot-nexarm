@@ -10,14 +10,14 @@ import pytest
 
 pytest.importorskip("datasets", reason="datasets is required (install lerobot[dataset])")
 
-from lerobot.datasets.mobile_nexarm_artifact import (
+from lerobot_robot_nexarm.mobile_bi_nexarm_sim import load_contract
+from lerobot_robot_nexarm.mobile_nexarm_artifact import (
     EpisodeArtifactWriter,
     EpisodeMetadata,
     split_for_seed,
     validate_episode_artifact,
     write_artifacts_to_lerobot,
 )
-from lerobot.robots.mobile_bi_nexarm_sim import load_contract
 
 
 def _artifact(path: Path) -> Path:

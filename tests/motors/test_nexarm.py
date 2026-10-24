@@ -17,7 +17,7 @@ import pytest
 
 pytest.importorskip("serial", reason="pyserial is required (install lerobot[hardware])")
 
-from lerobot.motors.nexarm.nexarm import (  # noqa: E402
+from lerobot_robot_nexarm.motors.nexarm import (  # noqa: E402
     CMD_LEROBOT_MODE,
     CMD_READ_POS,
     CMD_SET_MOTION_PARAMS,
@@ -107,8 +107,8 @@ def test_constants_match_six_joint_protocol() -> None:
 def test_bus_connect_disconnect() -> None:
     mock_serial = MagicMock(is_open=True)
     with (
-        patch("lerobot.motors.nexarm.nexarm.serial.Serial", return_value=mock_serial) as serial_cls,
-        patch("lerobot.motors.nexarm.nexarm.time.sleep"),
+        patch("lerobot_robot_nexarm.motors.nexarm.serial.Serial", return_value=mock_serial) as serial_cls,
+        patch("lerobot_robot_nexarm.motors.nexarm.time.sleep"),
     ):
         bus = NexArmMotorsBus("/dev/null")
         bus.connect()
@@ -140,7 +140,7 @@ def test_read_positions_retries_then_times_out() -> None:
     bus = NexArmMotorsBus("/dev/null")
     with (
         patch.object(bus, "_send", return_value=None) as send,
-        patch("lerobot.motors.nexarm.nexarm.time.sleep"),
+        patch("lerobot_robot_nexarm.motors.nexarm.time.sleep"),
         pytest.raises(TimeoutError, match="No position reply"),
     ):
         bus.read_positions(retries=3)
@@ -171,7 +171,7 @@ def test_write_positions_clamps_and_encodes() -> None:
 )
 def test_control_commands(method: str, value: bool | None, command: int, expected_args: bytes) -> None:
     bus = NexArmMotorsBus("/dev/null")
-    with patch.object(bus, "_send") as send, patch("lerobot.motors.nexarm.nexarm.time.sleep"):
+    with patch.object(bus, "_send") as send, patch("lerobot_robot_nexarm.motors.nexarm.time.sleep"):
         if value is None:
             getattr(bus, method)()
         else:

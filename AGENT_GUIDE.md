@@ -54,7 +54,7 @@ Use `nexarm_sim` or simulation scripts in `examples/nexarm/`:
 
 ### Path C — "I just want to understand the codebase"
 
-Read §2 above, then `AGENTS.md` "Architecture", then open `src/lerobot/motors/nexarm/nexarm.py`, `src/lerobot/robots/nexarm_follower/`, and `src/lerobot/policies/act/`.
+Read §2 above, then `AGENTS.md` "Architecture", then open `packages/lerobot_robot_nexarm/src/lerobot_robot_nexarm/motors/nexarm.py`, `packages/lerobot_robot_nexarm/src/lerobot_robot_nexarm/nexarm_follower/`, and `src/lerobot/policies/act/`.
 
 ---
 

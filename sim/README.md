@@ -100,7 +100,7 @@ Every model loads from one tree, with no symlinks, from any working directory:
   and `fusion_extract.json` before `apply_fusion_extract.py` merges them.
 - `run_export.py` extracts meshes, inertials and the workcell from Fusion, and
   `apply_fusion_extract.py` merges them into the committed models (section 11).
-- `../src/lerobot/robots/nexarm_sim/` contains the LeRobot simulation backend
+- `../packages/lerobot_robot_nexarm/src/lerobot_robot_nexarm/nexarm_sim/` contains the LeRobot simulation backend
   and `NexArmSim` robot implementation. `pick_place_task.py` adds the optional
   seeded single-arm task without changing the six-feature robot contract.
 - `../examples/nexarm/simulate.py` launches the viewer and optional leader
@@ -148,7 +148,7 @@ The gripper maps its raw range linearly and inverted onto the jaw slide joint
 slide_m = slide_min + (2833 - raw) / (2833 - 1195) * (slide_max - slide_min)
 ```
 
-One implementation, `src/lerobot/motors/nexarm/mujoco_mapping.py`
+One implementation, `packages/lerobot_robot_nexarm/src/lerobot_robot_nexarm/motors/mujoco_mapping.py`
 (`raw_to_joint_position` / `joint_position_to_raw`), is shared by the simulator
 backend and `NexArmKinematicsDynamics`. It reads the MuJoCo joint range, not the
 actuator `ctrlrange`, so kinematics-only models work too. Datasets and
@@ -640,7 +640,7 @@ The tests verify:
 Run the style check for the simulation implementation:
 
 ```bash
-uv run --locked --extra dev ruff check src/lerobot/robots/nexarm_sim examples/nexarm/simulate.py tests/robots/test_nexarm_sim.py sim/export_fusion_to_mujoco.py
+uv run --locked --extra dev ruff check packages/lerobot_robot_nexarm/src/lerobot_robot_nexarm/nexarm_sim examples/nexarm/simulate.py tests/robots/test_nexarm_sim.py sim/export_fusion_to_mujoco.py
 ```
 
 ## 13. Troubleshooting

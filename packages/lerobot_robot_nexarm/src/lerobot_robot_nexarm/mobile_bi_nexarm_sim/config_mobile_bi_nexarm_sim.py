@@ -5,7 +5,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-from ..config import RobotConfig
+from lerobot.robots.config import RobotConfig
 
 
 @RobotConfig.register_subclass("mobile_bi_nexarm_sim")

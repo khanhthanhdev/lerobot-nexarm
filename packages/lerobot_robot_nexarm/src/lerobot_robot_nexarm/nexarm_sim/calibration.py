@@ -21,8 +21,8 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
-from lerobot.motors.nexarm.mujoco_mapping import JOINT_MAPPING_VERSION
-from lerobot.motors.nexarm.nexarm import JOINT_NAMES
+from lerobot_robot_nexarm.motors.mujoco_mapping import JOINT_MAPPING_VERSION
+from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES
 
 from .mujoco_backend import NexArmMujocoBackend
 

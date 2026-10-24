@@ -17,7 +17,6 @@ pytest.importorskip("serial", reason="pyserial is required (install lerobot[hard
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from lerobot.motors.nexarm.nexarm import GRIPPER_CLOSED_POS, JOINT_NAMES  # noqa: E402
 from lerobot.nexarm_service import local_runner  # noqa: E402
 from lerobot.nexarm_service.app import API_PREFIX, create_app  # noqa: E402
 from lerobot.nexarm_service.events import EventHub  # noqa: E402
@@ -28,6 +27,7 @@ from lerobot.nexarm_service.jobs import (  # noqa: E402
     TrainRequest,
     parse_metric_line,
 )
+from lerobot_robot_nexarm.motors.nexarm import GRIPPER_CLOSED_POS, JOINT_NAMES  # noqa: E402
 from tests.nexarm_service.fakes import FakeHardware  # noqa: E402
 
 REST = [2000, 2100, 1900, 2050, 2048, 2000]

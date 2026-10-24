@@ -15,7 +15,6 @@ import torch
 from PIL import Image
 
 from lerobot.configs import PipelineFeatureType, PolicyFeature
-from lerobot.motors.nexarm.nexarm import GRIPPER_CLOSED_POS, GRIPPER_OPEN_POS
 from lerobot.processor import (
     ObservationProcessorStep,
     PolicyAction,
@@ -27,6 +26,7 @@ from lerobot.processor import (
     make_policy_processor_pipelines,
 )
 from lerobot.utils.constants import ACTION
+from lerobot_robot_nexarm.motors.nexarm import GRIPPER_CLOSED_POS, GRIPPER_OPEN_POS
 
 from .configuration_turbovla import DEFAULT_GRIPPER_THRESHOLD, TurboVLAConfig
 

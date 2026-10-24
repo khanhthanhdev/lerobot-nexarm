@@ -33,7 +33,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from lerobot.motors.nexarm.nexarm import (
+from lerobot_robot_nexarm.motors.nexarm import (
     GRIPPER_CLOSED_POS,
     GRIPPER_OPEN_POS,
     JOINT_NAMES,

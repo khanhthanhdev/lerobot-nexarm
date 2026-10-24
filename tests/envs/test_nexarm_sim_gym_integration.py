@@ -20,9 +20,9 @@ import pytest
 from lerobot.configs.accelerator import AcceleratorConfig, GradientAccumulationConfig
 from lerobot.configs.train import TrainPipelineConfig
 from lerobot.datasets.lerobot_dataset import LeRobotDataset
-from lerobot.motors.nexarm.nexarm import JOINT_NAMES
-from lerobot.robots.nexarm_sim.mujoco_backend import HOME_POSITIONS
 from lerobot.utils.constants import ACTION, OBS_STR
+from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES
+from lerobot_robot_nexarm.nexarm_sim.mujoco_backend import HOME_POSITIONS
 
 
 def create_synthetic_nexarm_dataset(root_dir: Path, repo_id: str, num_frames: int = 20) -> LeRobotDataset:

@@ -182,7 +182,7 @@ motorbridge-smart-servo-dep = ["motorbridge-smart-servo>=0.0.4,<0.1.0"]
 timm-dep = ["timm>=1.0.0,<1.1.0"]
 # NexArm robot, teleoperator and env plugins, from the workspace packages in `packages/`. Plain `uv sync`
 # also installs them through the `nexarm` dependency group.
-nexarm = ["lerobot[pyserial-dep]", "lerobot[deepdiff-dep]", "lerobot_teleoperator_nexarm"]
+nexarm = ["lerobot_robot_nexarm", "lerobot_teleoperator_nexarm"]
 # Local engine behind the NexArm desktop app (lerobot-nexarm-service).
 service = ["lerobot[nexarm]", "lerobot[dataset]", "fastapi>=0.115.0,<1.0.0", "uvicorn>=0.30.0,<1.0.0", "websockets>=13.0,<18.0"]
 
@@ -443,7 +443,7 @@ members = ["policies/*", "packages/*"]
 # (not `project.dependencies`) keeps them out of the published `lerobot` wheel metadata.
 [dependency-groups]
 policies = ["lerobot_policy_bspline"]
-nexarm = ["lerobot_teleoperator_nexarm"]
+nexarm = ["lerobot_robot_nexarm", "lerobot_teleoperator_nexarm"]
 
 [tool.uv]
 default-groups = ["policies", "nexarm"]
@@ -451,6 +451,7 @@ default-groups = ["policies", "nexarm"]
 [tool.uv.sources]
 lerobot_policy_bspline = { workspace = true }
 lerobot_policy_turbovla = { workspace = true }
+lerobot_robot_nexarm = { workspace = true }
 lerobot_teleoperator_nexarm = { workspace = true }
 # Bump `rev` to a pushed TurboVLA commit. For local TurboVLA development, temporarily use
 # `turbovla = { path = "../TurboVLA", editable = true }` and never commit it (see docs/source/nexarm/turbovla_guide.md).
@@ -557,7 +558,7 @@ ignore = [
 "plans/**" = ["D"]
 [tool.ruff.lint.isort]
 combine-as-imports = true
-known-first-party = ["lerobot", "lerobot_teleoperator_nexarm"]
+known-first-party = ["lerobot", "lerobot_robot_nexarm", "lerobot_teleoperator_nexarm"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"

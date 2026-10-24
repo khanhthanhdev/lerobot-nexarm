@@ -6,7 +6,8 @@ import numpy as np
 import pytest
 from huggingface_hub import HfApi
 
-from lerobot.datasets import LeRobotDataset, collection_merge as merge
+from lerobot.datasets import LeRobotDataset
+from lerobot_robot_nexarm import collection_merge as merge
 
 FEATURES = {
     "action": {"dtype": "float32", "shape": (1,), "names": ["joint"]},
