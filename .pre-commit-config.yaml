@@ -112,7 +112,7 @@ repos:
           - "pyzmq>=26.2.1,<28.0.0"
         pass_filenames: false
         types_or: [python, pyi, toml]
-        files: ^(src/lerobot/|scripts/|utils/|conftest\.py$|setup\.py$|pyproject\.toml$)
+        files: ^(src/lerobot/|packages/[^/]+/src/|scripts/|utils/|conftest\.py$|setup\.py$|pyproject\.toml$)
 
   ##### Docstring Checks #####
   # - repo: https://github.com/akaihola/darglint2

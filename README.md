@@ -513,17 +513,15 @@ To protect the bus servos against thermal degradation and mechanical fatigue, `N
 ## Code Architecture
 
 ```
-src/lerobot/
-├── motors/nexarm/
-│   ├── __init__.py                  # Exports NexArmMotorsBus, NexArmKinematicsDynamics
-│   ├── nexarm.py                    # CommProtocol UART framing, read/write, torque, bridge mode
-│   └── kinematics_dynamics.py       # C-accelerated FK, IK, Jacobian, M(q), g(q)
-├── robots/
+packages/                            # LeRobot plugins, each under <package>/src/<package>/
+├── lerobot_robot_nexarm/
+│   ├── motors/                      # NexArmMotorsBus (UART framing, torque, bridge mode), kinematics_dynamics.py
 │   ├── nexarm_follower/             # Follower robot driver (connect, observe, send_action)
-│   ├── nexarm_sim/                  # MuJoCo single-arm simulation & pick-and-place task
+│   ├── nexarm_sim/                  # MuJoCo single-arm simulation, pick-and-place and stack-bowls tasks
 │   └── mobile_bi_nexarm_sim/        # Bimanual mobile robot simulation
-├── teleoperators/nexarm_leader/     # Leader arm driver (torque disable, joint mirroring)
-└── envs/nexarm.py                   # Gymnasium environments (NexArmPickPlace-v0, NexArmStackBowls-v0)
+├── lerobot_teleoperator_nexarm/     # Leader arm driver (torque disable, joint mirroring)
+├── lerobot_env_nexarm/              # Gymnasium environments (NexArmPickPlace-v0, NexArmStackBowls-v0), sim benchmark
+└── nexarm_service/                  # Desktop-app engine (lerobot-nexarm-service)
 ```
 
 ---

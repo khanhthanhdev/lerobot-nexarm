@@ -62,7 +62,10 @@ RUN uv venv
 
 # Install third-party dependencies separately for layer caching
 COPY --chown=user_lerobot:user_lerobot setup.py pyproject.toml uv.lock README.md MANIFEST.in ./
-RUN uv sync --locked --extra all --no-install-project --no-cache
+# uv.lock covers the workspace members (policies/*, packages/*), so their pyproject.toml files must be present.
+COPY --chown=user_lerobot:user_lerobot policies ./policies
+COPY --chown=user_lerobot:user_lerobot packages ./packages
+RUN uv sync --locked --extra all --no-install-workspace --no-cache
 
 # Copy the application code and install the local project
 # Make sure to have the git-LFS files for testing

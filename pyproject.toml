@@ -618,7 +618,7 @@ ignore-setters = false
 fail-under = 52
 output-format = "term-missing"
 color = true
-paths = ["src/lerobot"]
+paths = ["src/lerobot", "packages"]
 exclude = ["src/lerobot/policies/molmoact2/molmoact2_hf_model"]
 
 [tool.pytest.ini_options]
@@ -632,7 +632,17 @@ python_version = "3.12"
 ignore_missing_imports = true
 follow_imports = "skip"
 # Paths the hook checks as a whole (pass_filenames: false); keep its `files` pattern in sync.
-files = ["src/lerobot", "scripts", "utils", "conftest.py", "setup.py"]
+files = [
+    "src/lerobot",
+    "packages/lerobot_robot_nexarm/src",
+    "packages/lerobot_teleoperator_nexarm/src",
+    "packages/lerobot_env_nexarm/src",
+    "packages/nexarm_service/src",
+    "scripts",
+    "utils",
+    "conftest.py",
+    "setup.py",
+]
 exclude = ['_pb2(_grpc)?\.py$']
 exclude_gitignore = true
 warn_redundant_casts = true

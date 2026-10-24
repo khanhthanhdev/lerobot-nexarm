@@ -27,6 +27,7 @@ on:
       - main
     paths:
       - "src/**"
+      - "packages/**"
       - "tests/**"
       - ".github/workflows/**"
       - "pyproject.toml"
@@ -37,6 +38,7 @@ on:
       - main
     paths:
       - "src/**"
+      - "packages/**"
       - "tests/**"
       - ".github/workflows/**"
       - "pyproject.toml"
