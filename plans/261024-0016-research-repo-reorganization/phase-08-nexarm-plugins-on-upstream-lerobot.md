@@ -40,3 +40,8 @@ Move all NexArm code out of `src/lerobot/` into plugin packages, then depend on 
 
 ## Risk / Rollback
 Import breakage in downstream scripts and the desktop app. Move in small commits, one package each, so each can be reverted.
+
+## Scope decision (user, 2026-10-24)
+The upstream merge kept more core patches than this phase planned fallbacks for: robot_type stamping in record/rollout, `--rerun_save_path` in rollout and the viz helpers (including the `.rrd` sink fix), the Windows `last`-checkpoint junction fallback, `--video-backend` in the dataset viewer, `manual_control` in `keyboard_input`, lazy `groot` imports, per-stage eval success rates and `local_files_only`. No upstream PRs are open.
+
+Decision: do steps 1-3 now. Move the NexArm code into the `packages/` plugins and remove the registration imports from the core scripts. `src/lerobot/` stays, carrying only those patches. Removing it (step 4, and the acceptance criterion "`src/lerobot/` no longer exists") waits until each patch has a merged upstream PR or a NexArm-side fallback.
