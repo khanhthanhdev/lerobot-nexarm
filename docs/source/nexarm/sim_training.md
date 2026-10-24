@@ -225,7 +225,7 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 uv run python examples/nexarm/train_stack_bowls_act
     --dataset-root outputs/datasets/nexarm_stack_bowls \
     --num-gpus 4 --mixed-precision bf16 \
     --output-dir outputs/train/act_stack_bowls_4gpu \
-    --batch_size=8 --gradient_accumulation_steps=1 --num_workers=4
+    --batch_size=8 --accelerator.gradient_accumulation.steps=1 --num_workers=4
 ```
 
 Add `--dry-run` first to print the dataset summary and the exact `accelerate` command without starting
@@ -239,7 +239,7 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 uv run python examples/nexarm/train_stack_bowls_act
     --dataset-root outputs/datasets/nexarm_sim_pick_place \
     --num-gpus 4 --mixed-precision bf16 \
     --output-dir outputs/train/act_pick_place_4gpu \
-    --batch_size=8 --gradient_accumulation_steps=1 --num_workers=4
+    --batch_size=8 --accelerator.gradient_accumulation.steps=1 --num_workers=4
 ```
 
 ### Settings
@@ -247,7 +247,7 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 uv run python examples/nexarm/train_stack_bowls_act
 - The base settings are in `examples/nexarm/stack_bowls_act.yaml`: 100-action chunks (3.3 s at 30 FPS),
   100,000 steps, a checkpoint every 5,000 steps, and the last 10 % of episodes held out for loss evaluation.
   Any `--key=value` flag after the launcher's own flags overrides the YAML (for example `--steps=50000`).
-- Effective batch = `batch_size x gradient_accumulation_steps x GPUs`. The YAML's single-GPU value is 2 x 8 = 16;
+- Effective batch = `batch_size x accelerator.gradient_accumulation.steps x GPUs`. The YAML's single-GPU value is 2 x 8 = 16;
   the 4-GPU example uses 8 x 1 x 4 = 32. Raise `batch_size` and lower accumulation on large GPUs.
 - `--mixed-precision bf16` needs Ampere or newer; use `fp16` on older GPUs.
 - `--num_workers` is per GPU.

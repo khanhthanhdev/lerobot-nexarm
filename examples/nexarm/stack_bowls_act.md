@@ -38,11 +38,11 @@ The YAML starts with batch size 2 and eight gradient accumulation steps (effecti
 # Short training smoke test; writes a separate checkpoint.
 uv run python examples/nexarm/train_stack_bowls_act.py \
   --output-dir outputs/train/nexarm_stack_bowls_act_smoke \
-  --steps=1 --batch_size=1 --gradient_accumulation_steps=1 --num_workers=0
+  --steps=1 --batch_size=1 --accelerator.gradient_accumulation.steps=1 --num_workers=0
 
 # Adjust the duration and batch settings.
 uv run python examples/nexarm/train_stack_bowls_act.py \
-  --steps=50000 --batch_size=1 --gradient_accumulation_steps=16
+  --steps=50000 --batch_size=1 --accelerator.gradient_accumulation.steps=16
 
 # Resume weights AND optimizer state from an interrupted run.
 uv run lerobot-train \
@@ -63,11 +63,11 @@ CUDA_VISIBLE_DEVICES=0,1,2 uv run python examples/nexarm/train_stack_bowls_act.p
   --num-gpus 3 --mixed-precision fp16 \
   --pretrained /absolute/path/to/pretrained_model \
   --output-dir outputs/train/stack_bowls_act_3gpu \
-  --batch_size=2 --gradient_accumulation_steps=3 --num_workers=2
+  --batch_size=2 --accelerator.gradient_accumulation.steps=3 --num_workers=2
 ```
 
 Replace the checkpoint path with the downloaded NexArm ACT `pretrained_model` directory; omit `--pretrained` for initial training. Add `--dry-run` to inspect the distributed command without starting workers, including on a machine with fewer GPUs. Installation is the same full profile linked above.
 
-Effective batch size is `batch_size × gradient_accumulation_steps × GPUs`: the example uses `2 × 3 × 3 = 18`, close to the single-GPU preset's 16. Keeping the preset's accumulation of 8 would instead give batch 48 on three GPUs. For larger GPUs, increase batch size and reduce accumulation to keep roughly the same effective batch. `--num_workers` is per GPU, so the example starts six loader workers in total. Use `bf16` instead of `fp16` if every selected GPU supports it.
+Effective batch size is `batch_size × accelerator.gradient_accumulation.steps × GPUs`: the example uses `2 × 3 × 3 = 18`, close to the single-GPU preset's 16. Keeping the preset's accumulation of 8 would instead give batch 48 on three GPUs. For larger GPUs, increase batch size and reduce accumulation to keep roughly the same effective batch. `--num_workers` is per GPU, so the example starts six loader workers in total. Use `bf16` instead of `fp16` if every selected GPU supports it.
 
 Keep the existing learning rate and step count initially, compare held-out loss and measured throughput, and tune from there. DDP keeps a complete ACT model on each GPU; GPU memory is not pooled. Speedup depends on GPU interconnect and AV1 video decoding, and is not guaranteed to reach 3×. See [LeRobot multi-GPU training](https://huggingface.co/docs/lerobot/multi_gpu_training).

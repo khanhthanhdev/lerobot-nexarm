@@ -310,11 +310,11 @@ Pass the resulting total with `--steps=<N>`; eval at intermediate checkpoints (`
 ### 7.4 Batch size & gradient accumulation
 
 - **Bigger batch is preferable** for stable gradients on teleop data.
-- If GPU memory is the bottleneck, use **gradient accumulation** via `--gradient_accumulation_steps=<N>` to raise _effective_ batch without raising peak memory:
+- If GPU memory is the bottleneck, use **gradient accumulation** via `--accelerator.gradient_accumulation.steps=<N>` to raise _effective_ batch without raising peak memory:
   ```bash
   uv run lerobot-train ... \
     --batch_size=2 \
-    --gradient_accumulation_steps=4
+    --accelerator.gradient_accumulation.steps=4
   ```
   Effective batch size will be $2 \times 4 = 8$ samples per update step.
 - Scale **learning rate** gently with batch; most LeRobot defaults work fine for a 2–4× batch change.
