@@ -64,15 +64,22 @@ def init_rerun(
     batch_size = os.getenv("RERUN_FLUSH_NUM_BYTES", "8000")
     os.environ["RERUN_FLUSH_NUM_BYTES"] = batch_size
     rr.init(session_name)
-    if save_path is not None:
-        output_path = Path(save_path)
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        rr.save(str(output_path))
     memory_limit = os.getenv("LEROBOT_RERUN_MEMORY_LIMIT", "10%")
-    if ip and port:
-        rr.connect_grpc(url=f"rerun+http://{ip}:{port}/proxy")
-    else:
-        rr.spawn(memory_limit=memory_limit)
+    url = f"rerun+http://{ip}:{port}/proxy" if ip and port else None
+    if save_path is None:
+        if url:
+            rr.connect_grpc(url=url)
+        else:
+            rr.spawn(memory_limit=memory_limit)
+        return
+
+    # connect_grpc/spawn replace any earlier sink, so a file from rr.save() would stay empty.
+    # Tee the stream to the viewer and the file instead.
+    output_path = Path(save_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    if url is None:
+        rr.spawn(memory_limit=memory_limit, connect=False)
+    rr.set_sinks(rr.GrpcSink(url), rr.FileSink(str(output_path)))
 
 
 def shutdown_rerun() -> None:
