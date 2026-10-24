@@ -57,7 +57,8 @@ class RolloutApi:
         from lerobot.rollout.configs import BaseStrategyConfig, EpisodicStrategyConfig
 
         policy = PreTrainedConfig.from_pretrained(checkpoint)
-        policy.pretrained_path = Path(checkpoint)
+        # A Hub id must stay a str: Path() would turn "user/model" into "user\model" on Windows.
+        policy.pretrained_path = checkpoint  # type: ignore[assignment]
         task = str(params.get("task", ""))
         dataset = None
         strategy: Any = BaseStrategyConfig()

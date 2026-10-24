@@ -8,7 +8,6 @@ Sessions and the calibration check get this object injected, so tests substitute
 touching serial ports.
 """
 
-from pathlib import Path
 from typing import Any
 
 from lerobot.cameras.opencv import OpenCVCameraConfig
@@ -19,8 +18,14 @@ from lerobot.teleoperators.nexarm_leader import NexArmLeader, NexArmLeaderConfig
 
 
 def opencv_camera_config(cam: CameraProfile) -> OpenCVCameraConfig:
-    source: int | Path = int(cam.source) if cam.source.isdigit() else Path(cam.source)
-    return OpenCVCameraConfig(index_or_path=source, width=cam.width, height=cam.height, fps=cam.fps)
+    source: int | str = int(cam.source) if cam.source.isdigit() else cam.source
+    # A str source stays a str: Path() would collapse the "//" of a stream URL.
+    return OpenCVCameraConfig(
+        index_or_path=source,  # type: ignore[arg-type]
+        width=cam.width,
+        height=cam.height,
+        fps=cam.fps,
+    )
 
 
 def follower_config(profile: RobotProfile, with_cameras: bool = False) -> NexArmFollowerConfig:
