@@ -90,6 +90,8 @@ class _NexArmMujocoEnv(gym.Env):
         self.observation_width = observation_width
         self.observation_height = observation_height
         self.max_episode_steps = max_episode_steps
+        # lerobot_eval.rollout reads this when gym.make added no TimeLimit wrapper.
+        self._max_episode_steps = max_episode_steps
         self.reward_type = reward_type
         self.success_hold_s = success_hold_s
         self.control_mode = control_mode

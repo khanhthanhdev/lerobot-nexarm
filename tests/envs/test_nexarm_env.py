@@ -170,6 +170,18 @@ def test_nexarm_env_lerobot_factory():
     vec_env.close()
 
 
+@pytest.mark.parametrize(
+    ("task", "episode_length", "expected"),
+    [("NexArmPickPlace-v0", None, 400), ("NexArmStackBowls-v0", None, 900), ("NexArmStackBowls-v0", 50, 50)],
+)
+def test_nexarm_env_exposes_max_episode_steps_to_lerobot_eval(task, episode_length, expected):
+    """lerobot-eval reads `_max_episode_steps` through the vector env, with or without --env.episode_length."""
+    cfg = NexArmEnv(task=task, obs_type="state", episode_length=episode_length)
+    vec_env = make_env(cfg, n_envs=1)["nexarm"][0]
+    assert vec_env.call("_max_episode_steps")[0] == expected
+    vec_env.close()
+
+
 def test_nexarm_env_control_modes():
     from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES
     from lerobot_robot_nexarm.nexarm_sim.mujoco_backend import RAW_RANGES
