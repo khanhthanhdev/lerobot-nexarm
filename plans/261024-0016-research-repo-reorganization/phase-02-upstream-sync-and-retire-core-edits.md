@@ -124,8 +124,8 @@ Without those files, 25 upstream files differ by +233/-25. That diff is only the
 
 ### Open checks
 
-- Run on the Linux GPU server: `uv run pytest tests -k nexarm -q`, `uv run pytest tests/nexarm_service -q`, the full suite, and `make test-nexarm-ete`.
+- Run on the Linux GPU server: `uv run pytest tests policies -q` and `make test-nexarm-ete`.
 - Sim dataset smoke test (2 episodes of `examples/nexarm/generate_stack_bowls_dataset.py`) on a machine with OpenGL.
 - `uv sync --locked --extra all` on Linux, where the `cmeel-*` wheels exist.
 - Real-arm smoke test before merging to `main`: teleoperate, record 2 episodes with `examples/nexarm/record_collection.py --merge_root ...`, then replay 1 episode.
-- Decide whether to open upstream PRs for the patches above. Apply the table's fallbacks if they are not merged when phase 08 starts.
+- Resolved (2026-10-24): no upstream PRs; every patch above got its NexArm-side fallback in phase 08, and `lerobot` is now pinned upstream. The branch is pushed and not merged into `main`.
