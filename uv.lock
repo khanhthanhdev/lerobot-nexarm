@@ -37,6 +37,7 @@ members = [
     "lerobot",
     "lerobot-policy-bspline",
     "lerobot-policy-turbovla",
+    "lerobot-teleoperator-nexarm",
 ]
 
 [[package]]
@@ -3135,7 +3136,7 @@ wheels = [
 name = "lerobot"
 version = "0.6.2"
 source = { editable = "." }
-default-groups = ["policies"]
+default-groups = ["nexarm", "policies"]
 dependencies = [
     { name = "cmake" },
     { name = "draccus" },
@@ -3195,6 +3196,7 @@ all = [
     { name = "jsonlines" },
     { name = "jupyter" },
     { name = "lancedb" },
+    { name = "lerobot-teleoperator-nexarm" },
     { name = "matplotlib" },
     { name = "metaworld" },
     { name = "mock-serial", marker = "sys_platform != 'win32'" },
@@ -3503,6 +3505,7 @@ multi-task-dit = [
 ]
 nexarm = [
     { name = "deepdiff" },
+    { name = "lerobot-teleoperator-nexarm" },
     { name = "pyserial" },
 ]
 notebook = [
@@ -3608,6 +3611,7 @@ service = [
     { name = "deepdiff" },
     { name = "fastapi" },
     { name = "jsonlines" },
+    { name = "lerobot-teleoperator-nexarm" },
     { name = "pandas" },
     { name = "pyarrow" },
     { name = "pyserial" },
@@ -3690,6 +3694,9 @@ xvla = [
 ]
 
 [package.dev-dependencies]
+nexarm = [
+    { name = "lerobot-teleoperator-nexarm" },
+]
 policies = [
     { name = "lerobot-policy-bspline" },
 ]
@@ -3891,6 +3898,7 @@ requires-dist = [
     { name = "lerobot", extras = ["xvla"], marker = "extra == 'all'" },
     { name = "lerobot-lancedb", marker = "extra == 'lancedb-convert'", specifier = ">=0.3.1,<0.4.0" },
     { name = "lerobot-policy-turbovla", marker = "extra == 'turbovla'", editable = "policies/lerobot_policy_turbovla" },
+    { name = "lerobot-teleoperator-nexarm", marker = "extra == 'nexarm'", editable = "packages/lerobot_teleoperator_nexarm" },
     { name = "liger-kernel", marker = "sys_platform == 'linux' and extra == 'fineart-vla-kernels'", specifier = ">=0.8.0,<0.9.0" },
     { name = "matplotlib", marker = "extra == 'matplotlib-dep'", specifier = ">=3.10.3,<4.0.0" },
     { name = "meshcat", marker = "extra == 'unitree-g1'", specifier = ">=0.3.0,<0.4.0" },
@@ -3963,6 +3971,7 @@ requires-dist = [
 provides-extras = ["lancedb", "lancedb-convert", "dataset", "training", "hardware", "viz", "core-scripts", "evaluation", "dataset-viz", "av-dep", "pygame-dep", "placo-dep", "transformers-dep", "sentencepiece-dep", "grpcio-dep", "accelerate-dep", "can-dep", "peft-dep", "scipy-dep", "diffusers-dep", "qwen-vl-utils-dep", "matplotlib-dep", "pyserial-dep", "rustypot-dep", "deepdiff-dep", "pynput-dep", "pyzmq-dep", "motorbridge-dep", "motorbridge-smart-servo-dep", "timm-dep", "nexarm", "service", "serial-motors", "feetech", "dynamixel", "damiao", "robstride", "openarms", "gamepad", "hopejr", "lekiwi", "unitree-g1", "reachy2", "rebot", "kinematics", "intelrealsense", "phone", "diffusion", "wallx", "pi", "dm05", "molmoact2", "smolvla", "multi-task-dit", "groot", "sarm", "robometer", "topreward", "xvla", "eo1", "fastwam", "flux3", "evo1", "fineart-vla", "fineart-vla-kernels", "hilserl", "vla-jepa", "lingbot-va", "lingbot-vla-v2", "wall-oss-05", "lawam", "turbovla", "remote", "peft", "annotations", "dev", "notebook", "test", "video-benchmark", "aloha", "pusht", "libero", "metaworld", "all"]
 
 [package.metadata.requires-dev]
+nexarm = [{ name = "lerobot-teleoperator-nexarm", editable = "packages/lerobot_teleoperator_nexarm" }]
 policies = [{ name = "lerobot-policy-bspline", editable = "policies/lerobot_policy_bspline" }]
 
 [[package]]
@@ -4009,6 +4018,17 @@ requires-dist = [
     { name = "lerobot", editable = "." },
     { name = "turbovla", git = "https://github.com/khanhthanhdev/TurboVLA?rev=28bc1e7e8cf259aacee4fd928258caa669cbaaae" },
 ]
+
+[[package]]
+name = "lerobot-teleoperator-nexarm"
+version = "0.1.0"
+source = { editable = "packages/lerobot_teleoperator_nexarm" }
+dependencies = [
+    { name = "lerobot", extra = ["deepdiff-dep", "pyserial-dep"] },
+]
+
+[package.metadata]
+requires-dist = [{ name = "lerobot", extras = ["pyserial-dep", "deepdiff-dep"], editable = "." }]
 
 [[package]]
 name = "librt"

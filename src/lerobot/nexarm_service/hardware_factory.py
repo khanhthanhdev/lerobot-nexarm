@@ -14,7 +14,7 @@ from lerobot.cameras.opencv import OpenCVCameraConfig
 from lerobot.motors.nexarm import NexArmMotorsBus
 from lerobot.nexarm_service.profiles import CameraProfile, RobotProfile
 from lerobot.robots.nexarm_follower import NexArmFollower, NexArmFollowerConfig
-from lerobot.teleoperators.nexarm_leader import NexArmLeader, NexArmLeaderConfig
+from lerobot_teleoperator_nexarm import NexArmLeader, NexArmLeaderConfig
 
 
 def opencv_camera_config(cam: CameraProfile) -> OpenCVCameraConfig:

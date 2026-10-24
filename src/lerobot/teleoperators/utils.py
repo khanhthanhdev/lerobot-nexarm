@@ -55,10 +55,6 @@ def make_teleoperator_from_config(config: TeleoperatorConfig) -> "Teleoperator":
         from .so_leader import SO101Leader
 
         return SO101Leader(config)
-    elif config.type == "nexarm_leader":
-        from .nexarm_leader import NexArmLeader
-
-        return NexArmLeader(config)
     elif config.type == "mock_teleop":
         from tests.mocks.mock_teleop import MockTeleop
 

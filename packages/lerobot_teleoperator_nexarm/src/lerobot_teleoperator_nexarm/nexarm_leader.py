@@ -34,9 +34,9 @@ from lerobot.motors.nexarm.nexarm import (
     map_follower_to_leader,
     map_leader_to_follower,
 )
+from lerobot.teleoperators.teleoperator import Teleoperator
 from lerobot.utils.decorators import check_if_already_connected, check_if_not_connected
 
-from ..teleoperator import Teleoperator
 from .config_nexarm_leader import NexArmLeaderConfig
 
 logger = logging.getLogger(__name__)

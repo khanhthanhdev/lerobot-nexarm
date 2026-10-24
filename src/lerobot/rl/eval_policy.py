@@ -29,7 +29,6 @@ from lerobot.robots import (  # noqa: F401
 )
 from lerobot.teleoperators import (
     gamepad,  # noqa: F401
-    nexarm_leader,  # noqa: F401
     so_leader,  # noqa: F401
 )
 

@@ -85,7 +85,7 @@ from lerobot.datasets import LeRobotDataset, make_dataset
 from lerobot.optim import load_optimizer_state
 from lerobot.policies import make_policy, make_pre_post_processors
 from lerobot.robots import mobile_bi_nexarm_sim, nexarm_follower, nexarm_sim, so_follower  # noqa: F401
-from lerobot.teleoperators import gamepad, nexarm_leader, so_leader  # noqa: F401
+from lerobot.teleoperators import gamepad, so_leader  # noqa: F401
 from lerobot.teleoperators.utils import TeleopEvents
 from lerobot.transport.utils import (
     MAX_MESSAGE_SIZE,

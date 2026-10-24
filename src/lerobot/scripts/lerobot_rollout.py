@@ -209,7 +209,6 @@ from lerobot.teleoperators import (  # noqa: F401
     bi_so_leader,
     homunculus,
     koch_leader,
-    nexarm_leader,
     omx_leader,
     openarm_leader,
     openarm_mini,

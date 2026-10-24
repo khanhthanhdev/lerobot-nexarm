@@ -20,9 +20,9 @@ import argparse
 import time
 
 from lerobot.robots.nexarm_follower import NexArmFollower, NexArmFollowerConfig
-from lerobot.teleoperators.nexarm_leader import NexArmLeader, NexArmLeaderConfig
 from lerobot.utils.robot_utils import precise_sleep
 from lerobot.utils.visualization_utils import init_rerun, log_rerun_data, shutdown_rerun
+from lerobot_teleoperator_nexarm import NexArmLeader, NexArmLeaderConfig
 
 try:  # imported as a package module (tests) or run as a script
     from examples.nexarm.camera_config import CameraSetupError, add_camera_args, build_camera_configs

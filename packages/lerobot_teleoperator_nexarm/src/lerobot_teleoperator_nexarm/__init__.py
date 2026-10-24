@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""LeRobot plugin for the NexArm leader arm. Importing it registers the `nexarm_leader` teleoperator type."""
+
 from .config_nexarm_leader import NexArmLeaderConfig
 from .nexarm_leader import NexArmLeader
 
