@@ -30,16 +30,16 @@ from .mujoco_backend import NexArmMujocoBackend
 class NexArmSim(Robot):
     """LeRobot follower backed by the NexArm MuJoCo model.
 
-    ``name`` selects this simulated implementation, while ``robot_type`` reports the physical embodiment
-    (``nexarm_follower``) so simulated and real datasets and policies stay compatible.
+    ``--robot.type=nexarm_sim`` selects this simulated implementation. ``name`` and ``robot_type`` report the
+    physical embodiment (``nexarm_follower``): ``lerobot-record`` and ``lerobot-rollout`` stamp ``name`` into
+    the dataset's ``robot_type``, so simulated and real datasets and policies stay compatible.
     """
 
     config_class = NexArmSimConfig
-    name = "nexarm_sim"
+    name = "nexarm_follower"
 
     def __init__(self, config: NexArmSimConfig):
         super().__init__(config)
-        self.robot_type = "nexarm_follower"
         self.config = config
         self._backend: NexArmMujocoBackend | None = None
 

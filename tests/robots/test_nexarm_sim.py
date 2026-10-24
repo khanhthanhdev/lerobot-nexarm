@@ -89,8 +89,8 @@ def test_sim_robot_reports_follower_type_and_returns_commanded_action() -> None:
             id="test", model_path=MODEL_PATH, camera_names=(), settle_steps=0, action_delay_steps=2
         )
     )
-    assert robot.name == "nexarm_sim"
-    assert robot.robot_type == "nexarm_follower"
+    # lerobot-record and lerobot-rollout write robot.name into the dataset's robot_type.
+    assert robot.name == robot.robot_type == "nexarm_follower"
     robot.connect()
     try:
         action = {f"{name}.pos": HOME_POSITIONS[name] + 100 for name in JOINT_NAMES}
