@@ -25,7 +25,7 @@ from lerobot_policy_turbovla.modeling_turbovla import TurboVLAPolicy  # noqa: E4
 
 from lerobot.policies.factory import make_pre_post_processors  # noqa: E402
 from lerobot.policies.utils import prepare_observation_for_inference  # noqa: E402
-from lerobot.utils.constants import HF_LEROBOT_HOME, OBS_STATE  # noqa: E402
+from lerobot.utils.constants import OBS_STATE  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 if str(REPO_ROOT) not in sys.path:  # the rollout and training scripts are imported as `examples.nexarm.*`
@@ -38,30 +38,17 @@ DATASET_REPO_ID = "thanhkt/nexarm_stack_bowls"
 EPISODE = 143
 NUM_FRAMES = 20
 TOLERANCE = 1e-4
-TEXT_WEIGHTS = "prajjwal1/bert-tiny"  # has no tokenizer files; bert-base-uncased's tokenizer is added
-TOKENIZER = "google-bert/bert-base-uncased"
-VISION_MODEL = "facebook/dinov2-with-registers-small"
 CAMERA_NAMES = ("front", "wrist")
 
 
-def dataset_root() -> Path:
-    if root := os.environ.get("TURBOVLA_PARITY_DATASET_ROOT"):
-        return Path(root)
-    snapshots = sorted(
-        (HF_LEROBOT_HOME / "hub" / "datasets--thanhkt--nexarm_stack_bowls" / "snapshots").glob("*")
-    )
-    for snapshot in snapshots:
-        if (snapshot / "meta" / "info.json").is_file():
-            return snapshot
-    pytest.skip(f"{DATASET_REPO_ID} is not in the local cache; set TURBOVLA_PARITY_DATASET_ROOT")
-
-
 @pytest.fixture(scope="module")
-def dataset():
+def dataset(nexarm_dataset_root):
     from lerobot.datasets.lerobot_dataset import LeRobotDataset
 
     try:
-        return LeRobotDataset(DATASET_REPO_ID, root=dataset_root(), episodes=[EPISODE], local_files_only=True)
+        return LeRobotDataset(
+            DATASET_REPO_ID, root=nexarm_dataset_root, episodes=[EPISODE], local_files_only=True
+        )
     except FileNotFoundError as error:
         pytest.skip(f"Episode {EPISODE} of {DATASET_REPO_ID} is not available locally: {error}")
 
@@ -84,20 +71,6 @@ def frames(dataset):
             }
         )
     return result
-
-
-@pytest.fixture(scope="module")
-def tiny_backbones(tmp_path_factory):
-    transformers = pytest.importorskip("transformers")
-    text_dir = tmp_path_factory.mktemp("bert_tiny")
-    try:
-        transformers.BertModel.from_pretrained(TEXT_WEIGHTS).save_pretrained(text_dir)
-        transformers.AutoTokenizer.from_pretrained(TOKENIZER).save_pretrained(text_dir)
-        transformers.AutoImageProcessor.from_pretrained(VISION_MODEL)
-        transformers.AutoModel.from_pretrained(VISION_MODEL)
-    except OSError as error:
-        pytest.skip(f"Backbones are neither cached nor downloadable: {error}")
-    return str(text_dir), VISION_MODEL
 
 
 @pytest.fixture(scope="module")
