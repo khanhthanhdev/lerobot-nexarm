@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from lerobot.utils import keyboard_input as ki
+from lerobot_robot_nexarm import recording_session as session
 from lerobot_robot_nexarm.recording_session import run_manual_session
 
 
@@ -108,9 +108,10 @@ def test_discard_then_reset_then_record(monkeypatch):
 
 @pytest.mark.parametrize("key", ["enter", "right", "n"])
 def test_manual_keys_are_quiet_and_ignored_during_save(monkeypatch, capsys, key):
-    monkeypatch.setattr(ki.sys.stdin, "isatty", lambda: True)
-    monkeypatch.setattr(ki.TerminalKeyListener, "start", lambda _: None)
-    listener, events = ki.init_keyboard_listener(manual_control=True)
+    monkeypatch.setattr(session.sys.stdin, "isatty", lambda: True)
+    monkeypatch.setattr(session, "HAS_TERMIOS", True)
+    monkeypatch.setattr(session.TerminalKeyListener, "start", lambda _: None)
+    listener, events = session.init_manual_keyboard_listener()
     listener._on_key(key)
     assert not events["exit_early"]
     events["controls_enabled"] = True

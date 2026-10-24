@@ -47,10 +47,13 @@ from lerobot.scripts.lerobot_record import RecordConfig, record, record_loop
 from lerobot.teleoperators import make_teleoperator_from_config
 from lerobot.utils.feature_utils import combine_feature_dicts
 from lerobot.utils.import_utils import register_third_party_plugins
-from lerobot.utils.keyboard_input import init_keyboard_listener
 from lerobot.utils.utils import init_logging, log_say
 from lerobot.utils.visualization_utils import shutdown_visualization
-from lerobot_robot_nexarm.recording_session import run_manual_session, show_recording_status
+from lerobot_robot_nexarm.recording_session import (
+    init_manual_keyboard_listener,
+    run_manual_session,
+    show_recording_status,
+)
 from lerobot_robot_nexarm.rerun_recording import init_visualization
 
 
@@ -215,7 +218,7 @@ def _record_manual(cfg: CollectionRecordConfig, processors: Processors) -> LeRob
             teleop.connect()
         robot.connect()
 
-        listener, events = init_keyboard_listener(manual_control=True)
+        listener, events = init_manual_keyboard_listener()
         if listener is None:
             raise RuntimeError("Manual collection requires an interactive terminal for Enter/Right controls.")
 

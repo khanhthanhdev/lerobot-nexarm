@@ -1,8 +1,16 @@
 """Manual episode collection with a small terminal dashboard."""
 
+import importlib.util
 import sys
 import time
 from collections.abc import Callable
+
+from lerobot.utils.keyboard_input import TerminalKeyListener, create_key_listener
+
+# Ignore a second press this soon after the last one, so key repeat cannot skip a phase.
+KEY_DEBOUNCE_S = 0.5
+# The stdin key reader needs termios, which Windows lacks.
+HAS_TERMIOS = importlib.util.find_spec("termios") is not None
 
 _DIGITS = (
     (" ███ ", "█   █", "█   █", "█   █", " ███ "),
@@ -31,6 +39,48 @@ def show_recording_status(count: int, status: str, location: str = "") -> None:
     if location:
         print(f"\nDataset: {location}")
     sys.stdout.flush()
+
+
+def init_manual_keyboard_listener():
+    """Keyboard listener for ``run_manual_session``: returns ``(listener, events)`` like LeRobot's.
+
+    Enter or Right/n ends the current phase, Left/r discards the episode being recorded and Esc/q
+    finishes. Keys are silent, ignored while ``events["controls_enabled"]`` is false (during saving)
+    and debounced. A terminal reads keys from stdin when it can; otherwise LeRobot picks the backend.
+    """
+    events = {
+        "exit_early": False,
+        "rerecord_episode": False,
+        "stop_recording": False,
+        "controls_enabled": False,
+    }
+    last_press = 0.0
+
+    def on_key(name: str) -> None:
+        nonlocal last_press
+        key = name.lower()
+        if key in ("esc", "q"):
+            events["stop_recording"] = True
+            events["exit_early"] = True
+            return
+        if key not in ("enter", "right", "n", "left", "r"):
+            return
+        if key in ("left", "r") and not events.get("allow_rerecord", False):
+            return
+        now = time.monotonic()
+        if not events["controls_enabled"] or now - last_press < KEY_DEBOUNCE_S:
+            return
+        last_press = now
+        if key in ("left", "r"):
+            events["rerecord_episode"] = True
+        events["exit_early"] = True
+
+    if sys.stdin.isatty() and HAS_TERMIOS:
+        listener = TerminalKeyListener(on_key)
+        listener.start()
+        return listener, events
+    controls = "Enter/Right/n: start or stop, Left/r: discard, Esc/q: finish"
+    return create_key_listener(on_key, controls_help=controls), events
 
 
 def run_manual_session(

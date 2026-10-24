@@ -92,17 +92,15 @@ def test_manual_control_records_and_merges(monkeypatch, tmp_path, merge_into_roo
         "exit_early": False,
         "rerecord_episode": False,
         "stop_recording": False,
-        "quiet": True,
         "controls_enabled": False,
     }
 
-    def fake_listener(**kwargs):
-        assert kwargs == {"manual_control": True}
+    def fake_listener():
         # One press starts the episode, the second ends it.
         _press_enter_when_enabled(events, 2)
         return _StoppedListener(), events
 
-    monkeypatch.setattr(wrapper, "init_keyboard_listener", fake_listener)
+    monkeypatch.setattr(wrapper, "init_manual_keyboard_listener", fake_listener)
     monkeypatch.setattr(collection_merge, "hub_root_info", lambda _: None)
     merge_flags = (
         {"root_repo_id": "test/root", "merge_root": str(tmp_path / "root")} if merge_into_root else {}

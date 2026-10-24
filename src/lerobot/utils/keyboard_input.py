@@ -161,17 +161,14 @@ def apply_recording_control(control: str, events: dict) -> None:
     (re-record the last episode), or ``"esc"`` (stop recording).
     """
     if control == "right":
-        if not events.get("quiet", False):
-            print("Right arrow key pressed. Exiting loop...")
+        print("Right arrow key pressed. Exiting loop...")
         events["exit_early"] = True
     elif control == "left":
-        if not events.get("quiet", False):
-            print("Left arrow key pressed. Exiting loop and rerecord the last episode...")
+        print("Left arrow key pressed. Exiting loop and rerecord the last episode...")
         events["rerecord_episode"] = True
         events["exit_early"] = True
     elif control == "esc":
-        if not events.get("quiet", False):
-            print("Escape key pressed. Stopping data recording...")
+        print("Escape key pressed. Stopping data recording...")
         events["stop_recording"] = True
         events["exit_early"] = True
 
@@ -399,7 +396,7 @@ def create_key_listener(dispatch: Callable[[str], None], *, controls_help: str =
     return None
 
 
-def init_keyboard_listener(*, manual_control: bool = False):
+def init_keyboard_listener():
     """Initialize a non-blocking keyboard listener for interactive recording controls.
 
     Backend selection:
@@ -428,24 +425,13 @@ def init_keyboard_listener(*, manual_control: bool = False):
         "rerecord_episode": False,
         "stop_recording": False,
     }
-    if manual_control:
-        events.update(quiet=True, controls_enabled=False)
-    last_press = 0.0
 
     # Accept the single-byte letter equivalents n/r/q alongside the arrow/Esc keys: the
     # letters are immune to the escape-sequence split/delay/interception that affects arrows
     # over laggy SSH/VNC links. Case-insensitive so Shift+letter still works.
     def on_key(name: str) -> None:
-        nonlocal last_press
         key = name.lower()
-        if manual_control and key in ("left", "r") and not events.get("allow_rerecord", False):
-            return
-        if manual_control and key not in ("esc", "q"):
-            now = time.monotonic()
-            if not events["controls_enabled"] or now - last_press < 0.5:
-                return
-            last_press = now
-        if key in ("right", "n") or (manual_control and key == "enter"):
+        if key in ("right", "n"):
             apply_recording_control("right", events)
         elif key in ("left", "r"):
             apply_recording_control("left", events)
@@ -453,9 +439,5 @@ def init_keyboard_listener(*, manual_control: bool = False):
             apply_recording_control("esc", events)
         # other keys (incl. up/down) are intentionally ignored
 
-    if manual_control and sys.stdin.isatty() and _TERMIOS_AVAILABLE:
-        listener = TerminalKeyListener(on_key)
-        listener.start()
-    else:
-        listener = create_key_listener(on_key, controls_help="Right/Left/Esc, or n=next, r=re-record, q=quit")
+    listener = create_key_listener(on_key, controls_help="Right/Left/Esc, or n=next, r=re-record, q=quit")
     return listener, events
