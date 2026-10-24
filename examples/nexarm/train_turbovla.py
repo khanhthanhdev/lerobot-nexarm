@@ -231,6 +231,9 @@ def parse_args():
         help="Execution device ('cuda' or 'cpu')",
     )
     parser.add_argument("--num-workers", type=int, default=4, help="DataLoader worker processes")
+    parser.add_argument(
+        "--seed", type=int, default=None, help="Seed Python, NumPy and torch before building the model"
+    )
     parser.add_argument("--wandb", action="store_true", help="Log metrics to Weights & Biases")
     parser.add_argument("--wandb-project", type=str, default="nexarm-turbovla")
     args = parser.parse_args()
@@ -728,8 +731,73 @@ def save_checkpoint(
     print(f"\n[CHECKPOINT] Saved checkpoint at step {step} -> {output_dir / step_str}*")
 
 
+def build_param_groups(
+    model: nn.Module, lr: float, vision_lr: float, freeze_vision: bool
+) -> list[dict[str, Any]]:
+    """Optimizer groups: action head, the rest except the vision encoder, then the vision encoder."""
+    param_groups = [
+        {
+            "params": [p for n, p in model.action_head.named_parameters() if p.requires_grad],
+            "lr": lr,
+        },
+        {
+            "params": [
+                p
+                for n, p in model.named_parameters()
+                if "action_head" not in n and "vision_encoder" not in n and p.requires_grad
+            ],
+            "lr": lr,
+        },
+    ]
+    if not freeze_vision:
+        param_groups.append(
+            {
+                "params": [p for n, p in model.vision_encoder.named_parameters() if p.requires_grad],
+                "lr": vision_lr,
+            }
+        )
+    return param_groups
+
+
+def lr_multiplier(update: int, warmup_steps: int, max_steps: int) -> float:
+    """Learning-rate factor after `update` optimizer updates: linear warmup, then cosine down to 5%."""
+    if update < warmup_steps:
+        return (update + 1) / warmup_steps
+    progress = (update - warmup_steps) / max(1, max_steps - warmup_steps)
+    return 0.05 + 0.95 * (1 + math.cos(math.pi * min(progress, 1.0))) / 2
+
+
+def action_loss(
+    predictions: torch.Tensor,
+    targets: torch.Tensor,
+    action_is_pad: torch.Tensor,
+    loss_type: str = "l1",
+    gripper_loss_weight: float = 3.0,
+) -> torch.Tensor:
+    """Per-element action loss, gripper (index 5) up-weighted, averaged over the non-padded steps."""
+    if loss_type == "mse":
+        raw_diff = (predictions - targets) ** 2
+    elif loss_type == "smooth_l1":
+        raw_diff = F.smooth_l1_loss(predictions, targets, reduction="none")
+    else:
+        raw_diff = torch.abs(predictions - targets)
+
+    if gripper_loss_weight != 1.0 and targets.shape[-1] >= 6:
+        weights = torch.ones(targets.shape[-1], device=targets.device, dtype=targets.dtype)
+        weights[5] = gripper_loss_weight
+        raw_diff = raw_diff * weights.view(1, 1, -1)
+    valid = ~action_is_pad
+    return raw_diff.masked_fill(~valid.unsqueeze(-1), 0).sum() / (
+        valid.sum().clamp_min(1) * targets.shape[-1]
+    )
+
+
 def main():
     args = parse_args()
+    if args.seed is not None:
+        from lerobot.utils.random_utils import set_seed
+
+        set_seed(args.seed)
     dataset_specs = resolve_dataset_specs(args)
 
     # Detect distributed training (e.g. launched via torchrun)
@@ -939,38 +1007,13 @@ def main():
 
     # Optimizer with parameter groups
     raw_model = model.module if is_distributed else model
-    param_groups = [
-        {
-            "params": [p for n, p in raw_model.action_head.named_parameters() if p.requires_grad],
-            "lr": args.lr,
-        },
-        {
-            "params": [
-                p
-                for n, p in raw_model.named_parameters()
-                if "action_head" not in n and "vision_encoder" not in n and p.requires_grad
-            ],
-            "lr": args.lr,
-        },
-    ]
-    if not args.freeze_vision:
-        param_groups.append(
-            {
-                "params": [p for n, p in raw_model.vision_encoder.named_parameters() if p.requires_grad],
-                "lr": args.dinov3_lr,
-            }
-        )
-
+    param_groups = build_param_groups(raw_model, args.lr, args.dinov3_lr, args.freeze_vision)
     optimizer = AdamW(param_groups, weight_decay=args.weight_decay)
 
     # Schedule counts optimizer updates, preserving each group's relative learning rate.
-    def lr_multiplier(update: int) -> float:
-        if update < args.warmup_steps:
-            return (update + 1) / args.warmup_steps
-        progress = (update - args.warmup_steps) / max(1, args.max_steps - args.warmup_steps)
-        return 0.05 + 0.95 * (1 + math.cos(math.pi * min(progress, 1.0))) / 2
-
-    scheduler = LambdaLR(optimizer, lr_lambda=lr_multiplier)
+    scheduler = LambdaLR(
+        optimizer, lr_lambda=lambda update: lr_multiplier(update, args.warmup_steps, args.max_steps)
+    )
     scaler = torch.amp.GradScaler("cuda", enabled=device.type == "cuda" and amp_dtype == torch.float16)
 
     # Weights & Biases
@@ -1031,20 +1074,12 @@ def main():
             else torch.autocast(device_type="cpu", enabled=False)
         ):
             predictions = model(instructions, samples, states).float()
-            if args.loss_type == "mse":
-                raw_diff = (predictions - targets) ** 2
-            elif args.loss_type == "smooth_l1":
-                raw_diff = F.smooth_l1_loss(predictions, targets, reduction="none")
-            else:
-                raw_diff = torch.abs(predictions - targets)
-
-            if args.gripper_loss_weight != 1.0 and targets.shape[-1] >= 6:
-                weights = torch.ones(targets.shape[-1], device=device, dtype=targets.dtype)
-                weights[5] = args.gripper_loss_weight
-                raw_diff = raw_diff * weights.view(1, 1, -1)
-            valid = ~batch["action_is_pad"].to(device)
-            loss = raw_diff.masked_fill(~valid.unsqueeze(-1), 0).sum() / (
-                valid.sum().clamp_min(1) * targets.shape[-1]
+            loss = action_loss(
+                predictions,
+                targets,
+                batch["action_is_pad"].to(device),
+                args.loss_type,
+                args.gripper_loss_weight,
             )
 
             if args.grad_accum_steps > 1:
