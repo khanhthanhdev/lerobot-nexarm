@@ -63,26 +63,26 @@ def test_local_dataset_never_contacts_hub(tmp_path, no_hub, missing):
         assert str(root) in str(exc.value)
 
 
-def test_local_dataset_reports_missing_video(tmp_path, monkeypatch, no_hub, lerobot_dataset_factory):
-    # This checks file availability before loading, without decoding video frames.
-    monkeypatch.setattr(
-        "tests.fixtures.dataset_factories.encode_video_frames",
-        lambda image_dir, video_path, **kwargs: video_path.touch(),
-    )
-    dataset = lerobot_dataset_factory(
-        root=tmp_path / "local_video",
+def test_local_dataset_reports_missing_video(tmp_path, no_hub):
+    camera = {"dtype": "video", "shape": (64, 64, 3), "names": ["height", "width", "channels"]}
+    dataset = LeRobotDataset.create(
         repo_id=REPO_ID,
-        total_episodes=1,
-        total_frames=3,
+        root=tmp_path / "local_video",
+        fps=10,
+        features={**FEATURES, "observation.images.front": camera},
         use_videos=True,
-        camera_features={
-            "observation.images.front": {
-                "dtype": "video",
-                "shape": (16, 16, 3),
-                "names": ["height", "width", "channels"],
-            }
-        },
     )
+    for _ in range(3):
+        dataset.add_frame(
+            {
+                "action": np.zeros(2, dtype=np.float32),
+                "observation.state": np.zeros(2, dtype=np.float32),
+                "observation.images.front": np.zeros((64, 64, 3), dtype=np.uint8),
+                "task": "Dummy task",
+            }
+        )
+    dataset.save_episode()
+    dataset.finalize()
     video = dataset.root / dataset.meta.get_video_file_path(0, "observation.images.front")
     video.unlink()
 
