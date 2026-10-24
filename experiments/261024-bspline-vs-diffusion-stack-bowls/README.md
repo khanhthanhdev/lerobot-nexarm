@@ -24,7 +24,7 @@ MUJOCO_GL=egl uv run python examples/nexarm/generate_stack_bowls_dataset.py \
     --episodes 300 --gpus 0,1,2,3
 ```
 
-Train both policies with the same data, seed, batch size and steps:
+Train both policies with the same data, seed, batch size, image size and steps. Both configs resize the 480x640 frames to 120x160 (`resize_shape`): at full size, batch 8 already exceeds an 8 GB GPU, while at 120x160 batch 32 fits. On a larger GPU you can drop or raise `resize_shape`, as long as both configs keep the same value.
 
 ```bash
 uv run lerobot-train --config_path experiments/261024-bspline-vs-diffusion-stack-bowls/train_bspline.yaml

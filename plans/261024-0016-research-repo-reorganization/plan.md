@@ -30,6 +30,10 @@ Research behind this plan: [research-261024-0706-research-repo-layout-options.md
 | B-spline source                | Ported into a LeRobot policy plugin; the `bspline-policy` fork (of `B-spline-policy/bspline-policy`, built on `diffusion_policy`) is reference only | Recommended; it is third-party code, not LeRobot code |
 | TurboVLA wrap                  | Inference first (phase 05), then training (phase 06)                                                                                                | Recommended                                           |
 | Upstream                       | Add `upstream` remote, merge, retire core edits, then depend on upstream `lerobot`                                                                  | Recommended                                           |
+| Old TurboVLA scripts           | Retired after the 2k-step GPU parity; the full-run and LIBERO comparisons no longer gate it (phase 06)                                              | User, 2026-10-24                                      |
+| TurboVLA image-step slowdown   | Follow-up, not part of this plan                                                                                                                    | User, 2026-10-24                                      |
+| Long training runs             | The user trains on their own servers; this repo carries the code and experiment configs                                                             | User, 2026-10-24                                      |
+| Removing `src/lerobot/`        | NexArm-side fallback for each carried patch; upstream PRs only for plain bug fixes (phase 08 table)                                                 | Maintainer, delegated by user 2026-10-24              |
 
 ## Target layout
 

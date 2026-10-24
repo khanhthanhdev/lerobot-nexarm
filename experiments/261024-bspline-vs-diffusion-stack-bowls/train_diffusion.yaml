@@ -8,6 +8,9 @@ dataset:
 policy:
   type: diffusion
   push_to_hub: false
+  # 480x640 frames at batch 8 already exceed 8 GB; at 120x160, batch 32 fits (about 3.5 steps/s on an RTX 5050).
+  # Keep the same value in both configs so the comparison stays fair. Drop it on larger GPUs.
+  resize_shape: [120, 160]
 
 output_dir: experiments/261024-bspline-vs-diffusion-stack-bowls/outputs/train_diffusion
 job_name: 261024-diffusion-stack-bowls
