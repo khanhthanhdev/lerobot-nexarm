@@ -134,5 +134,5 @@ Each patch needs a merged upstream PR or a NexArm-side fallback first. After tha
 - `lerobot-find-joint-limits` and the HIL-SERL entry points (`rl/actor.py`, `rl/learner.py`, `rl/gym_manipulator.py`, `rl/eval_policy.py`) do not call `register_third_party_plugins()`, and upstream's don't either. `--robot.type=nexarm_*` therefore no longer parses there. No NexArm doc or example uses these commands, and adding the call would be a new core patch.
 - On Linux: `pytest tests -k nexarm`, `tests/nexarm_service` and `make test-nexarm-ete`.
 - Publishing: `all` includes `lerobot[nexarm]`, which now names workspace packages that are not on PyPI (as `turbovla` already did), so `release.yml`'s `lerobot[all]` wheel install would fail until the plugins are published or left out of `all`.
-- Building the Docker images (`Dockerfile.user`, `Dockerfile.internal`): not done here.
+- `Dockerfile.user` builds on Linux (2026-10-24, `marinelab`, from `86d7f4b5`, image 20.2 GB). Inside it, `register_third_party_plugins()` registers `nexarm_follower`, `nexarm_sim`, `mobile_bi_nexarm_sim`, `nexarm_leader`, env `nexarm` and policy `bspline`. `turbovla` is absent as expected: the `all` extra does not include the `turbovla` or `service` extras. `Dockerfile.internal` (CUDA base) has not been built.
 - The desktop app against the real arm: health, sessions, teleop and recording.
