@@ -153,17 +153,20 @@ Route (user left the choice to the maintainer, 2026-10-24): NexArm-side fallback
 
 `all` no longer includes `lerobot[nexarm]`; `uv sync` installs the plugins through the default `nexarm` group.
 
-After that:
+### Pin (done 2026-10-24)
 
-1. Replace `src/lerobot/` with a pinned `lerobot` (a release or a commit) in the root `pyproject.toml`.
-2. Point the packages' `lerobot = { workspace = true }` sources at the pin.
-3. Move the NexArm tests into the packages, because they import `tests.mocks` and `tests.nexarm_service`, which go away with upstream's `tests/`.
-4. Document the upgrade step: bump the pin, run `uv lock`, run the tests.
+1. Done: `lerobot = { git = "https://github.com/huggingface/lerobot", rev = "d3793b7e36522321c1c455f0dc4826db3793dceb" }` (the upstream merge base `src/lerobot/` matched) in the root `[tool.uv.sources]`. The root project is the non-published `lerobot-nexarm` workspace root (`[tool.uv] package = false`); its extras forward to `lerobot[...]` under the same names. `src/`, `setup.py`, `MANIFEST.in`, the root `conftest.py`, `utils/` and `scripts/ci/` are gone.
+2. Done: the members' `lerobot = { workspace = true }` sources are removed, so they resolve the root pin. `mujoco` moved into `lerobot_robot_nexarm`.
+3. Changed: the NexArm tests stay in the root `tests/`. Only upstream's tests were deleted; `tests/mocks/` (three mocks) and `tests/nexarm_service/` are NexArm-owned and stay, so nothing needed to move. Policy tests stay in `policies/*/tests/`.
+4. Done: "Upgrading LeRobot" in `CONTRIBUTING.md`.
+5. Upstream docs, non-NexArm examples, upstream workflows and GPU/benchmark Dockerfiles are removed; CI is `quality.yml`, `tests.yml`, `security.yml` and the manual `mobile_nexarm_sim.yml`.
+
+Consequences: `rerun-sdk` resolves to 0.33.1 (upstream's `<0.34` cap; the fork had 0.36), and the `.rrd` recording tests pass on it. The installed `lerobot` has no `py.typed`, so mypy no longer type-checks calls into LeRobot. Windows results are unchanged: 446 passed, 1 skipped, the 11 known OpenGL/asset failures.
 
 ### Open
 
 - `lerobot-find-joint-limits` and the HIL-SERL entry points (`rl/actor.py`, `rl/learner.py`, `rl/gym_manipulator.py`, `rl/eval_policy.py`) do not call `register_third_party_plugins()`, and upstream's don't either. `--robot.type=nexarm_*` therefore no longer parses there. No NexArm doc or example uses these commands, and adding the call would be a new core patch.
-- On Linux: `pytest tests -k nexarm`, `tests/nexarm_service` and `make test-nexarm-ete`.
+- On Linux: `pytest tests policies` and `make test-nexarm-ete` on the pinned layout (the `tests.yml` workflow runs both).
 - Publishing: done, `all` leaves the NexArm packages out. `--extra nexarm` and `--extra turbovla` still name packages that are not on PyPI, so they only work from this repo.
-- `Dockerfile.user` builds on Linux (2026-10-24, `marinelab`, from `86d7f4b5`, image 20.2 GB). Inside it, `register_third_party_plugins()` registers `nexarm_follower`, `nexarm_sim`, `mobile_bi_nexarm_sim`, `nexarm_leader`, env `nexarm` and policy `bspline`. `turbovla` is absent as expected: the `all` extra does not include the `turbovla` or `service` extras. `Dockerfile.internal` (CUDA base) has not been built.
+- `Dockerfile.user` builds on Linux (2026-10-24, `marinelab`, from `86d7f4b5`, image 20.2 GB). Inside it, `register_third_party_plugins()` registers `nexarm_follower`, `nexarm_sim`, `mobile_bi_nexarm_sim`, `nexarm_leader`, env `nexarm` and policy `bspline`. `turbovla` is absent as expected: the `all` extra does not include the `turbovla` or `service` extras. `Dockerfile.internal` was removed with the pin. Rebuild `Dockerfile.user` from the pinned layout on Linux.
 - The desktop app against the real arm: health, sessions, teleop and recording.
