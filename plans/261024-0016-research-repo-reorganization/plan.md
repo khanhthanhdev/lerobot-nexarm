@@ -71,7 +71,7 @@ Phase 07 can run alongside 04-06. Phase 08 can start once phase 05 has shown the
 - On a fresh clone with no `git submodule` step, `uv sync` installs LeRobot, the NexArm plugins and the B-spline plugin, and `uv sync --extra turbovla` adds TurboVLA and its plugin.
 - `lerobot-train --policy.type=turbovla` and `--policy.type=bspline` train on a NexArm dataset; `lerobot-eval` scores them on the NexArm stack-bowls sim and on LIBERO; `lerobot-rollout` and the desktop app run their checkpoints on the real arm.
 - TurboVLA through LeRobot matches the current scripts: same actions on the same inputs (phase 05) and comparable sim success after training (phase 06).
-- `src/lerobot/` no longer exists in this repo; LeRobot comes from a pinned upstream version (phase 08).
+- `src/lerobot/` no longer exists in this repo; LeRobot comes from a pinned upstream version (phase 08). **Deferred** by validation decision 5: what remains is listed in the phase-08 execution notes.
 - No doc, script or test points at a moved or deleted path (phase 09).
 - NexArm tests pass on a Linux box at least as well as the phase-01 baseline.
 
@@ -100,5 +100,6 @@ Phase 01 tags `pre-reorg`. Each phase lands as its own branch and merge, so any 
 2. Stop pruning: accept upstream's non-NexArm robots and motors during the merge (phase 02).
 3. Phase 08 removes `src/lerobot/` and depends on a pinned upstream `lerobot`.
 4. The TurboVLA adapter lives in this repo at `policies/lerobot_policy_turbovla/`; TurboVLA stays a plain model package.
+5. (2026-10-24) Phase 08 moves NexArm into `packages/` plugins now. `src/lerobot/` stays, carrying only generic patches, until each patch has a merged upstream PR or a NexArm-side fallback. This supersedes the removal in item 3.
 
 <!-- slug: research-repo-reorganization -->
