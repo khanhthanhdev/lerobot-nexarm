@@ -20,9 +20,9 @@ import numpy as np
 import pytest
 from gymnasium.utils.env_checker import check_env
 
-import lerobot.envs.nexarm  # noqa: F401
-from lerobot.envs.configs import NexArmEnv
+import lerobot_env_nexarm.nexarm  # noqa: F401
 from lerobot.envs.factory import make_env
+from lerobot_env_nexarm import NexArmEnv
 
 
 def test_nexarm_env_registration():

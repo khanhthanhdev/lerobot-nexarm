@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=71.0.0,<82.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lerobot_env_nexarm"
+version = "0.1.0"
+description = "NexArm MuJoCo tasks as a LeRobot env plugin (`--env.type=nexarm`) and the NexArm sim benchmark."
+license = "Apache-2.0"
+requires-python = ">=3.12"
+dependencies = [
+    "lerobot",
+    # The MuJoCo backend and the tasks.
+    "lerobot_robot_nexarm",
+]
+
+[project.scripts]
+lerobot-nexarm-sim-benchmark = "lerobot_env_nexarm.sim_benchmark:main"
+
+[tool.uv.sources]
+lerobot = { workspace = true }
+lerobot_robot_nexarm = { workspace = true }
+
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -550,20 +550,20 @@ class NexArmStackBowlsEnv(_NexArmMujocoEnv):
 # Register the environment with Gymnasium
 gym.register(
     id="NexArmPickPlace-v0",
-    entry_point="lerobot.envs.nexarm:NexArmPickPlaceEnv",
+    entry_point="lerobot_env_nexarm.nexarm:NexArmPickPlaceEnv",
 )
 
 gym.register(
     id="gym_nexarm/NexArmPickPlace-v0",
-    entry_point="lerobot.envs.nexarm:NexArmPickPlaceEnv",
+    entry_point="lerobot_env_nexarm.nexarm:NexArmPickPlaceEnv",
 )
 
 gym.register(
     id="NexArmStackBowls-v0",
-    entry_point="lerobot.envs.nexarm:NexArmStackBowlsEnv",
+    entry_point="lerobot_env_nexarm.nexarm:NexArmStackBowlsEnv",
 )
 
 gym.register(
     id="gym_nexarm/NexArmStackBowls-v0",
-    entry_point="lerobot.envs.nexarm:NexArmStackBowlsEnv",
+    entry_point="lerobot_env_nexarm.nexarm:NexArmStackBowlsEnv",
 )

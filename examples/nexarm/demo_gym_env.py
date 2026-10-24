@@ -12,7 +12,7 @@ import gymnasium as gym
 import numpy as np
 
 # Ensure NexArm environment registration
-import lerobot.envs.nexarm  # noqa: F401
+import lerobot_env_nexarm.nexarm  # noqa: F401
 
 
 def main() -> None:

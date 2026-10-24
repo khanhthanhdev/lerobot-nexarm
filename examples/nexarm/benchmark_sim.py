@@ -11,7 +11,7 @@ Example:
 
 from __future__ import annotations
 
-from lerobot.scripts.lerobot_nexarm_sim_benchmark import main
+from lerobot_env_nexarm.sim_benchmark import main
 
 if __name__ == "__main__":
     raise SystemExit(main())

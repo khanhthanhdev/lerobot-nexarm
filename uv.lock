@@ -35,6 +35,7 @@ resolution-markers = [
 [manifest]
 members = [
     "lerobot",
+    "lerobot-env-nexarm",
     "lerobot-policy-bspline",
     "lerobot-policy-turbovla",
     "lerobot-robot-nexarm",
@@ -3197,6 +3198,7 @@ all = [
     { name = "jsonlines" },
     { name = "jupyter" },
     { name = "lancedb" },
+    { name = "lerobot-env-nexarm" },
     { name = "lerobot-robot-nexarm" },
     { name = "lerobot-teleoperator-nexarm" },
     { name = "matplotlib" },
@@ -3506,6 +3508,7 @@ multi-task-dit = [
     { name = "transformers" },
 ]
 nexarm = [
+    { name = "lerobot-env-nexarm" },
     { name = "lerobot-robot-nexarm" },
     { name = "lerobot-teleoperator-nexarm" },
 ]
@@ -3611,6 +3614,7 @@ service = [
     { name = "datasets" },
     { name = "fastapi" },
     { name = "jsonlines" },
+    { name = "lerobot-env-nexarm" },
     { name = "lerobot-robot-nexarm" },
     { name = "lerobot-teleoperator-nexarm" },
     { name = "pandas" },
@@ -3695,6 +3699,7 @@ xvla = [
 
 [package.dev-dependencies]
 nexarm = [
+    { name = "lerobot-env-nexarm" },
     { name = "lerobot-robot-nexarm" },
     { name = "lerobot-teleoperator-nexarm" },
 ]
@@ -3895,6 +3900,7 @@ requires-dist = [
     { name = "lerobot", extras = ["wall-oss-05"], marker = "extra == 'all'" },
     { name = "lerobot", extras = ["wallx"], marker = "extra == 'all'" },
     { name = "lerobot", extras = ["xvla"], marker = "extra == 'all'" },
+    { name = "lerobot-env-nexarm", marker = "extra == 'nexarm'", editable = "packages/lerobot_env_nexarm" },
     { name = "lerobot-lancedb", marker = "extra == 'lancedb-convert'", specifier = ">=0.3.1,<0.4.0" },
     { name = "lerobot-policy-turbovla", marker = "extra == 'turbovla'", editable = "policies/lerobot_policy_turbovla" },
     { name = "lerobot-robot-nexarm", marker = "extra == 'nexarm'", editable = "packages/lerobot_robot_nexarm" },
@@ -3972,10 +3978,26 @@ provides-extras = ["lancedb", "lancedb-convert", "dataset", "training", "hardwar
 
 [package.metadata.requires-dev]
 nexarm = [
+    { name = "lerobot-env-nexarm", editable = "packages/lerobot_env_nexarm" },
     { name = "lerobot-robot-nexarm", editable = "packages/lerobot_robot_nexarm" },
     { name = "lerobot-teleoperator-nexarm", editable = "packages/lerobot_teleoperator_nexarm" },
 ]
 policies = [{ name = "lerobot-policy-bspline", editable = "policies/lerobot_policy_bspline" }]
+
+[[package]]
+name = "lerobot-env-nexarm"
+version = "0.1.0"
+source = { editable = "packages/lerobot_env_nexarm" }
+dependencies = [
+    { name = "lerobot" },
+    { name = "lerobot-robot-nexarm" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "lerobot", editable = "." },
+    { name = "lerobot-robot-nexarm", editable = "packages/lerobot_robot_nexarm" },
+]
 
 [[package]]
 name = "lerobot-lancedb"

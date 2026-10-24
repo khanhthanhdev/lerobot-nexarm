@@ -15,7 +15,7 @@ This is the **Hiwonder NexArm** fork of LeRobot — focused exclusively on the H
 | `packages/lerobot_robot_nexarm/src/lerobot_robot_nexarm/nexarm_sim/`           | `NexArmSimConfig` + `NexArmSim` — single-arm MuJoCo simulation environment                   |
 | `packages/lerobot_robot_nexarm/src/lerobot_robot_nexarm/mobile_bi_nexarm_sim/` | `MobileBiNexArmSimConfig` + `MobileBiNexArmSim` — bimanual mobile robot simulation           |
 | `src/lerobot/teleoperators/nexarm_leader/` | `NexArmLeaderConfig` + `NexArmLeader` — read positions, leader→follower joint mapping        |
-| `src/lerobot/envs/nexarm.py`               | Gym environment for NexArm simulation                                                        |
+| `packages/lerobot_env_nexarm/src/lerobot_env_nexarm/nexarm.py`               | Gym environment for NexArm simulation                                                        |
 | `sim/`                                     | MuJoCo MJCF, URDF description, Isaac Lab configs, meshes, and exporters                      |
 | `examples/nexarm/`                         | Ready-to-run scripts for teleoperate, record, and rollout                                    |
 
