@@ -230,6 +230,8 @@ def rollout(cfg: RolloutConfig):
     """Main entry point for policy deployment."""
     init_logging(console_level=cfg.inference.log_level)
 
+    # getattr: callers may pass a config stub that predates this optional field.
+    rerun_save_path = getattr(cfg, "rerun_save_path", None)
     if cfg.display_data:
         logger.info(
             "Initializing %s visualization (ip=%s, port=%s)",
@@ -242,9 +244,9 @@ def rollout(cfg: RolloutConfig):
             session_name="rollout",
             ip=cfg.display_ip,
             port=cfg.display_port,
-            rerun_save_path=cfg.rerun_save_path,
+            rerun_save_path=rerun_save_path,
         )
-    elif cfg.rerun_save_path is not None:
+    elif rerun_save_path is not None:
         raise ValueError("--rerun_save_path requires --display_data=true.")
 
     signal_handler = ProcessSignalHandler(use_threads=True, display_pid=False)
