@@ -82,7 +82,7 @@ The hardware layers (`robots/`, `motors/`, `teleoperators/`) are no longer prune
 
 ## Git Submodules and TurboVLA
 
-`TurboVLA/` and `bspline-policy/` are git submodules and are empty after a plain clone; run `git submodule update --init --recursive` before using them. The TurboVLA workflow lives in `examples/nexarm/` (`setup_turbovla.py`, `train_turbovla.py`, `rollout_turbovla.py`, `diagnose_turbovla.py`) and resolves the repo-root `TurboVLA/` directory. Multi-GPU and Slurm launchers are in `scripts/nexarm/`.
+`TurboVLA/` is a git submodule and is empty after a plain clone; run `git submodule update --init --recursive` before using it. B-spline Policy is not a submodule: it is the workspace plugin `policies/lerobot_policy_bspline/` (`--policy.type=bspline`), installed by plain `uv sync`. The TurboVLA workflow lives in `examples/nexarm/` (`setup_turbovla.py`, `train_turbovla.py`, `rollout_turbovla.py`, `diagnose_turbovla.py`) and resolves the repo-root `TurboVLA/` directory. Multi-GPU and Slurm launchers are in `scripts/nexarm/`.
 
 ## User-Facing Guides
 
