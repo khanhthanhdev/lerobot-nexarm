@@ -25,8 +25,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from lerobot.nexarm_service.events import EventHub
-from lerobot.nexarm_service.servers import RemoteServer
+from nexarm_service.events import EventHub
+from nexarm_service.servers import RemoteServer
 
 logger = logging.getLogger(__name__)
 

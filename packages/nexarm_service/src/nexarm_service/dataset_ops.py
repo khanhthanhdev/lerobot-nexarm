@@ -13,7 +13,7 @@ from typing import Any
 
 import numpy as np
 
-from lerobot.nexarm_service.dataset_store import DatasetNotFoundError, DatasetStore, valid_repo_id
+from nexarm_service.dataset_store import DatasetNotFoundError, DatasetStore, valid_repo_id
 
 
 class DatasetEditError(ValueError):

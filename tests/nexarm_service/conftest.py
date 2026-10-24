@@ -10,8 +10,8 @@ import pytest
 
 pytest.importorskip("fastapi", reason="install lerobot[service]")
 
-from lerobot.nexarm_service import local_runner  # noqa: E402
-from lerobot.nexarm_service.app import create_app  # noqa: E402
+from nexarm_service import local_runner  # noqa: E402
+from nexarm_service.app import create_app  # noqa: E402
 from tests.nexarm_service.dataset_factory import make_dataset  # noqa: E402
 from tests.nexarm_service.live import LiveEngine  # noqa: E402
 

@@ -18,8 +18,8 @@ pytest.importorskip("serial", reason="pyserial is required (install lerobot[hard
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from lerobot.nexarm_service import API_VERSION  # noqa: E402
-from lerobot.nexarm_service.app import API_PREFIX, create_app, openapi_schema  # noqa: E402
+from nexarm_service import API_VERSION  # noqa: E402
+from nexarm_service.app import API_PREFIX, create_app, openapi_schema  # noqa: E402
 
 OPENAPI_SNAPSHOT = Path(__file__).parents[2] / "docs" / "service" / "openapi.json"
 
@@ -63,7 +63,7 @@ def test_profile_rejects_mismatched_or_unsafe_names(client):
 
 
 def test_ports_and_cameras_are_lists(client, monkeypatch):
-    monkeypatch.setattr("lerobot.nexarm_service.routes.system.list_cameras", lambda: [{"id": 0}])
+    monkeypatch.setattr("nexarm_service.routes.system.list_cameras", lambda: [{"id": 0}])
     assert isinstance(client.get(f"{API_PREFIX}/ports").json(), list)
     assert client.get(f"{API_PREFIX}/cameras").json() == [{"id": 0}]
 
@@ -93,7 +93,7 @@ EVENTS_SNAPSHOT = Path(__file__).parents[2] / "docs" / "service" / "events.json"
 
 
 def test_events_snapshot_is_fresh_and_covers_every_event_type():
-    from lerobot.nexarm_service.events import EVENT_SCHEMAS, EVENT_TYPES
+    from nexarm_service.events import EVENT_SCHEMAS, EVENT_TYPES
 
     committed = json.loads(EVENTS_SNAPSHOT.read_text(encoding="utf-8"))
     assert committed == EVENT_SCHEMAS, (
@@ -117,7 +117,7 @@ def test_every_event_the_engine_publishes_is_in_the_committed_schema():
     import re
     from pathlib import Path
 
-    import lerobot.nexarm_service as pkg
+    import nexarm_service as pkg
 
     schema = json.loads((Path(__file__).parents[2] / "docs/service/events.json").read_text())
     published = set()

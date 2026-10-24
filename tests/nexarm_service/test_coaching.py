@@ -19,10 +19,10 @@ pytest.importorskip("serial", reason="pyserial is required (install lerobot[hard
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from lerobot.nexarm_service.app import API_PREFIX, create_app  # noqa: E402
 from lerobot.rollout.configs import DAggerStrategyConfig  # noqa: E402
 from lerobot.rollout.strategies.dagger import DAggerEvents, DAggerPhase, DAggerStrategy  # noqa: E402
 from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES, map_follower_to_leader  # noqa: E402
+from nexarm_service.app import API_PREFIX, create_app  # noqa: E402
 from tests.nexarm_service.fakes import FakeBus, FakeFollower  # noqa: E402
 
 REST = [2000, 2100, 1900, 2050, 2048, 2000]

@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=71.0.0,<82.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nexarm_service"
+version = "0.1.0"
+description = "Local engine behind the NexArm desktop app (lerobot-nexarm-service): HTTP/WebSocket API over the NexArm plugins."
+license = "Apache-2.0"
+requires-python = ">=3.12"
+dependencies = [
+    "lerobot[dataset]",
+    "lerobot_robot_nexarm",
+    "lerobot_teleoperator_nexarm",
+    "fastapi>=0.115.0,<1.0.0",
+    "uvicorn>=0.30.0,<1.0.0",
+    "websockets>=13.0,<18.0",
+]
+
+[project.scripts]
+lerobot-nexarm-service = "nexarm_service.cli:main"
+
+[tool.uv.sources]
+lerobot = { workspace = true }
+lerobot_robot_nexarm = { workspace = true }
+lerobot_teleoperator_nexarm = { workspace = true }
+
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -49,21 +49,25 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
 
     if args.dump_events:
-        from lerobot.nexarm_service.events import EVENT_SCHEMAS
+        from nexarm_service.events import EVENT_SCHEMAS
 
         sys.stdout.write(json.dumps(EVENT_SCHEMAS, indent=2, sort_keys=True) + "\n")
         return
 
     if args.dump_openapi:
-        from lerobot.nexarm_service.app import openapi_schema
+        from nexarm_service.app import openapi_schema
 
         sys.stdout.write(json.dumps(openapi_schema(), indent=2, sort_keys=True) + "\n")
         return
 
     import uvicorn
 
-    from lerobot.nexarm_service.app import create_app
-    from lerobot.nexarm_service.auth import require_token_for_bind
+    from lerobot.utils.import_utils import register_third_party_plugins
+    from nexarm_service.app import create_app
+    from nexarm_service.auth import require_token_for_bind
+
+    # Policy checkpoints name their type (`turbovla`, `bspline`, ...); plugin types resolve only once imported.
+    register_third_party_plugins()
 
     require_token_for_bind(args.host, args.token)
     app = create_app(args.home, token=args.token)

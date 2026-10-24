@@ -11,10 +11,10 @@ touching serial ports.
 from typing import Any
 
 from lerobot.cameras.opencv import OpenCVCameraConfig
-from lerobot.nexarm_service.profiles import CameraProfile, RobotProfile
 from lerobot_robot_nexarm.motors import NexArmMotorsBus
 from lerobot_robot_nexarm.nexarm_follower import NexArmFollower, NexArmFollowerConfig
 from lerobot_teleoperator_nexarm import NexArmLeader, NexArmLeaderConfig
+from nexarm_service.profiles import CameraProfile, RobotProfile
 
 
 def opencv_camera_config(cam: CameraProfile) -> OpenCVCameraConfig:

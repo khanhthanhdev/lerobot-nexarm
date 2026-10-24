@@ -13,34 +13,34 @@ from typing import Any
 
 from fastapi import FastAPI
 
-from lerobot.nexarm_service import API_VERSION
-from lerobot.nexarm_service.auth import TokenAuthMiddleware
-from lerobot.nexarm_service.calibration import reset_non_identity_files
-from lerobot.nexarm_service.coaching import CoachingWorker
-from lerobot.nexarm_service.dataset_ops import DatasetOps
-from lerobot.nexarm_service.dataset_store import DatasetStore
-from lerobot.nexarm_service.events import EventHub
-from lerobot.nexarm_service.hardware_factory import Hardware
-from lerobot.nexarm_service.jobs import JobManager
-from lerobot.nexarm_service.local_runner import LocalRunner
-from lerobot.nexarm_service.models import ModelStore
-from lerobot.nexarm_service.operations import OperationRunner
-from lerobot.nexarm_service.profiles import ProfileStore, default_home
-from lerobot.nexarm_service.record import RecordingWorker
-from lerobot.nexarm_service.remote import RemoteRunner
-from lerobot.nexarm_service.remote_teleop import HostingWorker, RemoteOperatorWorker
-from lerobot.nexarm_service.replay import ReplayWorker
-from lerobot.nexarm_service.rollout import RolloutApi, RolloutWorker
-from lerobot.nexarm_service.routes import datasets, jobs, remote, sessions, system
-from lerobot.nexarm_service.session import (
+from lerobot.utils.constants import HF_LEROBOT_HOME
+from nexarm_service import API_VERSION
+from nexarm_service.auth import TokenAuthMiddleware
+from nexarm_service.calibration import reset_non_identity_files
+from nexarm_service.coaching import CoachingWorker
+from nexarm_service.dataset_ops import DatasetOps
+from nexarm_service.dataset_store import DatasetStore
+from nexarm_service.events import EventHub
+from nexarm_service.hardware_factory import Hardware
+from nexarm_service.jobs import JobManager
+from nexarm_service.local_runner import LocalRunner
+from nexarm_service.models import ModelStore
+from nexarm_service.operations import OperationRunner
+from nexarm_service.profiles import ProfileStore, default_home
+from nexarm_service.record import RecordingWorker
+from nexarm_service.remote import RemoteRunner
+from nexarm_service.remote_teleop import HostingWorker, RemoteOperatorWorker
+from nexarm_service.replay import ReplayWorker
+from nexarm_service.rollout import RolloutApi, RolloutWorker
+from nexarm_service.routes import datasets, jobs, remote, sessions, system
+from nexarm_service.session import (
     LEASE_TIMEOUT_S,
     SessionKind,
     SessionManager,
     Worker,
     WorkerFactory,
 )
-from lerobot.nexarm_service.teleop import TeleopWorker
-from lerobot.utils.constants import HF_LEROBOT_HOME
+from nexarm_service.teleop import TeleopWorker
 
 logger = logging.getLogger(__name__)
 

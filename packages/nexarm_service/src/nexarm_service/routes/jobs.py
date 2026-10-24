@@ -12,10 +12,10 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from starlette.background import BackgroundTask
 
-from lerobot.nexarm_service.dataset_store import DatasetNotFoundError
-from lerobot.nexarm_service.jobs import Job, MetricPoint, TrainRequest
-from lerobot.nexarm_service.models import ModelInfo
-from lerobot.nexarm_service.operations import Operation
+from nexarm_service.dataset_store import DatasetNotFoundError
+from nexarm_service.jobs import Job, MetricPoint, TrainRequest
+from nexarm_service.models import ModelInfo
+from nexarm_service.operations import Operation
 
 router = APIRouter()
 
@@ -112,7 +112,7 @@ def import_model(body: ModelImport, request: Request) -> Operation:
 @router.get("/jobs/{job_id}/checkpoints/{step}/archive", tags=["jobs"], response_class=FileResponse)
 def checkpoint_archive(job_id: str, step: str, request: Request) -> FileResponse:
     """A checkpoint's ``pretrained_model`` directory as a tar.gz (how remote training returns results)."""
-    from lerobot.nexarm_service.archive import pack
+    from nexarm_service.archive import pack
 
     state = request.app.state
     try:

@@ -22,10 +22,10 @@ from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisco
 from pydantic import BaseModel
 
 from lerobot import __version__
-from lerobot.nexarm_service import API_VERSION, CAPABILITIES
-from lerobot.nexarm_service.hardware import PortInfo, list_cameras, list_ports
-from lerobot.nexarm_service.profiles import RobotProfile, valid_name
-from lerobot.nexarm_service.servers import RemoteServer
+from nexarm_service import API_VERSION, CAPABILITIES
+from nexarm_service.hardware import PortInfo, list_cameras, list_ports
+from nexarm_service.profiles import RobotProfile, valid_name
+from nexarm_service.servers import RemoteServer
 
 router = APIRouter()
 
@@ -87,8 +87,8 @@ class ServerTest(BaseModel):
 @router.post("/servers/test", tags=["system"])
 def test_server(server: RemoteServer) -> ServerTest:
     """Open the SSH tunnel to a GPU server and ask its engine for its version; starts nothing remotely."""
-    from lerobot.nexarm_service import servers
-    from lerobot.nexarm_service.remote import RemoteClient, RemoteError
+    from nexarm_service import servers
+    from nexarm_service.remote import RemoteClient, RemoteError
 
     try:
         with servers.SshTunnel(server) as url:

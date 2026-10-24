@@ -15,10 +15,10 @@ pytest.importorskip("serial", reason="pyserial is required (install lerobot[hard
 from fastapi.testclient import TestClient  # noqa: E402
 from starlette.websockets import WebSocketDisconnect  # noqa: E402
 
-from lerobot.nexarm_service import auth, remote_teleop  # noqa: E402
-from lerobot.nexarm_service.app import API_PREFIX, create_app  # noqa: E402
-from lerobot.nexarm_service.safety import SOFT_LIMITS  # noqa: E402
 from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES  # noqa: E402
+from nexarm_service import auth, remote_teleop  # noqa: E402
+from nexarm_service.app import API_PREFIX, create_app  # noqa: E402
+from nexarm_service.safety import SOFT_LIMITS  # noqa: E402
 from tests.nexarm_service.fakes import FakeHardware  # noqa: E402
 from tests.nexarm_service.live import LiveEngine, wait_for  # noqa: E402
 

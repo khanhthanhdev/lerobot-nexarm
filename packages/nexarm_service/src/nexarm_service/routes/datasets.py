@@ -14,15 +14,15 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from starlette.background import BackgroundTask
 
-from lerobot.nexarm_service.dataset_ops import list_hub_datasets
-from lerobot.nexarm_service.dataset_store import (
+from nexarm_service.dataset_ops import list_hub_datasets
+from nexarm_service.dataset_store import (
     DatasetNotFoundError,
     DatasetSummary,
     EpisodeSummary,
     JointsData,
     valid_repo_id,
 )
-from lerobot.nexarm_service.operations import Operation
+from nexarm_service.operations import Operation
 
 router = APIRouter()
 
@@ -207,7 +207,7 @@ def modify_features(owner: str, name: str, body: ModifyFeatures, request: Reques
 
 @router.post("/datasets/{owner}/{name}/rename", tags=["datasets"])
 def rename(owner: str, name: str, body: NewName, request: Request) -> dict[str, Any]:
-    from lerobot.nexarm_service.dataset_ops import DatasetEditError
+    from nexarm_service.dataset_ops import DatasetEditError
 
     try:
         return request.app.state.dataset_ops.rename(f"{owner}/{name}", body.output_repo_id)
@@ -248,9 +248,9 @@ async def upload_archive(owner: str, name: str, request: Request, replace: bool 
     """
     from starlette.concurrency import run_in_threadpool
 
-    from lerobot.nexarm_service.archive import ArchiveError, extract
-    from lerobot.nexarm_service.dataset_store import TRANSFER_MARKER
-    from lerobot.nexarm_service.jobs import ACTIVE_STATES
+    from nexarm_service.archive import ArchiveError, extract
+    from nexarm_service.dataset_store import TRANSFER_MARKER
+    from nexarm_service.jobs import ACTIVE_STATES
 
     state = request.app.state
     repo = f"{owner}/{name}"
@@ -296,7 +296,7 @@ async def upload_archive(owner: str, name: str, request: Request, replace: bool 
 
 @router.get("/datasets/{owner}/{name}/archive", tags=["datasets"], response_class=FileResponse)
 def download_archive(owner: str, name: str, request: Request) -> FileResponse:
-    from lerobot.nexarm_service.archive import pack
+    from nexarm_service.archive import pack
 
     state = request.app.state
     try:

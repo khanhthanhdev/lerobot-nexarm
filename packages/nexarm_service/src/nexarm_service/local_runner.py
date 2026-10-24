@@ -13,8 +13,8 @@ import threading
 from pathlib import Path
 from typing import Any
 
-from lerobot.nexarm_service.dataset_store import DatasetStore
-from lerobot.nexarm_service.jobs import Job, JobRunner, JobSink
+from nexarm_service.dataset_store import DatasetStore
+from nexarm_service.jobs import Job, JobRunner, JobSink
 
 logger = logging.getLogger(__name__)
 

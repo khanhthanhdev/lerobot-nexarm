@@ -28,12 +28,12 @@ import time
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
 
-from lerobot.nexarm_service import API_VERSION
-from lerobot.nexarm_service.arm_worker import JOINT_PUBLISH_EVERY, ArmWorker, joint_update_payload
-from lerobot.nexarm_service.events import EventHub
-from lerobot.nexarm_service.profiles import RobotProfile
-from lerobot.nexarm_service.safety import clamp_action
 from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES
+from nexarm_service import API_VERSION
+from nexarm_service.arm_worker import JOINT_PUBLISH_EVERY, ArmWorker, joint_update_payload
+from nexarm_service.events import EventHub
+from nexarm_service.profiles import RobotProfile
+from nexarm_service.safety import clamp_action
 
 logger = logging.getLogger(__name__)
 

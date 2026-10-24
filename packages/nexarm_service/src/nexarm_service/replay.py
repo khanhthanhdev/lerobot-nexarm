@@ -12,12 +12,12 @@ the episode's opening pose (never jumped), and every action is clamped to the so
 import time
 from typing import Any
 
-from lerobot.nexarm_service.arm_worker import JOINT_PUBLISH_EVERY, ArmWorker, joint_update_payload
-from lerobot.nexarm_service.dataset_store import DatasetStore
-from lerobot.nexarm_service.events import EventHub
-from lerobot.nexarm_service.profiles import RobotProfile
-from lerobot.nexarm_service.safety import clamp_action, ramp_to
 from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES
+from nexarm_service.arm_worker import JOINT_PUBLISH_EVERY, ArmWorker, joint_update_payload
+from nexarm_service.dataset_store import DatasetStore
+from nexarm_service.events import EventHub
+from nexarm_service.profiles import RobotProfile
+from nexarm_service.safety import clamp_action, ramp_to
 
 
 class ReplayWorker(ArmWorker):

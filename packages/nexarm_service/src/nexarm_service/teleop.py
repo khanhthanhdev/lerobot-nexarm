@@ -7,10 +7,10 @@
 import time
 from typing import Any
 
-from lerobot.nexarm_service.arm_worker import JOINT_PUBLISH_EVERY, ArmWorker, joint_update_payload
-from lerobot.nexarm_service.events import EventHub
-from lerobot.nexarm_service.profiles import RobotProfile
-from lerobot.nexarm_service.safety import clamp_action
+from nexarm_service.arm_worker import JOINT_PUBLISH_EVERY, ArmWorker, joint_update_payload
+from nexarm_service.events import EventHub
+from nexarm_service.profiles import RobotProfile
+from nexarm_service.safety import clamp_action
 
 
 class TeleopWorker(ArmWorker):

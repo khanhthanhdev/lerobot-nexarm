@@ -9,8 +9,8 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from lerobot.nexarm_service.calibration import CalibrationReport, build_report
-from lerobot.nexarm_service.session import (
+from nexarm_service.calibration import CalibrationReport, build_report
+from nexarm_service.session import (
     SessionBusyError,
     SessionInfo,
     SessionKind,

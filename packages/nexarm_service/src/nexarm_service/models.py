@@ -11,7 +11,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from lerobot.nexarm_service.dataset_store import DatasetNotFoundError, DatasetStore
+from nexarm_service.dataset_store import DatasetNotFoundError, DatasetStore
 
 REQUIRED_ROBOT_TYPE = "nexarm_follower"
 _MODEL_ID_RE = re.compile(r"^[A-Za-z0-9][\w.-]*/[A-Za-z0-9][\w.-]*$")

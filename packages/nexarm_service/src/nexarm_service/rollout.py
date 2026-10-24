@@ -17,12 +17,12 @@ import time
 from pathlib import Path
 from typing import Any
 
-from lerobot.nexarm_service.arm_worker import JOINT_PUBLISH_EVERY, FollowerGuard, joint_update_payload
-from lerobot.nexarm_service.events import EventHub
-from lerobot.nexarm_service.hardware_factory import follower_config, leader_config
-from lerobot.nexarm_service.models import ModelStore
-from lerobot.nexarm_service.profiles import RobotProfile
-from lerobot.nexarm_service.safety import clamp_action
+from nexarm_service.arm_worker import JOINT_PUBLISH_EVERY, FollowerGuard, joint_update_payload
+from nexarm_service.events import EventHub
+from nexarm_service.hardware_factory import follower_config, leader_config
+from nexarm_service.models import ModelStore
+from nexarm_service.profiles import RobotProfile
+from nexarm_service.safety import clamp_action
 
 logger = logging.getLogger(__name__)
 

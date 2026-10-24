@@ -18,12 +18,12 @@ pytest.importorskip("serial", reason="pyserial is required (install lerobot[hard
 from fastapi.testclient import TestClient  # noqa: E402
 from pydantic import ValidationError  # noqa: E402
 
-from lerobot.nexarm_service import archive, servers  # noqa: E402
-from lerobot.nexarm_service.app import API_PREFIX, create_app  # noqa: E402
-from lerobot.nexarm_service.jobs import TrainRequest  # noqa: E402
-from lerobot.nexarm_service.models import describe_checkpoint  # noqa: E402
-from lerobot.nexarm_service.remote import RemoteClient, RemoteError, RemoteRunner, ensure_engine  # noqa: E402
-from lerobot.nexarm_service.servers import RemoteServer  # noqa: E402
+from nexarm_service import archive, servers  # noqa: E402
+from nexarm_service.app import API_PREFIX, create_app  # noqa: E402
+from nexarm_service.jobs import TrainRequest  # noqa: E402
+from nexarm_service.models import describe_checkpoint  # noqa: E402
+from nexarm_service.remote import RemoteClient, RemoteError, RemoteRunner, ensure_engine  # noqa: E402
+from nexarm_service.servers import RemoteServer  # noqa: E402
 from tests.nexarm_service.dataset_factory import make_dataset  # noqa: E402
 from tests.nexarm_service.remote_support import SERVER, make_local, remote_request  # noqa: E402
 

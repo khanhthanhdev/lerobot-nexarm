@@ -18,7 +18,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from lerobot.nexarm_service.events import EventHub
+from nexarm_service.events import EventHub
 
 logger = logging.getLogger(__name__)
 

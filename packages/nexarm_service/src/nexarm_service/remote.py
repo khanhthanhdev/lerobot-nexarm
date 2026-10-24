@@ -21,12 +21,12 @@ from typing import Any
 
 import httpx
 
-from lerobot.nexarm_service import API_VERSION
-from lerobot.nexarm_service.archive import extract, pack
-from lerobot.nexarm_service.dataset_store import DatasetStore
-from lerobot.nexarm_service.jobs import Job, JobRunner, JobSink
-from lerobot.nexarm_service.local_runner import kept_episodes
-from lerobot.nexarm_service.servers import RemoteServer, SshTunnel, start_engine_command
+from nexarm_service import API_VERSION
+from nexarm_service.archive import extract, pack
+from nexarm_service.dataset_store import DatasetStore
+from nexarm_service.jobs import Job, JobRunner, JobSink
+from nexarm_service.local_runner import kept_episodes
+from nexarm_service.servers import RemoteServer, SshTunnel, start_engine_command
 
 logger = logging.getLogger(__name__)
 

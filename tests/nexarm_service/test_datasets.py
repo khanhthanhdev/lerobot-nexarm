@@ -17,7 +17,7 @@ pytest.importorskip("serial", reason="pyserial is required (install lerobot[hard
 import cv2  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
-from lerobot.nexarm_service.app import API_PREFIX, create_app  # noqa: E402
+from nexarm_service.app import API_PREFIX, create_app  # noqa: E402
 from tests.nexarm_service.dataset_factory import make_dataset  # noqa: E402
 from tests.nexarm_service.fakes import FakeHardware  # noqa: E402
 

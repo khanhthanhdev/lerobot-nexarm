@@ -40,6 +40,7 @@ members = [
     "lerobot-policy-turbovla",
     "lerobot-robot-nexarm",
     "lerobot-teleoperator-nexarm",
+    "nexarm-service",
 ]
 
 [[package]]
@@ -3610,19 +3611,7 @@ serial-motors = [
     { name = "rustypot" },
 ]
 service = [
-    { name = "av" },
-    { name = "datasets" },
-    { name = "fastapi" },
-    { name = "jsonlines" },
-    { name = "lerobot-env-nexarm" },
-    { name = "lerobot-robot-nexarm" },
-    { name = "lerobot-teleoperator-nexarm" },
-    { name = "pandas" },
-    { name = "pyarrow" },
-    { name = "torchcodec", version = "0.11.1", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'arm64' and sys_platform == 'darwin') or (platform_machine == 'aarch64' and sys_platform == 'linux') or (platform_machine == 'arm64' and sys_platform == 'linux') or sys_platform == 'win32'" },
-    { name = "torchcodec", version = "0.11.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine == 'AMD64' and sys_platform == 'linux') or (platform_machine == 'x86_64' and sys_platform == 'linux')" },
-    { name = "uvicorn" },
-    { name = "websockets" },
+    { name = "nexarm-service" },
 ]
 smolvla = [
     { name = "accelerate" },
@@ -3726,7 +3715,6 @@ requires-dist = [
     { name = "einops", specifier = ">=0.8.0,<0.9.0" },
     { name = "faker", marker = "extra == 'sarm'", specifier = ">=33.0.0,<35.0.0" },
     { name = "fastapi", marker = "extra == 'phone'", specifier = "<1.0" },
-    { name = "fastapi", marker = "extra == 'service'", specifier = ">=0.115.0,<1.0.0" },
     { name = "filelock", specifier = ">=3.12.0,<4.0.0" },
     { name = "foxglove-sdk", marker = "extra == 'viz'", specifier = ">=0.25.1,<0.26.0" },
     { name = "fsspec", specifier = ">=2023.5.0,<2027.0.0" },
@@ -3768,7 +3756,6 @@ requires-dist = [
     { name = "lerobot", extras = ["dataset"], marker = "extra == 'libero'" },
     { name = "lerobot", extras = ["dataset"], marker = "extra == 'metaworld'" },
     { name = "lerobot", extras = ["dataset"], marker = "extra == 'pusht'" },
-    { name = "lerobot", extras = ["dataset"], marker = "extra == 'service'" },
     { name = "lerobot", extras = ["dataset"], marker = "extra == 'training'" },
     { name = "lerobot", extras = ["deepdiff-dep"], marker = "extra == 'hardware'" },
     { name = "lerobot", extras = ["dev"], marker = "extra == 'all'" },
@@ -3815,7 +3802,6 @@ requires-dist = [
     { name = "lerobot", extras = ["motorbridge-smart-servo-dep"], marker = "extra == 'rebot'" },
     { name = "lerobot", extras = ["multi-task-dit"], marker = "extra == 'all'" },
     { name = "lerobot", extras = ["nexarm"], marker = "extra == 'all'" },
-    { name = "lerobot", extras = ["nexarm"], marker = "extra == 'service'" },
     { name = "lerobot", extras = ["notebook"], marker = "extra == 'dev'" },
     { name = "lerobot", extras = ["openarms"], marker = "extra == 'all'" },
     { name = "lerobot", extras = ["peft"], marker = "extra == 'all'" },
@@ -3915,6 +3901,7 @@ requires-dist = [
     { name = "msgpack", marker = "extra == 'remote'", specifier = ">=1.1.0,<2.0.0" },
     { name = "mujoco", specifier = ">=3.8.1" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=2.0.0,<3.0.0" },
+    { name = "nexarm-service", marker = "extra == 'service'", editable = "packages/nexarm_service" },
     { name = "num2words", marker = "extra == 'smolvla'", specifier = ">=0.5.14,<0.6.0" },
     { name = "numpy", specifier = ">=2.0.0,<2.3.0" },
     { name = "onnx", marker = "extra == 'unitree-g1'", specifier = ">=1.16.0,<2.0.0" },
@@ -3969,9 +3956,7 @@ requires-dist = [
     { name = "tqdm", specifier = ">=4.66.0,<5.0.0" },
     { name = "transformers", marker = "extra == 'transformers-dep'", specifier = ">=5.4.0,<5.6.0" },
     { name = "turbovla", marker = "extra == 'turbovla'", git = "https://github.com/khanhthanhdev/TurboVLA?rev=28bc1e7e8cf259aacee4fd928258caa669cbaaae" },
-    { name = "uvicorn", marker = "extra == 'service'", specifier = ">=0.30.0,<1.0.0" },
     { name = "wandb", marker = "extra == 'training'", specifier = ">=0.24.0,<0.28.0" },
-    { name = "websockets", marker = "extra == 'service'", specifier = ">=13.0,<18.0" },
     { name = "xacro", marker = "extra == 'test'", specifier = ">=2.0.0,<3.0.0" },
 ]
 provides-extras = ["lancedb", "lancedb-convert", "dataset", "training", "hardware", "viz", "core-scripts", "evaluation", "dataset-viz", "av-dep", "pygame-dep", "placo-dep", "transformers-dep", "sentencepiece-dep", "grpcio-dep", "accelerate-dep", "can-dep", "peft-dep", "scipy-dep", "diffusers-dep", "qwen-vl-utils-dep", "matplotlib-dep", "pyserial-dep", "rustypot-dep", "deepdiff-dep", "pynput-dep", "pyzmq-dep", "motorbridge-dep", "motorbridge-smart-servo-dep", "timm-dep", "nexarm", "service", "serial-motors", "feetech", "dynamixel", "damiao", "robstride", "openarms", "gamepad", "hopejr", "lekiwi", "unitree-g1", "reachy2", "rebot", "kinematics", "intelrealsense", "phone", "diffusion", "wallx", "pi", "dm05", "molmoact2", "smolvla", "multi-task-dit", "groot", "sarm", "robometer", "topreward", "xvla", "eo1", "fastwam", "flux3", "evo1", "fineart-vla", "fineart-vla-kernels", "hilserl", "vla-jepa", "lingbot-va", "lingbot-vla-v2", "wall-oss-05", "lawam", "turbovla", "remote", "peft", "annotations", "dev", "notebook", "test", "video-benchmark", "aloha", "pusht", "libero", "metaworld", "all"]
@@ -5018,6 +5003,29 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/dc/76/3af777226b63a5e64a6b36b1ec5855c14e2b94a37096d4760e595fc43511/networkx-3.7.tar.gz", hash = "sha256:fd77a511bd90f39f3d016351345b52cf5319b813bdca01de3f755d3cca62e96a", size = 1866482, upload-time = "2026-09-21T16:45:16.974Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/7e/cd/fe58041e9011f307c490e3e17dd48cc516448f7c698a3f2d9d9d65d7e6a8/networkx-3.7-py3-none-any.whl", hash = "sha256:e3fd2c13a7814cee3746340d8d7f8598a67f16a58bf47fb7f8793fab6efca1b0", size = 2142205, upload-time = "2026-09-21T16:45:14.609Z" },
+]
+
+[[package]]
+name = "nexarm-service"
+version = "0.1.0"
+source = { editable = "packages/nexarm_service" }
+dependencies = [
+    { name = "fastapi" },
+    { name = "lerobot", extra = ["dataset"] },
+    { name = "lerobot-robot-nexarm" },
+    { name = "lerobot-teleoperator-nexarm" },
+    { name = "uvicorn" },
+    { name = "websockets" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fastapi", specifier = ">=0.115.0,<1.0.0" },
+    { name = "lerobot", extras = ["dataset"], editable = "." },
+    { name = "lerobot-robot-nexarm", editable = "packages/lerobot_robot_nexarm" },
+    { name = "lerobot-teleoperator-nexarm", editable = "packages/lerobot_teleoperator_nexarm" },
+    { name = "uvicorn", specifier = ">=0.30.0,<1.0.0" },
+    { name = "websockets", specifier = ">=13.0,<18.0" },
 ]
 
 [[package]]

@@ -184,7 +184,7 @@ timm-dep = ["timm>=1.0.0,<1.1.0"]
 # also installs them through the `nexarm` dependency group.
 nexarm = ["lerobot_robot_nexarm", "lerobot_teleoperator_nexarm", "lerobot_env_nexarm"]
 # Local engine behind the NexArm desktop app (lerobot-nexarm-service).
-service = ["lerobot[nexarm]", "lerobot[dataset]", "fastapi>=0.115.0,<1.0.0", "uvicorn>=0.30.0,<1.0.0", "websockets>=13.0,<18.0"]
+service = ["nexarm_service"]
 
 # Motors
 # rustypot drives Feetech and Dynamixel motors; pyserial is for `lerobot-find-port`, the first step of every
@@ -415,7 +415,6 @@ lerobot-edit-dataset="lerobot.scripts.lerobot_edit_dataset:main"
 lerobot-setup-can="lerobot.scripts.lerobot_setup_can:main"
 lerobot-annotate="lerobot.scripts.lerobot_annotate:main"
 lerobot-rollout="lerobot.scripts.lerobot_rollout:main"
-lerobot-nexarm-service="lerobot.nexarm_service.cli:main"
 lerobot-policy-server="lerobot.scripts.lerobot_policy_server:main"
 
 # ---------------- Tool Configurations ----------------
@@ -453,6 +452,7 @@ lerobot_policy_turbovla = { workspace = true }
 lerobot_env_nexarm = { workspace = true }
 lerobot_robot_nexarm = { workspace = true }
 lerobot_teleoperator_nexarm = { workspace = true }
+nexarm_service = { workspace = true }
 # Bump `rev` to a pushed TurboVLA commit. For local TurboVLA development, temporarily use
 # `turbovla = { path = "../TurboVLA", editable = true }` and never commit it (see docs/source/nexarm/turbovla_guide.md).
 turbovla = { git = "https://github.com/khanhthanhdev/TurboVLA", rev = "28bc1e7e8cf259aacee4fd928258caa669cbaaae" }
@@ -552,13 +552,12 @@ ignore = [
 "src/lerobot/__init__.py" = ["D"]
 "src/lerobot/__version__.py" = ["D"]
 # NexArm fork code that upstream's list does not cover; still on the old docstring style.
-"src/lerobot/nexarm_service/**" = ["D"]
 "packages/**" = ["D"]
 "sim/**" = ["D"]
 "plans/**" = ["D"]
 [tool.ruff.lint.isort]
 combine-as-imports = true
-known-first-party = ["lerobot", "lerobot_env_nexarm", "lerobot_robot_nexarm", "lerobot_teleoperator_nexarm"]
+known-first-party = ["lerobot", "lerobot_env_nexarm", "lerobot_robot_nexarm", "lerobot_teleoperator_nexarm", "nexarm_service"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"

@@ -9,15 +9,15 @@ import contextlib
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from lerobot.nexarm_service import API_VERSION
-from lerobot.nexarm_service.remote_teleop import (
+from nexarm_service import API_VERSION
+from nexarm_service.remote_teleop import (
     DEFAULT_FPS,
     JOINT_KEYS,
     HostingWorker,
     ProtocolError,
     parse_action,
 )
-from lerobot.nexarm_service.session import SessionKind, SessionState
+from nexarm_service.session import SessionKind, SessionState
 
 router = APIRouter()
 
