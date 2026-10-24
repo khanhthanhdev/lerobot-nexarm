@@ -137,6 +137,22 @@ Route (user left the choice to the maintainer, 2026-10-24): NexArm-side fallback
 | Per-stage success rates in `lerobot-eval`           | `lerobot-nexarm-sim-benchmark` (in `lerobot_env_nexarm`) reports the `stage/*` flags that `NexArmEnv` already puts in `info`. Plain `lerobot-eval` then reports `pc_success` only.                                                                                                                                                                      |
 | `local_files_only` in `LeRobotDataset` / metadata   | A NexArm helper that checks `meta/` and the episode files under `root` before building `LeRobotDataset` with `HF_HUB_OFFLINE=1`. `train_stack_bowls_act.py` and the TurboVLA plugin tests use it.                                                                                                                                                       |
 
+### Fallbacks done (2026-10-24)
+
+`git diff upstream/main -- src/lerobot` is empty. One commit per patch, each restoring its upstream files:
+
+| Patch                 | What replaced it                                                                                                                                                                                                                                                                                                      |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| junction, viz backend | Dropped. `sim/README.md` shows a one-line PyAV `visualize_dataset` call for the Windows TorchCodec case.                                                                                                                                                                                                              |
+| lazy `groot` imports  | Dropped with `tests/policies/test_optional_policy_imports.py`. Upstream's `groot/__init__.py` imports `cv2`, which the test blocked, but `opencv-python-headless` is a base dependency, so a normal install always has it.                                                                                            |
+| `local_files_only`    | `lerobot_robot_nexarm.local_dataset` checks `meta/` and the selected episodes' data and video files under `root`, then builds the upstream classes. No `HF_HUB_OFFLINE`: with a `root`, LeRobot only contacts the Hub when one of those files is missing. Tests in `tests/datasets/test_local_dataset.py`.            |
+| `--rerun_save_path`   | `lerobot_robot_nexarm.rerun_recording` calls upstream `init_rerun`, then sets a gRPC and a file sink. `record_collection.py` and `teleoperate.py` use it; `lerobot-nexarm-rollout` (also behind `examples/nexarm/rollout.py`) is `lerobot-rollout` plus the flag. Plain `lerobot-rollout` no longer takes it.         |
+| `manual_control`      | `recording_session.init_manual_keyboard_listener` sets the session events directly (no `quiet` flag needed). Its key test now also passes on Windows.                                                                                                                                                                 |
+| `robot_type`          | Not a wrapper post-fix: `NexArmSim.name` is now `nexarm_follower`, so upstream's `robot_type=robot.name` stamps the physical type in `lerobot-record`, `lerobot-rollout` and the service. `--robot.type=nexarm_sim` still selects the sim (config registry); no code dispatches on the robot's name.                  |
+| per-stage rates       | Not `lerobot-nexarm-sim-benchmark` (it only runs pick-and-place): `lerobot-nexarm-eval` is `lerobot-eval` that asks each env (via `VectorEnv.call`) to log its seeded episodes' final `stage/*` flags and adds `pc_<stage>` to `overall`, `per_group` and `per_task`. Plain `lerobot-eval` reports `pc_success` only. |
+
+`all` no longer includes `lerobot[nexarm]`; `uv sync` installs the plugins through the default `nexarm` group.
+
 After that:
 
 1. Replace `src/lerobot/` with a pinned `lerobot` (a release or a commit) in the root `pyproject.toml`.
@@ -148,6 +164,6 @@ After that:
 
 - `lerobot-find-joint-limits` and the HIL-SERL entry points (`rl/actor.py`, `rl/learner.py`, `rl/gym_manipulator.py`, `rl/eval_policy.py`) do not call `register_third_party_plugins()`, and upstream's don't either. `--robot.type=nexarm_*` therefore no longer parses there. No NexArm doc or example uses these commands, and adding the call would be a new core patch.
 - On Linux: `pytest tests -k nexarm`, `tests/nexarm_service` and `make test-nexarm-ete`.
-- Publishing: `all` includes `lerobot[nexarm]`, which now names workspace packages that are not on PyPI (as `turbovla` already did), so `release.yml`'s `lerobot[all]` wheel install would fail until the plugins are published or left out of `all`.
+- Publishing: done, `all` leaves the NexArm packages out. `--extra nexarm` and `--extra turbovla` still name packages that are not on PyPI, so they only work from this repo.
 - `Dockerfile.user` builds on Linux (2026-10-24, `marinelab`, from `86d7f4b5`, image 20.2 GB). Inside it, `register_third_party_plugins()` registers `nexarm_follower`, `nexarm_sim`, `mobile_bi_nexarm_sim`, `nexarm_leader`, env `nexarm` and policy `bspline`. `turbovla` is absent as expected: the `all` extra does not include the `turbovla` or `service` extras. `Dockerfile.internal` (CUDA base) has not been built.
 - The desktop app against the real arm: health, sessions, teleop and recording.

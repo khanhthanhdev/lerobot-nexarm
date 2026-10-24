@@ -10,18 +10,19 @@ This is the **Hiwonder NexArm** fork of LeRobot — focused exclusively on the H
 
 NexArm code is LeRobot plugins in `packages/` (uv workspace members, installed by plain `uv sync`). LeRobot's CLIs import them through `register_third_party_plugins()`; the registered type names are unchanged. Paths below are under `packages/<package>/src/<package>/`.
 
-| Path                                                           | What it does                                                                                      |
-| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `lerobot_robot_nexarm/motors/`                                 | CommProtocol UART framing, 6-servo sync read/write, torque, bridge mode (CMD 56/68/96/97/98)      |
-| `lerobot_robot_nexarm/nexarm_follower/`                        | `NexArmFollowerConfig` + `NexArmFollower` (`nexarm_follower`) — connect, observe, send_action     |
-| `lerobot_robot_nexarm/nexarm_sim/`                             | `NexArmSimConfig` + `NexArmSim` (`nexarm_sim`) — single-arm MuJoCo simulation                     |
-| `lerobot_robot_nexarm/mobile_bi_nexarm_sim/`                   | `MobileBiNexArmSimConfig` + `MobileBiNexArmSim` (`mobile_bi_nexarm_sim`) — bimanual mobile sim    |
-| `lerobot_robot_nexarm/{collection_merge,recording_session}.py` | Collection recording tools behind `examples/nexarm/record_collection.py`                          |
-| `lerobot_teleoperator_nexarm/`                                 | `NexArmLeaderConfig` + `NexArmLeader` (`nexarm_leader`) — read positions, leader→follower mapping |
-| `lerobot_env_nexarm/`                                          | `NexArmEnv` (`--env.type=nexarm`), the gym envs, and `lerobot-nexarm-sim-benchmark`               |
-| `nexarm_service/`                                              | Desktop-app engine (`lerobot-nexarm-service`, `--extra service`)                                  |
-| `sim/`                                                         | MuJoCo MJCF, URDF description, Isaac Lab configs, meshes, and exporters                           |
-| `examples/nexarm/`                                             | Ready-to-run scripts for teleoperate, record, and rollout                                         |
+| Path                                                           | What it does                                                                                                                |
+| -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `lerobot_robot_nexarm/motors/`                                 | CommProtocol UART framing, 6-servo sync read/write, torque, bridge mode (CMD 56/68/96/97/98)                                |
+| `lerobot_robot_nexarm/nexarm_follower/`                        | `NexArmFollowerConfig` + `NexArmFollower` (`nexarm_follower`) — connect, observe, send_action                               |
+| `lerobot_robot_nexarm/nexarm_sim/`                             | `NexArmSimConfig` + `NexArmSim` (`nexarm_sim`) — single-arm MuJoCo simulation                                               |
+| `lerobot_robot_nexarm/mobile_bi_nexarm_sim/`                   | `MobileBiNexArmSimConfig` + `MobileBiNexArmSim` (`mobile_bi_nexarm_sim`) — bimanual mobile sim                              |
+| `lerobot_robot_nexarm/{collection_merge,recording_session}.py` | Collection recording tools behind `examples/nexarm/record_collection.py`, incl. the manual-control keys                     |
+| `lerobot_robot_nexarm/{local_dataset,rerun_recording}.py`      | Local-only dataset loading; `.rrd` recording of the Rerun stream and `lerobot-nexarm-rollout`                               |
+| `lerobot_teleoperator_nexarm/`                                 | `NexArmLeaderConfig` + `NexArmLeader` (`nexarm_leader`) — read positions, leader→follower mapping                           |
+| `lerobot_env_nexarm/`                                          | `NexArmEnv` (`--env.type=nexarm`), the gym envs, `lerobot-nexarm-eval` (per-stage rates) and `lerobot-nexarm-sim-benchmark` |
+| `nexarm_service/`                                              | Desktop-app engine (`lerobot-nexarm-service`, `--extra service`)                                                            |
+| `sim/`                                                         | MuJoCo MJCF, URDF description, Isaac Lab configs, meshes, and exporters                                                     |
+| `examples/nexarm/`                                             | Ready-to-run scripts for teleoperate, record, and rollout                                                                   |
 
 ## Tech Stack
 
@@ -82,7 +83,7 @@ Run the full pre-commit suite before submitting changes. `pyproject.toml` owns R
 
 ## Scope of the Fork
 
-The hardware layers (`robots/`, `motors/`, `teleoperators/`) are no longer pruned: upstream's robots, motors and teleoperators are back, and the NexArm types are registered next to them. Edits to upstream files are limited to the `nexarm_*` registration imports plus a few generic patches listed in `plans/261024-0016-research-repo-reorganization/phase-02-upstream-sync-and-retire-core-edits.md`. The NexArm collection flags for recording (`--manual_control`, `--recording_log`, `--root_repo_id`, `--merge_root`, `--rerun_save_path`) live in the wrapper `examples/nexarm/record_collection.py`, not in `lerobot-record`. Upstream policies (`act`, `diffusion`, `smolvla`, `pi0*`, `groot`, ...) and simulation envs (`aloha`, `pusht`, `libero`, `metaworld`, ...) are still registered, and the `make test-end-to-end` targets still train on upstream `aloha` datasets.
+The hardware layers (`robots/`, `motors/`, `teleoperators/`) are no longer pruned: upstream's robots, motors and teleoperators are back, and the NexArm types are registered next to them. `src/lerobot/` matches upstream: the NexArm types register through the plugins, and the former core patches live in the plugins (`local_dataset`, `rerun_recording`, the manual-control keys in `recording_session`, `lerobot-nexarm-eval` for per-stage rates). Keep it that way; add NexArm behavior to `packages/`, not to `src/lerobot/`. The NexArm collection flags for recording (`--manual_control`, `--recording_log`, `--root_repo_id`, `--merge_root`, `--rerun_save_path`) live in the wrapper `examples/nexarm/record_collection.py`, not in `lerobot-record`. Upstream policies (`act`, `diffusion`, `smolvla`, `pi0*`, `groot`, ...) and simulation envs (`aloha`, `pusht`, `libero`, `metaworld`, ...) are still registered, and the `make test-end-to-end` targets still train on upstream `aloha` datasets.
 
 ## TurboVLA and B-spline Policy
 
