@@ -27,6 +27,7 @@ no images were rendered. Camera checks are pinhole projections.
 ## Findings (most severe first)
 
 ### 1. Bowls weigh 705 g each (high, verified)
+
 `sim/fusion_export/bowl_stack_scene.xml:42` (and the same line pattern for the blue and black bowls). Each bowl
 has 33 collision proxies at 1.818 g, which totals 60 g as intended. However, the visual mesh geom has no `mass`
 or `density`, so MuJoCo fills the mesh at the default density of 1000 kg/m³ and adds about 645 g. Measured body
@@ -36,6 +37,7 @@ Fix: set `mass="0"` (or `density="0"`) on the three `*_visual` geoms, or give th
 `<inertial>`.
 
 ### 2. The `ready` keyframe is in deep self-collision (medium, verified)
+
 `sim/description/mjcf/nexarm.xml:189` (and the identical `fusion_export/NexArm-sim.xml`). The pose
 `(0, -0.5236, 1.0472, -0.5236, 0)` folds the forearm back into the base. The jaws sit 31.5 mm inside `link_1`,
 and stepping from it leaves the elbow 111 mrad off target. The mirrored pose `(0, +0.5236, -1.0472, +0.5236, 0)`
@@ -44,13 +46,16 @@ MuJoCo viewer's "load key" does.
 Fix: flip the signs of joints 2–4 in that keyframe.
 
 ### 3. Keyframes break any scene with free objects (medium, verified)
+
 The keyframes declare 8 qpos values, but `scene.xml` has nq=15. MuJoCo zero-pads the rest, which places the cube
 at the world origin with an all-zero quaternion, 10 mm inside the base and the floor. The backend uses
 `mj_resetData`, so training is unaffected; only manual viewer use is.
 Fix: move the keyframes into each scene file with the full qpos, or drop them from the robot file.
 
 ### 4. Joint and gripper speeds are unlimited in the MJCF (medium, verified)
+
 `nexarm.xml` actuators set no velocity limit. Measured step responses:
+
 - Joint 1: peak 16 rad/s.
 - Joint 2: peak 12 rad/s.
 - Joint 5: peak 25 rad/s.
@@ -64,7 +69,9 @@ Fix: rate-limit the commanded target per physics step in the backend (servo spee
 `intvelocity` / velocity-clamped actuators.
 
 ### 5. Position actuators droop under gravity (low/medium, verified)
+
 The actuators are PD (kp plus kv) with no integral term, so gravity leaves a steady-state offset:
+
 - Joint 2: up to about 25 mrad (2.04 Nm / kp 80), roughly 16 servo ticks. A clean step from home to q2=1.0
   settled 9.8 mrad short.
 - Joint 3: up to about 18 mrad.
@@ -73,12 +80,14 @@ Real bus servos hold position more stiffly, so this is a pose-dependent offset b
 `kp_scale` in the calibration can absorb part of it, but only for fitted joints.
 
 ### 6. Duplicated asset trees (medium, maintainability, verified)
+
 `sim/description/mjcf/nexarm.xml` is byte-identical to `sim/fusion_export/NexArm-sim.xml` (after whitespace).
 `scene.xml` matches as well. `sim/description/urdf/nexarm.urdf` is identical to `sim/fusion_export/nexarm.urdf`.
 All 15 STLs in `sim/assets/meshes/visual/` are identical to those in `sim/fusion_export/meshes/` (about 18 MB
 checked in twice).
 
 Defaults disagree on which tree to use:
+
 - `NexArmSimConfig` and every example script default to `fusion_export/`.
 - The gym env defaults to `description/` (`envs/nexarm.py:37`).
 - `bowl_stack_scene.xml` exists only in `fusion_export/`.
@@ -98,21 +107,25 @@ explicit `meshdir` (or `assetdir`) in the including scene. Add a test that the e
 compile to the same model.
 
 ### 7. The four bowl meshes are the same file (low, verified)
+
 `bowl.stl`, `bowl_red.stl`, `bowl_blue.stl`, and `bowl_black.stl` share an md5 hash (`dd41ff8e…`, 1.6 MB each,
 both trees). Colour comes from materials. Fix: use one `bowl.stl` and drop the copies.
 
 ### 8. The default bowl scene spawns interpenetrating bowls (low, verified)
+
 In `bowl_stack_scene.xml`, the bowls sit 100 mm apart but are 133 mm wide. Loading the raw file gives 5.8 mm
 penetration, and the blue bowl ends up perched on the other two. Task reset repositions them, so only the viewer
 and `simulate.py` are affected. Fix: use the reset slot positions (±0.11, 0.14 m apart) in the XML.
 
 ### 9. URDF collision uses full CAD meshes, contradicting the docs (low, verified)
+
 `sim/assets/meshes/collision/README.md` says collisions use primitives "inside the URDF and MJCF". The MJCF does,
 but every URDF `<collision>` references the visual STL (up to 78 k faces for `link_1`). Isaac conversion uses
 `convex_decomp=False`, so each link becomes a single convex hull.
 Fix: port the MJCF primitives into the URDF/xacro, or correct the README.
 
 ### 10. Small parameter drift between the three model descriptions (low, verified)
+
 - Jaw damping: URDF 0.05 vs MJCF 0.01.
 - Jaw friction: URDF 0.02 vs MJCF 0.
 - Pinion damping: URDF 0.01 vs MJCF 0.08 (inherited from `childclass="nexarm"`).
@@ -120,22 +133,26 @@ Fix: port the MJCF primitives into the URDF/xacro, or correct the README.
 - Isaac disables self-collisions; MJCF enables them.
 
 ### 11. Self-collision is common across the commanded joint range (informational, verified)
+
 Of 3000 uniformly sampled poses within joint limits, 41% have more than 2 mm self-penetration. The most frequent
 pairs are `link_2`–`base_link` and `link_2`–`link_4`/`link_5`. The `link_2` capsule is undersized rather than generous: 5% of the mesh vertices lie 66 mm or more from its axis, against a 32 mm radius, so real self-contacts are, if anything, under-reported. Hardware also self-collides at the extremes, so this is expected, but the backend never
 rejects or warns on self-colliding targets, and position actuators will push through contacts with up to their
 full `forcerange`.
 
 ### 12. Camera intrinsics are not tied to real hardware (verify)
+
 `top` and `front` use fovy 55°, and `wrist` uses 92.2°. If `top` is a RealSense D435 colour stream, its vertical
 FOV is about 42°. `examples/nexarm/calibrate_camera_alignment.py` exists; confirm whether its output was folded
 back into the scene files.
 
 ### 13. The bowl grasp is not physical (informational)
+
 Both `grasp_mode`s in `stack_bowls_task.py:177` teleport the held bowl to the gripper every physics step
 (position only; orientation stays frozen). The docstring states this. Datasets generated this way do not teach
 grasp-force or slip behaviour.
 
 ### 14. Rendering tests fail instead of skipping when OpenGL is missing (low, verified)
+
 The single-arm sim suites ran with 83 passed and 9 failed. All 9 failures are `mujoco.FatalError: gladLoadGL
 error`, because this Windows Server host has no OpenGL driver. No failure points to a model defect. Tests that
 render (`test_backend_steps_and_renders`, `test_nexarm_env_*` pixel tests,
@@ -144,6 +161,7 @@ should skip when no GL context can be created, the same way hardware tests use s
 `tests/utils.py`.
 
 ### 15. Smaller asset gaps (low, verified)
+
 - `cam_mount` has no collision geom, so the camera bracket passes through objects and other links.
 - `floor` never uses the `groundplane` material, so the checker texture defined in both scenes goes unused.
 - Bowl collision walls are 11 mm-thick capsules, while the mesh wall is about 4 mm thick. This changes how deep

@@ -10,9 +10,11 @@ dependencies: []
 # Phase 1: Canonical asset tree
 
 ## Goal
+
 Load every single-arm consumer from `sim/description/`, with no symlinks and no duplicate models or meshes.
 
 ## Files to Create / Modify
+
 - Modify: `C:/Users/Administrator/code/lerobot-nexarm/sim/description/mjcf/nexarm.xml`: set `meshdir="../../assets/meshes/visual"`.
 - Modify: `C:/Users/Administrator/code/lerobot-nexarm/sim/description/urdf/nexarm.urdf` and `nexarm.urdf.xacro`: mesh paths become `../../assets/meshes/visual/<name>.stl`.
 - Delete: `sim/description/mjcf/meshes` and `sim/description/urdf/meshes` (both are symlinks).
@@ -40,6 +42,7 @@ Load every single-arm consumer from `sim/description/`, with no symlinks and no 
 - Create: `tests/robots/test_nexarm_sim_assets.py`.
 
 ## Tasks & Steps
+
 - [ ] Run `git grep -n fusion_export -- ':!plans'` and confirm that the list matches the files above before editing.
 - [ ] Repoint `meshdir` and the URDF mesh paths, then delete the two symlinks.
 - [ ] Move the bowl scene and collapse the bowl meshes to `bowl.stl`.
@@ -52,10 +55,12 @@ Load every single-arm consumer from `sim/description/`, with no symlinks and no 
   - [ ] No git symlink exists under `sim/` (`git ls-files -s sim | awk '$1==120000'` is empty).
 
 ## Verification
+
 - `uv run pytest tests/robots/test_nexarm_sim_assets.py tests/test_sim_exports.py -q`
 - `git grep -n "fusion_export" -- ':!plans' ':!sim/export_fusion_to_mujoco.py' ':!sim/exporter' ':!sim/run_export.py' ':!sim/README.md' ':!.gitignore'` returns nothing.
 - `uv run python sim/mobile_nexarm/generate_assets.py --check` reports only the known axis drift.
 
 ## Risk / rollback
+
 User scripts that pass `--model sim/fusion_export/...` will break; call this out in the commit message. Roll back
 by reverting the commit.

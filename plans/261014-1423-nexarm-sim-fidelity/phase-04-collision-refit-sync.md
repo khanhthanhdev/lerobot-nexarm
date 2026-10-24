@@ -10,16 +10,19 @@ dependencies: [3]
 # Phase 4: Collision refit, URDF/Isaac sync, GL skip
 
 ## Goal
+
 Collision primitives cover the link meshes, and the URDF and Isaac configs carry the same dynamics as the MJCF.
 Tests that need OpenGL skip cleanly when it is missing.
 
 ## Context
+
 - The `link_2` capsule (r 32 mm) is undersized: 5% of its mesh vertices lie 66 mm or more from its axis.
 - Self-contacts appear in 41% of random poses, but none at the IK grasp poses.
 - The URDF uses raw CAD meshes for collision.
 - Isaac imports with `convex_decomp=False`.
 
 ## Files to Create / Modify
+
 - Modify: `C:/Users/Administrator/code/lerobot-nexarm/sim/description/mjcf/nexarm.xml`: refit the arm-link collision primitives. Split `link_2` into 2–3 primitives if needed.
 - Modify: `sim/description/urdf/nexarm.urdf` and `nexarm.urdf.xacro`:
   - use the same primitive collisions;
@@ -35,6 +38,7 @@ Tests that need OpenGL skip cleanly when it is missing.
 - Create tests in `tests/robots/test_nexarm_sim_assets.py`: collision coverage, self-contact and URDF/MJCF agreement.
 
 ## Tasks & Steps
+
 - [ ] Measure the share of each link's mesh vertices that fall inside its collision geoms.
 - [ ] Refit the primitives until each arm link reaches at least 90% coverage, while keeping:
   - [ ] no self-contact at the keyframes and along the scripted IK trajectories;
@@ -49,15 +53,19 @@ Tests that need OpenGL skip cleanly when it is missing.
   - [ ] URDF joint damping equals MJCF joint damping.
 
 ## Verification
+
 - `uv run pytest tests -k "nexarm or sim_exports" -q` passes. On a host without OpenGL, the render tests are reported as skipped.
 - `uv run pre-commit run --all-files --show-diff-on-failure`
 
 ## Merge gate
+
 <!-- Updated: Validation Session 1 - user reviews collision fit in viewer -->
+
 The user reviews the refit collisions in the MuJoCo viewer (with group 3 visible) before merge. The implementer
 stops after this phase and asks for that review.
 
 ## Risk / rollback
+
 Primitives that are too fat block real poses. Validate on the scripted trajectories, not only on keyframes. The
 coverage fit cannot be checked visually here, so the user should look at it in the viewer
 (`uv run python examples/nexarm/simulate.py`) before merging. Roll back by reverting the commit.

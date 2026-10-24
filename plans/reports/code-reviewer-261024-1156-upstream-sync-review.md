@@ -23,13 +23,14 @@ There are two real problems:
 - **Code:** `init_rerun` calls `rr.save(path)` and then `rr.connect_grpc(...)` (remote viewer) or `rr.spawn(...)` (local viewer). In rerun 0.36 each of these calls replaces the recording's sink. The later call therefore drops the file sink, and everything logged after it goes only to the viewer.
 - **Evidence:** I ran a test script under `uv run --no-sync python -I` with rerun 0.36.3. It logs 200 scalars in three modes:
 
-  | Mode | File size |
-  | --- | --- |
-  | `save` only | 11748 B |
-  | `save` then `connect_grpc` | 3226 B (header only) |
-  | `rr.set_sinks(rr.GrpcSink(...), rr.FileSink(path))` | 11732 B |
+  | Mode                                                | File size            |
+  | --------------------------------------------------- | -------------------- |
+  | `save` only                                         | 11748 B              |
+  | `save` then `connect_grpc`                          | 3226 B (header only) |
+  | `rr.set_sinks(rr.GrpcSink(...), rr.FileSink(path))` | 11732 B              |
 
   The `spawn` path is inferred, not tested: `rr.spawn(connect=True)` calls `connect_grpc` internally.
+
 - **Who is affected:** every `--rerun_save_path` user:
   - `examples/nexarm/record_collection.py` (non-manual path through `_rerun_saved_to`, and `_record_manual`)
   - `examples/nexarm/record.py:90`
@@ -68,7 +69,7 @@ There are two real problems:
   - `sim/README.md:343-364`
   - `docs/source/nexarm/pipeline.md:54`
   - `SERVER_TRAINING_GUIDE.md:78`
-- **Failure scenario:** a user follows AGENT_GUIDE §4, records with `lerobot-record`, and sees no id. The follow-up replay, visualize and train commands need `<repo_id>_<YYYYMMDD_HHMMSS>`. The user has to guess it from `~/.cache/huggingface/lerobot/`.
+- **Failure scenario:** a user follows AGENT*GUIDE §4, records with `lerobot-record`, and sees no id. The follow-up replay, visualize and train commands need `<repo_id>*<YYYYMMDD_HHMMSS>`. The user has to guess it from `~/.cache/huggingface/lerobot/`.
 - **Severity:** Medium (documented workflow broken).
 - **Fix (either):**
   - Point those commands at `examples/nexarm/record_collection.py`, which accepts every `lerobot-record` flag.
@@ -141,15 +142,15 @@ The plan says "rerun-sdk 0.33.1 -> 0.36.3", but `main:uv.lock` already had 0.36.
 
 ## Tests run (Windows, CPU, `uv run --no-sync`)
 
-| Tests | Result |
-| --- | --- |
-| `tests/scripts/test_record_collection.py`, `tests/datasets/test_collection_merge.py`, `tests/scripts/test_prepare_collection.py` | 19 passed |
-| `tests/nexarm_service`, `tests/policies/test_optional_policy_imports.py`, `tests/utils/test_visualization_utils.py` | 133 passed |
-| `tests/envs/test_nexarm_env.py` | 28 passed, 4 failed (all `mujoco.FatalError: gladLoadGL`, the plan's known no-OpenGL environment) |
-| `tests/scripts/test_train_stack_bowls_act.py`, `tests/envs/test_nexarm_sim_gym_integration.py` | 4 passed, 2 failed (same OpenGL cause) |
-| `tests/datasets/test_lerobot_dataset.py -k local_files_only` | passed |
-| Scratch manual-path test (M2) | 2 passed |
-| Scratch rerun sink experiment (H1) | confirms the defect and the fix |
+| Tests                                                                                                                            | Result                                                                                            |
+| -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `tests/scripts/test_record_collection.py`, `tests/datasets/test_collection_merge.py`, `tests/scripts/test_prepare_collection.py` | 19 passed                                                                                         |
+| `tests/nexarm_service`, `tests/policies/test_optional_policy_imports.py`, `tests/utils/test_visualization_utils.py`              | 133 passed                                                                                        |
+| `tests/envs/test_nexarm_env.py`                                                                                                  | 28 passed, 4 failed (all `mujoco.FatalError: gladLoadGL`, the plan's known no-OpenGL environment) |
+| `tests/scripts/test_train_stack_bowls_act.py`, `tests/envs/test_nexarm_sim_gym_integration.py`                                   | 4 passed, 2 failed (same OpenGL cause)                                                            |
+| `tests/datasets/test_lerobot_dataset.py -k local_files_only`                                                                     | passed                                                                                            |
+| Scratch manual-path test (M2)                                                                                                    | 2 passed                                                                                          |
+| Scratch rerun sink experiment (H1)                                                                                               | confirms the defect and the fix                                                                   |
 
 ## Recommended actions (priority order)
 

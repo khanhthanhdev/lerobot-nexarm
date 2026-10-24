@@ -10,9 +10,11 @@ dependencies: [1]
 # Phase 2: Scene and object fixes
 
 ## Goal
+
 Scene objects have real masses, the scenes load collision-free, and keyframes work in every scene.
 
 ## Files to Create / Modify
+
 - Modify: `C:/Users/Administrator/code/lerobot-nexarm/sim/description/mjcf/bowl_stack_scene.xml`
   - Set `mass="0"` on each `bowl_*_visual` geom.
   - Set the `bowl_col` class mass to `0.0016667` (55 g ÷ 33 geoms).
@@ -31,6 +33,7 @@ Scene objects have real masses, the scenes load collision-free, and keyframes wo
 - Create tests in `tests/robots/test_nexarm_sim_assets.py`.
 
 ## Tasks & Steps
+
 - [ ] Fix the bowl masses. Assert that `body_mass` is 0.055 ± 1e-6 for each bowl.
 - [ ] Move the keyframes into the scenes, with `ready` = `(0, 0.5236, -1.0472, 0.5236, 0)` plus the gripper and object poses.
   - Check that the pose has no self-contact. If it does, search for a nearby collision-free pose and record it.
@@ -44,8 +47,10 @@ Scene objects have real masses, the scenes load collision-free, and keyframes wo
   - [ ] The raw bowl scene settles for 1 s with no bowl-bowl contact.
 
 ## Verification
+
 - `uv run pytest tests/robots/test_nexarm_sim_assets.py tests/robots/test_nexarm_stack_bowls.py -q`
 
 ## Risk / rollback
+
 Domain randomization scales the bowl mass around 55 g, which is intended. The bowl assist is kinematic, so
 existing bowl datasets stay valid. Roll back by reverting the commit.

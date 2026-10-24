@@ -4,11 +4,11 @@ Recorded on 2026-10-24 at commit `c96f8b20` (tag `pre-reorg`). Later phases comp
 
 ## Windows (this box, Windows Server 2022, CPU)
 
-| Command | Result |
-|---|---|
+| Command                                                                 | Result                            |
+| ----------------------------------------------------------------------- | --------------------------------- |
 | `uv run pytest tests -k nexarm -q --ignore=tests/utils/test_process.py` | 338 passed, 10 failed, 28 skipped |
-| `uv run pytest tests/nexarm_service -q` | 128 passed |
-| `make test-nexarm-ete` | not run: needs MuJoCo rendering |
+| `uv run pytest tests/nexarm_service -q`                                 | 128 passed                        |
+| `make test-nexarm-ete`                                                  | not run: needs MuJoCo rendering   |
 
 Without `--ignore`, collection fails: `tests/utils/test_process.py` uses `signal.SIGHUP`, which Windows does not have.
 
@@ -29,11 +29,11 @@ All 10 failures are environment problems (MuJoCo has no OpenGL context on this b
 
 Recorded on 2026-10-24 on `marinelab` (Ubuntu 24.04, RTX 5050 8 GB, `MUJOCO_GL=egl`), in fresh worktrees synced with `uv sync --locked --extra test --extra dev --extra viz --extra service --extra training` (the branch adds `--extra turbovla`). Without `--extra training`, `test_nexarm_train_eval_integration` fails because `accelerate` is missing.
 
-| Command | `pre-reorg` (`c96f8b20`) | `chore/upstream-sync` (`86d7f4b5`) |
-|---|---|---|
-| `uv run pytest tests -k nexarm -q` | 348 passed, 26 skipped | 348 passed, 26 skipped |
-| `uv run pytest tests/nexarm_service -q` | 128 passed | 128 passed |
-| `uv run pytest tests -k nexarm -q` at `255d29e5` (adds the 3 `_max_episode_steps` env tests) | n/a | 351 passed, 26 skipped |
-| `make test-nexarm-ete` | 3 passed | 3 passed |
+| Command                                                                                      | `pre-reorg` (`c96f8b20`) | `chore/upstream-sync` (`86d7f4b5`) |
+| -------------------------------------------------------------------------------------------- | ------------------------ | ---------------------------------- |
+| `uv run pytest tests -k nexarm -q`                                                           | 348 passed, 26 skipped   | 348 passed, 26 skipped             |
+| `uv run pytest tests/nexarm_service -q`                                                      | 128 passed               | 128 passed                         |
+| `uv run pytest tests -k nexarm -q` at `255d29e5` (adds the 3 `_max_episode_steps` env tests) | n/a                      | 351 passed, 26 skipped             |
+| `make test-nexarm-ete`                                                                       | 3 passed                 | 3 passed                           |
 
 On the branch, `uv run pytest policies packages tests/utils/test_rerun_save_path.py tests/scripts/test_record_collection.py` gives 26 passed. With `TURBOVLA_PARITY_DATASET_ROOT` pointing at a full download of `thanhkt/nexarm_stack_bowls@64ce8aeb`, the TurboVLA plugin tests give 14 passed; the 2 `[trained]` inference-parity cases do not apply to the only trained checkpoint on the server, which uses three cameras while that dataset has two.

@@ -22,16 +22,14 @@ import numpy as np
 import torch
 from PIL import Image, ImageDraw
 from tqdm import tqdm
+
 from lerobot.datasets.lerobot_dataset import LeRobotDataset
 from lerobot.utils.io_utils import write_video
 
 
 def tensor_to_rgb(tensor: torch.Tensor | np.ndarray) -> np.ndarray:
     """Convert (C, H, W) or (H, W, C) float [0, 1] or uint8 [0, 255] to RGB uint8."""
-    if isinstance(tensor, torch.Tensor):
-        img = tensor.detach().cpu().numpy()
-    else:
-        img = np.array(tensor)
+    img = tensor.detach().cpu().numpy() if isinstance(tensor, torch.Tensor) else np.array(tensor)
 
     if img.ndim == 3 and img.shape[0] in (1, 3):  # (C, H, W) -> (H, W, C)
         img = np.transpose(img, (1, 2, 0))
@@ -62,8 +60,7 @@ def export_episode(
 
     # Detect camera keys
     feature_cam_keys = [
-        k for k in dataset.features.keys()
-        if "image" in k or dataset.features[k].get("dtype") in ("image", "video")
+        k for k in dataset.features if "image" in k or dataset.features[k].get("dtype") in ("image", "video")
     ]
     # Preferred order
     cam_order = ["observation.images.front", "observation.images.wrist", "observation.images.top"]
@@ -99,10 +96,7 @@ def export_episode(
         else:
             # Target specific camera (e.g. 'front', 'wrist', 'top')
             matched = [img for k, img in cam_imgs.items() if camera.lower() in k.lower()]
-            if matched:
-                frame_arr = matched[0]
-            else:
-                frame_arr = next(iter(cam_imgs.values())) if cam_imgs else None
+            frame_arr = matched[0] if matched else next(iter(cam_imgs.values()), None)
 
         if frame_arr is None:
             continue
@@ -135,7 +129,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-id", default="local/nexarm_stack_bowls")
     parser.add_argument("--root", type=Path, default=Path("outputs/datasets/nexarm_stack_bowls"))
-    parser.add_argument("--episodes", type=int, nargs="+", default=[0], help="Episode indices to export (e.g. 0 1 2)")
+    parser.add_argument(
+        "--episodes", type=int, nargs="+", default=[0], help="Episode indices to export (e.g. 0 1 2)"
+    )
     parser.add_argument("--camera", default="all", help="Camera name ('all', 'front', 'wrist', 'top')")
     parser.add_argument("--output", type=Path, default=None, help="Specific output video file path")
     parser.add_argument("--output-dir", type=Path, default=Path("outputs/demo_videos"))

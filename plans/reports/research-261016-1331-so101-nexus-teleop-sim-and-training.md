@@ -9,16 +9,16 @@ The core idea: the simulator is wrapped as a **LeRobot `Robot`** (`SimSOFollower
 
 ### Pieces
 
-| Piece | File | Role |
-|---|---|---|
-| Leader factory | `src/so101_nexus/teleop/leader.py:113` | Stock LeRobot `SO101Leader(use_degrees=True)` over serial. Real leader calibration converts ticks → degrees (body) and 0–100 (gripper). |
-| Sim follower | `src/so101_nexus/lerobot_adapter/sim_follower.py:108` | `Robot` subclass registered as `sim_so_follower` (`sim_follower_config.py:12`). Owns a `gym.make(env_id)` env. |
-| Sim camera | `lerobot_adapter/sim_camera_config.py:10` | `CameraConfig` type `sim`; `source` = obs key (`wrist_camera`, `overhead_camera`) or `"render"` (side view). |
-| Unit conversion | `lerobot_adapter/normalization.py` | LeRobot units ↔ "motor ticks" ↔ sim radians, reusing LeRobot's own `FeetechMotorsBus._normalize/_unnormalize`. |
-| Synthetic calibration | `lerobot_adapter/synthetic_calibration.py:27` | Sim-only `MotorCalibration` JSON: mid = 2048, drive_mode 0, range sized from MJCF `ctrlrange`; gripper 0..4095. |
-| Recording loop | `teleop/recorder.py:385` | Countdown → per-step loop at fixed FPS. |
-| Dataset schema | `teleop/dataset.py:701` (`build_features`), `:750` (`build_frame`) | LeRobot v3 features. |
-| UI | `teleop/app.py` (Gradio walkthrough: setup → init → record → review → approve/discard → push) | Entry: `so101-nexus teleop` (`cli.py:32`). |
+| Piece                 | File                                                                                          | Role                                                                                                                                    |
+| --------------------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Leader factory        | `src/so101_nexus/teleop/leader.py:113`                                                        | Stock LeRobot `SO101Leader(use_degrees=True)` over serial. Real leader calibration converts ticks → degrees (body) and 0–100 (gripper). |
+| Sim follower          | `src/so101_nexus/lerobot_adapter/sim_follower.py:108`                                         | `Robot` subclass registered as `sim_so_follower` (`sim_follower_config.py:12`). Owns a `gym.make(env_id)` env.                          |
+| Sim camera            | `lerobot_adapter/sim_camera_config.py:10`                                                     | `CameraConfig` type `sim`; `source` = obs key (`wrist_camera`, `overhead_camera`) or `"render"` (side view).                            |
+| Unit conversion       | `lerobot_adapter/normalization.py`                                                            | LeRobot units ↔ "motor ticks" ↔ sim radians, reusing LeRobot's own `FeetechMotorsBus._normalize/_unnormalize`.                        |
+| Synthetic calibration | `lerobot_adapter/synthetic_calibration.py:27`                                                 | Sim-only `MotorCalibration` JSON: mid = 2048, drive_mode 0, range sized from MJCF `ctrlrange`; gripper 0..4095.                         |
+| Recording loop        | `teleop/recorder.py:385`                                                                      | Countdown → per-step loop at fixed FPS.                                                                                                 |
+| Dataset schema        | `teleop/dataset.py:701` (`build_features`), `:750` (`build_frame`)                            | LeRobot v3 features.                                                                                                                    |
+| UI                    | `teleop/app.py` (Gradio walkthrough: setup → init → record → review → approve/discard → push) | Entry: `so101-nexus teleop` (`cli.py:32`).                                                                                              |
 
 ### Unit chain (joint-space, the default)
 
@@ -40,7 +40,7 @@ hand-tuned correction is the wrist-roll offset (a UI slider).
 1. `leader.get_action()` → apply wrist-roll offset.
 2. `obs = follower.get_observation()` **before** stepping (so the frame is `(s_t, a_t, r_t)`).
    `observation.state` is **sim readback** converted back to LeRobot units, not the leader echo.
-3. `sent = follower.send_action(action)` → `env.step`; the *clipped* action actually sent is what
+3. `sent = follower.send_action(action)` → `env.step`; the _clipped_ action actually sent is what
    gets recorded as `action`.
 4. Store reward, `reward_components`, `success`, `done`, privileged `environment_state`, and
    wrist / overhead / side images.

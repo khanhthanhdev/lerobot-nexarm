@@ -6,11 +6,11 @@ What you expect to happen, and why.
 
 ## Data
 
-| Field | Value |
-|---|---|
-| Dataset `repo_id` | |
-| Revision | |
-| Episodes used | |
+| Field             | Value |
+| ----------------- | ----- |
+| Dataset `repo_id` |       |
+| Revision          |       |
+| Episodes used     |       |
 
 ## Command
 
@@ -25,10 +25,10 @@ Hub id, step and W&B run link.
 
 ## Results
 
-| Policy | Setting | Episodes | Success rate | Notes |
-|---|---|---|---|---|
-| | sim | 50 | | |
-| | real arm | 10 | | |
+| Policy | Setting  | Episodes | Success rate | Notes |
+| ------ | -------- | -------- | ------------ | ----- |
+|        | sim      | 50       |              |       |
+|        | real arm | 10       |              |       |
 
 ## Notes
 

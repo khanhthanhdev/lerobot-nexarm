@@ -18,6 +18,7 @@ Source review: `plans/reports/sim-review-261014-1356-nexarm-sim-assets.md`.
 ## Outcome
 
 The single-arm MuJoCo twin behaves like the real follower within known hardware specs:
+
 - servo speed, stiffness and torque match the Hiwonder HX servos;
 - objects have their real masses;
 - the model loads from one canonical asset tree on any OS.
@@ -66,13 +67,13 @@ Sim datasets and policies then see the same kinematic timing as hardware.
 
 ## Phases
 
-| # | Phase | Status | Effort | Depends on |
-|---|---|---|---|---|
-| 0 | [Real-to-sim joint mapping](phase-00-joint-mapping.md) | pending (needs a robot session) | 3h | — |
-| 1 | [Canonical asset tree](phase-01-canonical-asset-tree.md) | pending | 3h | — |
-| 2 | [Scene and object fixes](phase-02-scene-object-fixes.md) | pending | 2h | 1 |
-| 3 | [Servo model](phase-03-servo-model.md) | pending | 5h | 1, 2 |
-| 4 | [Collision refit, URDF/Isaac sync, GL skip](phase-04-collision-refit-sync.md) | pending | 4h | 3 |
+| #   | Phase                                                                         | Status                          | Effort | Depends on |
+| --- | ----------------------------------------------------------------------------- | ------------------------------- | ------ | ---------- |
+| 0   | [Real-to-sim joint mapping](phase-00-joint-mapping.md)                        | pending (needs a robot session) | 3h     | —          |
+| 1   | [Canonical asset tree](phase-01-canonical-asset-tree.md)                      | pending                         | 3h     | —          |
+| 2   | [Scene and object fixes](phase-02-scene-object-fixes.md)                      | pending                         | 2h     | 1          |
+| 3   | [Servo model](phase-03-servo-model.md)                                        | pending                         | 5h     | 1, 2       |
+| 4   | [Collision refit, URDF/Isaac sync, GL skip](phase-04-collision-refit-sync.md) | pending                         | 4h     | 3          |
 
 ## Acceptance criteria
 
@@ -114,16 +115,18 @@ Sim datasets and policies then see the same kinematic timing as hardware.
 ## Validation Log
 
 ### Session 1 (2026-10-14)
+
 Questions asked: 4, plus 3 decisions made before planning: speed cap, scope, canonical tree.
 
-| Topic | Decision | Propagated to |
-|---|---|---|
-| Gripper force | Start at the spec-derived 116 N. Lower it, or soften pads, only if the resting-cube pick slips or penetrates. | phase 3 |
-| Old sim datasets | Record `dynamics_model` in new dataset reports. Old datasets stay usable, and an append across dynamics warns. | phase 3 |
-| `sim/fusion_export/` | Untrack and gitignore it. The exporter still writes there for manual review. | phase 1 |
-| Collision refit | Keep it in the plan. The user reviews it in the viewer before merge. | phase 4 |
+| Topic                | Decision                                                                                                       | Propagated to |
+| -------------------- | -------------------------------------------------------------------------------------------------------------- | ------------- |
+| Gripper force        | Start at the spec-derived 116 N. Lower it, or soften pads, only if the resting-cube pick slips or penetrates.  | phase 3       |
+| Old sim datasets     | Record `dynamics_model` in new dataset reports. Old datasets stay usable, and an append across dynamics warns. | phase 3       |
+| `sim/fusion_export/` | Untrack and gitignore it. The exporter still writes there for manual review.                                   | phase 1       |
+| Collision refit      | Keep it in the plan. The user reviews it in the viewer before merge.                                           | phase 4       |
 
 ### Verification Results
+
 - Claims checked: 35 (file paths, symbols, test names, line references).
 - Verified: 35 | Failed: 0 | Unverified: 0. Tier: Standard (4 phases).
 - Gaps found and added before validation: `src/lerobot/motors/nexarm/kinematics_dynamics.py:92`,
@@ -132,19 +135,20 @@ Questions asked: 4, plus 3 decisions made before planning: speed cap, scope, can
 - `validate_source` compares only axes and ranges, so the servo-gain changes do not affect the mobile check.
 
 ### Whole-Plan Consistency Sweep
+
 - `dynamics_model` has one source (`SIM_DYNAMICS_MODEL` in `mujoco_backend.py`). Both the calibration and the
   dataset reports reference it.
 - The fusion_export decision is consistent across plan.md (decisions, non-goals) and phase 1 (files, `.gitignore`).
 - The gripper force figure (116 N) matches between plan.md hardware facts and phase 3.
 - No unresolved contradictions.
 
-
 ### Session 2 (2026-10-14): real dataset
+
 Source: `plans/reports/real-data-261014-1805-nexarm-stack-bowls-analysis.md`.
 
-| Topic | Decision | Propagated to |
-|---|---|---|
-| Speed cap | Fit per-joint caps from the real demos, only for saturating joints. `motion_speed` is not a real cap; confirmed on the 7 full-length (about 30 Hz) episodes despite frequent slow-loop warnings. | plan decisions, criterion 3, phase 3 |
-| Recording settings | All 163 episodes used `motion_speed=2000`, `motion_acc=100` (user). | plan decisions |
-| Replay metric | Use the task demos for criterion 7, excluding episodes 69–89. | criterion 7, phase 3 |
-| Camera | The dataset has no `top` stream; the D435i fovy still needs a `pyrealsense2` read. | non-goals removed, phase 2 unchanged |
+| Topic              | Decision                                                                                                                                                                                         | Propagated to                        |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------ |
+| Speed cap          | Fit per-joint caps from the real demos, only for saturating joints. `motion_speed` is not a real cap; confirmed on the 7 full-length (about 30 Hz) episodes despite frequent slow-loop warnings. | plan decisions, criterion 3, phase 3 |
+| Recording settings | All 163 episodes used `motion_speed=2000`, `motion_acc=100` (user).                                                                                                                              | plan decisions                       |
+| Replay metric      | Use the task demos for criterion 7, excluding episodes 69–89.                                                                                                                                    | criterion 7, phase 3                 |
+| Camera             | The dataset has no `top` stream; the D435i fovy still needs a `pyrealsense2` read.                                                                                                               | non-goals removed, phase 2 unchanged |
