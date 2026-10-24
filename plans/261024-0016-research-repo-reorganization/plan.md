@@ -21,15 +21,15 @@ Research behind this plan: [research-261024-0706-research-repo-layout-options.md
 
 ## Decisions so far
 
-| Decision | Choice | Source |
-|---|---|---|
-| Edits to upstream train/record | Not intended; you use LeRobot's abstractions. The existing edits get retired (phase 02) | User, 2026-10-24 |
-| What TurboVLA trains on | NexArm datasets now; other datasets for benchmarks later | User, 2026-10-24 |
-| B-spline Policy | Active research, port it | User, 2026-10-24 |
-| TurboVLA source | Stays its own repo, installed as a pinned dependency (no submodule) | Recommended, research report |
-| B-spline source | Ported into a LeRobot policy plugin; the `bspline-policy` fork (of `B-spline-policy/bspline-policy`, built on `diffusion_policy`) is reference only | Recommended; it is third-party code, not LeRobot code |
-| TurboVLA wrap | Inference first (phase 05), then training (phase 06) | Recommended |
-| Upstream | Add `upstream` remote, merge, retire core edits, then depend on upstream `lerobot` | Recommended |
+| Decision                       | Choice                                                                                                                                              | Source                                                |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| Edits to upstream train/record | Not intended; you use LeRobot's abstractions. The existing edits get retired (phase 02)                                                             | User, 2026-10-24                                      |
+| What TurboVLA trains on        | NexArm datasets now; other datasets for benchmarks later                                                                                            | User, 2026-10-24                                      |
+| B-spline Policy                | Active research, port it                                                                                                                            | User, 2026-10-24                                      |
+| TurboVLA source                | Stays its own repo, installed as a pinned dependency (no submodule)                                                                                 | Recommended, research report                          |
+| B-spline source                | Ported into a LeRobot policy plugin; the `bspline-policy` fork (of `B-spline-policy/bspline-policy`, built on `diffusion_policy`) is reference only | Recommended; it is third-party code, not LeRobot code |
+| TurboVLA wrap                  | Inference first (phase 05), then training (phase 06)                                                                                                | Recommended                                           |
+| Upstream                       | Add `upstream` remote, merge, retire core edits, then depend on upstream `lerobot`                                                                  | Recommended                                           |
 
 ## Target layout
 
@@ -52,17 +52,17 @@ lerobot-nexarm/
 
 ## Phases
 
-| # | Phase | Priority | Effort | Depends on | Status |
-|---|---|---|---|---|---|
-| 01 | [Housekeeping and baseline](./phase-01-housekeeping-and-baseline.md) | P1 | 2h | none | completed |
-| 02 | [Upstream sync and retire core edits](./phase-02-upstream-sync-and-retire-core-edits.md) | P1 | 2-3d | 01 | in-progress |
-| 03 | [Workspace and experiments layout](./phase-03-workspace-and-experiments-layout.md) | P1 | 3h | 02 | completed |
-| 04 | [TurboVLA as a pinned dependency](./phase-04-turbovla-pinned-dependency.md) | P1 | 0.5-1d | 03 | completed |
-| 05 | [TurboVLA policy plugin, inference](./phase-05-turbovla-policy-inference.md) | P1 | 2-3d | 04 | in-progress |
-| 06 | [TurboVLA training and LIBERO benchmark](./phase-06-turbovla-training-and-benchmark.md) | P2 | 3-5d + GPU | 05 | pending |
-| 07 | [B-spline Policy port](./phase-07-bspline-policy-port.md) | P2 | 3-5d + GPU | 03 | in-progress |
-| 08 | [NexArm plugins on upstream LeRobot](./phase-08-nexarm-plugins-on-upstream-lerobot.md) | P2 | 3-5d | 02, 05 | pending |
-| 09 | [Tools/examples split and docs sweep](./phase-09-tools-examples-split-and-docs.md) | P2 | 1d | 06, 07, 08 | pending |
+| #   | Phase                                                                                    | Priority | Effort     | Depends on | Status      |
+| --- | ---------------------------------------------------------------------------------------- | -------- | ---------- | ---------- | ----------- |
+| 01  | [Housekeeping and baseline](./phase-01-housekeeping-and-baseline.md)                     | P1       | 2h         | none       | completed   |
+| 02  | [Upstream sync and retire core edits](./phase-02-upstream-sync-and-retire-core-edits.md) | P1       | 2-3d       | 01         | in-progress |
+| 03  | [Workspace and experiments layout](./phase-03-workspace-and-experiments-layout.md)       | P1       | 3h         | 02         | completed   |
+| 04  | [TurboVLA as a pinned dependency](./phase-04-turbovla-pinned-dependency.md)              | P1       | 0.5-1d     | 03         | completed   |
+| 05  | [TurboVLA policy plugin, inference](./phase-05-turbovla-policy-inference.md)             | P1       | 2-3d       | 04         | in-progress |
+| 06  | [TurboVLA training and LIBERO benchmark](./phase-06-turbovla-training-and-benchmark.md)  | P2       | 3-5d + GPU | 05         | in-progress |
+| 07  | [B-spline Policy port](./phase-07-bspline-policy-port.md)                                | P2       | 3-5d + GPU | 03         | in-progress |
+| 08  | [NexArm plugins on upstream LeRobot](./phase-08-nexarm-plugins-on-upstream-lerobot.md)   | P2       | 3-5d       | 02, 05     | pending     |
+| 09  | [Tools/examples split and docs sweep](./phase-09-tools-examples-split-and-docs.md)       | P2       | 1d         | 06, 07, 08 | pending     |
 
 Phase 07 can run alongside 04-06. Phase 08 can start once phase 05 has shown the plugin pattern works.
 
