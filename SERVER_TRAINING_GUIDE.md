@@ -35,7 +35,7 @@ bash scripts/nexarm/setup_server.sh
 The script automatically:
 
 1. Installs or updates `uv`.
-2. Syncs the environment with PyTorch, CUDA, Transformers, DINOv3 (timm), Accelerate, and LeRobot.
+2. Syncs the environment with PyTorch, CUDA, Transformers, DINOv3 (timm), the pinned `turbovla` package, and LeRobot.
 3. Caches foundation models (`facebook/dinov3-vitb16-pretrain-lvd1689m` and `google-bert/bert-base-uncased`).
 
 The script syncs the full NexArm profile from [`run.md`, Dependency Profiles](run.md#dependency-profiles) plus `--extra turbovla`, which installs the pinned TurboVLA package. Use the same line on any other machine that trains or runs TurboVLA.
