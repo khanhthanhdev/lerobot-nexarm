@@ -1,7 +1,7 @@
 ---
 phase: 4
 title: "TurboVLA as a pinned dependency"
-status: pending
+status: completed
 priority: P1
 effort: "0.5-1d"
 dependencies: [3]
@@ -47,3 +47,10 @@ If TurboVLA does not work with numpy 2, keep the submodule for now and solve the
 - Core pins to change: `numpy>=1.26,<2`, `transformers>=4.56,<5`. `robosuite==1.4.1` and `tensorflow` are already in the `libero` extra, not core.
 - `turbovla/data/libero_rlds.py` and `turbovla/data/mixed_suite.py` import `tensorflow`, but tensorflow is not a core dependency. Keep those imports lazy, or keep them out of the import path used by `turbovla.models`.
 - `turbovla.models.configuration.TurboVLAConfig` is a dataclass made of `text`, `vision`, `interaction` and `action` sub-configs (`ActionHeadConfig`: `action_dim`, `state_dim`, `horizon`, ...). Alias it as `TurboVLAModelConfig` in phase 05.
+
+## Execution notes (2026-10-24)
+- TurboVLA side: branch `chore/lerobot-plugin-deps`, commit `28bc1e7e8cf259aacee4fd928258caa669cbaaae` (on `5082ece`, Transformers-5 BERT fix). Core pins `numpy>=2.0,<2.3`, `transformers>=5.4,<5.6`; only `turbovla*` is installed.
+- Here: `turbovla = ["lerobot[transformers-dep]", "turbovla"]` extra, git source pinned to that sha; `uv lock` resolves (347 packages). The submodule, its gitlink and the now-empty `.gitmodules` are gone; the old checkout was clean and its HEAD is on `origin/chore/lerobot-plugin-deps` (its git dir stays in `.git/modules/TurboVLA`).
+- Scripts import the installed package; `--turbovla-repo` and the `sys.path` inserts are removed from all four. `setup_turbovla.py` checks the installed package and no longer requires `accelerate` (not a TurboVLA dependency). `train_turbovla.py` gained `--sim-episodes` / `--real-episodes` to train on part of a dataset. Docs and `setup_server.sh` now use `--extra turbovla` instead of `--extra smolvla --extra groot`; local TurboVLA development is documented in `docs/source/nexarm/turbovla_guide.md`.
+- Verified on Windows: `uv sync --locked --extra turbovla --extra test --extra dev --inexact`; `turbovla.__file__` is in `.venv/Lib/site-packages`; `python -I -c "import experiments"` fails; `setup_turbovla.py --check-only` passes (no downloads: DINOv3 is gated). 20-step CPU smoke run of `train_turbovla.py` on `thanhkt/nexarm_stack_bowls` episodes 143-152 with `facebook/dinov2-with-registers-small` and `prajjwal1/bert-tiny` (+ bert-base tokenizer), batch 8, lr 3e-4: logged loss 0.545, 0.514, 0.482, 0.411, 0.381.
+- Not verified here: a fresh clone on Linux (`uv sync --extra turbovla` without submodule commands).

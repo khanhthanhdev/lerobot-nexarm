@@ -80,9 +80,9 @@ Run the full pre-commit suite before submitting changes. `pyproject.toml` owns R
 
 The hardware layers (`robots/`, `motors/`, `teleoperators/`) are no longer pruned: upstream's robots, motors and teleoperators are back, and the NexArm types are registered next to them. Edits to upstream files are limited to the `nexarm_*` registration imports plus a few generic patches listed in `plans/261024-0016-research-repo-reorganization/phase-02-upstream-sync-and-retire-core-edits.md`. The NexArm collection flags for recording (`--manual_control`, `--recording_log`, `--root_repo_id`, `--merge_root`, `--rerun_save_path`) live in the wrapper `examples/nexarm/record_collection.py`, not in `lerobot-record`. Upstream policies (`act`, `diffusion`, `smolvla`, `pi0*`, `groot`, ...) and simulation envs (`aloha`, `pusht`, `libero`, `metaworld`, ...) are still registered, and the `make test-end-to-end` targets still train on upstream `aloha` datasets.
 
-## Git Submodules and TurboVLA
+## TurboVLA and B-spline Policy
 
-`TurboVLA/` is a git submodule and is empty after a plain clone; run `git submodule update --init --recursive` before using it. B-spline Policy is not a submodule: it is the workspace plugin `policies/lerobot_policy_bspline/` (`--policy.type=bspline`), installed by plain `uv sync`. The TurboVLA workflow lives in `examples/nexarm/` (`setup_turbovla.py`, `train_turbovla.py`, `rollout_turbovla.py`, `diagnose_turbovla.py`) and resolves the repo-root `TurboVLA/` directory. Multi-GPU and Slurm launchers are in `scripts/nexarm/`.
+There are no git submodules. TurboVLA is the `turbovla` package from its own repo (<https://github.com/khanhthanhdev/TurboVLA>), pinned by commit in `[tool.uv.sources]` and installed by `uv sync --extra turbovla`. For local TurboVLA development, temporarily point that source at a checkout (`turbovla = { path = "../TurboVLA", editable = true }`) and never commit the change; see `docs/source/nexarm/turbovla_guide.md`. B-spline Policy is the workspace plugin `policies/lerobot_policy_bspline/` (`--policy.type=bspline`), installed by plain `uv sync`. The TurboVLA workflow lives in `examples/nexarm/` (`setup_turbovla.py`, `train_turbovla.py`, `rollout_turbovla.py`, `diagnose_turbovla.py`) and imports the installed package. Multi-GPU and Slurm launchers are in `scripts/nexarm/`.
 
 ## User-Facing Guides
 

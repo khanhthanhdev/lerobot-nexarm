@@ -17,10 +17,10 @@ For single-GPU training, real-robot collection and rollout, see [`pipeline.md`](
 
 ### What the simulation gives you
 
-| Task           | Generator                                          | Prompt                                                                         | Typical length |
-| -------------- | -------------------------------------------------- | ------------------------------------------------------------------------------ | -------------- |
-| Stack bowls    | `examples/nexarm/generate_stack_bowls_dataset.py`  | One of six bowl orders, e.g. _"Stack the bowls with red on bottom, blue in middle, and black on top."_ | ~340 frames    |
-| Pick and place | `examples/nexarm/generate_sim_dataset.py`          | _"Pick up the red cube, place it in the green target zone, and release it."_  | ~375 frames    |
+| Task           | Generator                                         | Prompt                                                                                                 | Typical length |
+| -------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | -------------- |
+| Stack bowls    | `examples/nexarm/generate_stack_bowls_dataset.py` | One of six bowl orders, e.g. _"Stack the bowls with red on bottom, blue in middle, and black on top."_ | ~340 frames    |
+| Pick and place | `examples/nexarm/generate_sim_dataset.py`         | _"Pick up the red cube, place it in the green target zone, and release it."_                           | ~375 frames    |
 
 Every episode records the `front`, `wrist` and `top` cameras (640 x 480, 30 FPS), the six joint positions as
 state, and the six joint targets as action, in raw servo units. Sim datasets use `robot_type="nexarm_follower"`,
@@ -41,9 +41,8 @@ forearm and closed gripper horizontal. Each dataset's `generation_report.json` r
 ### Install
 
 ```bash
-git submodule update --init TurboVLA
 uv sync --locked --extra test --extra dev --extra core_scripts --extra training --extra nexarm \
-    --extra intelrealsense --extra smolvla --extra groot
+    --extra intelrealsense --extra turbovla
 export MUJOCO_GL=egl
 ```
 
@@ -95,17 +94,17 @@ physics runs on the CPU, so more workers help only while CPU cores are free.
 
 Useful flags (both generators):
 
-| Flag                                     | Effect                                                                                                                 |
-| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `--episodes N`                           | Number of **accepted** episodes. Failed or low-quality attempts are dropped and logged with their reason.               |
-| `--max-attempts N`                       | Attempt budget, default 3 x `--episodes`. Acceptance is normally 90–100 %.                                              |
-| `--cameras front,wrist`                  | Two cameras instead of three (stack bowls). The policy must then run with the same two cameras.                         |
-| `--no-dr`                                | Turn off domain randomization (lighting, materials, camera jitter, dynamics, object friction and mass). Keep it on for training data. |
-| `--split eval`                           | Write a held-out set. Eval seeds start at 1,000,000 and never overlap the training seeds.                               |
-| `--resume`                               | Add episodes to an existing `--root`. Refused if the existing data used another joint mapping.                         |
-| `--calibration PATH`                     | Apply a fitted sim calibration (`sim_calibration.md`), including its action delay.                                      |
-| `--joint-mapping PATH`                   | Use a joint mapping measured on your follower with `probe_joint_mapping.py`.                                            |
-| `--no-video`                             | Store PNG frames instead of video (larger on disk, faster to decode).                                                   |
+| Flag                    | Effect                                                                                                                                |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `--episodes N`          | Number of **accepted** episodes. Failed or low-quality attempts are dropped and logged with their reason.                             |
+| `--max-attempts N`      | Attempt budget, default 3 x `--episodes`. Acceptance is normally 90–100 %.                                                            |
+| `--cameras front,wrist` | Two cameras instead of three (stack bowls). The policy must then run with the same two cameras.                                       |
+| `--no-dr`               | Turn off domain randomization (lighting, materials, camera jitter, dynamics, object friction and mass). Keep it on for training data. |
+| `--split eval`          | Write a held-out set. Eval seeds start at 1,000,000 and never overlap the training seeds.                                             |
+| `--resume`              | Add episodes to an existing `--root`. Refused if the existing data used another joint mapping.                                        |
+| `--calibration PATH`    | Apply a fitted sim calibration (`sim_calibration.md`), including its action delay.                                                    |
+| `--joint-mapping PATH`  | Use a joint mapping measured on your follower with `probe_joint_mapping.py`.                                                          |
+| `--no-video`            | Store PNG frames instead of video (larger on disk, faster to decode).                                                                 |
 
 A fresh run on an existing `--root` stops with an error; delete the folder or pass `--resume`.
 
@@ -308,16 +307,16 @@ rate, then on the real arm.
 
 ## Troubleshooting
 
-| Symptom                                                              | Fix                                                                                                                                  |
-| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| Generation fails to create an OpenGL context, or images are black    | `MUJOCO_GL=egl` is not set, or the driver has no EGL. Check `nvidia-smi` and that `libegl1` is installed.                            |
-| Generator: `Dataset already exists: <root>`                          | Delete the folder or pass `--resume`.                                                                                                |
-| Generator: `--resume` refused because of `joint_mapping`             | The folder was made with another mapping (e.g. before `servo_4096_v2`). Generate a new dataset in a new folder.                      |
-| Many `quality_*` or `ik_failed_*` rejects                            | The reasons are listed in `generation_report.json`. A fresh checkout of the models usually accepts 90–100 %; a big drop means the sim assets changed. |
-| `torchrun`: `Address already in use`                                 | Another run uses port 29500. Pass a different `--master_port`.                                                                       |
-| NCCL hangs at start                                                  | Try `NCCL_P2P_DISABLE=1`; on cloud machines also check `NCCL_SOCKET_IFNAME`.                                                         |
-| CUDA out of memory                                                   | Lower the per-GPU batch and raise gradient accumulation to keep the effective batch; for TurboVLA add `--freeze-vision`.             |
-| GPUs mostly idle, CPU at 100 %                                       | Video decoding is the bottleneck. Lower `--num-workers` per GPU if RAM is short, or generate with `--no-video`.                       |
-| TurboVLA: `Local sim dataset metadata not found`                     | `--sim-dataset-root` must be the folder that contains `meta/info.json`.                                                              |
-| TurboVLA: `TurboVLA repository not found`                            | Run `git submodule update --init TurboVLA`.                                                                                          |
-| ACT launcher: `Requested N GPUs, but only M are visible`             | `CUDA_VISIBLE_DEVICES` lists fewer GPUs than `--num-gpus`.                                                                           |
+| Symptom                                                           | Fix                                                                                                                                                   |
+| ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Generation fails to create an OpenGL context, or images are black | `MUJOCO_GL=egl` is not set, or the driver has no EGL. Check `nvidia-smi` and that `libegl1` is installed.                                             |
+| Generator: `Dataset already exists: <root>`                       | Delete the folder or pass `--resume`.                                                                                                                 |
+| Generator: `--resume` refused because of `joint_mapping`          | The folder was made with another mapping (e.g. before `servo_4096_v2`). Generate a new dataset in a new folder.                                       |
+| Many `quality_*` or `ik_failed_*` rejects                         | The reasons are listed in `generation_report.json`. A fresh checkout of the models usually accepts 90–100 %; a big drop means the sim assets changed. |
+| `torchrun`: `Address already in use`                              | Another run uses port 29500. Pass a different `--master_port`.                                                                                        |
+| NCCL hangs at start                                               | Try `NCCL_P2P_DISABLE=1`; on cloud machines also check `NCCL_SOCKET_IFNAME`.                                                                          |
+| CUDA out of memory                                                | Lower the per-GPU batch and raise gradient accumulation to keep the effective batch; for TurboVLA add `--freeze-vision`.                              |
+| GPUs mostly idle, CPU at 100 %                                    | Video decoding is the bottleneck. Lower `--num-workers` per GPU if RAM is short, or generate with `--no-video`.                                       |
+| TurboVLA: `Local sim dataset metadata not found`                  | `--sim-dataset-root` must be the folder that contains `meta/info.json`.                                                                               |
+| TurboVLA: `No module named 'turbovla'`                            | Add `--extra turbovla` to the `uv sync` line.                                                                                                         |
+| ACT launcher: `Requested N GPUs, but only M are visible`          | `CUDA_VISIBLE_DEVICES` lists fewer GPUs than `--num-gpus`.                                                                                            |

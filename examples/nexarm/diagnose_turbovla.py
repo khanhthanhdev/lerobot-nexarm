@@ -71,9 +71,6 @@ def main():
     parser.add_argument("--dataset-root", type=Path, required=True)
     parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument("--stats-path", type=Path)
-    parser.add_argument(
-        "--turbovla-repo", type=Path, default=Path(__file__).resolve().parents[2] / "TurboVLA"
-    )
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     parser.add_argument("--samples-per-group", type=int, default=24)
     parser.add_argument("--gripper-threshold", type=float, default=DEFAULT_GRIPPER_THRESHOLD)
@@ -92,7 +89,7 @@ def main():
     from lerobot.datasets.lerobot_dataset import LeRobotDataset, LeRobotDatasetMetadata
 
     runner = TurboVLAPolicyRunner(
-        args.checkpoint, args.turbovla_repo, args.stats_path, device=args.device, binarize_gripper=False
+        args.checkpoint, args.stats_path, device=args.device, binarize_gripper=False
     )
     if not runner.stats:
         raise ValueError("Checkpoint normalization statistics are required for this diagnostic")

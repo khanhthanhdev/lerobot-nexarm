@@ -15,8 +15,6 @@ import argparse
 import sys
 from pathlib import Path
 
-DEFAULT_TURBOVLA_DIR = Path(__file__).resolve().parents[2] / "TurboVLA"
-
 
 def check_dependencies() -> bool:
     print("[1/3] Checking core Python dependencies...")
@@ -27,7 +25,6 @@ def check_dependencies() -> bool:
         ("transformers", "Hugging Face Transformers"),
         ("timm", "PyTorch Image Models (timm)"),
         ("safetensors", "SafeTensors"),
-        ("accelerate", "Hugging Face Accelerate"),
         ("lerobot", "LeRobot"),
     ]
 
@@ -55,22 +52,18 @@ def check_dependencies() -> bool:
     except Exception as e:
         print(f"  ℹ Torch GPU check skipped: {e}")
 
-    # Check TurboVLA package import
-    if DEFAULT_TURBOVLA_DIR.exists():
-        sys.path.insert(0, str(DEFAULT_TURBOVLA_DIR))
-        try:
-            from turbovla.models import TurboVLAConfig
+    # Check the installed TurboVLA package (the `turbovla` extra)
+    try:
+        import turbovla
+        from turbovla.models import TurboVLAConfig
 
-            cfg = TurboVLAConfig()
-            cfg.vision.num_views = 2
-            cfg.action.action_dim = 6
-            cfg.action.state_dim = 6
-            print(f"  ✓ TurboVLA package found at {DEFAULT_TURBOVLA_DIR}")
-        except Exception as e:
-            print(f"  ✗ Failed to import TurboVLA from {DEFAULT_TURBOVLA_DIR}: {e}")
-            all_ok = False
-    else:
-        print(f"  ✗ TurboVLA submodule not found at {DEFAULT_TURBOVLA_DIR}")
+        cfg = TurboVLAConfig()
+        cfg.vision.num_views = 2
+        cfg.action.action_dim = 6
+        cfg.action.state_dim = 6
+        print(f"  ✓ TurboVLA package installed at {Path(turbovla.__file__).parent}")
+    except ImportError as e:
+        print(f"  ✗ TurboVLA package missing ({e}); install it with `uv sync --extra turbovla`.")
         all_ok = False
 
     return all_ok
@@ -188,7 +181,7 @@ def main() -> int:
             return 0
         else:
             print(
-                "Status: Some dependencies are missing. Run `uv sync --locked --extra test --extra dev --extra core_scripts --extra training --extra nexarm --extra intelrealsense --extra smolvla --extra groot`."
+                "Status: Some dependencies are missing. Run `uv sync --locked --extra test --extra dev --extra core_scripts --extra training --extra nexarm --extra intelrealsense --extra turbovla`."
             )
             return 1
 

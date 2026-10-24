@@ -124,7 +124,7 @@ Install the full NexArm profile (simulation data generation, real collection and
 uv sync --locked --extra test --extra dev --extra core_scripts --extra training --extra nexarm --extra intelrealsense
 ```
 
-Add policy extras to that line (TurboVLA: `--extra smolvla --extra groot`), or use `--extra all` for everything. `uv sync` uninstalls extras you do not list. The full table is in [`run.md`, Dependency Profiles](run.md#dependency-profiles).
+Add policy extras to that line (TurboVLA: `--extra turbovla`), or use `--extra all` for everything. `uv sync` uninstalls extras you do not list. The full table is in [`run.md`, Dependency Profiles](run.md#dependency-profiles).
 
 > **Important**: Always run commands through `uv run <command>` (e.g. `uv run python ...` or `uv run lerobot-train`). Do not manually activate the `.venv` or install packages with `pip`.
 

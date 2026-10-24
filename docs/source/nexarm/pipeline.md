@@ -14,7 +14,7 @@ All stages use up to three RGB cameras. Names must match between collection, tra
 
 All are 640x480 at 30 FPS. The `top` camera is on by default everywhere (real collection, record, teleoperate, rollout, `inference.yaml`, simulation); pass `--no-top-cam` to run with `front` and `wrist` only. A policy must be given exactly the cameras it was trained on: `rollout.py` and `rollout_turbovla.py` exit at startup when the opened cameras differ from the policy's image inputs. Legacy 2-camera models and datasets (for example `thanhkt/nexarm_stack_bowls`) need `--no-top-cam`.
 
-Install: use the full NexArm profile from [`run.md`, Dependency Profiles](../../../run.md#dependency-profiles), which includes `intelrealsense`. Add `--extra smolvla --extra groot` to it for TurboVLA. `uv sync` removes extras you do not list, so do not sync a smaller set.
+Install: use the full NexArm profile from [`run.md`, Dependency Profiles](../../../run.md#dependency-profiles), which includes `intelrealsense`. Add `--extra turbovla` to it for TurboVLA. `uv sync` removes extras you do not list, so do not sync a smaller set.
 
 ## 1. Data collection
 

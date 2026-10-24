@@ -32,7 +32,6 @@ import argparse
 import json
 import os
 import platform
-import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -66,7 +65,6 @@ except ModuleNotFoundError:
         check_policy_cameras,
     )
 
-DEFAULT_TURBOVLA_DIR = Path(__file__).resolve().parents[2] / "TurboVLA"
 # Raw gripper position between GRIPPER_OPEN_POS and GRIPPER_CLOSED_POS that separates open from closed.
 DEFAULT_GRIPPER_THRESHOLD = 1800.0
 DEFAULT_IMAGE_SIZE = 224
@@ -174,12 +172,6 @@ def parse_args(argv=None):
         help="Path to stats_turbovla.json or stats_gr00t.json for unnormalization (auto-detected if in checkpoint dir)",
     )
     parser.add_argument(
-        "--turbovla-repo",
-        type=Path,
-        default=DEFAULT_TURBOVLA_DIR if DEFAULT_TURBOVLA_DIR.exists() else Path("/home/25thanh.tk/TurboVLA"),
-        help="Path to TurboVLA repository",
-    )
-    parser.add_argument(
         "--task",
         default=None,
         help="Language prompt (default: the prompt saved with the checkpoint; in the stack-bowls sim, "
@@ -262,7 +254,6 @@ class TurboVLAPolicyRunner:
     def __init__(
         self,
         checkpoint_path: Path | str,
-        turbovla_repo: Path | str,
         stats_path: Path | None,
         device: str = "cuda",
         bert_path: str | None = None,
@@ -276,9 +267,6 @@ class TurboVLAPolicyRunner:
         self.gripper_threshold = gripper_threshold
         self.debug_actions = debug_actions
         checkpoint_path = Path(checkpoint_path)
-        turbovla_repo = Path(turbovla_repo)
-        sys.path.insert(0, str(turbovla_repo))
-        sys.path.insert(0, str(turbovla_repo / "third_party" / "starvla_runtime"))
 
         from transformers import AutoImageProcessor
         from turbovla.models import TurboVLAConfig, build_turbovla
@@ -615,7 +603,6 @@ def main():
     args = parse_args()
     runner = TurboVLAPolicyRunner(
         checkpoint_path=args.checkpoint,
-        turbovla_repo=args.turbovla_repo,
         stats_path=args.stats_path,
         device=args.device,
         bert_path=args.bert_path,

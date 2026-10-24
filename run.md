@@ -78,7 +78,7 @@ Add extras to that line instead of syncing a smaller set:
 
 | Workflow                                | Add                                |
 | --------------------------------------- | ---------------------------------- |
-| TurboVLA (`train_turbovla.py`, rollout) | `--extra smolvla --extra groot`    |
+| TurboVLA (`train_turbovla.py`, rollout) | `--extra turbovla`                 |
 | Benchmarking pi0 / SmolVLA checkpoints  | `--extra pi --extra smolvla`       |
 | Diffusion policy                        | `--extra diffusion`                |
 | Everything (all policies and tools)     | use `uv sync --locked --extra all` |
@@ -468,7 +468,7 @@ uv run python examples/nexarm/rollout_turbovla.py \
     --checkpoint outputs/train/nexarm_turbovla/final_ema_pytorch_model.pt
 ```
 
-TurboVLA needs `--extra smolvla --extra groot` added to the [full profile](#dependency-profiles). The checkpoint's `config.json` stores the task type, camera keys, image size, fps and training prompt, and rollout uses them; in the stack-bowls sim the prompt follows the sampled bowl order, so omit `--task`. Real data, co-training and real-robot rollout are in [`turbovla_guide.md`](docs/source/nexarm/turbovla_guide.md).
+TurboVLA needs `--extra turbovla` added to the [full profile](#dependency-profiles). The checkpoint's `config.json` stores the task type, camera keys, image size, fps and training prompt, and rollout uses them; in the stack-bowls sim the prompt follows the sampled bowl order, so omit `--task`. Real data, co-training and real-robot rollout are in [`turbovla_guide.md`](docs/source/nexarm/turbovla_guide.md).
 
 ### 4.5 Deploy & Rollout Trained Policy
 

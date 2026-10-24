@@ -21,8 +21,8 @@ This guide covers setting up, training, and deploying **TurboVLA** (Vision-Langu
 Verify your environment dependencies and cache base foundation models:
 
 ```bash
-# 1. Install the full NexArm profile (run.md, Dependency Profiles) plus the TurboVLA extras
-uv sync --locked --extra test --extra dev --extra core_scripts --extra training --extra nexarm --extra intelrealsense --extra smolvla --extra groot
+# 1. Install the full NexArm profile (run.md, Dependency Profiles) plus the TurboVLA extra
+uv sync --locked --extra test --extra dev --extra core_scripts --extra training --extra nexarm --extra intelrealsense --extra turbovla
 
 # 2. Check health and download vision/language backbones
 uv run python examples/nexarm/setup_turbovla.py --download-backbones
@@ -31,7 +31,18 @@ uv run python examples/nexarm/setup_turbovla.py --download-backbones
 uv run python examples/nexarm/setup_turbovla.py --download-pretrained
 ```
 
-`setup_turbovla.py` and `scripts/nexarm/setup_server.sh` mention only `--extra smolvla --extra training --extra groot`; on a machine that also records or rolls out on the real arm, keep the full line above, because `uv sync` removes extras you do not list.
+`--extra turbovla` installs the `turbovla` model package from <https://github.com/khanhthanhdev/TurboVLA>, pinned to one commit in the root `pyproject.toml` (`[tool.uv.sources]`). Keep the full line above, because `uv sync` removes extras you do not list.
+
+### Developing TurboVLA locally
+
+To test changes to TurboVLA itself, clone it next to this repo and point the source at the clone for the time being:
+
+```toml
+# pyproject.toml, [tool.uv.sources]: temporary, never commit this line
+turbovla = { path = "../TurboVLA", editable = true }
+```
+
+Then run `uv sync` with the same extras. An editable install can put the whole TurboVLA checkout on `sys.path`, which makes its repo-only folders (`experiments`, `deployment`) importable. Check with `uv run python -I -c "import experiments"`; it must fail. If it does not, reinstall with `uv sync --reinstall-package turbovla --config-settings editable_mode=strict` (same extras). When the change works, push it to TurboVLA, set `rev` to the pushed commit, restore the `git` source, run `uv lock` and commit `pyproject.toml` and `uv.lock`.
 
 ---
 

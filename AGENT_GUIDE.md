@@ -68,7 +68,7 @@ Use the canonical full NexArm profile from [`run.md`, Dependency Profiles](./run
 
 ```bash
 uv sync --locked --extra test --extra dev --extra core_scripts --extra training --extra nexarm --extra intelrealsense
-# Add to that line: --extra diffusion (Diffusion), --extra smolvla (SmolVLA), --extra smolvla --extra groot (TurboVLA)
+# Add to that line: --extra diffusion (Diffusion), --extra smolvla (SmolVLA), --extra turbovla (TurboVLA)
 
 git lfs install && git lfs pull
 uv run hf auth login                         # required to push datasets/policies

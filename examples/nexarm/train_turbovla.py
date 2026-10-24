@@ -43,7 +43,6 @@ import argparse
 import json
 import math
 import os
-import sys
 import time
 from pathlib import Path
 from typing import Any
@@ -58,7 +57,6 @@ from torch.optim.lr_scheduler import LambdaLR
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-DEFAULT_TURBOVLA_DIR = Path(__file__).resolve().parents[2] / "TurboVLA"
 DEFAULT_SIM_DATASET_ROOT = Path("outputs/datasets/nexarm_stack_bowls")
 TASK_TYPES = ("pick_place", "stack_bowls")
 
@@ -130,6 +128,14 @@ def parse_args():
         default=None,
         help="Hugging Face repo_id of the real-world dataset (downloaded if --real-dataset-root is unset)",
     )
+    for domain in ("sim", "real"):
+        parser.add_argument(
+            f"--{domain}-episodes",
+            type=int,
+            nargs="+",
+            default=None,
+            help=f"Episode indices of the {domain} dataset to train on (default: all episodes)",
+        )
     parser.add_argument(
         "--real-ratio",
         type=float,
@@ -174,12 +180,6 @@ def parse_args():
     parser.add_argument("--image-size", type=int, default=224, help="Input image dimension (224x224)")
 
     # Model args
-    parser.add_argument(
-        "--turbovla-repo",
-        type=Path,
-        default=DEFAULT_TURBOVLA_DIR,
-        help="Path to TurboVLA repository",
-    )
     parser.add_argument(
         "--dinov3-path",
         type=str,
@@ -752,13 +752,6 @@ def main():
     if is_main_process:
         print(f"=== Training TurboVLA on Hiwonder NexArm (device={device}, world_size={world_size}) ===")
 
-    # Add TurboVLA submodule to path
-    if args.turbovla_repo.exists():
-        sys.path.insert(0, str(args.turbovla_repo))
-        sys.path.insert(0, str(args.turbovla_repo / "third_party" / "starvla_runtime"))
-    else:
-        raise FileNotFoundError(f"TurboVLA repository not found at {args.turbovla_repo}")
-
     from transformers import AutoImageProcessor
     from turbovla.models import TurboVLAConfig, build_turbovla
 
@@ -775,6 +768,7 @@ def main():
         ds = LeRobotDataset(
             repo_id=repo_id,
             root=root,
+            episodes=getattr(args, f"{domain}_episodes"),
             delta_timestamps=delta_timestamps,
             local_files_only=root is not None,
         )

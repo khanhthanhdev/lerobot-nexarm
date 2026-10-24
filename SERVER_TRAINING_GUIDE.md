@@ -24,8 +24,8 @@ This guide provides complete, copy-pasteable instructions to set up, prepare dat
 On your remote GPU server (Ubuntu 22.04 / 24.04 with NVIDIA drivers):
 
 ```bash
-# Clone the repository with submodules (including TurboVLA)
-git clone --recurse-submodules https://github.com/khanhthanhdev/lerobot-nexarm.git
+# Clone the repository (the setup script installs TurboVLA as a pinned package)
+git clone https://github.com/khanhthanhdev/lerobot-nexarm.git
 cd lerobot-nexarm
 
 # Run the automated server setup script
@@ -38,7 +38,7 @@ The script automatically:
 2. Syncs the environment with PyTorch, CUDA, Transformers, DINOv3 (timm), Accelerate, and LeRobot.
 3. Caches foundation models (`facebook/dinov3-vitb16-pretrain-lvd1689m` and `google-bert/bert-base-uncased`).
 
-The script syncs only `--extra smolvla --extra training --extra groot`, which is enough for a training server (including simulation data generation). On a machine that also records or rolls out on the real arm, use the full NexArm profile from [`run.md`, Dependency Profiles](run.md#dependency-profiles) plus `--extra smolvla --extra groot`.
+The script syncs the full NexArm profile from [`run.md`, Dependency Profiles](run.md#dependency-profiles) plus `--extra turbovla`, which installs the pinned TurboVLA package. Use the same line on any other machine that trains or runs TurboVLA.
 
 _(Optional)_ If you want to fine-tune from official released TurboVLA weights:
 
