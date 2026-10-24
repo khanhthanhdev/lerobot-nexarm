@@ -50,4 +50,5 @@ Hub id, step and W&B run link: pending.
 ## Notes
 
 - `gripper_index: 6` puts the gripper loss weight on LIBERO's gripper action; `binarize_gripper: false` because the snapping thresholds are NexArm raw positions.
+- `--eval.n_episodes` counting per task comes from reading `lerobot_eval.py` (it evaluates each task separately); confirm the per-task episode count in the eval output before trusting the 50.
 - TurboVLA's own mixed-suite RLDS training stays in the TurboVLA repo; this run does not reproduce it.
