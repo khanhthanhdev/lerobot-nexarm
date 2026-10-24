@@ -13,6 +13,9 @@ dependencies = [
     "lerobot[pyserial-dep,deepdiff-dep]",
 ]
 
+[project.scripts]
+lerobot-nexarm-rollout = "lerobot_robot_nexarm.rerun_recording:rollout_main"
+
 [tool.uv.sources]
 lerobot = { workspace = true }
 

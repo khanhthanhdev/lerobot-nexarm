@@ -20,7 +20,7 @@ import pytest
 
 rr = pytest.importorskip("rerun", reason="rerun-sdk is required (install lerobot[viz])")
 
-from lerobot.utils.rerun_visualization import init_rerun  # noqa: E402
+from lerobot_robot_nexarm.rerun_recording import init_rerun  # noqa: E402
 
 
 def _free_port() -> int:
@@ -48,3 +48,13 @@ def test_save_path_keeps_data_while_streaming_to_a_viewer(tmp_path):
     recorded_size = _logged_file_size(recording, 200)
 
     assert recorded_size > header_size + 2000
+
+
+def test_rollout_flag_is_removed_before_lerobot_rollout_parses_it():
+    from lerobot_robot_nexarm.rerun_recording import split_save_path
+
+    argv = ["--robot.type=nexarm_sim", "--display_data=true", "--rerun_save_path=out/run.rrd"]
+    assert split_save_path(argv) == (["--robot.type=nexarm_sim", "--display_data=true"], "out/run.rrd")
+    assert split_save_path(["--robot.type=nexarm_sim"]) == (["--robot.type=nexarm_sim"], None)
+    with pytest.raises(ValueError, match="requires --display_data=true"):
+        split_save_path(["--rerun_save_path=out/run.rrd"])

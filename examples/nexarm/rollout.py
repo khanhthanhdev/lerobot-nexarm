@@ -112,7 +112,7 @@ def main():
     cmd = [
         sys.executable,
         "-m",
-        "lerobot.scripts.lerobot_rollout",
+        "lerobot_robot_nexarm.rerun_recording",  # lerobot-rollout plus --rerun_save_path
         f"--strategy.type={args.strategy}",
         f"--policy.path={args.policy_path}",
         "--robot.type=nexarm_follower",

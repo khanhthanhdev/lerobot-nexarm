@@ -9,7 +9,7 @@ from examples.nexarm import record_collection as wrapper
 from lerobot.configs.dataset import DatasetRecordConfig
 from lerobot.datasets import LeRobotDataset
 from lerobot.scripts import lerobot_record
-from lerobot_robot_nexarm import collection_merge
+from lerobot_robot_nexarm import collection_merge, rerun_recording
 from tests.mocks.mock_robot import MockRobotConfig
 from tests.mocks.mock_teleop import MockTeleopConfig
 
@@ -41,10 +41,14 @@ def test_rerun_save_path_requires_display_data(tmp_path):
 def test_rerun_save_path_reaches_the_visualization(monkeypatch, tmp_path):
     calls = []
 
-    def fake_init_visualization(display_mode, **kwargs):
-        calls.append((display_mode, kwargs))
+    def fake_init_rerun(**kwargs):
+        calls.append(kwargs)
 
-    monkeypatch.setattr(lerobot_record, "init_visualization", fake_init_visualization)
+    def plain_init_visualization(*args, **kwargs):
+        raise AssertionError("lerobot-record must start the visualization through the NexArm helper")
+
+    monkeypatch.setattr(rerun_recording, "init_rerun", fake_init_rerun)
+    monkeypatch.setattr(lerobot_record, "init_visualization", plain_init_visualization)
     monkeypatch.setattr(lerobot_record, "shutdown_visualization", lambda *_: None)
     monkeypatch.setattr(lerobot_record, "log_visualization_data", lambda *_, **__: None)
     save_path = str(tmp_path / "session.rrd")
@@ -52,11 +56,9 @@ def test_rerun_save_path_reaches_the_visualization(monkeypatch, tmp_path):
     dataset = wrapper.record_collection(make_config(tmp_path, display_data=True, rerun_save_path=save_path))
 
     assert dataset.num_episodes == 1
-    assert calls == [
-        ("rerun", {"session_name": "recording", "ip": None, "port": None, "rerun_save_path": save_path})
-    ]
+    assert calls == [{"session_name": "recording", "ip": None, "port": None, "save_path": save_path}]
     # The wrapper only patches lerobot-record while it runs.
-    assert lerobot_record.init_visualization is fake_init_visualization
+    assert lerobot_record.init_visualization is plain_init_visualization
 
 
 def test_without_collection_flags_the_wrapper_is_plain_lerobot_record(tmp_path):

@@ -21,7 +21,6 @@ importing from here directly. Requires the ``viz`` extra (``pip install 'lerobot
 
 import numbers
 import os
-from pathlib import Path
 
 import numpy as np
 
@@ -39,10 +38,7 @@ def _is_scalar(x):
 
 
 def init_rerun(
-    session_name: str = "lerobot_control_loop",
-    ip: str | None = None,
-    port: int | None = None,
-    save_path: str | Path | None = None,
+    session_name: str = "lerobot_control_loop", ip: str | None = None, port: int | None = None
 ) -> None:
     """
     Initializes the Rerun SDK for visualizing the control loop.
@@ -51,8 +47,6 @@ def init_rerun(
         session_name: Name of the Rerun session.
         ip: Optional IP for connecting to a Rerun server.
         port: Optional port for connecting to a Rerun server.
-        save_path: Optional path for a local ``.rrd`` recording. The file preserves
-            the images, robot observations, and actions logged during the session.
     """
 
     require_package("rerun-sdk", extra="viz", import_name="rerun")
@@ -65,23 +59,10 @@ def init_rerun(
     os.environ["RERUN_FLUSH_NUM_BYTES"] = batch_size
     rr.init(session_name)
     memory_limit = os.getenv("LEROBOT_RERUN_MEMORY_LIMIT", "10%")
-    url = f"rerun+http://{ip}:{port}/proxy" if ip and port else None
-    if save_path is None:
-        if url:
-            rr.connect_grpc(url=url)
-        else:
-            rr.spawn(memory_limit=memory_limit)
-        return
-
-    # connect_grpc/spawn replace any earlier sink, so a file from rr.save() would stay empty.
-    # Tee the stream to the viewer and the file instead.
-    output_path = Path(save_path)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    if url is None:
-        spawn_port = 9876
-        rr.spawn(port=spawn_port, memory_limit=memory_limit, connect=False)
-        url = f"rerun+http://127.0.0.1:{spawn_port}/proxy"
-    rr.set_sinks(rr.GrpcSink(url), rr.FileSink(str(output_path)))
+    if ip and port:
+        rr.connect_grpc(url=f"rerun+http://{ip}:{port}/proxy")
+    else:
+        rr.spawn(memory_limit=memory_limit)
 
 
 def shutdown_rerun() -> None:

@@ -49,8 +49,9 @@ from lerobot.utils.feature_utils import combine_feature_dicts
 from lerobot.utils.import_utils import register_third_party_plugins
 from lerobot.utils.keyboard_input import init_keyboard_listener
 from lerobot.utils.utils import init_logging, log_say
-from lerobot.utils.visualization_utils import init_visualization, shutdown_visualization
+from lerobot.utils.visualization_utils import shutdown_visualization
 from lerobot_robot_nexarm.recording_session import run_manual_session, show_recording_status
+from lerobot_robot_nexarm.rerun_recording import init_visualization
 
 
 @dataclass
@@ -117,7 +118,7 @@ def _rerun_saved_to(path: str | None):
         yield
         return
     original = lerobot_record.init_visualization
-    lerobot_record.init_visualization = functools.partial(original, rerun_save_path=path)
+    lerobot_record.init_visualization = functools.partial(init_visualization, rerun_save_path=path)
     try:
         yield
     finally:

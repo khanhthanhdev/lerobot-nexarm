@@ -459,7 +459,7 @@ when CUDA is unavailable.
 For a quick autonomous test without recording a dataset:
 
 ```bash
-uv run lerobot-rollout \
+uv run lerobot-nexarm-rollout \
   --strategy.type=base \
   --policy.path=outputs/train/act_nexarm_sim/checkpoints/last/pretrained_model \
   --robot.type=nexarm_sim \
@@ -475,7 +475,8 @@ uv run lerobot-rollout \
 `base` runs the policy autonomously and exits after `--duration` seconds. It
 does not save a dataset. `--display_data=true` streams the simulated camera
 observations to Rerun; it does not open the interactive MuJoCo viewer.
-`--rerun_save_path` preserves the visual trace so it can be opened again with
+`lerobot-nexarm-rollout` is `lerobot-rollout` plus `--rerun_save_path`, which
+preserves the visual trace so it can be opened again with
 `uv run rerun outputs/rollouts/act_nexarm_sim.rrd`.
 
 To record the policy rollout as an evaluation dataset, switch to `sentry` and
