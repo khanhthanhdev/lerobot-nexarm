@@ -4,7 +4,7 @@
 set -euo pipefail
 collection_repo="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$collection_repo"
-exec uv run --no-sync python examples/nexarm/prepare_collection.py \
+exec uv run --no-sync python tools/nexarm/prepare_collection.py \
     --leader-port /dev/ttyUSB0 \
     --follower-port /dev/ttyUSB1 \
     --front-cam /dev/v4l/by-id/usb-046d_C270_HD_WEBCAM_E49C2640-video-index0 \

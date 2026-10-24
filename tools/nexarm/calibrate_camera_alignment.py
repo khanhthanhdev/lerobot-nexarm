@@ -7,9 +7,9 @@ from MuJoCo against the live physical camera feed, ensuring exact alignment
 of viewpoints, field-of-view, and table plane before policy rollout.
 
 Usage:
-    python examples/nexarm/calibrate_camera_alignment.py --cam-index 0 --camera-name front
-    python examples/nexarm/calibrate_camera_alignment.py --cam-index /dev/video4 --camera-name top
-    python examples/nexarm/calibrate_camera_alignment.py --mock --save-snapshot outputs/calibration/test_align.png
+    python tools/nexarm/calibrate_camera_alignment.py --cam-index 0 --camera-name front
+    python tools/nexarm/calibrate_camera_alignment.py --cam-index /dev/video4 --camera-name top
+    python tools/nexarm/calibrate_camera_alignment.py --mock --save-snapshot outputs/calibration/test_align.png
 """
 
 from __future__ import annotations
@@ -23,12 +23,8 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+from lerobot_robot_nexarm.camera_config import camera_source
 from lerobot_robot_nexarm.nexarm_sim.mujoco_backend import NexArmMujocoBackend, resolve_model_path
-
-try:  # imported as a package module (tests) or run as a script
-    from examples.nexarm.camera_config import camera_source
-except ModuleNotFoundError:
-    from camera_config import camera_source  # type: ignore[no-redef]
 
 
 def parse_args() -> argparse.Namespace:

@@ -5,7 +5,7 @@ Source Hub repos are kept unless --delete-sources is passed (deleted only after 
 Without --output-dir the merged dataset is built in a temporary directory that is removed after upload.
 
 Example:
-    uv run python examples/nexarm/merge_hub_datasets.py \\
+    uv run python tools/nexarm/merge_hub_datasets.py \\
         --source-repo-ids my-user/nexarm_pick_20261001_120000 my-user/nexarm_pick_20261002_150000 \\
         --output-repo-id my-user/nexarm_pick
 """

@@ -18,7 +18,7 @@ you move it. Directions are named from the robot's point of view:
 - left and right: the robot's own left and right.
 
 Example:
-    uv run python examples/nexarm/probe_joint_mapping.py --port /dev/ttyUSB1
+    uv run python tools/nexarm/probe_joint_mapping.py --port /dev/ttyUSB1
 """
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES, POSITION_CENTER, TIC
 from lerobot_robot_nexarm.nexarm_sim.mujoco_backend import resolve_model_path
 
 try:  # imported as a package module (tests) or run as a script
-    from examples.nexarm.servo_step_test import follower_bus
+    from tools.nexarm.servo_step_test import follower_bus
 except ModuleNotFoundError:
     from servo_step_test import follower_bus  # type: ignore[no-redef]
 

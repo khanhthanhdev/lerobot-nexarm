@@ -14,7 +14,7 @@ For the cleanest fit, record a few object-free episodes that sweep each joint th
 not fitted unless requested. Align cameras separately with ``calibrate_camera_alignment.py``.
 
 Example:
-    uv run python examples/nexarm/calibrate_sim.py --repo-id <user>/<real_dataset> \
+    uv run python tools/nexarm/calibrate_sim.py --repo-id <user>/<real_dataset> \
         --out outputs/calibration/nexarm_sim_calibration.json
 """
 

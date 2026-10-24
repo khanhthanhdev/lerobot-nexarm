@@ -21,18 +21,10 @@ import time
 
 from lerobot.utils.robot_utils import precise_sleep
 from lerobot.utils.visualization_utils import log_rerun_data, shutdown_rerun
+from lerobot_robot_nexarm.camera_config import CameraSetupError, add_camera_args, build_camera_configs
 from lerobot_robot_nexarm.nexarm_follower import NexArmFollower, NexArmFollowerConfig
 from lerobot_robot_nexarm.rerun_recording import init_rerun
 from lerobot_teleoperator_nexarm import NexArmLeader, NexArmLeaderConfig
-
-try:  # imported as a package module (tests) or run as a script
-    from examples.nexarm.camera_config import CameraSetupError, add_camera_args, build_camera_configs
-except ModuleNotFoundError:
-    from camera_config import (  # type: ignore[no-redef]
-        CameraSetupError,
-        add_camera_args,
-        build_camera_configs,
-    )
 
 
 def parse_args():

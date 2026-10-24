@@ -350,7 +350,7 @@ uv run python examples/nexarm/vision_grasp.py --robot sim
 Overlay live physical camera frames onto the MuJoCo simulated camera view to align field of view, focal angle, and table placement:
 
 ```bash
-uv run python examples/nexarm/calibrate_camera_alignment.py \
+uv run python tools/nexarm/calibrate_camera_alignment.py \
     --camera-name front \
     --cam-index 0
 ```

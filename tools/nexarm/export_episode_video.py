@@ -4,13 +4,13 @@
 
 Example usage:
     # Export episode 0 side-by-side (front + wrist)
-    uv run python examples/nexarm/export_episode_video.py --episodes 0
+    uv run python tools/nexarm/export_episode_video.py --episodes 0
 
     # Export multiple episodes
-    uv run python examples/nexarm/export_episode_video.py --episodes 0 1 2 --output-dir outputs/demo_videos
+    uv run python tools/nexarm/export_episode_video.py --episodes 0 1 2 --output-dir outputs/demo_videos
 
     # Export only front camera view
-    uv run python examples/nexarm/export_episode_video.py --episodes 0 --camera front
+    uv run python tools/nexarm/export_episode_video.py --episodes 0 --camera front
 """
 
 from __future__ import annotations

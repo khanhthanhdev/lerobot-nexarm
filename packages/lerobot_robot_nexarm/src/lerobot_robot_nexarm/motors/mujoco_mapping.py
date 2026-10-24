@@ -21,7 +21,7 @@ range linearly and inverted onto the jaw slide joint: ``GRIPPER_CLOSED_POS`` is 
 
 By default raw 2048 lands on the exported CAD pose, which is the real arm's Home pose (``servo_4096_v2``;
 ``v1`` used an earlier CAD zero with the arm bent differently). A :class:`JointMapping` measured on the real follower
-with ``examples/nexarm/probe_joint_mapping.py`` adds a per-joint sign and zero offset, so the sim reaches the
+with ``tools/nexarm/probe_joint_mapping.py`` adds a per-joint sign and zero offset, so the sim reaches the
 same pose as the real arm for the same raw values.
 """
 
@@ -88,7 +88,7 @@ class JointMapping:
 
     @classmethod
     def load(cls, path: Path | str) -> JointMapping:
-        """Read the JSON written by ``examples/nexarm/probe_joint_mapping.py``."""
+        """Read the JSON written by ``tools/nexarm/probe_joint_mapping.py``."""
         joints = json.loads(Path(path).read_text(encoding="utf-8"))["joints"]
         return cls(
             signs={name: int(joint["sign"]) for name, joint in joints.items()},

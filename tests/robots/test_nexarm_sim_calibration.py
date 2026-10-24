@@ -8,7 +8,6 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from examples.nexarm.calibrate_sim import Episode, Simulator, fit_calibration, rmse
 from lerobot_robot_nexarm.motors.mujoco_mapping import JOINT_MAPPING_VERSION
 from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES
 from lerobot_robot_nexarm.nexarm_sim import (
@@ -17,6 +16,7 @@ from lerobot_robot_nexarm.nexarm_sim import (
     NexArmSimConfig,
     SimCalibration,
 )
+from tools.nexarm.calibrate_sim import Episode, Simulator, fit_calibration, rmse
 
 MODEL_PATH = Path(__file__).resolve().parents[2] / "sim" / "description" / "mjcf" / "scene.xml"
 

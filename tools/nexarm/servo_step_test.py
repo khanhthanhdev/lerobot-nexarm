@@ -21,7 +21,7 @@ on so the arm keeps holding its pose. ``--motion-speed 0`` means no CMD 56 limit
 ``--delta``.
 
 Example:
-    uv run python examples/nexarm/servo_step_test.py --port /dev/ttyUSB1 --joint elbow_flex --delta 800 \
+    uv run python tools/nexarm/servo_step_test.py --port /dev/ttyUSB1 --joint elbow_flex --delta 800 \
         --motion-speed 2000 0
 """
 

@@ -7,9 +7,9 @@ it follows from the stream height and the vertical focal length: ``fovy = 2 * at
 on the ``top`` camera in the scene XML, then check the camera pose with ``calibrate_camera_alignment.py``.
 
 Example (on the robot PC, D435i connected):
-    uv run python examples/nexarm/realsense_fovy.py --width 640 --height 480
+    uv run python tools/nexarm/realsense_fovy.py --width 640 --height 480
 Offline, from intrinsics you already have:
-    uv run python examples/nexarm/realsense_fovy.py --height 480 --fy 615.3
+    uv run python tools/nexarm/realsense_fovy.py --height 480 --fy 615.3
 """
 
 from __future__ import annotations

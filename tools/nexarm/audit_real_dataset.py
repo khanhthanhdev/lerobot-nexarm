@@ -18,7 +18,7 @@ Reads only the joint data (``action`` and ``observation.state``, raw servo ticks
   the sim.
 
 Example:
-    uv run python examples/nexarm/audit_real_dataset.py --repo-id thanhkt/nexarm_stack_bowls --episode-time-s 15
+    uv run python tools/nexarm/audit_real_dataset.py --repo-id thanhkt/nexarm_stack_bowls --episode-time-s 15
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES
 from lerobot_robot_nexarm.nexarm_sim.stack_bowls_task import GRIPPER_ASSIST_RELEASE_POS
 
 try:  # imported as a package module (tests) or run as a script
-    from examples.nexarm.calibrate_sim import Episode, load_episodes, parse_episode_list
+    from tools.nexarm.calibrate_sim import Episode, load_episodes, parse_episode_list
 except ModuleNotFoundError:
     from calibrate_sim import Episode, load_episodes, parse_episode_list  # type: ignore[no-redef]
 

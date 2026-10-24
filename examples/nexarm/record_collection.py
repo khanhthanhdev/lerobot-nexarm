@@ -14,7 +14,7 @@ This wraps ``lerobot-record`` (:func:`lerobot.scripts.lerobot_record.record`). I
 - ``--rerun_save_path``: also save the Rerun stream to a local ``.rrd`` file (needs
   ``--display_data=true``).
 
-Example (``examples/nexarm/prepare_collection.py`` builds this command for you)::
+Example (``tools/nexarm/prepare_collection.py`` builds this command for you)::
 
     uv run python examples/nexarm/record_collection.py \\
         --robot.type=nexarm_follower --robot.port=/dev/ttyUSB1 \\
@@ -273,7 +273,7 @@ def _merge(cfg: CollectionRecordConfig, dataset: LeRobotDataset) -> None:
         logging.exception("Local merge failed. Local session retained at %s", dataset.root)
         print(
             "Merge failed; local episodes are saved. Retry with:\n"
-            f"uv run --no-sync python examples/nexarm/merge_collection.py --repo-id {dataset.repo_id} "
+            f"uv run --no-sync python tools/nexarm/merge_collection.py --repo-id {dataset.repo_id} "
             f"--root '{dataset.root}' --root-repo-id {cfg.root_repo_id}"
             + (f" --merge-root '{cfg.merge_root}'" if cfg.merge_root else ""),
             flush=True,

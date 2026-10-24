@@ -176,7 +176,7 @@ real follower (un-energised, posed by hand straight up, then a quarter turn per
 joint; the readings need not be `2048`):
 
 ```bash
-uv run python examples/nexarm/probe_joint_mapping.py --port /dev/ttyUSB1
+uv run python tools/nexarm/probe_joint_mapping.py --port /dev/ttyUSB1
 ```
 
 It writes `outputs/nexarm/joint_mapping_probe.json`, which changes the arm
@@ -534,7 +534,7 @@ control rate, load time, parameter count, and peak CUDA memory. Add
 fast as inference and rendering allow.
 
 `--calibration PATH` loads a `SimCalibration` JSON from
-`examples/nexarm/calibrate_sim.py` (its fps must equal `--fps`, otherwise the
+`tools/nexarm/calibrate_sim.py` (its fps must equal `--fps`, otherwise the
 run is refused), `--action-delay-steps N` overrides its latency (precedence:
 explicit value > calibration > 0), and `--dr` enables per-episode domain
 randomization (off by default for reproducible comparisons). The gym
@@ -556,7 +556,7 @@ contract, so it is not directly comparable.
 The same entry point is available as:
 
 ```bash
-MUJOCO_GL=egl uv run python examples/nexarm/benchmark_sim.py --policy act=PATH
+MUJOCO_GL=egl uv run python tools/nexarm/benchmark_sim.py --policy act=PATH
 ```
 
 ## 11. Re-export from Fusion 360

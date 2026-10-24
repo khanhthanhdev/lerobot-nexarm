@@ -11,14 +11,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-try:  # imported as a package module (tests) or run as a script
-    from examples.nexarm.camera_config import add_camera_args, build_camera_dicts, find_realsense_serial
-except ModuleNotFoundError:
-    from camera_config import (  # type: ignore[no-redef]
-        add_camera_args,
-        build_camera_dicts,
-        find_realsense_serial,
-    )
+from lerobot_robot_nexarm.camera_config import add_camera_args, build_camera_dicts, find_realsense_serial
 
 REPO = Path(__file__).resolve().parents[2]
 DEFAULT_ROOT_REPO_ID = "thanhkt/nexarm_stack_bowls_top"

@@ -8,7 +8,7 @@ prints how far each joint is from the other arm. Fix any offset in hardware: the
 desktop's Servo Advanced page, the leader on the Synchronizer page.
 
 Place both arms by hand at the vendor Home pose (every joint at 2048 ticks), then:
-  uv run python examples/nexarm/calibrate_arms.py --leader-port /dev/ttyUSB0 --follower-port /dev/ttyUSB1
+  uv run python tools/nexarm/calibrate_arms.py --leader-port /dev/ttyUSB0 --follower-port /dev/ttyUSB1
 """
 
 import argparse

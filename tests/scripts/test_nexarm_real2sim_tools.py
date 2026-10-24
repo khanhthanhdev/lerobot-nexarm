@@ -6,16 +6,16 @@ import mujoco
 import numpy as np
 import pytest
 
-from examples.nexarm import (
+from lerobot_robot_nexarm.motors.mujoco_mapping import MUJOCO_JOINTS
+from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES
+from tools.nexarm import (
     audit_real_dataset as audit_module,
     probe_joint_mapping as probe,
     servo_step_test as step_test,
 )
-from examples.nexarm.calibrate_sim import Episode, parse_episode_list
-from examples.nexarm.overlay_recorded_frames import pose_model, side_by_side
-from examples.nexarm.realsense_fovy import fovy_deg, principal_point_offset_px
-from lerobot_robot_nexarm.motors.mujoco_mapping import MUJOCO_JOINTS
-from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES
+from tools.nexarm.calibrate_sim import Episode, parse_episode_list
+from tools.nexarm.overlay_recorded_frames import pose_model, side_by_side
+from tools.nexarm.realsense_fovy import fovy_deg, principal_point_offset_px
 
 SCENE = Path(__file__).resolve().parents[2] / "sim/description/mjcf/scene.xml"
 

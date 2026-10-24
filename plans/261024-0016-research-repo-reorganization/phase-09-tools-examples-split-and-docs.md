@@ -1,7 +1,7 @@
 ---
 phase: 9
 title: "Tools/examples split and docs sweep"
-status: pending
+status: completed
 priority: P2
 effort: "1d"
 dependencies: [6, 7, 8]
@@ -39,3 +39,12 @@ About 200 references to `examples/nexarm/` exist across `run.md` (22), `docs/sou
 ## Risk / Rollback
 
 Low. Moves and text only.
+
+## Result (2026-10-25)
+
+- The 14 tools moved to `tools/nexarm/` in a moves-only commit; `camera_config.py` moved to `lerobot_robot_nexarm.camera_config`, because the examples that stay (`record`, `rollout`, `teleoperate`) and two moved tools (`prepare_collection`, `calibrate_camera_alignment`) all import it. Its script-mode import fallbacks are gone.
+- Changed: `train.yaml`, `inference.yaml`, `stack_bowls_act.yaml` and `stack_bowls_act.md` stay in `examples/nexarm/`. `train_stack_bowls_act.py` loads `stack_bowls_act.yaml` from its own folder, and `train.yaml`/`inference.yaml` are tutorial configs like `record.yaml`, not experiments with results.
+- `[tool.pytest.ini_options] pythonpath = ["."]` replaces the root `conftest.py` that used to put the repo root on `sys.path` for the `examples.nexarm.*`/`tools.nexarm.*` imports in the tests.
+- References: `git grep` finds no moved path outside `plans/` (plans and reports are dated records and keep their paths). Every moved tool and the touched examples run `--help`.
+- Not changed: `docs/8_Imitation_Learning_Tutorial.md` describes Hiwonder's packaged `finsh` download (its `pip install -e` lines and screenshots belong to that package, not this checkout).
+- The docs-build check no longer applies: the HF docs build was removed with the pin.

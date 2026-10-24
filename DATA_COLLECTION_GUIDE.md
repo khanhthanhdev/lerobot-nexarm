@@ -65,7 +65,7 @@ The local root stores an import ledger in `meta/collection_sessions.json`. Retry
 Retry a failed local merge without recording again (the recorder prints this command with the exact session id and root):
 
 ```bash
-uv run --no-sync python examples/nexarm/merge_collection.py \
+uv run --no-sync python tools/nexarm/merge_collection.py \
     --repo-id thanhkt/nexarm_stack_bowls_20261004_160000
 ```
 
@@ -251,5 +251,5 @@ Use `--repo-id thanhkt/nexarm_stack_bowls_top` (or `--dataset.repo_id=` for repl
 - **Upload failed / Internet disconnection during upload**:
   The recorded dataset is already finalized and safely stored locally in `~/.cache/huggingface/lerobot/<repo_id>` (the printed timestamped id). Re-upload it at any time without re-recording:
   ```bash
-  uv run python examples/nexarm/upload_dataset.py --repo-id "${HF_USER}/nexarm_stack_bowls_<YYYYMMDD_HHMMSS>"
+  uv run python tools/nexarm/upload_dataset.py --repo-id "${HF_USER}/nexarm_stack_bowls_<YYYYMMDD_HHMMSS>"
   ```

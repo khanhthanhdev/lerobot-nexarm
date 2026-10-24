@@ -11,7 +11,7 @@ Pass ``--mapping`` with the JSON written by ``probe_joint_mapping.py`` to test a
 is applied to the sim. Rendering needs OpenGL (on headless Linux set ``MUJOCO_GL=egl``).
 
 Example:
-    uv run python examples/nexarm/overlay_recorded_frames.py --repo-id thanhkt/nexarm_stack_bowls \
+    uv run python tools/nexarm/overlay_recorded_frames.py --repo-id thanhkt/nexarm_stack_bowls \
         --episode 150 --mapping outputs/nexarm/joint_mapping_probe.json
 """
 
@@ -30,7 +30,7 @@ from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES
 from lerobot_robot_nexarm.nexarm_sim.mujoco_backend import resolve_model_path
 
 try:  # imported as a package module (tests) or run as a script
-    from examples.nexarm.probe_joint_mapping import ARM_JOINTS, mapped_qpos
+    from tools.nexarm.probe_joint_mapping import ARM_JOINTS, mapped_qpos
 except ModuleNotFoundError:
     from probe_joint_mapping import ARM_JOINTS, mapped_qpos  # type: ignore[no-redef]
 
@@ -50,7 +50,7 @@ def pose_model(
 
 
 def side_by_side(real: np.ndarray, sim: np.ndarray) -> np.ndarray:
-    """real | sim | 50% blend, all uint8 HxWx3 of the same size."""
+    """Real | sim | 50% blend, all uint8 HxWx3 of the same size."""
     blend = ((real.astype(np.uint16) + sim.astype(np.uint16)) // 2).astype(np.uint8)
     return np.concatenate([real, sim, blend], axis=1)
 

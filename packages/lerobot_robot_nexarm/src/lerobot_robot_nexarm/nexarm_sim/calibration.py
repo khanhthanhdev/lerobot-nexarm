@@ -98,7 +98,7 @@ class SimCalibration:
         if joint_mapping != joint_mapping_version:
             raise ValueError(
                 f"Calibration {path} was fitted with joint mapping {joint_mapping or 'the pre-servo-constant mapping'} "
-                f"but the sim uses {joint_mapping_version}. Re-run examples/nexarm/calibrate_sim.py with the same "
+                f"but the sim uses {joint_mapping_version}. Re-run tools/nexarm/calibrate_sim.py with the same "
                 "--joint-mapping."
             )
         source = raw.get("source", {})
@@ -121,7 +121,7 @@ def check_calibration_fps(calibration: SimCalibration, fps: int) -> None:
     if calibration.fps is not None and calibration.fps != fps:
         raise ValueError(
             f"Simulation calibration was fitted at {calibration.fps} fps but this run uses {fps} fps. "
-            "Re-run examples/nexarm/calibrate_sim.py at the run fps or match --fps to the calibration."
+            "Re-run tools/nexarm/calibrate_sim.py at the run fps or match --fps to the calibration."
         )
 
 

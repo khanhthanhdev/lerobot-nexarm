@@ -117,7 +117,7 @@ help sim-to-real more than more training steps do.
 cat outputs/datasets/nexarm_stack_bowls/generation_report.json       # counts, rejects, joint_mapping
 uv run python examples/nexarm/train_stack_bowls_act.py \
     --repo-id local/nexarm_stack_bowls --dataset-root outputs/datasets/nexarm_stack_bowls --check-data
-uv run python examples/nexarm/export_episode_video.py --help           # side-by-side video of one episode
+uv run python tools/nexarm/export_episode_video.py --help           # side-by-side video of one episode
 ```
 
 `--check-data` decodes episode 0 and checks the cameras, state, action chunks and episode-end padding. It works
@@ -276,7 +276,7 @@ rate, then on the real arm.
 
 ## 5. Before running on the real arm
 
-- Measure the follower's joint directions once with `examples/nexarm/probe_joint_mapping.py` (see
+- Measure the follower's joint directions once with `tools/nexarm/probe_joint_mapping.py` (see
   [`sim_calibration.md`](sim_calibration.md)). If it reports a sign or offset that is not the identity,
   regenerate the sim data with `--joint-mapping outputs/nexarm/joint_mapping_probe.json`; otherwise sim-trained
   policies move those joints the wrong way.

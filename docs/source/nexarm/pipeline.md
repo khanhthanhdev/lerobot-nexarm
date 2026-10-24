@@ -41,7 +41,7 @@ The pick-and-place generator `generate_sim_dataset.py` takes the same generation
 Find the serial ports first (`uv run lerobot-find-port`; defaults are leader `/dev/ttyUSB0`, follower `/dev/ttyUSB1`), then check cameras and record in one step. On the collection rig, `./scripts/nexarm/collect.sh` runs the same script with the rig's ports, by-id camera paths and pixel formats:
 
 ```bash
-uv run python examples/nexarm/prepare_collection.py \
+uv run python tools/nexarm/prepare_collection.py \
     --leader-port /dev/ttyUSB0 --follower-port /dev/ttyUSB1 \
     --front-cam 0 --wrist-cam 1 --num-episodes 50
 ```
@@ -53,7 +53,7 @@ uv run python examples/nexarm/prepare_collection.py \
 
 Simpler alternatives with the same camera flags (`--front-cam`, `--wrist-cam`, `--front-fourcc`, `--wrist-fourcc`, `--top-cam`, `--no-top-cam`): `examples/nexarm/record.py` and `examples/nexarm/teleoperate.py`, or `lerobot-record` with `--robot.cameras` including `top: {type: intelrealsense, serial_number_or_name: <serial>, width: 640, height: 480, fps: 30}`. Both append `_YYYYMMDD_HHMMSS` to the repo id. `record.py` and `examples/nexarm/record_collection.py` (same flags as `lerobot-record`) print the final `Dataset repo_id:` and `Dataset root:`; plain `lerobot-record` does not, so use the newest `<name>_YYYYMMDD_HHMMSS` folder under `~/.cache/huggingface/lerobot/`. Use that id in later commands.
 
-Check a recorded episode with `examples/nexarm/export_episode_video.py` (side-by-side front, wrist and top).
+Check a recorded episode with `tools/nexarm/export_episode_video.py` (side-by-side front, wrist and top).
 
 ## 2. Training
 
@@ -153,6 +153,6 @@ MUJOCO_GL=egl uv run lerobot-nexarm-sim-benchmark \
 - Success rate is the primary metric; use termination reasons to separate drops from timeouts and p95 latency to check the policy can sustain 30 FPS. `--realtime` throttles to the control rate; `--seed-start` and `--episode-timeout` control the episode set.
 - The benchmark does not encode video, to avoid distorting timing. For a qualitative comparison use a `sentry` rollout or the episode videos that `lerobot-eval` saves.
 
-Real-robot throughput check: `uv run python examples/nexarm/prepare_collection.py --test-cameras --stress-test 30`.
+Real-robot throughput check: `uv run python tools/nexarm/prepare_collection.py --test-cameras --stress-test 30`.
 
 See also `sim/README.md` (simulation details) and `AGENT_GUIDE.md` (setup and policy selection).

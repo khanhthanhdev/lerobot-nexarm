@@ -54,7 +54,7 @@ Use `nexarm_sim` or simulation scripts in `examples/nexarm/`:
 
 ### Path C — "I just want to understand the codebase"
 
-Read §2 above, then `AGENTS.md` "Architecture", then open `packages/lerobot_robot_nexarm/src/lerobot_robot_nexarm/motors/nexarm.py`, `packages/lerobot_robot_nexarm/src/lerobot_robot_nexarm/nexarm_follower/`, and `src/lerobot/policies/act/`.
+Read §2 above, then `AGENTS.md` "LeRobot (upstream, pinned)", then open `packages/lerobot_robot_nexarm/src/lerobot_robot_nexarm/motors/nexarm.py`, `packages/lerobot_robot_nexarm/src/lerobot_robot_nexarm/nexarm_follower/`, and the installed `lerobot.policies.act` (`uv run python -c "import lerobot.policies.act as m; print(m.__path__[0])"`). Operational tools (calibration, probes, dataset audits, merges, uploads) are in `tools/nexarm/`.
 
 ---
 
@@ -384,33 +384,12 @@ lerobot-eval \
 
 - Use `--policy.path=outputs/train/.../checkpoints/<step>/pretrained_model` for local checkpoints.
 - `--eval.n_episodes` should be ≥ 50 for a stable success-rate estimate.
-- Available envs live in `src/lerobot/envs/`. See [`docs/source/libero.mdx`](https://huggingface.co/docs/lerobot/libero), [`metaworld.mdx`](https://huggingface.co/docs/lerobot/metaworld), [`robocasa.mdx`](https://huggingface.co/docs/lerobot/robocasa), [`vlabench.mdx`](https://huggingface.co/docs/lerobot/vlabench) for specific benchmarks.
+- Upstream envs live in the installed `lerobot.envs` package; the NexArm env is `--env.type=nexarm` (`packages/lerobot_env_nexarm/`). See [`docs/source/libero.mdx`](https://huggingface.co/docs/lerobot/libero), [`metaworld.mdx`](https://huggingface.co/docs/lerobot/metaworld), [`robocasa.mdx`](https://huggingface.co/docs/lerobot/robocasa), [`vlabench.mdx`](https://huggingface.co/docs/lerobot/vlabench) for specific benchmarks.
 - To add a new benchmark, see [`docs/source/adding_benchmarks.mdx`](https://huggingface.co/docs/lerobot/adding_benchmarks) and [`envhub.mdx`](https://huggingface.co/docs/lerobot/envhub).
 
 ### 8.2b Dockerfiles for benchmark eval
 
-Benchmark envs have native dependencies that are painful to install locally. The repo ships **pre-baked Dockerfiles** for each supported benchmark — use these to run `lerobot-eval` in a reproducible environment:
-
-| Benchmark   | Dockerfile                                                                             |
-| ----------- | -------------------------------------------------------------------------------------- |
-| LIBERO      | [`docker/Dockerfile.benchmark.libero`](./docker/Dockerfile.benchmark.libero)           |
-| LIBERO+     | [`docker/Dockerfile.benchmark.libero_plus`](./docker/Dockerfile.benchmark.libero_plus) |
-| MetaWorld   | [`docker/Dockerfile.benchmark.metaworld`](./docker/Dockerfile.benchmark.metaworld)     |
-| RoboCasa    | [`docker/Dockerfile.benchmark.robocasa`](./docker/Dockerfile.benchmark.robocasa)       |
-| RoboCerebra | [`docker/Dockerfile.benchmark.robocerebra`](./docker/Dockerfile.benchmark.robocerebra) |
-| RoboMME     | [`docker/Dockerfile.benchmark.robomme`](./docker/Dockerfile.benchmark.robomme)         |
-| RoboTwin    | [`docker/Dockerfile.benchmark.robotwin`](./docker/Dockerfile.benchmark.robotwin)       |
-| VLABench    | [`docker/Dockerfile.benchmark.vlabench`](./docker/Dockerfile.benchmark.vlabench)       |
-
-Build and run (adapt to your benchmark):
-
-```bash
-docker build -f docker/Dockerfile.benchmark.robomme -t lerobot-bench-robomme .
-docker run --gpus all --rm -it \
-  -v $HOME/.cache/huggingface:/root/.cache/huggingface \
-  lerobot-bench-robomme \
-  lerobot-eval --policy.path=<your_policy> --env.type=<env> --eval.n_episodes=50
-```
+Benchmark envs have native dependencies that are painful to install locally. Upstream LeRobot ships a pre-baked `Dockerfile.benchmark.<name>` for LIBERO, LIBERO+, MetaWorld, RoboCasa, RoboCerebra, RoboMME, RoboTwin and VLABench in [huggingface/lerobot `docker/`](https://github.com/huggingface/lerobot/tree/main/docker). Those images contain upstream LeRobot only, so use them for upstream policies; for TurboVLA on LIBERO, install `--extra libero --extra turbovla` here (see [`experiments/261024-turbovla-libero`](./experiments/261024-turbovla-libero/README.md)).
 
 See [`docker/README.md`](./docker/README.md) for base-image details.
 

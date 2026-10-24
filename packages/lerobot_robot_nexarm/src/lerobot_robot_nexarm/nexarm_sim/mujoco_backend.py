@@ -107,7 +107,7 @@ class NexArmMujocoBackend:
         joint_mapping: JointMapping = IDENTITY_MAPPING,
     ) -> None:
         self.model_path = resolve_model_path(model_path)
-        # Real-to-sim sign and zero offset per arm joint (examples/nexarm/probe_joint_mapping.py).
+        # Real-to-sim sign and zero offset per arm joint (tools/nexarm/probe_joint_mapping.py).
         self.joint_mapping = joint_mapping
         self.model = mujoco.MjModel.from_xml_path(str(self.model_path))
         self.data = mujoco.MjData(self.model)

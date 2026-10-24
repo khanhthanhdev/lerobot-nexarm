@@ -33,7 +33,7 @@ class NexArmSimConfig(RobotConfig):
     action_delay_steps: int | None = None
     enable_domain_randomization: bool = False
     calibration_path: Path | None = None
-    # Real-to-sim joint sign and offset from examples/nexarm/probe_joint_mapping.py; None is the identity.
+    # Real-to-sim joint sign and offset from tools/nexarm/probe_joint_mapping.py; None is the identity.
     joint_mapping_path: Path | None = None
 
     def __post_init__(self) -> None:

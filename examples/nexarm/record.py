@@ -40,10 +40,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-try:  # imported as a package module (tests) or run as a script
-    from examples.nexarm.camera_config import CameraSetupError, add_camera_args, build_camera_dicts
-except ModuleNotFoundError:
-    from camera_config import CameraSetupError, add_camera_args, build_camera_dicts  # type: ignore[no-redef]
+from lerobot_robot_nexarm.camera_config import CameraSetupError, add_camera_args, build_camera_dicts
 
 
 def parse_args():

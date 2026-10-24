@@ -458,7 +458,7 @@ The engine runs the hardware sessions, so it owns the robot's USB ports while a 
 Before deploying a policy trained in simulation onto the real arm, verify that the physical camera perspective and workspace match the simulation:
 
 ```bash
-uv run python examples/nexarm/calibrate_camera_alignment.py \
+uv run python tools/nexarm/calibrate_camera_alignment.py \
   --camera-name front \
   --cam-index 0
 ```

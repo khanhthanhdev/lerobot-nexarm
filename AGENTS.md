@@ -18,11 +18,17 @@ NexArm code is LeRobot plugins in `packages/` (uv workspace members, installed b
 | `lerobot_robot_nexarm/mobile_bi_nexarm_sim/`                   | `MobileBiNexArmSimConfig` + `MobileBiNexArmSim` (`mobile_bi_nexarm_sim`) — bimanual mobile sim                              |
 | `lerobot_robot_nexarm/{collection_merge,recording_session}.py` | Collection recording tools behind `examples/nexarm/record_collection.py`, incl. the manual-control keys                     |
 | `lerobot_robot_nexarm/{local_dataset,rerun_recording}.py`      | Local-only dataset loading; `.rrd` recording of the Rerun stream and `lerobot-nexarm-rollout`                               |
+| `lerobot_robot_nexarm/camera_config.py`                        | The `--front-cam`/`--wrist-cam`/`--top-cam` flags and camera configs shared by the examples and tools                       |
 | `lerobot_teleoperator_nexarm/`                                 | `NexArmLeaderConfig` + `NexArmLeader` (`nexarm_leader`) — read positions, leader→follower mapping                           |
 | `lerobot_env_nexarm/`                                          | `NexArmEnv` (`--env.type=nexarm`), the gym envs, `lerobot-nexarm-eval` (per-stage rates) and `lerobot-nexarm-sim-benchmark` |
 | `nexarm_service/`                                              | Desktop-app engine (`lerobot-nexarm-service`, `--extra service`)                                                            |
 | `sim/`                                                         | MuJoCo MJCF, URDF description, Isaac Lab configs, meshes, and exporters                                                     |
-| `examples/nexarm/`                                             | Ready-to-run scripts for teleoperate, record, and rollout                                                                   |
+| `sim/mobile_nexarm/`                                           | Mobile bimanual NexArm assets, ManiSkill/Isaac configs and video2sim                                                        |
+| `examples/nexarm/`                                             | Ready-to-run tutorials: teleoperate, record, rollout, the sim demos and sim dataset generators, ACT and TurboVLA launchers  |
+| `tools/nexarm/`                                                | Operational tools: arm/camera/sim calibration, joint-mapping and servo probes, dataset audits, merges, uploads, videos      |
+| `policies/`                                                    | Research policy plugins: `lerobot_policy_turbovla` (adapter for the pinned `turbovla` package), `lerobot_policy_bspline`    |
+| `experiments/`                                                 | One `YYMMDD-<slug>` folder per experiment: README (hypothesis, data, command, results) and its draccus configs              |
+| `firmware/`, `hardware/`                                       | Vendor controller firmware and protocol docs; mechanical, 3D-printing and reliability guidelines                            |
 
 ## Tech Stack
 
@@ -80,7 +86,7 @@ To move to a newer LeRobot, follow "Upgrading LeRobot" in `CONTRIBUTING.md`.
 - **`tests/`** — Pytest suite for the NexArm plugins, examples and scripts, organized by module; mocks in `tests/mocks/`. Policy tests sit in `policies/*/tests/`.
 - **`.github/workflows/`** — CI: `quality.yml` (pre-commit), `tests.yml` (NexArm and policy tests plus `make test-nexarm-ete`), `security.yml` (TruffleHog), `mobile_nexarm_sim.yml` (manual).
 - **`docs/`** — the numbered NexArm hardware tutorials; `docs/source/nexarm/` holds the pipeline, sim and TurboVLA guides. LeRobot's own docs are at <https://huggingface.co/docs/lerobot>.
-- **`examples/nexarm/`** — ready-to-run NexArm scripts; **`experiments/`** — one folder per experiment; **`scripts/`** — protocol vectors, GPU bootstrap, multi-GPU and Slurm launchers.
+- **`examples/nexarm/`** — ready-to-run NexArm tutorials; **`tools/nexarm/`** — calibration, probes and dataset tools; **`experiments/`** — one folder per experiment; **`scripts/`** — protocol vectors, GPU bootstrap, multi-GPU and Slurm launchers.
 - **`sim/`, `firmware/`, `hardware/`** — sim assets and exporters, vendor firmware, hardware files.
 - **`docker/`** — `Dockerfile.user` (CPU image of this repo).
 - **Root files**: `pyproject.toml` (the non-published `lerobot-nexarm` workspace root: lerobot pin, extras, tool config), `Makefile` (`build-user`, E2E targets), `uv.lock`, `CONTRIBUTING.md` & `README.md`.

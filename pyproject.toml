@@ -128,6 +128,7 @@ ignore = [
 "tests/**" = ["D"]
 "policies/*/tests/**" = ["D"]
 "examples/**" = ["D"]
+"tools/**" = ["D"]
 "scripts/**" = ["D"]
 "packages/**" = ["D"]
 "sim/**" = ["D"]
@@ -179,10 +180,8 @@ default.extend-ignore-identifiers-re = [
 ]
 
 [tool.pytest.ini_options]
-markers = [
-    "multigpu: distributed tests needing 2-4 GPUs (CI: docker_publish.yml lane)",
-    "multigpu_heavy: 8-GPU sweeps and soak tests; never run in CI",
-]
+# The tests import the example and tool scripts as `examples.nexarm.*` and `tools.nexarm.*`.
+pythonpath = ["."]
 
 [tool.mypy]
 python_version = "3.12"

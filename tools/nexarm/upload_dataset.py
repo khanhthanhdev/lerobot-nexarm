@@ -7,15 +7,15 @@ internet connection issues, timeout, or if --dataset.push_to_hub=false was used.
 
 Usage:
     # Upload an existing local dataset by repo_id:
-    uv run python examples/nexarm/upload_dataset.py --repo-id <username>/<dataset_name>
+    uv run python tools/nexarm/upload_dataset.py --repo-id <username>/<dataset_name>
 
     # Upload from a specific local directory to a target repo_id:
-    uv run python examples/nexarm/upload_dataset.py \
+    uv run python tools/nexarm/upload_dataset.py \
         --repo-id <username>/<dataset_name> \
         --root ~/.cache/huggingface/lerobot/<username>/<local_folder>
 
     # Chunked resumable upload (upload_large_folder) is the default; for one plain commit instead:
-    uv run python examples/nexarm/upload_dataset.py \
+    uv run python tools/nexarm/upload_dataset.py \
         --repo-id <username>/<dataset_name> \
         --no-large-folder
 """

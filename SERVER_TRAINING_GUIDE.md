@@ -92,7 +92,7 @@ mkdir -p datasets && tar -xzvf nexarm_dataset.tar.gz -C datasets
 
 ```bash
 # On local machine (upload the dataset root):
-uv run python examples/nexarm/upload_dataset.py \
+uv run python tools/nexarm/upload_dataset.py \
     --repo-id your_username/nexarm_stack_bowls_top \
     --root ~/.cache/huggingface/lerobot/thanhkt/nexarm_stack_bowls_top
 
