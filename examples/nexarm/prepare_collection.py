@@ -325,8 +325,7 @@ def main():
     log_path = output_dir / "recording.log"
     command = [
         sys.executable,
-        "-m",
-        "lerobot.scripts.lerobot_record",
+        str(REPO / "examples" / "nexarm" / "record_collection.py"),
         "--robot.type=nexarm_follower",
         f"--robot.port={args.follower_port}",
         f"--robot.cameras={json.dumps(configs)}",

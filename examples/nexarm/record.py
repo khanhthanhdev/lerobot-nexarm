@@ -2,7 +2,8 @@
 
 # Record a demonstration dataset with NexArm.
 #
-# This is a convenience wrapper around the lerobot-record CLI.
+# This is a convenience wrapper around examples/nexarm/record_collection.py, which runs
+# lerobot-record with the NexArm collection flags (--rerun_save_path, --root_repo_id, ...).
 # Replace YOUR_HF_USERNAME with your actual Hugging Face username
 # (run `huggingface-cli whoami` to confirm).
 #
@@ -37,6 +38,7 @@ import argparse
 import json
 import subprocess
 import sys
+from pathlib import Path
 
 try:  # imported as a package module (tests) or run as a script
     from examples.nexarm.camera_config import CameraSetupError, add_camera_args, build_camera_dicts
@@ -69,8 +71,7 @@ def main():
 
     cmd = [
         sys.executable,
-        "-m",
-        "lerobot.scripts.lerobot_record",
+        str(Path(__file__).with_name("record_collection.py")),
         "--robot.type=nexarm_follower",
         f"--robot.port={args.follower_port}",
         f"--robot.cameras={cameras_json}",

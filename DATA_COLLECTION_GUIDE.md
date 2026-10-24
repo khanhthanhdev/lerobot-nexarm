@@ -143,7 +143,7 @@ uv run python examples/nexarm/teleoperate.py \
 
 ## 4. Record Demonstrations
 
-`collect.sh` above is the recommended path. The equivalent `lerobot-record` command follows; its cameras must match the root (`thanhkt/nexarm_stack_bowls_top` has front, wrist and top).
+`collect.sh` above is the recommended path. The equivalent command follows. It runs `examples/nexarm/record_collection.py`, which is `lerobot-record` plus the NexArm collection flags (`--manual_control`, `--root_repo_id`, `--merge_root`, `--rerun_save_path`); its cameras must match the root (`thanhkt/nexarm_stack_bowls_top` has front, wrist and top).
 
 ### Step 4.1: Set Hugging Face User
 
@@ -155,7 +155,7 @@ export HF_USER="$(NO_COLOR=1 hf auth whoami | awk -F': *' 'NR==1 {print $2}')"
 ### Step 4.2: Run Recording Command
 
 ```bash
-uv run lerobot-record \
+uv run python examples/nexarm/record_collection.py \
     --robot.type=nexarm_follower \
     --robot.port=/dev/ttyUSB1 \
     --teleop.type=nexarm_leader \
@@ -177,7 +177,7 @@ uv run lerobot-record \
 
 For the 2-camera root, remove the `top` entry and use `--root_repo_id=thanhkt/nexarm_stack_bowls`.
 
-`lerobot-record` appends `_YYYYMMDD_HHMMSS` to `--dataset.repo_id` and prints the final `Dataset repo_id:` and `Dataset root:` when it finishes. Use that printed id in the commands below (shown as `${HF_USER}/nexarm_stack_bowls_<YYYYMMDD_HHMMSS>`), or the merged root `thanhkt/nexarm_stack_bowls_top`.
+The recorder appends `_YYYYMMDD_HHMMSS` to `--dataset.repo_id` and prints the final `Dataset repo_id:` and `Dataset root:` when it finishes. Use that printed id in the commands below (shown as `${HF_USER}/nexarm_stack_bowls_<YYYYMMDD_HHMMSS>`), or the merged root `thanhkt/nexarm_stack_bowls_top`.
 
 ### Key Parameter Explanations:
 
