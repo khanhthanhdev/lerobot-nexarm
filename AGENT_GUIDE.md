@@ -230,7 +230,7 @@ Match the policy to the user's **GPU memory** and **time budget**. Numbers below
 
 All policies typically train for **5–10 epochs** (see §7).
 
-> **Human-facing version:** the [Compute Hardware Guide](./docs/source/hardware_guide.mdx) reuses the table below and adds a cloud-GPU tier guide and a Hugging Face Jobs pointer.
+> **Human-facing version:** the [Compute Hardware Guide](https://huggingface.co/docs/lerobot/hardware_guide) reuses the table below and adds a cloud-GPU tier guide and a Hugging Face Jobs pointer.
 
 | Policy      | Batch | Update (ms) | Peak GPU mem (GB) | Best for                                                                                         |
 | ----------- | ----: | ----------: | ----------------: | ------------------------------------------------------------------------------------------------ |
@@ -253,7 +253,7 @@ All policies typically train for **5–10 epochs** (see §7).
 - **12–16 GB VRAM (4070/4080, A4000):** → `smolvla` with defaults, or `act`/`diffusion` with larger batch. `pi0`/`pi05`/`wall_x`/`xvla` feasible only with small batch + gradient accumulation.
 - **24+ GB VRAM (3090/4090/A5000):** → any policy. Prefer `smolvla` (unfrozen) for multi-task; `act` for single-task grasp-and-place (still often the best ROI). Could experiment with `pi0` or `pi05` or `xvla`
 - **80 GB (A100/H100):** → any, with healthy batch. `pi05`, `xvla`, `wall_x` become comfortable.
-- **CPU only:** → don't train here. Use Google Colab (see [`docs/source/notebooks.mdx`](./docs/source/notebooks.mdx)) or a rented GPU.
+- **CPU only:** → don't train here. Use Google Colab (see [`docs/source/notebooks.mdx`](https://huggingface.co/docs/lerobot/notebooks)) or a rented GPU.
 
 ### 6.3 Policy Compatibility Matrix on NexArm
 
@@ -384,8 +384,8 @@ lerobot-eval \
 
 - Use `--policy.path=outputs/train/.../checkpoints/<step>/pretrained_model` for local checkpoints.
 - `--eval.n_episodes` should be ≥ 50 for a stable success-rate estimate.
-- Available envs live in `src/lerobot/envs/`. See [`docs/source/libero.mdx`](./docs/source/libero.mdx), [`metaworld.mdx`](./docs/source/metaworld.mdx), [`robocasa.mdx`](./docs/source/robocasa.mdx), [`vlabench.mdx`](./docs/source/vlabench.mdx) for specific benchmarks.
-- To add a new benchmark, see [`docs/source/adding_benchmarks.mdx`](./docs/source/adding_benchmarks.mdx) and [`envhub.mdx`](./docs/source/envhub.mdx).
+- Available envs live in `src/lerobot/envs/`. See [`docs/source/libero.mdx`](https://huggingface.co/docs/lerobot/libero), [`metaworld.mdx`](https://huggingface.co/docs/lerobot/metaworld), [`robocasa.mdx`](https://huggingface.co/docs/lerobot/robocasa), [`vlabench.mdx`](https://huggingface.co/docs/lerobot/vlabench) for specific benchmarks.
+- To add a new benchmark, see [`docs/source/adding_benchmarks.mdx`](https://huggingface.co/docs/lerobot/adding_benchmarks) and [`envhub.mdx`](https://huggingface.co/docs/lerobot/envhub).
 
 ### 8.2b Dockerfiles for benchmark eval
 
@@ -460,8 +460,8 @@ For manipulation and stacking tasks, the recommended 3-camera layout consists of
 
 ## 11. Further reading & resources
 
-- **Getting started:** [`installation.mdx`](./docs/source/installation.mdx) · [`il_robots.mdx`](./docs/source/il_robots.mdx) · [What makes a good dataset](https://huggingface.co/blog/lerobot-datasets)
-- **Per-policy docs:** browse [`docs/source/*.mdx`](./docs/source/) (policies, hardware, benchmarks, advanced training).
+- **Getting started:** [`installation.mdx`](https://huggingface.co/docs/lerobot/installation) · [`il_robots.mdx`](https://huggingface.co/docs/lerobot/il_robots) · [What makes a good dataset](https://huggingface.co/blog/lerobot-datasets)
+- **Per-policy docs:** browse [the LeRobot docs](https://huggingface.co/docs/lerobot) (policies, hardware, benchmarks, advanced training).
 - **Community:** [Discord](https://discord.com/invite/s3KuuzsPFb) · [Hub `LeRobot` tag](https://huggingface.co/datasets?other=LeRobot) · [Dataset visualizer](https://huggingface.co/spaces/lerobot/visualize_dataset)
 
 > Keep this file current. If you learn a rule that would prevent a class of user mistakes, add it here and in [`AGENTS.md`](./AGENTS.md).

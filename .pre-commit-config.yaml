@@ -70,10 +70,6 @@ repos:
         name: Format Markdown with Prettier
         types_or: [markdown, mdx]
         args: [--prose-wrap=preserve]
-        # docs/source/api/ holds the generated API reference. Its `[[autodoc]]` blocks restrict output
-        # to an indented `- member` list, which prettier reads as a lazy paragraph continuation and
-        # joins onto one line — silently turning a member list into part of the directive.
-        exclude: ^docs/source/api/.*\.mdx$
 
   ##### Security #####
   - repo: https://github.com/gitleaks/gitleaks

@@ -8,11 +8,11 @@ TurboVLA trained with `lerobot-train --policy.type=turbovla` on LeRobot-format L
 
 ## Data
 
-| Field             | Value                                                                                    |
-| ----------------- | ---------------------------------------------------------------------------------------- |
-| Dataset `repo_id` | `lerobot/libero` (the dataset `docs/source/libero.mdx` recommends; MP4 video, 2 cameras) |
-| Revision          | `a1aaacb7f6cd6ee5fb43120f673cebb0cfea7dd4` (Hub head on 2026-10-24)                      |
-| Episodes used     | all 1693 (273,465 frames at 10 fps; `observation.state` 8-D, `action` 7-D)               |
+| Field             | Value                                                                                                                                |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Dataset `repo_id` | `lerobot/libero` (the dataset the [LeRobot LIBERO docs](https://huggingface.co/docs/lerobot/libero) recommend; MP4 video, 2 cameras) |
+| Revision          | `a1aaacb7f6cd6ee5fb43120f673cebb0cfea7dd4` (Hub head on 2026-10-24)                                                                  |
+| Episodes used     | all 1693 (273,465 frames at 10 fps; `observation.state` 8-D, `action` 7-D)                                                           |
 
 `HuggingFaceVLA/libero` (same demonstrations, PNG frames in parquet) also exists, at `86958911c0f959db2bbbdb107eb3e17c5f9c798e`; use it only if no video decoder works.
 

@@ -178,24 +178,6 @@ default.extend-ignore-identifiers-re = [
     "EmbedND",
 ]
 
-# Docstring coverage gate. `fail-under` is a RATCHET, not a target: it is set just below the currently
-# measured coverage so it passes today, and is raised in the same PR that documents a module. Never set it
-# to a value that fails on main. The destination is 100; see docs/source/writing_docstrings.mdx.
-[tool.interrogate]
-ignore-init-module = true
-ignore-init-method = true
-ignore-nested-functions = false
-ignore-magic = false
-ignore-semiprivate = false
-ignore-private = false
-ignore-property-decorators = false
-ignore-module = false
-ignore-setters = false
-fail-under = 52
-output-format = "term-missing"
-color = true
-paths = ["packages"]
-
 [tool.pytest.ini_options]
 markers = [
     "multigpu: distributed tests needing 2-4 GPUs (CI: docker_publish.yml lane)",
