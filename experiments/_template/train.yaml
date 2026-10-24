@@ -1,0 +1,23 @@
+# Copy into experiments/YYMMDD-slug/ and edit. Load with:
+#   uv run lerobot-train --config_path experiments/YYMMDD-slug/train.yaml
+dataset:
+  repo_id: local/nexarm_pick
+  # revision: <commit hash or tag of the dataset version you trained on>
+
+policy:
+  type: act
+  push_to_hub: false
+
+output_dir: experiments/YYMMDD-slug/outputs/train
+job_name: YYMMDD-slug
+seed: 1000
+batch_size: 32
+steps: 100000
+save_freq: 25000
+log_freq: 100
+# Set env and env_eval_freq to evaluate in sim during training.
+env_eval_freq: 0
+
+wandb:
+  enable: true
+  project: lerobot-nexarm

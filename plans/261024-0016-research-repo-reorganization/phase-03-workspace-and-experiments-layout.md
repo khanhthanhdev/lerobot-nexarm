@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "Workspace and experiments layout"
-status: pending
+status: completed
 priority: P1
 effort: "3h"
 dependencies: [2]
@@ -33,3 +33,8 @@ Create the uv workspace that the policy and NexArm plugin packages install from,
 
 ## Risk / Rollback
 Low. Revert the commit.
+
+## Execution notes (2026-10-24, branch `chore/upstream-sync`)
+- uv 0.13.0 accepts `members = ["policies/*", "packages/*"]` with no members yet; `uv lock` and `uv sync --locked` succeed with no lockfile change.
+- `.gitignore` needed no change: its existing `outputs/` rule (no leading slash) already ignores `outputs/` at any depth, including `experiments/*/outputs/` (checked with `git check-ignore`).
+- `experiments/_template/train.yaml` parses into `TrainPipelineConfig` (policy `act`, W&B on), and `lerobot-train --config_path experiments/_template/train.yaml --help` runs.
