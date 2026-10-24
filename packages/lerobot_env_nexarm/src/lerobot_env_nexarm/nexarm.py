@@ -14,6 +14,8 @@
 
 from __future__ import annotations
 
+import json
+import os
 from pathlib import Path
 from typing import Any, Literal
 
@@ -58,6 +60,9 @@ class _NexArmMujocoEnv(gym.Env):
     default_scene_path: Path = DEFAULT_SCENE_PATH
     environment_state_dim: int = 6
     task_description: str = ""
+    # Set by log_stages_to: where seeded episodes are logged, and the episode being tracked.
+    _stage_log: Path | None = None
+    _stage_episode: dict[str, Any] | None = None
 
     metadata = {
         "render_modes": ["rgb_array", "human"],
@@ -312,7 +317,33 @@ class _NexArmMujocoEnv(gym.Env):
         int_seed = int(seed) if seed is not None else int(self.np_random.integers(0, 2**31 - 1))
         status = self.task.reset(seed=int_seed, settle_steps=10)
         self._step_count = 0
-        return self._get_obs(), self._info(status)
+        info = self._info(status)
+        self._flush_stage_episode()
+        if self._stage_log is not None and seed is not None:
+            self._stage_episode = {"seed": int(seed), **self._stage_record(info)}
+        return self._get_obs(), info
+
+    def log_stages_to(self, prefix: str | None) -> None:
+        """Log each seeded episode's final ``stage/*`` flags to ``<prefix>.<pid>.jsonl``; ``None`` stops.
+
+        One JSON line per episode: ``seed``, ``success`` and ``stages``. Only episodes started by
+        ``reset(seed=...)`` are logged, so a vector env's autoreset episodes are left out.
+        """
+        self._flush_stage_episode()
+        self._stage_log = Path(f"{prefix}.{os.getpid()}.jsonl") if prefix is not None else None
+
+    @staticmethod
+    def _stage_record(info: dict[str, Any]) -> dict[str, Any]:
+        stages = {
+            key.removeprefix("stage/"): bool(value) for key, value in info.items() if key.startswith("stage/")
+        }
+        return {"success": bool(info.get("is_success", False)), "stages": stages}
+
+    def _flush_stage_episode(self) -> None:
+        if self._stage_episode is not None and self._stage_log is not None:
+            with self._stage_log.open("a", encoding="utf-8") as log:
+                log.write(json.dumps(self._stage_episode) + "\n")
+        self._stage_episode = None
 
     def step(
         self,
@@ -330,6 +361,10 @@ class _NexArmMujocoEnv(gym.Env):
         truncated = bool(self._step_count >= self.max_episode_steps)
         info = self._info(status)
         info["reward_components"] = dict(self._last_reward_components)
+        if self._stage_episode is not None:
+            self._stage_episode.update(self._stage_record(info))
+            if terminated or truncated:
+                self._flush_stage_episode()
 
         if self.render_mode == "human":
             self.render()
@@ -350,6 +385,7 @@ class _NexArmMujocoEnv(gym.Env):
         return None
 
     def close(self) -> None:
+        self._flush_stage_episode()
         if self._viewer is not None:
             self._viewer.close()
             self._viewer = None

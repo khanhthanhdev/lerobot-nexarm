@@ -581,6 +581,25 @@ def test_nexarm_env_config_forwards_assist_thresholds_to_stack_bowls_only():
         NexArmEnv(grasp_mode="physical")
 
 
+def test_stage_log_keeps_only_seeded_episodes(tmp_path):
+    import json
+
+    env = gym.make("NexArmStackBowls-v0", obs_type="state", max_episode_steps=2)
+    env.unwrapped.log_stages_to(str(tmp_path / "stages"))
+    env.reset(seed=7)
+    hold = env.unwrapped._get_agent_pos()
+    env.step(hold)
+    env.step(hold)  # truncated: the seeded episode is written
+    env.reset()  # an autoreset-style episode without a seed is not logged
+    env.step(hold)
+    env.close()
+
+    (log,) = tmp_path.glob("stages.*.jsonl")
+    records = [json.loads(line) for line in log.read_text().splitlines()]
+    assert [record["seed"] for record in records] == [7]
+    assert records[0]["success"] is False and not any(records[0]["stages"].values())
+
+
 def test_lerobot_eval_reports_stack_bowls_success_and_stage_rates():
     import mujoco
     from torch import nn
@@ -588,6 +607,7 @@ def test_lerobot_eval_reports_stack_bowls_success_and_stage_rates():
     from lerobot.configs.policies import PreTrainedConfig
     from lerobot.policies import PreTrainedPolicy
     from lerobot.scripts.lerobot_eval import eval_policy_all
+    from lerobot_env_nexarm.stage_eval import eval_policy_all_with_stages
 
     cfg = NexArmEnv(task="NexArmStackBowls-v0", obs_type="state", episode_length=30)
     envs = make_env(cfg, n_envs=1)
@@ -627,7 +647,8 @@ def test_lerobot_eval_reports_stack_bowls_success_and_stage_rates():
 
     identity = Identity()
 
-    info = eval_policy_all(
+    info = eval_policy_all_with_stages(
+        eval_policy_all,
         envs=envs,
         policy=StackThenHold(),
         env_preprocessor=identity,

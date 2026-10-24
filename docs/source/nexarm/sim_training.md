@@ -255,6 +255,9 @@ MUJOCO_GL=egl uv run lerobot-eval \
 
 The cameras, image size and normalization come from the checkpoint. In the stack-bowls scene the environment
 gives each episode the prompt of its sampled bowl order. Up to 10 episode videos are saved under `--output_dir`.
+`lerobot-eval` reports `pc_success`. For how far the failed episodes got, run `lerobot-nexarm-eval` with the
+same flags: it adds `pc_<stage>` (`pc_picked_middle`, `pc_nested_middle`, ...) to the log and to
+`eval_info.json`, and each episode's stage flags to its task's metrics.
 
 ### ACT (pick and place)
 
