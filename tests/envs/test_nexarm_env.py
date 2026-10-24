@@ -604,8 +604,16 @@ def test_lerobot_eval_reports_stack_bowls_success_and_stage_rates():
             self.stacked = True
             return observation["observation.state"].clone()
 
-    def identity(x):
-        return x
+    class Identity:
+        """A pass-through processor; eval resets processors before each batch of episodes."""
+
+        def __call__(self, x):
+            return x
+
+        def reset(self):
+            pass
+
+    identity = Identity()
 
     info = eval_policy_all(
         envs=envs,
