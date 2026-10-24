@@ -82,7 +82,6 @@ class LeRobotDatasetMetadata:
         *,
         repo_type: Literal["dataset", "bucket"] = "dataset",
         token: str | bool | None = None,
-        local_files_only: bool = False,
     ) -> None:
         """Load or download metadata for an existing LeRobot dataset.
 
@@ -110,11 +109,7 @@ class LeRobotDatasetMetadata:
                 token, ``True`` to require the locally stored token, ``False``
                 to disable authentication, or ``None`` to use the Hugging Face
                 Hub default.
-            local_files_only: If ``True``, fail on missing local metadata instead
-                of contacting the Hub. Cannot be combined with ``force_cache_sync``.
         """
-        if local_files_only and force_cache_sync:
-            raise ValueError("local_files_only cannot be combined with force_cache_sync.")
         if repo_type not in ("dataset", "bucket"):
             raise ValueError(f"repo_type must be 'dataset' or 'bucket', got {repo_type!r}")
 
@@ -142,18 +137,11 @@ class LeRobotDatasetMetadata:
         with metadata_lock:
             try:
                 if force_cache_sync or (
-                    not local_files_only
-                    and self._requested_root is None
-                    and has_legacy_hub_download_metadata(self.root)
+                    self._requested_root is None and has_legacy_hub_download_metadata(self.root)
                 ):
                     raise FileNotFoundError
                 self._load_metadata()
-            except (FileNotFoundError, NotADirectoryError) as exc:
-                if local_files_only:
-                    raise FileNotFoundError(
-                        f"Local dataset metadata is incomplete at {self.root}: {exc}. "
-                        "Restore the complete meta/ directory. Hub downloads are disabled for this dataset."
-                    ) from exc
+            except (FileNotFoundError, NotADirectoryError):
                 if self.repo_type != "bucket" and is_valid_version(self.revision):
                     if token is None:
                         self.revision = get_safe_version(self.repo_id, self.revision)

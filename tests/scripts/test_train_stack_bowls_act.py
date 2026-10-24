@@ -29,7 +29,7 @@ def test_local_dry_run_preserves_dataset_and_output_paths(monkeypatch, tmp_path,
         revision="main", total_episodes=4, total_frames=100, total_tasks=1, fps=30, features={}
     )
     metadata = Mock(return_value=meta)
-    monkeypatch.setattr(launcher, "LeRobotDatasetMetadata", metadata)
+    monkeypatch.setattr(launcher, "load_local_metadata", metadata)
     monkeypatch.setattr(launcher, "validate_metadata", Mock())
     monkeypatch.setattr(launcher, "resolve_policy", Mock(return_value=SimpleNamespace(chunk_size=100)))
     hub = Mock(side_effect=AssertionError("Local dry run must not query Hub"))
@@ -37,7 +37,7 @@ def test_local_dry_run_preserves_dataset_and_output_paths(monkeypatch, tmp_path,
     run = Mock()
     monkeypatch.setattr(launcher.subprocess, "run", run)
     launcher.main()
-    metadata.assert_called_once_with("owner/bowls", root=root, revision="main", local_files_only=True)
+    metadata.assert_called_once_with("owner/bowls", root=root, revision="main")
     command = capsys.readouterr().out
     assert "--dataset.repo_id=owner/bowls" in command
     assert f"--output_dir={tmp_path / 'result'}" in command

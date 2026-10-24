@@ -75,7 +75,6 @@ class LeRobotDataset(torch.utils.data.Dataset):
         repo_type: str = "dataset",
         token: str | bool | None = None,
         video_decoder_cache_size: int | None = None,
-        local_files_only: bool = False,
     ):
         """
         2 modes are available for instantiating this class, depending on 2 different use cases:
@@ -190,8 +189,6 @@ class LeRobotDataset(torch.utils.data.Dataset):
                 are already present in the local cache, this will be faster. However, files loaded might not
                 be in sync with the version on the hub, especially if you specified 'revision'. Defaults to
                 False.
-            local_files_only (bool, optional): Load only files already on disk. Raise an error for
-                incomplete metadata, episodes, or videos instead of contacting the Hub. Defaults to False.
             download_videos (bool, optional): Flag to download the videos. Note that when set to True but the
                 video files are already present on local disk, they won't be downloaded again. Defaults to
                 True.
@@ -265,7 +262,6 @@ class LeRobotDataset(torch.utils.data.Dataset):
             # an object-store root already refreshed its meta/ at localization
             force_cache_sync=force_cache_sync and self._storage_root is None,
             token=token,
-            local_files_only=local_files_only,
         )
         self.root = self.meta.root
         self.revision = self.meta.revision
@@ -338,18 +334,6 @@ class LeRobotDataset(torch.utils.data.Dataset):
 
         # Load actual data
         if force_cache_sync or not reader.try_load():
-            if local_files_only:
-                missing = [
-                    str(self.root / path)
-                    for path in reader.get_episodes_file_paths()
-                    if not (self.root / path).is_file()
-                ]
-                details = f" Missing files (up to 5): {', '.join(missing[:5])}." if missing else ""
-                raise FileNotFoundError(
-                    f"Local dataset data or videos are incomplete at {self.root}.{details} "
-                    "Restore all recorded episodes and referenced video files. "
-                    "Hub downloads are disabled for this dataset."
-                )
             if self.revision is not None and is_valid_version(self.revision):
                 if token is None:
                     self.revision = get_safe_version(self.repo_id, self.revision)

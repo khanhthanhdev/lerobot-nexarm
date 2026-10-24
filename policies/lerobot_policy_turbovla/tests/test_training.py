@@ -41,17 +41,16 @@ TOTAL_STEPS = 10
 @pytest.fixture(scope="module")
 def dataset(nexarm_dataset_root):
     """Episode 143 with `HORIZON`-step action chunks."""
-    from lerobot.datasets.lerobot_dataset import LeRobotDataset, LeRobotDatasetMetadata
+    from lerobot_robot_nexarm.local_dataset import load_local_dataset, load_local_metadata
 
     try:
-        meta = LeRobotDatasetMetadata(DATASET_REPO_ID, nexarm_dataset_root, local_files_only=True)
+        meta = load_local_metadata(DATASET_REPO_ID, nexarm_dataset_root)
         delta_timestamps = {ACTION: [i / max(1, meta.fps) for i in range(HORIZON)]}
-        return LeRobotDataset(
+        return load_local_dataset(
             DATASET_REPO_ID,
-            root=nexarm_dataset_root,
+            nexarm_dataset_root,
             episodes=[EPISODE],
             delta_timestamps=delta_timestamps,
-            local_files_only=True,
         )
     except FileNotFoundError as error:
         pytest.skip(f"Episode {EPISODE} of {DATASET_REPO_ID} is not available locally: {error}")
