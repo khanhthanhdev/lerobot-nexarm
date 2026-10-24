@@ -36,7 +36,7 @@ def disable_input_listeners() -> None:
     """
     from lerobot.rollout.strategies import dagger, episodic
 
-    episodic.init_keyboard_listener = lambda **_: (None, new_episodic_events())
+    episodic.init_keyboard_listener = lambda **_: (None, new_episodic_events())  # type: ignore[attr-defined]
     dagger._init_dagger_keyboard = lambda events, cfg: None
     dagger._init_dagger_pedal = lambda events, cfg: None
 
@@ -57,7 +57,7 @@ class RolloutApi:
         from lerobot.rollout.configs import BaseStrategyConfig, EpisodicStrategyConfig
 
         policy = PreTrainedConfig.from_pretrained(checkpoint)
-        policy.pretrained_path = checkpoint
+        policy.pretrained_path = Path(checkpoint)
         task = str(params.get("task", ""))
         dataset = None
         strategy: Any = BaseStrategyConfig()

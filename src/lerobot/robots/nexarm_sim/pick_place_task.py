@@ -172,7 +172,7 @@ class NexArmPickPlaceTask:
             hold_time_s=hold_time,
             is_grasped=self._is_grasped(),
             is_released=released,
-            is_inside_target=inside,
+            is_inside_target=bool(inside),
         )
 
     def _is_released(self) -> bool:

@@ -279,11 +279,11 @@ def _log_episode_step(
         if isinstance(value, np.ndarray) and value.ndim == 3:
             recording.log(f"observation/images/{key}", rr.Image(value).compress())
         elif np.isscalar(value):
-            recording.log(f"observation/state/{key}", rr.Scalars(float(value)))
+            recording.log(f"observation/state/{key}", rr.Scalars(float(np.asarray(value))))
         elif isinstance(value, np.ndarray) and value.ndim == 1:
             recording.log(f"observation/state/{key}", rr.Scalars(value.astype(float)))
     for key, value in action.items():
-        recording.log(f"action/{key}", rr.Scalars(float(value)))
+        recording.log(f"action/{key}", rr.Scalars(float(np.asarray(value))))
 
 
 def _run_episode(
@@ -366,7 +366,8 @@ def benchmark_policy(spec: PolicySpec, args: argparse.Namespace) -> dict[str, An
         camera_height=args.camera_height,
         camera_width=args.camera_width,
     )
-    from lerobot.rollout import BaseStrategyConfig, RolloutConfig, SyncInferenceConfig, build_rollout_context
+    from lerobot.inference import SyncInferenceConfig
+    from lerobot.rollout import BaseStrategyConfig, RolloutConfig, build_rollout_context
 
     rollout_cfg = RolloutConfig(
         robot=NexArmSimConfig(
@@ -398,6 +399,8 @@ def benchmark_policy(spec: PolicySpec, args: argparse.Namespace) -> dict[str, An
         _cuda_synchronize(device)
         load_time_s = time.perf_counter() - load_started
         load_peak_gpu_gb = _cuda_peak_gb(device)
+        if ctx.policy.policy is None:
+            raise RuntimeError("The rollout context loaded no local policy")
         parameter_count = sum(parameter.numel() for parameter in ctx.policy.policy.parameters())
 
         robot = ctx.hardware.robot_wrapper.inner

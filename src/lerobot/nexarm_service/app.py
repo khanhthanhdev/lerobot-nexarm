@@ -37,6 +37,7 @@ from lerobot.nexarm_service.session import (
     SessionKind,
     SessionManager,
     Worker,
+    WorkerFactory,
 )
 from lerobot.nexarm_service.teleop import TeleopWorker
 from lerobot.utils.constants import HF_LEROBOT_HOME
@@ -131,7 +132,7 @@ class _State:
         }
         self.jobs = JobManager(home, self.events, runners)
         self.models = ModelStore(home, self.jobs, self.dataset_store)
-        factories = {
+        factories: dict[SessionKind, WorkerFactory] = {
             SessionKind.teleoperation: self._teleop,
             SessionKind.recording: self._recording,
             SessionKind.replay: self._replay,

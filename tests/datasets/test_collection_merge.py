@@ -189,8 +189,8 @@ def test_precheck_new_root_is_allowed(monkeypatch, tmp_path):
 
 
 def record_config(tmp_path, root_dir):
-    from lerobot.configs.dataset import DatasetRecordConfig
     from examples.nexarm.record_collection import CollectionRecordConfig
+    from lerobot.configs.dataset import DatasetRecordConfig
     from tests.mocks.mock_robot import MockRobotConfig
     from tests.mocks.mock_teleop import MockTeleopConfig
 

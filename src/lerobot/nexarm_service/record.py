@@ -131,7 +131,7 @@ class RecordingWorker(ArmWorker):
             ),
         )
         cameras = len(follower.cameras)
-        writer_kwargs = {
+        writer_kwargs: dict[str, Any] = {
             "image_writer_processes": self._cfg.num_image_writer_processes,
             "image_writer_threads": self._cfg.num_image_writer_threads_per_camera * cameras,
             "batch_encoding_size": self._cfg.video_encoding_batch_size,

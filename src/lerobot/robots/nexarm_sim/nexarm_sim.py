@@ -16,9 +16,9 @@ from __future__ import annotations
 
 from functools import cached_property
 
+from lerobot.lerobot_types import RobotAction, RobotObservation
 from lerobot.motors.nexarm.mujoco_mapping import load_joint_mapping
 from lerobot.motors.nexarm.nexarm import JOINT_NAMES
-from lerobot.lerobot_types import RobotAction, RobotObservation
 from lerobot.utils.decorators import check_if_already_connected, check_if_not_connected
 
 from ..robot import Robot

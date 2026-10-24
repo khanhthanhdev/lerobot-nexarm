@@ -35,6 +35,7 @@ import math
 import struct
 import threading
 import time
+from collections.abc import Sequence
 
 import serial
 
@@ -122,7 +123,7 @@ def parse_frame(data: bytes) -> tuple[int, int, bytes] | None:
     return (device_id, cmd, bytes(args))
 
 
-def map_leader_to_follower(leader_pos: list[int | float]) -> list[int]:
+def map_leader_to_follower(leader_pos: Sequence[int | float]) -> list[int]:
     """Map leader (master) raw positions to follower (slave) positions.
 
     ID2 (shoulder_lift): mirrored → 4096 - pos

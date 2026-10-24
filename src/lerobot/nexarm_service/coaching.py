@@ -171,8 +171,8 @@ class CoachingWorker(RolloutWorker):
         if action not in _PLANS:
             raise ValueError(f"this session does not support the {action!r} control")
         phase = self.phase()
-        plan = _PLANS[action].get(phase)
-        if plan is None:
+        chain = _PLANS[action].get(phase)
+        if chain is None:
             raise ValueError(f"{action} is not possible while the policy is {phase}")
         if action == "drop_last":
             self._discard_next = True
@@ -180,7 +180,7 @@ class CoachingWorker(RolloutWorker):
             self._strategy.config.num_episodes += 1
         if action in ("takeover", "handback", "resume"):
             self._hold_action = None
-        self._run_chain(plan)
+        self._run_chain(chain)
         return self.status()
 
     def _run_chain(self, steps: list[tuple[str, str]], then: Any = None) -> None:

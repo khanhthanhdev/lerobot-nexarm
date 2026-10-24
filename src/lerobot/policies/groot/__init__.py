@@ -27,6 +27,7 @@ __all__ = ["GrootConfig", "GrootPolicy", "make_groot_pre_post_processors"]
 
 def __getattr__(name: str) -> Any:
     """Load GR00T's model and processors only when requested by a GR00T caller."""
+    value: Any
     if name == "GrootPolicy":
         from .modeling_groot import GrootPolicy
 

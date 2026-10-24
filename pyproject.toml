@@ -529,6 +529,10 @@ ignore = [
 # Package root: two one-line docstring fixes land with the docstring PR.
 "src/lerobot/__init__.py" = ["D"]
 "src/lerobot/__version__.py" = ["D"]
+# NexArm fork code that upstream's list does not cover; still on the old docstring style.
+"src/lerobot/nexarm_service/**" = ["D"]
+"sim/**" = ["D"]
+"plans/**" = ["D"]
 [tool.ruff.lint.isort]
 combine-as-imports = true
 known-first-party = ["lerobot"]

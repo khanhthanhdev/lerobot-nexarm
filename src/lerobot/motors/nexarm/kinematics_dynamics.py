@@ -152,7 +152,7 @@ class NexArmKinematicsDynamics:
         rpy_rad = rotation_matrix_to_rpy(R)
         rpy_deg = np.rad2deg(rpy_rad)
 
-        quat = np.zeros(4, dtype=np.float64)
+        quat: np.ndarray = np.zeros(4, dtype=np.float64)
         mujoco.mju_mat2Quat(quat, self.data.site_xmat[self.site_id])
 
         return {

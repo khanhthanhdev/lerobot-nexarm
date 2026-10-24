@@ -106,7 +106,7 @@ class DatasetOps:
         self._require_source(repo_id)
         target = self._require_new(output_repo_id)
         dataset = self._open(repo_id)
-        added: dict[str, tuple[np.ndarray, dict[str, Any]]] = {}
+        added: dict[str, tuple[Any, dict]] = {}
         for name, spec in (add or {}).items():
             values = np.asarray(spec["values"], dtype=spec["dtype"])
             if len(values) != dataset.meta.total_frames:

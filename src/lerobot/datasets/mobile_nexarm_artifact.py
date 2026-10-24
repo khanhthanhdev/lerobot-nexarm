@@ -225,7 +225,7 @@ def validate_episode_artifact(
         raise ValueError("trajectory contains non-finite values")
     if len(timestamp) > 1:
         expected_dt = 1 / int(metadata["fps"])
-        drift = np.max(np.abs(np.diff(timestamp) - expected_dt))
+        drift = float(np.max(np.abs(np.diff(timestamp) - expected_dt)))
         if drift > timestamp_tolerance_s:
             raise ValueError(f"timestamps drift by {drift:.6f}s from {metadata['fps']} FPS")
     for camera in metadata.get("cameras", []):

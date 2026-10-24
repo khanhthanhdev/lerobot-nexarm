@@ -77,7 +77,7 @@ class LocalRunner(JobRunner):
     def start(self, job: Job, sink: JobSink, output_dir: Path) -> None:
         command = build_train_command(job, self._store, output_dir)
         env = {**os.environ, "PYTHONUNBUFFERED": "1", "PYTHONIOENCODING": "utf-8"}
-        flags = subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0  # type: ignore[attr-defined]
+        flags = subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0
         proc = subprocess.Popen(  # noqa: S603  (argument list, no shell; values validated by the request model)
             command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env, creationflags=flags
         )
@@ -115,7 +115,7 @@ class LocalRunner(JobRunner):
     def _pump(self, job_id: str, proc: subprocess.Popen[bytes], sink: JobSink) -> None:
         assert proc.stdout is not None
         pending = ""
-        for chunk in iter(lambda: proc.stdout.read1(4096), b""):  # type: ignore[union-attr]
+        for chunk in iter(lambda: proc.stdout.read1(4096), b""):  # type: ignore[union-attr,attr-defined]
             parts = _LINE_SPLIT.split(pending + chunk.decode("utf-8", errors="replace"))
             pending = parts.pop()
             for text in parts:

@@ -253,7 +253,7 @@ class _NexArmMujocoEnv(gym.Env):
         if self.control_mode == "raw":
             return np.array([raw_positions[f"{name}.pos"] for name in JOINT_NAMES], dtype=np.float32)
 
-        normalized = np.zeros(6, dtype=np.float32)
+        normalized: np.ndarray = np.zeros(6, dtype=np.float32)
         for i, name in enumerate(JOINT_NAMES):
             raw = raw_positions[f"{name}.pos"]
             low, high = RAW_RANGES[name]

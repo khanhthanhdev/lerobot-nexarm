@@ -37,7 +37,7 @@ PICK_LIFT_M = 0.02
 ARM_STATIC_MAX_SPEED_RAD_S = 0.1
 # The task's stages, in the order a successful episode reaches them. Each latches once reached.
 STAGES = ("picked_middle", "nested_middle", "released_middle", "picked_top", "nested_top", "released_top")
-PERMUTATIONS: list[tuple[str, str, str]] = list(itertools.permutations(COLORS))
+PERMUTATIONS: list[tuple[str, str, str]] = [(a, b, c) for a, b, c in itertools.permutations(COLORS)]
 # 6 permutations:
 # 1. ('red', 'blue', 'black')
 # 2. ('red', 'black', 'blue')

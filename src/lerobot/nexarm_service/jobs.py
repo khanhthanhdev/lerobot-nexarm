@@ -12,6 +12,7 @@ Future runners (a managed cloud GPU service) only implement ``JobRunner``.
 
 from __future__ import annotations
 
+import builtins
 import logging
 import re
 import threading
@@ -187,7 +188,7 @@ class JobManager:
         with self._lock:
             return self._jobs[job_id].model_copy()
 
-    def logs(self, job_id: str, tail: int = 200, offset: int | None = None) -> list[str]:
+    def logs(self, job_id: str, tail: int = 200, offset: int | None = None) -> builtins.list[str]:
         """The last ``tail`` lines, or every line from ``offset`` on (how a remote runner follows the log)."""
         self.get(job_id)
         f = self._job_dir(job_id) / "train.log"
@@ -196,7 +197,7 @@ class JobManager:
         lines = f.read_text(encoding="utf-8", errors="replace").splitlines()
         return lines[offset:] if offset is not None else lines[-tail:]
 
-    def metrics(self, job_id: str) -> list[MetricPoint]:
+    def metrics(self, job_id: str) -> builtins.list[MetricPoint]:
         self.get(job_id)
         f = self._job_dir(job_id) / "metrics.jsonl"
         if not f.is_file():
@@ -207,7 +208,7 @@ class JobManager:
             if line
         ]
 
-    def checkpoints(self, job_id: str) -> list[dict[str, Any]]:
+    def checkpoints(self, job_id: str) -> builtins.list[dict[str, Any]]:
         job = self.get(job_id)
         runner = self._runners[job.runner]
         out = []
