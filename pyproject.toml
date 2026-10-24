@@ -346,7 +346,6 @@ all = [
     # helps pip's resolver converge by constraining scipy early, before it encounters
     # the loose scipy requirements from transitive deps like dm-control and metaworld.
     "scipy>=1.14.0,<2.0.0",
-    "lerobot[nexarm]",
     "lerobot[dynamixel]",
     "lerobot[feetech]",
     "lerobot[damiao]",
