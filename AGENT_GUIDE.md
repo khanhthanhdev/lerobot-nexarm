@@ -116,7 +116,7 @@ The `lerobot-*` CLIs open only the cameras in `--robot.cameras`; drop the `top` 
 ```bash
 HF_USER=$(NO_COLOR=1 hf auth whoami | awk -F': *' 'NR==1 {print $2}')
 
-uv run lerobot-record \
+uv run python examples/nexarm/record_collection.py \
   --robot.type=nexarm_follower --robot.port=/dev/ttyUSB1 \
   --teleop.type=nexarm_leader  --teleop.port=/dev/ttyUSB0 \
   --robot.cameras="{ front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30}, wrist: {type: opencv, index_or_path: 1, width: 640, height: 480, fps: 30}, top: {type: intelrealsense, serial_number_or_name: <REALSENSE_SERIAL>, width: 640, height: 480, fps: 30}}" \
@@ -128,7 +128,7 @@ uv run lerobot-record \
   --display_data=true
 ```
 
-`lerobot-record` appends `_YYYYMMDD_HHMMSS` to the repo id (e.g. `${HF_USER}/nexarm_cube_pick_20261011_093000`) and prints the final `Dataset repo_id:` and `Dataset root:` at the end. Use that printed id in §4.6–4.7 (shown as `<YYYYMMDD_HHMMSS>`). Leave `--dataset.root` unset (a fixed root fails on the second run).
+`record_collection.py` is `lerobot-record` with the NexArm collection flags added and takes the same flags. It appends `_YYYYMMDD_HHMMSS` to the repo id (e.g. `${HF_USER}/nexarm_cube_pick_20261011_093000`) and, unlike upstream's plain `lerobot-record`, prints the final `Dataset repo_id:` and `Dataset root:` at the end. Use that printed id in §4.6–4.7 (shown as `<YYYYMMDD_HHMMSS>`). Leave `--dataset.root` unset (a fixed root fails on the second run).
 
 **4.6 Replay an episode** (sanity check)
 

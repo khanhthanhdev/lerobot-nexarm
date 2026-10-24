@@ -75,7 +75,7 @@ Domain randomization (lighting, textures, colors, dynamics, bowl friction/mass) 
 
 ### Path B: Transfer Locally Recorded Teleoperation Dataset to Server
 
-Real recordings live under `~/.cache/huggingface/lerobot/`: the collection launcher merges into `thanhkt/nexarm_stack_bowls_top`, and `record.py` / `lerobot-record` print the timestamped `Dataset root:` of each session.
+Real recordings live under `~/.cache/huggingface/lerobot/`: the collection launcher merges into `thanhkt/nexarm_stack_bowls_top`, and `record.py` / `examples/nexarm/record_collection.py` print the timestamped `Dataset root:` of each session.
 
 ```bash
 # 1. On your local machine, compress the dataset root:

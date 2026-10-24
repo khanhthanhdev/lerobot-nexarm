@@ -383,8 +383,8 @@ uv run python examples/nexarm/record.py \
     --episode-time 12 \
     --reset-time 8
 
-# Using lerobot-record CLI directly
-uv run lerobot-record \
+# Using the lerobot-record flags directly (record_collection.py is lerobot-record plus the NexArm collection flags)
+uv run python examples/nexarm/record_collection.py \
     --robot.type=nexarm_follower --robot.port=/dev/ttyUSB1 \
     --teleop.type=nexarm_leader  --teleop.port=/dev/ttyUSB0 \
     --robot.cameras='{"front":{"type":"opencv","index_or_path":0,"width":640,"height":480,"fps":30},"wrist":{"type":"opencv","index_or_path":1,"width":640,"height":480,"fps":30},"top":{"type":"intelrealsense","serial_number_or_name":"<REALSENSE_SERIAL>","width":640,"height":480,"fps":30}}' \
@@ -399,7 +399,7 @@ uv run lerobot-record \
 
 `lerobot-record` pushes to the Hub by default; keep `--dataset.push_to_hub=false` for a `local/` id (use `<hf_user>/...` to upload). `record.py` records front, wrist and the RealSense top camera by default (add `--no-top-cam` for front and wrist only); `--fps` sets both the camera and dataset frame rate. For the stack-bowls collection rig with automatic merging, use [`DATA_COLLECTION_GUIDE.md`](DATA_COLLECTION_GUIDE.md) instead.
 
-**The recorder appends a timestamp to the repo id.** `local/nexarm_pick_cube` is saved as e.g. `local/nexarm_pick_cube_20261011_093000` under `~/.cache/huggingface/lerobot/`, and the final `Dataset repo_id:` and `Dataset root:` are printed when recording ends. Use that printed id in every follow-up command below (shown as `local/nexarm_pick_cube_<YYYYMMDD_HHMMSS>`).
+**The recorder appends a timestamp to the repo id.** `local/nexarm_pick_cube` is saved as e.g. `local/nexarm_pick_cube_20261011_093000` under `~/.cache/huggingface/lerobot/`, and `record.py` / `record_collection.py` print the final `Dataset repo_id:` and `Dataset root:` when recording ends (upstream's plain `lerobot-record` does not print them; use the newest `<name>_YYYYMMDD_HHMMSS` folder in the cache instead). Use that printed id in every follow-up command below (shown as `local/nexarm_pick_cube_<YYYYMMDD_HHMMSS>`).
 
 **Episode Controls During Recording:**
 

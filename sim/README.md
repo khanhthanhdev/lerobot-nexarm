@@ -340,7 +340,7 @@ after the last seed logged in `generation_episodes.jsonl`, which it requires.
 Set a Hub-compatible repository ID even when keeping the dataset local:
 
 ```bash
-uv run lerobot-record \
+uv run python examples/nexarm/record_collection.py \
   --robot.type=nexarm_sim \
   --robot.id=nexarm_sim \
   --robot.model_path=sim/description/mjcf/scene.xml \
@@ -358,8 +358,8 @@ uv run lerobot-record \
 ```
 
 The dataset contains six raw joint state values, six raw action values, and the
-front, wrist and top RGB streams. `lerobot-record` appends `_YYYYMMDD_HHMMSS`
-to the repo id and prints the final `Dataset repo_id:` and `Dataset root:`
+front, wrist and top RGB streams. `record_collection.py` takes the `lerobot-record`
+flags, appends `_YYYYMMDD_HHMMSS` to the repo id and prints the final `Dataset repo_id:` and `Dataset root:`
 (under `~/.cache/huggingface/lerobot/`); pass those to visualization, replay
 and training. A fixed `--dataset.root` is not timestamped and fails with
 `FileExistsError` on the second run, so leave it unset or make it unique per
