@@ -19,7 +19,6 @@ lerobot-nexarm-eval = "lerobot_env_nexarm.stage_eval:main"
 lerobot-nexarm-sim-benchmark = "lerobot_env_nexarm.sim_benchmark:main"
 
 [tool.uv.sources]
-lerobot = { workspace = true }
 lerobot_robot_nexarm = { workspace = true }
 
 [tool.setuptools.packages.find]

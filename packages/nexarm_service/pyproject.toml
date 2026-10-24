@@ -21,7 +21,6 @@ dependencies = [
 lerobot-nexarm-service = "nexarm_service.cli:main"
 
 [tool.uv.sources]
-lerobot = { workspace = true }
 lerobot_robot_nexarm = { workspace = true }
 lerobot_teleoperator_nexarm = { workspace = true }
 

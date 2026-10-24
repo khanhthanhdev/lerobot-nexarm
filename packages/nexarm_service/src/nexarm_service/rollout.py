@@ -36,7 +36,7 @@ def disable_input_listeners() -> None:
     """
     from lerobot.rollout.strategies import dagger, episodic
 
-    episodic.init_keyboard_listener = lambda **_: (None, new_episodic_events())  # type: ignore[attr-defined]
+    episodic.init_keyboard_listener = lambda **_: (None, new_episodic_events())
     dagger._init_dagger_keyboard = lambda events, cfg: None
     dagger._init_dagger_pedal = lambda events, cfg: None
 
@@ -58,7 +58,7 @@ class RolloutApi:
 
         policy = PreTrainedConfig.from_pretrained(checkpoint)
         # A Hub id must stay a str: Path() would turn "user/model" into "user\model" on Windows.
-        policy.pretrained_path = checkpoint  # type: ignore[assignment]
+        policy.pretrained_path = checkpoint
         task = str(params.get("task", ""))
         dataset = None
         strategy: Any = BaseStrategyConfig()

@@ -18,7 +18,6 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-lerobot = { workspace = true }
 lerobot_robot_nexarm = { workspace = true }
 
 [tool.setuptools.packages.find]

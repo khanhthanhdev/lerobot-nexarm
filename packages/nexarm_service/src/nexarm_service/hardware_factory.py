@@ -21,7 +21,7 @@ def opencv_camera_config(cam: CameraProfile) -> OpenCVCameraConfig:
     source: int | str = int(cam.source) if cam.source.isdigit() else cam.source
     # A str source stays a str: Path() would collapse the "//" of a stream URL.
     return OpenCVCameraConfig(
-        index_or_path=source,  # type: ignore[arg-type]
+        index_or_path=source,
         width=cam.width,
         height=cam.height,
         fps=cam.fps,

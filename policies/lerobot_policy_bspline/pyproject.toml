@@ -15,8 +15,5 @@ dependencies = [
     "scipy>=1.15.0,<2.0.0",  # scipy.interpolate.generate_knots
 ]
 
-[tool.uv.sources]
-lerobot = { workspace = true }
-
 [tool.setuptools.packages.find]
 where = ["src"]

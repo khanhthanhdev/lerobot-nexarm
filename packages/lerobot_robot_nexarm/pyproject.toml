@@ -11,13 +11,12 @@ requires-python = ">=3.12"
 # The collection tools (collection_merge, recording_session, mobile_nexarm_artifact) also need lerobot[dataset].
 dependencies = [
     "lerobot[pyserial-dep,deepdiff-dep]",
+    # The nexarm_sim and mobile_bi_nexarm_sim robots.
+    "mujoco>=3.8.1",
 ]
 
 [project.scripts]
 lerobot-nexarm-rollout = "lerobot_robot_nexarm.rerun_recording:rollout_main"
-
-[tool.uv.sources]
-lerobot = { workspace = true }
 
 [tool.setuptools.packages.find]
 where = ["src"]

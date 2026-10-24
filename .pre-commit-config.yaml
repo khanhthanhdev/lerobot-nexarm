@@ -15,8 +15,6 @@
 default_language_version:
     python: python3.12
 
-exclude: "tests/artifacts/.*\\.safetensors$"
-
 repos:
   ##### Meta #####
   - repo: meta
@@ -61,8 +59,8 @@ repos:
     hooks:
     -   id: pyupgrade
         args: [--py312-plus]
-        # Keep generated protobuf sources identical to protoc's output; firmware is vendor code.
-        exclude: ^(firmware/|src/lerobot/transport/.*_pb2(?:_grpc)?\.py$)
+        # Firmware is vendor code.
+        exclude: ^firmware/
 
   ##### Markdown Quality #####
   - repo: https://github.com/rbubley/mirrors-prettier
@@ -72,13 +70,10 @@ repos:
         name: Format Markdown with Prettier
         types_or: [markdown, mdx]
         args: [--prose-wrap=preserve]
-        # Jinja2 model-card templates use a .md extension but contain {% ... %} /
-        # {{ ... }} tags that prettier's Markdown formatter mangles (e.g. table loops).
-        #
         # docs/source/api/ holds the generated API reference. Its `[[autodoc]]` blocks restrict output
         # to an indented `- member` list, which prettier reads as a lazy paragraph continuation and
         # joins onto one line — silently turning a member list into part of the directive.
-        exclude: ^(src/lerobot/templates/.*\.md|docs/source/api/.*\.mdx)$
+        exclude: ^docs/source/api/.*\.mdx$
 
   ##### Security #####
   - repo: https://github.com/gitleaks/gitleaks
@@ -112,7 +107,7 @@ repos:
           - "pyzmq>=26.2.1,<28.0.0"
         pass_filenames: false
         types_or: [python, pyi, toml]
-        files: ^(src/lerobot/|packages/[^/]+/src/|scripts/|utils/|conftest\.py$|setup\.py$|pyproject\.toml$)
+        files: ^(packages/[^/]+/src/|scripts/|pyproject\.toml$)
 
   ##### Docstring Checks #####
   # - repo: https://github.com/akaihola/darglint2
