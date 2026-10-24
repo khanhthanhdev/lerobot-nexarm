@@ -27,11 +27,12 @@ All 10 failures are environment problems (MuJoCo has no OpenGL context on this b
 
 ## Linux GPU server
 
-Not run yet: this session has no access to the server. Run these at `pre-reorg` and fill in the results:
+Recorded on 2026-10-24 on `marinelab` (Ubuntu 24.04, RTX 5050 8 GB, `MUJOCO_GL=egl`), in fresh worktrees synced with `uv sync --locked --extra test --extra dev --extra viz --extra service --extra training` (the branch adds `--extra turbovla`). Without `--extra training`, `test_nexarm_train_eval_integration` fails because `accelerate` is missing.
 
-```bash
-git checkout pre-reorg
-uv run pytest tests -k nexarm -q
-uv run pytest tests/nexarm_service -q
-make test-nexarm-ete
-```
+| Command | `pre-reorg` (`c96f8b20`) | `chore/upstream-sync` (`86d7f4b5`) |
+|---|---|---|
+| `uv run pytest tests -k nexarm -q` | 348 passed, 26 skipped | 348 passed, 26 skipped |
+| `uv run pytest tests/nexarm_service -q` | 128 passed | 128 passed |
+| `make test-nexarm-ete` | 3 passed | 3 passed |
+
+On the branch, `uv run pytest policies packages tests/utils/test_rerun_save_path.py tests/scripts/test_record_collection.py` gives 26 passed. With `TURBOVLA_PARITY_DATASET_ROOT` pointing at a full download of `thanhkt/nexarm_stack_bowls@64ce8aeb`, the TurboVLA plugin tests give 14 passed; the 2 `[trained]` inference-parity cases do not apply to the only trained checkpoint on the server, which uses three cameras while that dataset has two.
