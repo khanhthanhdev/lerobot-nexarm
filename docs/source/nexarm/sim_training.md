@@ -7,7 +7,7 @@ The steps:
 
 1. Set up the machine.
 2. Generate the simulation datasets (rendering spread across GPUs).
-3. Train TurboVLA with `torchrun` (PyTorch DDP).
+3. Train TurboVLA with Accelerate.
 4. Train ACT with Accelerate.
 5. Evaluate the checkpoints in simulation.
 
@@ -128,87 +128,62 @@ outputs/datasets/nexarm_stack_bowls_eval`.
 
 ## 2. Train TurboVLA on several GPUs
 
-`examples/nexarm/train_turbovla.py` uses PyTorch DDP when started with `torchrun`: every GPU holds a full copy
-of the model, reads a different part of each batch, and gradients are averaged. The first process (rank 0)
-prints logs and writes checkpoints.
+TurboVLA trains with `lerobot-train --policy.type=turbovla`, started through Accelerate (DDP) for several
+GPUs: every GPU holds a full copy of the model, reads a different part of each batch, and gradients are
+averaged. The main process prints logs and writes checkpoints.
 
 ### Stack bowls, 4 GPUs
 
 ```bash
-CUDA_VISIBLE_DEVICES=0,1,2,3 uv run torchrun --nproc_per_node=4 --master_port=29500 \
-    examples/nexarm/train_turbovla.py \
-    --sim-dataset-root outputs/datasets/nexarm_stack_bowls \
-    --output-dir outputs/train/turbovla_stack_bowls_4gpu \
-    --batch-size 16 \
-    --max-steps 50000 \
-    --save-steps 5000 \
-    --lr 5e-5 \
-    --horizon 16 \
-    --num-workers 8
+CUDA_VISIBLE_DEVICES=0,1,2,3 uv run accelerate launch --multi_gpu --num_processes=4 --main_process_port=29500 \
+    -m lerobot.scripts.lerobot_train --policy.type=turbovla \
+    --dataset.repo_id=local/nexarm_stack_bowls --dataset.root=outputs/datasets/nexarm_stack_bowls \
+    --policy.device=cuda --policy.push_to_hub=false \
+    --policy.chunk_size=16 --policy.optimizer_lr=5e-5 --policy.optimizer_vision_lr=5e-5 \
+    --policy.vision_compute_precision=bf16_autocast --policy.interaction_compute_precision=bf16_autocast \
+    --accelerator.mixed_precision=bf16 --ema.enable=true --ema.decay=0.999 \
+    --batch_size=16 --steps=50000 --save_freq=5000 --num_workers=8 \
+    --output_dir=outputs/train/turbovla_stack_bowls_4gpu
 ```
 
 `scripts/nexarm/train_turbovla_multi_gpu.sh DATASET_ROOT OUTPUT_DIR BATCH MAX_STEPS SAVE_STEPS` runs the same
-command on every visible GPU (`NUM_GPUS=4` to choose).
+command on every visible GPU (`NUM_GPUS=4` to choose); extra `lerobot-train` flags go after the five arguments.
 
 ### Pick and place
 
-Same command with `--sim-dataset-root outputs/datasets/nexarm_sim_pick_place` and its own `--output-dir`.
-`--task-type auto` (the default) saves `pick_place` or `stack_bowls` in the checkpoint from the training
-prompts. Train one checkpoint per task.
+Same command with `--dataset.repo_id=local/nexarm_sim_pick_place`,
+`--dataset.root=outputs/datasets/nexarm_sim_pick_place` and its own `--output_dir`. Train one checkpoint per
+task.
 
-### Fine-tune from the official TurboVLA weights
-
-Converges faster than training from DINOv3 + BERT alone:
-
-```bash
-CUDA_VISIBLE_DEVICES=0,1,2,3 uv run torchrun --nproc_per_node=4 --master_port=29500 \
-    examples/nexarm/train_turbovla.py \
-    --sim-dataset-root outputs/datasets/nexarm_stack_bowls \
-    --pretrained-checkpoint pretrained/TurboVLA/checkpoints/robotwin/steps_55000_ema_model.safetensors \
-    --output-dir outputs/train/turbovla_stack_bowls_ft \
-    --batch-size 16 --max-steps 30000 --save-steps 5000 --num-workers 8
-```
-
-Add `--freeze-vision` to train only the interaction layers and action head (less memory, faster per step).
-
-### Co-train with real demonstrations
-
-Add the real dataset and the share of samples drawn from it:
-
-```bash
-    --real-dataset-root ~/.cache/huggingface/lerobot/thanhkt/nexarm_stack_bowls_top --real-ratio 0.5
-```
-
-The mix holds on every GPU (each rank draws from both datasets in that ratio). The cameras used are the ones
-every dataset has; the 3-camera sim data and the 3-camera real root train on three views.
+Add `--policy.freeze_vision=true` to train only the interaction layers and action head (less memory, faster
+per step). Fine-tuning from the official TurboVLA weights and sim/real co-training with a mixing ratio went
+away with the former `train_turbovla.py`; see [`turbovla_guide.md`](turbovla_guide.md#3-training-turbovla).
 
 ### Batch size, learning rate and precision
 
-- `--batch-size` is **per GPU**. Effective batch = `batch-size x grad-accum-steps x GPUs`; the 4-GPU example
-  trains at 64.
+- `--batch_size` is **per GPU**. Effective batch = `batch_size x GPUs`; the 4-GPU example trains at 64. Keep
+  `--accelerator.gradient_accumulation.steps` at 1: lerobot-train steps the learning-rate schedule once per
+  batch.
 - To match a single-GPU recipe exactly, divide its batch by the GPU count, or keep the per-GPU batch and expect
-  fewer steps to be needed. Start with the default `--lr 5e-5`; if loss is unstable at a large effective batch,
-  lower it or raise `--warmup-steps`.
-- `--max-steps` and `--save-steps` count optimizer updates, not samples, so 4 GPUs see 4x the data per step.
-- `--num-workers` is per GPU: 4 GPUs x 8 workers starts 32 video-decoding processes. Lower it if CPU or RAM runs
+  fewer steps to be needed. Start with the default `--policy.optimizer_lr=5e-5`; if loss is unstable at a large
+  effective batch, lower it or raise `--policy.scheduler_warmup_steps`.
+- `--steps` and `--save_freq` count optimizer updates, not samples, so 4 GPUs see 4x the data per step.
+- `--num_workers` is per GPU: 4 GPUs x 8 workers starts 32 video-decoding processes. Lower it if CPU or RAM runs
   out.
-- Precision defaults to bf16 on GPUs that support it (Ampere and newer), otherwise fp16. Force it with
-  `--precision`.
-- `--wandb --wandb-project nexarm-turbovla` logs from rank 0 only.
+- `--accelerator.mixed_precision=bf16` needs Ampere or newer; use `fp16` on older GPUs.
+- `--wandb.enable=true --wandb.project=nexarm-turbovla` logs from the main process only.
 
 ### Outputs
 
-In `--output-dir`:
+In `--output_dir`, every `--save_freq` steps, `checkpoints/<step>/` (with `last` pointing to the newest) holds:
 
-- `steps_XXXX_ema_pytorch_model.pt` and `steps_XXXX_ema_model.safetensors`: averaged (EMA) weights, best for
-  rollout. `final_ema_pytorch_model.pt` at the end.
-- `steps_XXXX_model.pt`: raw weights.
-- `stats_turbovla.json`: normalization statistics, read by rollout.
-- `config.json`: task type, ordered camera keys, image size, fps and default prompt, read by rollout.
+- `pretrained_model_ema/`: averaged (EMA) weights, best for rollout.
+- `pretrained_model/`: live weights and `train_config.json`.
+- `training_state/`: optimizer, scheduler and EMA state.
 
-There is no resume with optimizer state. After an interruption, start a new run from the last
-`steps_XXXX_model.pt` with `--pretrained-checkpoint` and the remaining number of steps; the optimizer and
-learning-rate schedule start fresh.
+Each model folder carries the ordered camera keys, image size and normalization statistics, which rollout
+reads. Resume an interrupted run like ACT (section 3, Resume): it restores weights, optimizer state, EMA and
+step count.
 
 ## 3. Train ACT on several GPUs
 
@@ -272,13 +247,14 @@ Checkpoints are under `--output-dir/checkpoints/<step>/pretrained_model`, with `
 ### TurboVLA
 
 ```bash
-MUJOCO_GL=egl uv run python examples/nexarm/rollout_turbovla.py --robot sim \
-    --checkpoint outputs/train/turbovla_stack_bowls_4gpu/final_ema_pytorch_model.pt \
-    --save-video outputs/rollout_turbovla.mp4
+MUJOCO_GL=egl uv run lerobot-eval \
+    --policy.path=outputs/train/turbovla_stack_bowls_4gpu/checkpoints/last/pretrained_model_ema \
+    --env.type=nexarm --env.task=NexArmStackBowls-v0 --eval.n_episodes=50 \
+    --output_dir=outputs/eval/turbovla_stack_bowls_4gpu
 ```
 
-The task, cameras, image size and fps come from the checkpoint. In the stack-bowls scene the prompt follows the
-sampled bowl order, so leave `--task` unset.
+The cameras, image size and normalization come from the checkpoint. In the stack-bowls scene the environment
+gives each episode the prompt of its sampled bowl order. Up to 10 episode videos are saved under `--output_dir`.
 
 ### ACT (pick and place)
 
@@ -301,22 +277,22 @@ rate, then on the real arm.
   [`sim_calibration.md`](sim_calibration.md)). If it reports a sign or offset that is not the identity,
   regenerate the sim data with `--joint-mapping outputs/nexarm/joint_mapping_probe.json`; otherwise sim-trained
   policies move those joints the wrong way.
-- Run the real arm with exactly the cameras the policy was trained on; `rollout.py` and `rollout_turbovla.py`
-  refuse a mismatch.
+- Run the real arm with exactly the cameras the policy was trained on; `rollout.py` refuses a
+  mismatch.
 - Keep a hand near the power switch the first time a new checkpoint moves the arm.
 
 ## Troubleshooting
 
-| Symptom                                                           | Fix                                                                                                                                                   |
-| ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Generation fails to create an OpenGL context, or images are black | `MUJOCO_GL=egl` is not set, or the driver has no EGL. Check `nvidia-smi` and that `libegl1` is installed.                                             |
-| Generator: `Dataset already exists: <root>`                       | Delete the folder or pass `--resume`.                                                                                                                 |
-| Generator: `--resume` refused because of `joint_mapping`          | The folder was made with another mapping (e.g. before `servo_4096_v2`). Generate a new dataset in a new folder.                                       |
-| Many `quality_*` or `ik_failed_*` rejects                         | The reasons are listed in `generation_report.json`. A fresh checkout of the models usually accepts 90–100 %; a big drop means the sim assets changed. |
-| `torchrun`: `Address already in use`                              | Another run uses port 29500. Pass a different `--master_port`.                                                                                        |
-| NCCL hangs at start                                               | Try `NCCL_P2P_DISABLE=1`; on cloud machines also check `NCCL_SOCKET_IFNAME`.                                                                          |
-| CUDA out of memory                                                | Lower the per-GPU batch and raise gradient accumulation to keep the effective batch; for TurboVLA add `--freeze-vision`.                              |
-| GPUs mostly idle, CPU at 100 %                                    | Video decoding is the bottleneck. Lower `--num-workers` per GPU if RAM is short, or generate with `--no-video`.                                       |
-| TurboVLA: `Local sim dataset metadata not found`                  | `--sim-dataset-root` must be the folder that contains `meta/info.json`.                                                                               |
-| TurboVLA: `No module named 'turbovla'`                            | Add `--extra turbovla` to the `uv sync` line.                                                                                                         |
-| ACT launcher: `Requested N GPUs, but only M are visible`          | `CUDA_VISIBLE_DEVICES` lists fewer GPUs than `--num-gpus`.                                                                                            |
+| Symptom                                                           | Fix                                                                                                                                                             |
+| ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Generation fails to create an OpenGL context, or images are black | `MUJOCO_GL=egl` is not set, or the driver has no EGL. Check `nvidia-smi` and that `libegl1` is installed.                                                       |
+| Generator: `Dataset already exists: <root>`                       | Delete the folder or pass `--resume`.                                                                                                                           |
+| Generator: `--resume` refused because of `joint_mapping`          | The folder was made with another mapping (e.g. before `servo_4096_v2`). Generate a new dataset in a new folder.                                                 |
+| Many `quality_*` or `ik_failed_*` rejects                         | The reasons are listed in `generation_report.json`. A fresh checkout of the models usually accepts 90–100 %; a big drop means the sim assets changed.           |
+| `accelerate launch`: `Address already in use`                     | Another run uses port 29500. Pass a different `--main_process_port`.                                                                                            |
+| NCCL hangs at start                                               | Try `NCCL_P2P_DISABLE=1`; on cloud machines also check `NCCL_SOCKET_IFNAME`.                                                                                    |
+| CUDA out of memory                                                | Lower the per-GPU batch and raise gradient accumulation to keep the effective batch; for TurboVLA keep accumulation at 1 and add `--policy.freeze_vision=true`. |
+| GPUs mostly idle, CPU at 100 %                                    | Video decoding is the bottleneck. Lower `--num_workers` per GPU if RAM is short, or generate with `--no-video`.                                                 |
+| TurboVLA: dataset metadata not found at the local root            | `--dataset.root` must be the folder that contains `meta/info.json`.                                                                                             |
+| TurboVLA: `No module named 'turbovla'`                            | Add `--extra turbovla` to the `uv sync` line.                                                                                                                   |
+| ACT launcher: `Requested N GPUs, but only M are visible`          | `CUDA_VISIBLE_DEVICES` lists fewer GPUs than `--num-gpus`.                                                                                                      |

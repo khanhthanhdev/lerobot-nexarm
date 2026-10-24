@@ -9,7 +9,7 @@ from torch.optim.lr_scheduler import LambdaLR
 from lerobot.configs import NormalizationMode, PreTrainedConfig
 from lerobot.optim import AdamWConfig, LRSchedulerConfig
 
-# Raw NexArm gripper position separating open from closed (as `rollout_turbovla.py --gripper-threshold`).
+# Raw NexArm gripper position separating open (1195) from closed (2833).
 DEFAULT_GRIPPER_THRESHOLD = 1800.0
 LOSS_TYPES = ("l1", "mse", "smooth_l1")
 
@@ -19,8 +19,8 @@ LOSS_TYPES = ("l1", "mse", "smooth_l1")
 class TurboVLASchedulerConfig(LRSchedulerConfig):
     """Linear warmup to the peak learning rate, then cosine decay to `min_lr_ratio` of it.
 
-    The schedule of `examples/nexarm/train_turbovla.py`: the factor is `(step + 1) / num_warmup_steps`
-    during warmup, then decays over the remaining `num_training_steps - num_warmup_steps` steps and
+    The schedule of the former `examples/nexarm/train_turbovla.py`: the factor is
+    `(step + 1) / num_warmup_steps` during warmup, then decays over the remaining `num_training_steps - num_warmup_steps` steps and
     stays at `min_lr_ratio`. Every parameter group keeps its own peak learning rate. lerobot-train
     steps the scheduler once per batch, so with gradient accumulation the schedule counts batches
     where the script counts optimizer updates.
@@ -47,15 +47,15 @@ class TurboVLASchedulerConfig(LRSchedulerConfig):
 class TurboVLAConfig(PreTrainedConfig):
     """TurboVLA (BERT text encoder, DINOv3 vision encoder, ACT-style action head) as a LeRobot policy.
 
-    The inference defaults reproduce `examples/nexarm/rollout_turbovla.py` and the training defaults
-    (loss, frozen modules, optimizer and schedule) reproduce `examples/nexarm/train_turbovla.py`.
+    The inference defaults reproduce the former `examples/nexarm/rollout_turbovla.py` and the training
+    defaults (loss, frozen modules, optimizer and schedule) the former `examples/nexarm/train_turbovla.py`.
     Images are resized by the vision backbone's Hugging Face image processor, state and action are
     min-max scaled to [-1, 1], and the model tokenizes the task prompt itself.
 
     Args:
         chunk_size: Actions predicted per forward pass (TurboVLA's `action.horizon`).
         n_action_steps: Actions executed from each chunk before predicting again
-            (`rollout_turbovla.py --open-loop-steps`).
+            (open-loop steps).
         camera_keys: Image features in the order the model was trained on. Empty means the order of
             `input_features`.
         image_size: Side of the square images fed to the vision backbone.
@@ -170,7 +170,7 @@ class TurboVLAConfig(PreTrainedConfig):
         return None
 
     def get_optimizer_preset(self) -> AdamWConfig:
-        """AdamW as in `train_turbovla.py`; the per-group learning rates come from `get_optim_params`."""
+        """AdamW as in the former `train_turbovla.py`; `get_optim_params` sets the per-group rates."""
         return AdamWConfig(
             lr=self.optimizer_lr,
             weight_decay=self.optimizer_weight_decay,
@@ -178,5 +178,5 @@ class TurboVLAConfig(PreTrainedConfig):
         )
 
     def get_scheduler_preset(self) -> TurboVLASchedulerConfig:
-        """Warmup then cosine decay to 5%, as in `train_turbovla.py`."""
+        """Warmup then cosine decay to 5%, as in the former `train_turbovla.py`."""
         return TurboVLASchedulerConfig(num_warmup_steps=self.scheduler_warmup_steps)

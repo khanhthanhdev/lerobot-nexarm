@@ -1,6 +1,6 @@
 # 261024-turbovla-nexarm-parity
 
-**Status: 2k-step parity done (2026-10-24); the full runs, sim eval of their checkpoints and the 2-GPU check are pending.**
+**Status: 2k-step parity done (2026-10-24). On that result the user retired `train_turbovla.py` and `rollout_turbovla.py`, so the script commands below only run at the `pre-reorg` tag. The full `lerobot-train` run, its sim eval and the 2-GPU check are pending and run on the user's servers. Making the plugin's image step as fast as the script's DataLoader-side resize (see the slowdown below) is a follow-up.**
 
 ## Hypothesis
 
@@ -108,13 +108,13 @@ Hub ids, steps and W&B run links: pending.
 
 ## Results
 
-| Pipeline                  | Setting           | Steps | Episodes | Success rate | Notes |
-| ------------------------- | ----------------- | ----- | -------- | ------------ | ----- |
+| Pipeline                  | Setting           | Steps | Episodes | Success rate | Notes                                                 |
+| ------------------------- | ----------------- | ----- | -------- | ------------ | ----------------------------------------------------- |
 | `train_turbovla.py`       | parity loss at 2k | 2000  | n/a      | n/a          | last-5 mean loss 0.0999, 3.10 steps/s, W&B `7nv789b8` |
 | `lerobot-train`           | parity loss at 2k | 2000  | n/a      | n/a          | last-5 mean loss 0.0996, 2.13 steps/s, W&B `0nqz8tyn` |
-| `train_turbovla.py` (EMA) | sim stack-bowls   | 50000 | 50       |              |       |
-| `lerobot-train` (EMA)     | sim stack-bowls   | 50000 | 50       |              |       |
-| `lerobot-train`, 2 GPUs   | 100 steps run     | 100   | n/a      | n/a          |       |
+| `train_turbovla.py` (EMA) | sim stack-bowls   | 50000 | 50       |              |                                                       |
+| `lerobot-train` (EMA)     | sim stack-bowls   | 50000 | 50       |              |                                                       |
+| `lerobot-train`, 2 GPUs   | 100 steps run     | 100   | n/a      | n/a          |                                                       |
 
 ## Notes
 

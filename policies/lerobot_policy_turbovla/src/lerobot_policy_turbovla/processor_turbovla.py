@@ -1,4 +1,4 @@
-"""Pre/post-processors for TurboVLA, matching `examples/nexarm/rollout_turbovla.py`.
+"""Pre/post-processors for TurboVLA, matching the former `examples/nexarm/rollout_turbovla.py`.
 
 Pre-processing: batch, min-max scale the state to [-1, 1], then run the camera frames, in the trained
 camera order, through the vision backbone's Hugging Face image processor (as uint8 PIL images,
@@ -108,7 +108,7 @@ class TurboVLAImageProcessorStep(ObservationProcessorStep):
 class TurboVLAGripperSnapStep(PolicyActionProcessorStep):
     """Snap the unnormalized gripper action to the closed or open extreme on each side of `threshold`.
 
-    Partial gripper targets make grasps fail on NexArm, so `rollout_turbovla.py` snaps by default.
+    Partial gripper targets make grasps fail on NexArm, so snapping is on by default.
     """
 
     enabled: bool = True

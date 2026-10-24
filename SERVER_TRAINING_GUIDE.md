@@ -40,7 +40,7 @@ The script automatically:
 
 The script syncs the full NexArm profile from [`run.md`, Dependency Profiles](run.md#dependency-profiles) plus `--extra turbovla`, which installs the pinned TurboVLA package. Use the same line on any other machine that trains or runs TurboVLA.
 
-_(Optional)_ If you want to fine-tune from official released TurboVLA weights:
+_(Optional)_ Download the official released TurboVLA weights. `lerobot-train` has no partial loading for weights whose heads differ from the NexArm model (the former `--pretrained-checkpoint`), so they cannot seed a NexArm run directly; a converted NexArm checkpoint can be fine-tuned with `--policy.path`. See the dropped features in [section 3](#3-training-on-the-server).
 
 ```bash
 uv run python examples/nexarm/setup_turbovla.py --download-pretrained
@@ -84,7 +84,7 @@ tar -czvf nexarm_dataset.tar.gz -C ~/.cache/huggingface/lerobot/thanhkt nexarm_s
 # 2. Transfer to server via rsync or scp:
 rsync -avzP nexarm_dataset.tar.gz user@server-ip:~/lerobot-nexarm/
 
-# 3. On the server, extract it and train with --real-dataset-root datasets/nexarm_stack_bowls_top:
+# 3. On the server, extract it and train with --dataset.root=datasets/nexarm_stack_bowls_top:
 mkdir -p datasets && tar -xzvf nexarm_dataset.tar.gz -C datasets
 ```
 
@@ -96,38 +96,20 @@ uv run python examples/nexarm/upload_dataset.py \
     --repo-id your_username/nexarm_stack_bowls_top \
     --root ~/.cache/huggingface/lerobot/thanhkt/nexarm_stack_bowls_top
 
-# On server: pass --real-repo-id your_username/nexarm_stack_bowls_top to train_turbovla.py
+# On server: pass --dataset.repo_id=your_username/nexarm_stack_bowls_top (no --dataset.root) to lerobot-train
 ```
 
 ---
 
 ## 3. Training on the Server
 
-### Through `lerobot-train` (replaces the scripts below once parity is confirmed)
+TurboVLA trains through LeRobot's own trainer with the policy plugin (`--policy.type=turbovla`). The loss, parameter groups, frozen BERT, AdamW settings and warmup-cosine schedule are those of the former `train_turbovla.py`, and a 2k-step GPU run gave loss curves within 4% of it ([`experiments/261024-turbovla-nexarm-parity`](experiments/261024-turbovla-nexarm-parity/README.md)). The checkpoints load directly in `lerobot-eval`, `lerobot-rollout` and the desktop app.
 
-The TurboVLA plugin (`--policy.type=turbovla`) trains through LeRobot's own trainer with the loss, parameter groups, frozen BERT, AdamW settings and warmup-cosine schedule of `train_turbovla.py`, and its checkpoints load directly in `lerobot-eval` and `lerobot-rollout` (no conversion). The launchers in Options 1-3 keep calling `train_turbovla.py` until the 2k-step GPU parity run in [`experiments/261024-turbovla-nexarm-parity`](experiments/261024-turbovla-nexarm-parity/README.md) passes; after that, these commands replace them.
+The launchers take `DATASET_ROOT OUTPUT_DIR BATCH_SIZE MAX_STEPS SAVE_STEPS` as positional arguments, followed by any extra `lerobot-train` flags. The dataset id defaults to `local/<folder name of DATASET_ROOT>`; set `REPO_ID` to use another one. A complete run is also written as a config file in [`experiments/261024-turbovla-nexarm-parity/train_full.yaml`](experiments/261024-turbovla-nexarm-parity/train_full.yaml), which you start with `uv run lerobot-train --config_path <file>`.
 
-```bash
-# Single GPU:
-uv run lerobot-train --policy.type=turbovla \
-    --dataset.repo_id=local/nexarm_stack_bowls --dataset.root=outputs/datasets/nexarm_stack_bowls \
-    --policy.device=cuda --policy.push_to_hub=false \
-    --policy.vision_compute_precision=bf16_autocast --policy.interaction_compute_precision=bf16_autocast \
-    --accelerator.mixed_precision=bf16 --ema.enable=true --ema.decay=0.999 \
-    --batch_size=16 --steps=50000 --save_freq=5000 --seed=1000 \
-    --output_dir=outputs/train/nexarm_turbovla_lerobot
+The former script's flags map to `--policy.optimizer_lr` (`--lr`), `--policy.optimizer_vision_lr` (`--dinov3-lr`), `--policy.scheduler_warmup_steps` (`--warmup-steps`), `--policy.camera_keys` (`--cameras`), `--policy.chunk_size` (`--horizon`), `--steps` (`--max-steps`), `--save_freq` (`--save-steps`) and `--batch_size` (`--batch-size`). `--precision bf16` becomes `--accelerator.mixed_precision=bf16` plus `--policy.vision_compute_precision=bf16_autocast --policy.interaction_compute_precision=bf16_autocast`, and EMA becomes `--ema.enable=true --ema.decay=0.999`. `--policy.freeze_text/freeze_vision/freeze_interaction`, `--policy.loss_type` and `--policy.gripper_loss_weight` keep their meaning. Keep gradient accumulation at 1, because lerobot-train steps the scheduler once per batch.
 
-# Multi-GPU (4 GPUs, batch 16 per GPU), same flags:
-uv run accelerate launch --num_processes=4 .venv/bin/lerobot-train --policy.type=turbovla \
-    --dataset.repo_id=local/nexarm_stack_bowls --dataset.root=outputs/datasets/nexarm_stack_bowls \
-    --policy.device=cuda --policy.push_to_hub=false \
-    --policy.vision_compute_precision=bf16_autocast --policy.interaction_compute_precision=bf16_autocast \
-    --accelerator.mixed_precision=bf16 --ema.enable=true --ema.decay=0.999 \
-    --batch_size=16 --steps=50000 --save_freq=5000 --seed=1000 \
-    --output_dir=outputs/train/nexarm_turbovla_lerobot
-```
-
-The script flags map to `--policy.optimizer_lr` (`--lr`), `--policy.optimizer_vision_lr` (`--dinov3-lr`), `--policy.scheduler_warmup_steps` (`--warmup-steps`), `--policy.freeze_text/freeze_vision/freeze_interaction`, `--policy.loss_type`, `--policy.gripper_loss_weight` and `--policy.camera_keys` (`--cameras`). Keep gradient accumulation at 1 to reproduce the script's schedule: lerobot-train steps the scheduler once per batch. Sim/real co-training with `--real-ratio` and `--pretrained-checkpoint` are only in `train_turbovla.py` for now.
+Retiring the script dropped three features: sim/real co-training that mixes two datasets with `--real-ratio`, partial weight loading with `--pretrained-checkpoint` (fine-tuning from the official TurboVLA weights), and the offline gripper-transition report of `diagnose_turbovla.py`. The EMA also differs slightly: diffusers' EMA copies the weights on its first update, where the script blended them. If you need any of these, check out the tag `pre-reorg` or an earlier commit. Checkpoints trained with the former script still run after a one-time conversion; see [`turbovla_guide.md`](docs/source/nexarm/turbovla_guide.md#checkpoints-from-the-former-train_turbovlapy).
 
 ### Option 1: Single-GPU Training
 
@@ -140,21 +122,20 @@ bash scripts/nexarm/train_turbovla_single_gpu.sh \
     outputs/train/nexarm_turbovla \
     16 50000 5000
 
-# Or using the Python script directly:
-CUDA_VISIBLE_DEVICES=0 uv run python examples/nexarm/train_turbovla.py \
-    --sim-dataset-root outputs/datasets/nexarm_stack_bowls \
-    --output-dir outputs/train/nexarm_turbovla \
-    --batch-size 16 \
-    --max-steps 50000 \
-    --save-steps 5000 \
-    --lr 5e-5 \
-    --horizon 16 \
-    --device cuda
+# Or using lerobot-train directly:
+CUDA_VISIBLE_DEVICES=0 uv run lerobot-train --policy.type=turbovla \
+    --dataset.repo_id=local/nexarm_stack_bowls --dataset.root=outputs/datasets/nexarm_stack_bowls \
+    --policy.device=cuda --policy.push_to_hub=false \
+    --policy.chunk_size=16 --policy.optimizer_lr=5e-5 --policy.optimizer_vision_lr=5e-5 \
+    --policy.vision_compute_precision=bf16_autocast --policy.interaction_compute_precision=bf16_autocast \
+    --accelerator.mixed_precision=bf16 --ema.enable=true --ema.decay=0.999 \
+    --batch_size=16 --steps=50000 --save_freq=5000 \
+    --output_dir=outputs/train/nexarm_turbovla
 ```
 
-### Option 2: Multi-GPU Training with PyTorch DDP (`torchrun`)
+### Option 2: Multi-GPU Training with Accelerate
 
-Automatically distributes batches across all available GPUs on the node:
+Distributes batches across all available GPUs on the node. `--batch_size` is per GPU:
 
 ```bash
 # Uses all detected GPUs automatically (or set NUM_GPUS=4):
@@ -163,15 +144,16 @@ bash scripts/nexarm/train_turbovla_multi_gpu.sh \
     outputs/train/nexarm_turbovla \
     16 50000 5000
 
-# Or explicitly:
-uv run torchrun --nproc_per_node=4 \
-    examples/nexarm/train_turbovla.py \
-    --sim-dataset-root outputs/datasets/nexarm_stack_bowls \
-    --output-dir outputs/train/nexarm_turbovla \
-    --batch-size 16 \
-    --max-steps 50000 \
-    --save-steps 5000 \
-    --lr 5e-5
+# Or explicitly, with the same flags as Option 1:
+uv run accelerate launch --multi_gpu --num_processes=4 --main_process_port=29500 \
+    -m lerobot.scripts.lerobot_train --policy.type=turbovla \
+    --dataset.repo_id=local/nexarm_stack_bowls --dataset.root=outputs/datasets/nexarm_stack_bowls \
+    --policy.device=cuda --policy.push_to_hub=false \
+    --policy.chunk_size=16 --policy.optimizer_lr=5e-5 --policy.optimizer_vision_lr=5e-5 \
+    --policy.vision_compute_precision=bf16_autocast --policy.interaction_compute_precision=bf16_autocast \
+    --accelerator.mixed_precision=bf16 --ema.enable=true --ema.decay=0.999 \
+    --batch_size=16 --steps=50000 --save_freq=5000 \
+    --output_dir=outputs/train/nexarm_turbovla
 ```
 
 ### Option 3: HPC / SLURM Cluster Job
@@ -182,7 +164,7 @@ Submit a batch job to a SLURM cluster:
 sbatch scripts/nexarm/train_turbovla.slurm
 ```
 
-The job trains on `--sim-dataset-root outputs/datasets/nexarm_stack_bowls` and writes to `outputs/train/nexarm_turbovla`, like the launchers above; edit the script to change them. To co-train with real data, add to the `train_turbovla.py` commands `--real-dataset-root <root>` (or `--real-repo-id`) and `--real-ratio`, as in [`turbovla_guide.md`](docs/source/nexarm/turbovla_guide.md#co-training-with-simulation-and-real-data).
+The job trains on 4 GPUs with `--dataset.root=outputs/datasets/nexarm_stack_bowls` and writes to `outputs/train/nexarm_turbovla`, like the launchers above; edit the script to change them. To train on real data instead, point `--dataset.repo_id` and `--dataset.root` at the real dataset from section 2 (for example `thanhkt/nexarm_stack_bowls_top` and its root).
 
 To monitor your SLURM job:
 
@@ -191,58 +173,37 @@ squeue -u $USER
 tail -f logs/turbovla_<job_id>.out
 ```
 
-### Option 4: Fine-Tuning from Pretrained TurboVLA (Fastest)
-
-To achieve fast convergence with fewer steps on smaller demonstration datasets (< 50 episodes), initialize from the official release weights and freeze the visual backbone:
-
-```bash
-uv run python examples/nexarm/train_turbovla.py \
-    --sim-dataset-root outputs/datasets/nexarm_stack_bowls \
-    --pretrained-checkpoint pretrained/TurboVLA/checkpoints/robotwin/steps_55000_ema_model.safetensors \
-    --output-dir outputs/train/nexarm_turbovla_ft \
-    --freeze-vision \
-    --batch-size 16 \
-    --max-steps 30000 \
-    --save-steps 5000
-```
-
 ---
 
 ## 4. Monitoring & Metrics
 
 ### Terminal Progress
 
-The training script displays step count, average L1 action loss, learning rate schedule, and steps per second (SPS):
-
-```
-TurboVLA Training:  42%|████▏     | 21000/50000 [35:12<48:38, 9.9sps, loss=0.0182, lr=3.41e-05]
-```
+Every `--log_freq` steps (200 by default), lerobot-train logs the step, the samples and episodes seen, the epoch, the loss, the gradient norm, the learning rate and the timings (`step`, `smpl`, `ep`, `epch`, `loss`, `grdn`, `lr`, `data_s`, `updt_s`).
 
 ### Weights & Biases (WandB)
 
-Enable online logging by adding `--wandb`:
+Enable online logging by adding the WandB flags to any of the commands above (the launchers pass extra flags through):
 
 ```bash
-uv run python examples/nexarm/train_turbovla.py \
-    --sim-dataset-root outputs/datasets/nexarm_stack_bowls \
-    --output-dir outputs/train/nexarm_turbovla \
-    --wandb --wandb-project nexarm-turbovla
+bash scripts/nexarm/train_turbovla_single_gpu.sh \
+    outputs/datasets/nexarm_stack_bowls outputs/train/nexarm_turbovla 16 50000 5000 \
+    --wandb.enable=true --wandb.project=nexarm-turbovla
 ```
 
 ---
 
 ## 5. Artifacts & Checkpoints Produced
 
-In your `--output-dir` (e.g. `outputs/train/nexarm_turbovla/`), the training run generates:
+Every `--save_freq` steps the training run writes `checkpoints/<step>/` in your `--output_dir` (e.g. `outputs/train/nexarm_turbovla/`), and `checkpoints/last` points to the newest:
 
-| File                          | Purpose                                                                   |
-| ----------------------------- | ------------------------------------------------------------------------- |
-| `final_ema_pytorch_model.pt`  | **Recommended**: Exponential Moving Average weights for inference         |
-| `final_ema_model.safetensors` | SafeTensors format of the EMA checkpoint                                  |
-| `final_model.pt`              | Raw optimizer weights from the last step                                  |
-| `stats_turbovla.json`         | Dataset min/max normalization stats (automatically loaded by rollout)     |
-| `config.json`                 | Architecture plus `task_type`, `camera_keys`, `image_size`, `fps`, `task` |
-| `steps_XXXX_*`                | Periodic checkpoints saved every `--save-steps`                           |
+| Path                                       | Purpose                                                           |
+| ------------------------------------------ | ----------------------------------------------------------------- |
+| `checkpoints/<step>/pretrained_model_ema/` | **Recommended**: Exponential Moving Average weights for inference |
+| `checkpoints/<step>/pretrained_model/`     | Live weights from that step, plus `train_config.json`             |
+| `checkpoints/<step>/training_state/`       | Optimizer, scheduler, RNG and EMA state for resuming              |
+
+Each model folder holds the weights, the policy `config.json` (cameras and their order, chunk size, backbones) and the pre/post-processors with the dataset's normalization statistics, so `--policy.path` alone loads it. To resume an interrupted run, pass `--config_path=<output_dir>/checkpoints/last/pretrained_model/train_config.json --resume=true`.
 
 ---
 
@@ -251,45 +212,48 @@ In your `--output-dir` (e.g. `outputs/train/nexarm_turbovla/`), the training run
 Copy the checkpoint directory back to your robot controller or local machine:
 
 ```bash
-# Transfer trained checkpoint folder from server to local robot machine:
-rsync -avzP user@server-ip:~/lerobot-nexarm/outputs/train/nexarm_turbovla/ ./outputs/train/nexarm_turbovla/
+# Transfer the EMA weights of the last checkpoint from the server to the local robot machine:
+rsync -avzP user@server-ip:~/lerobot-nexarm/outputs/train/nexarm_turbovla/checkpoints/last/pretrained_model_ema/ \
+    ./outputs/train/nexarm_turbovla/pretrained_model_ema/
 ```
 
 ### A. Test in MuJoCo Simulation:
 
 ```bash
-uv run python examples/nexarm/rollout_turbovla.py \
-    --robot sim \
-    --checkpoint outputs/train/nexarm_turbovla/final_ema_pytorch_model.pt
+MUJOCO_GL=egl uv run lerobot-eval \
+    --policy.path=outputs/train/nexarm_turbovla/pretrained_model_ema \
+    --env.type=nexarm --env.task=NexArmStackBowls-v0 --eval.n_episodes=20
 ```
 
-Rollout reads the task type, cameras, image size, fps and prompt from `config.json`; in the stack-bowls scene the prompt follows the sampled bowl order, so leave `--task` unset.
+The environment gives each episode the prompt of its sampled bowl order, so no task needs to be passed.
 
 ### B. Deploy on Physical NexArm Follower:
 
 ```bash
-uv run python examples/nexarm/rollout_turbovla.py \
-    --robot real \
-    --follower-port /dev/ttyUSB1 \
-    --front-cam 0 \
-    --wrist-cam 1 \
-    --checkpoint outputs/train/nexarm_turbovla/final_ema_pytorch_model.pt \
-    --task "Stack the bowls with red on bottom, blue in middle, and black on top."
+uv run lerobot-rollout \
+    --strategy.type=base \
+    --policy.path=outputs/train/nexarm_turbovla/pretrained_model_ema \
+    --robot.type=nexarm_follower \
+    --robot.port=/dev/ttyUSB1 \
+    --robot.cameras='{"front":{"type":"opencv","index_or_path":0,"width":640,"height":480,"fps":30},"wrist":{"type":"opencv","index_or_path":1,"width":640,"height":480,"fps":30},"top":{"type":"intelrealsense","serial_number_or_name":"<REALSENSE_SERIAL>","width":640,"height":480,"fps":30}}' \
+    --task="Stack the bowls with red on bottom, blue in middle, and black on top."
 ```
 
-The RealSense `top` camera is opened by default; add `--no-top-cam` for a 2-view checkpoint (the script exits if the cameras differ from the checkpoint's). See [`turbovla_guide.md`](docs/source/nexarm/turbovla_guide.md#4-rollout--evaluation) for legacy checkpoints.
+Give the policy exactly the cameras it was trained on; for a 2-view checkpoint, remove the `top` entry. Keep `--task` identical to the training prompt. See [`turbovla_guide.md`](docs/source/nexarm/turbovla_guide.md#4-rollout--evaluation) for checkpoints from the former script.
 
 ---
 
 ## 7. Hyperparameter Recommendations
 
-| Parameter        | Recommended Value | Description                                                               |
-| ---------------- | ----------------- | ------------------------------------------------------------------------- |
-| `--batch-size`   | `16` (per GPU)    | Total batch size across GPUs: 16–64                                       |
-| `--horizon`      | `16`              | Action chunk size (matches `rollout_turbovla.py` 30 FPS execution)        |
-| `--lr`           | `5e-5`            | Base AdamW learning rate for action head and interaction                  |
-| `--dinov3-lr`    | `5e-5`            | Learning rate for DINOv3 backbone (if unfrozen)                           |
-| `--warmup-steps` | `1000`            | Linear warmup steps before cosine decay                                   |
-| `--ema-decay`    | `0.999`           | Exponential moving average decay rate                                     |
-| `--precision`    | `bf16`            | BFloat16 mixed precision on Ampere/Ada/Hopper (RTX 30xx/40xx, A100, H100) |
-| `--max-steps`    | `30k–50k`         | Convergence usually reached between 30k–50k steps on ~50 episodes         |
+| Parameter                         | Recommended Value | Description                                                               |
+| --------------------------------- | ----------------- | ------------------------------------------------------------------------- |
+| `--batch_size`                    | `16` (per GPU)    | Total batch size across GPUs: 16–64                                       |
+| `--policy.chunk_size`             | `16`              | Action chunk size; the first 8 actions of each chunk run at 30 FPS        |
+| `--policy.optimizer_lr`           | `5e-5`            | Base AdamW learning rate for action head and interaction                  |
+| `--policy.optimizer_vision_lr`    | `5e-5`            | Learning rate for DINOv3 backbone (if unfrozen)                           |
+| `--policy.scheduler_warmup_steps` | `1000`            | Linear warmup steps before cosine decay                                   |
+| `--ema.decay`                     | `0.999`           | Exponential moving average decay rate (with `--ema.enable=true`)          |
+| `--accelerator.mixed_precision`   | `bf16`            | BFloat16 mixed precision on Ampere/Ada/Hopper (RTX 30xx/40xx, A100, H100) |
+| `--steps`                         | `30k–50k`         | Convergence usually reached between 30k–50k steps on ~50 episodes         |
+
+With `bf16`, also pass `--policy.vision_compute_precision=bf16_autocast --policy.interaction_compute_precision=bf16_autocast`, as the launchers do.

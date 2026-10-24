@@ -54,8 +54,9 @@ def check_dependencies() -> bool:
 
     # Check the installed TurboVLA package (the `turbovla` extra)
     try:
-        import turbovla
         from turbovla.models import TurboVLAConfig
+
+        import turbovla
 
         cfg = TurboVLAConfig()
         cfg.vision.num_views = 2
@@ -196,8 +197,10 @@ def main() -> int:
         print("Status: Setup complete! You are ready to train NexArm with TurboVLA.")
         print("\nTo train TurboVLA on a dataset:")
         print(
-            "  uv run python examples/nexarm/train_turbovla.py --sim-dataset-root outputs/datasets/nexarm_stack_bowls"
+            "  uv run lerobot-train --policy.type=turbovla --dataset.repo_id=local/nexarm_stack_bowls"
+            " --dataset.root=outputs/datasets/nexarm_stack_bowls --policy.device=cuda"
         )
+        print("  (or bash scripts/nexarm/train_turbovla_single_gpu.sh outputs/datasets/nexarm_stack_bowls)")
         return 0
     else:
         print("Status: Setup encountered warnings or errors above.")

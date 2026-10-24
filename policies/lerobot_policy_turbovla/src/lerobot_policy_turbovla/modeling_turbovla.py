@@ -50,7 +50,8 @@ class TurboVLAPolicy(PreTrainedPolicy):
     """TurboVLA through LeRobot.
 
     Inference: action chunks are queued and executed `n_action_steps` at a time. Training: `forward`
-    returns the masked action loss of `train_turbovla.py`, and `get_optim_params` its parameter groups.
+    returns the masked action loss of the former `train_turbovla.py`, and `get_optim_params` its
+    parameter groups.
     Building the policy loads both pretrained backbones (`text_model_name_or_path`,
     `vision_model_name_or_path`); `from_pretrained` then replaces every weight with the checkpoint's.
     """
@@ -74,7 +75,7 @@ class TurboVLAPolicy(PreTrainedPolicy):
     def from_pretrained(
         cls: builtins.type[T], pretrained_name_or_path: str | Path, *, strict: bool = True, **kwargs: Any
     ) -> T:
-        """Load a converted checkpoint; every weight must match, as in `rollout_turbovla.py`."""
+        """Load a checkpoint strictly: every weight must match, so trained and untrained weights never mix."""
         return super().from_pretrained(pretrained_name_or_path, strict=strict, **kwargs)
 
     def _frozen_modules(self) -> list[torch.nn.Module]:
@@ -86,7 +87,7 @@ class TurboVLAPolicy(PreTrainedPolicy):
         return [module for is_frozen, module in frozen if is_frozen]
 
     def train(self, mode: bool = True) -> "TurboVLAPolicy":
-        """Set the training mode; frozen modules always stay in eval mode, as in `train_turbovla.py`.
+        """Set the training mode; frozen modules always stay in eval mode.
 
         lerobot-train calls `train()` before every update, so the frozen modules are switched back here.
         """

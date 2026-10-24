@@ -19,14 +19,25 @@ export PYTHONUNBUFFERED=1
 
 mkdir -p logs
 
-uv run torchrun \
-    --nproc_per_node=4 \
-    --master_port=$(expr 10000 + $(echo -n $SLURM_JOB_ID | tail -c 4)) \
-    examples/nexarm/train_turbovla.py \
-    --sim-dataset-root outputs/datasets/nexarm_stack_bowls \
-    --output-dir outputs/train/nexarm_turbovla \
-    --batch-size 16 \
-    --max-steps 50000 \
-    --save-steps 5000 \
-    --lr 5e-5 \
-    --horizon 16
+uv run accelerate launch \
+    --multi_gpu \
+    --num_processes=4 \
+    --main_process_port=$(expr 10000 + $(echo -n $SLURM_JOB_ID | tail -c 4)) \
+    -m lerobot.scripts.lerobot_train \
+    --policy.type=turbovla \
+    --dataset.repo_id=local/nexarm_stack_bowls \
+    --dataset.root=outputs/datasets/nexarm_stack_bowls \
+    --policy.device=cuda \
+    --policy.push_to_hub=false \
+    --policy.chunk_size=16 \
+    --policy.optimizer_lr=5e-5 \
+    --policy.optimizer_vision_lr=5e-5 \
+    --policy.vision_compute_precision=bf16_autocast \
+    --policy.interaction_compute_precision=bf16_autocast \
+    --accelerator.mixed_precision=bf16 \
+    --ema.enable=true \
+    --ema.decay=0.999 \
+    --batch_size=16 \
+    --steps=50000 \
+    --save_freq=5000 \
+    --output_dir=outputs/train/nexarm_turbovla

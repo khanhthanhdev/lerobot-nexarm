@@ -76,12 +76,12 @@ uv sync --locked --extra test --extra dev --extra core_scripts --extra training 
 
 Add extras to that line instead of syncing a smaller set:
 
-| Workflow                                | Add                                |
-| --------------------------------------- | ---------------------------------- |
-| TurboVLA (`train_turbovla.py`, rollout) | `--extra turbovla`                 |
-| Benchmarking pi0 / SmolVLA checkpoints  | `--extra pi --extra smolvla`       |
-| Diffusion policy                        | `--extra diffusion`                |
-| Everything (all policies and tools)     | use `uv sync --locked --extra all` |
+| Workflow                               | Add                                |
+| -------------------------------------- | ---------------------------------- |
+| TurboVLA (`--policy.type=turbovla`)    | `--extra turbovla`                 |
+| Benchmarking pi0 / SmolVLA checkpoints | `--extra pi --extra smolvla`       |
+| Diffusion policy                       | `--extra diffusion`                |
+| Everything (all policies and tools)    | use `uv sync --locked --extra all` |
 
 `uv sync --locked` alone is enough for the MuJoCo viewer and keyboard demos (sections 2.1–2.4), but not for dataset generation, recording or training. `uv sync` uninstalls every extra you do not list, so always repeat the full line.
 
@@ -454,21 +454,18 @@ Train the real-time 32 Hz Vision-Language-Action model (DINOv3 visual backbone +
 # 1. Verify dependencies and download backbones
 uv run python examples/nexarm/setup_turbovla.py --download-backbones
 
-# 2. Train TurboVLA on the simulated stack-bowls dataset
-uv run python examples/nexarm/train_turbovla.py \
-    --sim-dataset-root outputs/datasets/nexarm_stack_bowls \
-    --output-dir outputs/train/nexarm_turbovla \
-    --batch-size 16 \
-    --max-steps 50000 \
-    --save-steps 5000
+# 2. Train TurboVLA on the simulated stack-bowls dataset (bf16, EMA; positional args:
+#    DATASET_ROOT OUTPUT_DIR BATCH_SIZE MAX_STEPS SAVE_STEPS, then extra lerobot-train flags)
+bash scripts/nexarm/train_turbovla_single_gpu.sh \
+    outputs/datasets/nexarm_stack_bowls outputs/train/nexarm_turbovla 16 50000 5000
 
-# 3. Rollout trained TurboVLA policy in MuJoCo simulation
-uv run python examples/nexarm/rollout_turbovla.py \
-    --robot sim \
-    --checkpoint outputs/train/nexarm_turbovla/final_ema_pytorch_model.pt
+# 3. Evaluate the EMA weights in MuJoCo simulation
+MUJOCO_GL=egl uv run lerobot-eval \
+    --policy.path=outputs/train/nexarm_turbovla/checkpoints/last/pretrained_model_ema \
+    --env.type=nexarm --env.task=NexArmStackBowls-v0 --eval.n_episodes=20
 ```
 
-TurboVLA needs `--extra turbovla` added to the [full profile](#dependency-profiles). The checkpoint's `config.json` stores the task type, camera keys, image size, fps and training prompt, and rollout uses them; in the stack-bowls sim the prompt follows the sampled bowl order, so omit `--task`. Real data, co-training and real-robot rollout are in [`turbovla_guide.md`](docs/source/nexarm/turbovla_guide.md).
+TurboVLA needs `--extra turbovla` added to the [full profile](#dependency-profiles). The launcher runs `lerobot-train --policy.type=turbovla`, so the checkpoints are ordinary LeRobot policy folders; in the stack-bowls sim the environment supplies the prompt of the sampled bowl order. On the real arm, run the checkpoint like the other policies in section 4.5, with `--task` set to the training prompt. Real data, multi-GPU training and checkpoints from the former `train_turbovla.py` are in [`turbovla_guide.md`](docs/source/nexarm/turbovla_guide.md).
 
 ### 4.5 Deploy & Rollout Trained Policy
 

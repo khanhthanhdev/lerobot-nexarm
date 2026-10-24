@@ -1,4 +1,4 @@
-r"""Convert a `train_turbovla.py` checkpoint into a LeRobot policy folder.
+r"""Convert a checkpoint of the former `examples/nexarm/train_turbovla.py` into a LeRobot policy.
 
 The output folder holds `config.json`, `model.safetensors` and the pre/post-processor files, so
 `lerobot-eval --policy.path=<folder>`, `lerobot-rollout` and the desktop app can load it.
@@ -10,8 +10,8 @@ Example:
 
 The checkpoint folder must contain `stats_turbovla.json` (or pass `--stats-path`). Its `config.json`
 supplies horizon, cameras, image size and training prompt; checkpoints without camera keys get
-front/wrist[/top] by view count, as in `rollout_turbovla.py`. Pass the backbones the checkpoint
-was trained with if they differ from the defaults (`train_turbovla.py --dinov3-path/--bert-path`).
+front/wrist[/top] by view count. Pass the backbones the checkpoint was trained with if they differ
+from the defaults (the script's `--dinov3-path/--bert-path`).
 """
 
 import argparse
@@ -149,7 +149,7 @@ def main(argv: list[str] | None = None) -> None:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument(
-        "--checkpoint", type=Path, required=True, help="train_turbovla.py .pt or .safetensors"
+        "--checkpoint", type=Path, required=True, help="train_turbovla.py checkpoint (.pt or .safetensors)"
     )
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--stats-path", type=Path, default=None, help="Default: found next to the checkpoint")
