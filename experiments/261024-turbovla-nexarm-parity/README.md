@@ -1,6 +1,6 @@
 # 261024-turbovla-nexarm-parity
 
-**Status: pending (needs a Linux GPU machine; the sim eval also needs EGL).** Only the CPU-scale checks below have run. The GPU results tables are empty on purpose.
+**Status: 2k-step parity done (2026-10-24); the full runs, sim eval of their checkpoints and the 2-GPU check are pending.**
 
 ## Hypothesis
 
@@ -81,6 +81,27 @@ Windows Server 2022, CPU, fp32, BERT-tiny text encoder with the bert-base tokeni
 - `policies/lerobot_policy_turbovla/tests/test_training_parity.py`: on the same seeded weights and the same 6 frames of episode 143 (2 with padded chunks), the preprocessed LeRobot batch equals the script collator's output, and the loss from `TurboVLAPolicy.forward` equals the script's loss (difference 0.0, tolerance 1e-5). Two updates through lerobot-train's `update_policy` and through the script's optimizer, clipping and schedule give the same weights (max difference 0.0, tolerance 1e-6). Parameter groups, learning rates and frozen modules match.
 - 30-step smoke, batch 8, lr 3e-4, 5 warmup steps, seed 1000, both pipelines: loss went from 0.687 / 0.707 (LeRobot / script) at step 1 to 0.479 / 0.351 at step 30; mean of steps 1-5 0.568 / 0.544, of steps 26-30 0.430 / 0.435. The learning-rate sequences are identical. The full sequences are in `plans/reports/turbovla-training-261024-1156-phase-06.md`.
 
+## 2k-step parity (done, 2026-10-24)
+
+Linux server `marinelab` (RTX 5050 8 GB), branch at `77ab5035`, both commands above at batch 16 and dataset revision `64ce8aeb`. W&B project `thanhkt27507-vsu/nexarm-turbovla`: script run `7nv789b8` (`train/action_loss`), LeRobot run `0nqz8tyn` (`train/loss`). Mean loss per 200-step window:
+
+| Steps     | Script | LeRobot | Difference |
+| --------- | ------ | ------- | ---------- |
+| 0-200     | 0.4315 | 0.4347  | +0.7%      |
+| 200-400   | 0.2606 | 0.2525  | -3.1%      |
+| 400-600   | 0.2186 | 0.2264  | +3.5%      |
+| 600-800   | 0.1881 | 0.1876  | -0.2%      |
+| 800-1000  | 0.1719 | 0.1652  | -3.9%      |
+| 1000-1200 | 0.1543 | 0.1519  | -1.5%      |
+| 1200-1400 | 0.1390 | 0.1396  | +0.4%      |
+| 1400-1600 | 0.1190 | 0.1232  | +3.5%      |
+| 1600-1800 | 0.1121 | 0.1083  | -3.4%      |
+| 1800-2000 | 0.1026 | 0.1015  | -1.1%      |
+
+The differences change sign from window to window and stay within 4%, which fits the different data order; the curves overlap. Peak GPU memory was about 5.8 GB (script) and 6.4 GB (LeRobot). Neither fits next to another job holding 3.6 GB of the card, at batch 8 or 16, because weights, gradients and AdamW state alone take about 3.5 GB.
+
+LeRobot is 31% slower (2.13 against 3.10 steps/s). Its log shows `updt_s` 0.314 s, about the script's whole step, plus `prep_s` 0.129 s: `turbovla_image_processor` converts every frame to PIL and resizes it in the training process, while the script does the same work in DataLoader workers. Moving that step off the main process would close the gap; it changes no numbers but needs the parity tests rerun.
+
 ## Checkpoint
 
 Hub ids, steps and W&B run links: pending.
@@ -89,8 +110,8 @@ Hub ids, steps and W&B run links: pending.
 
 | Pipeline                  | Setting           | Steps | Episodes | Success rate | Notes |
 | ------------------------- | ----------------- | ----- | -------- | ------------ | ----- |
-| `train_turbovla.py`       | parity loss at 2k | 2000  | n/a      | n/a          |       |
-| `lerobot-train`           | parity loss at 2k | 2000  | n/a      | n/a          |       |
+| `train_turbovla.py`       | parity loss at 2k | 2000  | n/a      | n/a          | last-5 mean loss 0.0999, 3.10 steps/s, W&B `7nv789b8` |
+| `lerobot-train`           | parity loss at 2k | 2000  | n/a      | n/a          | last-5 mean loss 0.0996, 2.13 steps/s, W&B `0nqz8tyn` |
 | `train_turbovla.py` (EMA) | sim stack-bowls   | 50000 | 50       |              |       |
 | `lerobot-train` (EMA)     | sim stack-bowls   | 50000 | 50       |              |       |
 | `lerobot-train`, 2 GPUs   | 100 steps run     | 100   | n/a      | n/a          |       |
