@@ -179,3 +179,15 @@ uv run python examples/nexarm/rollout_turbovla.py \
 ```
 
 The `top` RealSense is opened by default. A 2-view checkpoint needs `--no-top-cam`; the script exits at startup if the opened cameras differ from the checkpoint's. Keep `--task` identical to the training prompt (omit it to use the saved one).
+
+### Through LeRobot (`lerobot-eval`, `lerobot-rollout`, desktop app)
+
+The `turbovla` extra also installs the policy plugin [`policies/lerobot_policy_turbovla`](../../../policies/lerobot_policy_turbovla/README.md) (`--policy.type=turbovla`, inference only). Convert a checkpoint once, then pass the folder as `--policy.path`:
+
+```bash
+uv run python -m lerobot_policy_turbovla.convert_checkpoint \
+    --checkpoint outputs/train/nexarm_turbovla/final_ema_pytorch_model.pt \
+    --output-dir outputs/train/nexarm_turbovla/lerobot_policy
+```
+
+Add `--vision-model` / `--text-model` if the checkpoint was trained with other backbones than DINOv3 ViT-B and BERT-base (`rollout_turbovla.py` takes `--vision-path` / `--bert-path` for the same reason). The plugin's pre/post-processors reproduce `rollout_turbovla.py`, including gripper snapping and 8 executed actions per chunk.

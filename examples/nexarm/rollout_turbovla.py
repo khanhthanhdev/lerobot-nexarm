@@ -202,6 +202,14 @@ def parse_args(argv=None):
         help="Hugging Face repo or local path for BERT text encoder (defaults to auto-detected local cache or google-bert/bert-base-uncased)",
     )
     parser.add_argument(
+        "--vision-path",
+        type=str,
+        default=None,
+        help="Hugging Face repo or local path for the vision backbone the checkpoint was trained with "
+        "(train_turbovla.py --dinov3-path; defaults to the local DINOv3 snapshot or "
+        "facebook/dinov3-vitb16-pretrain-lvd1689m)",
+    )
+    parser.add_argument(
         "--allow-hf-download",
         action="store_true",
         help="Allow online downloads from Hugging Face Hub (default: False, use local cache only)",
@@ -257,6 +265,7 @@ class TurboVLAPolicyRunner:
         stats_path: Path | None,
         device: str = "cuda",
         bert_path: str | None = None,
+        vision_path: str | None = None,
         allow_hf_download: bool = False,
         binarize_gripper: bool = True,
         gripper_threshold: float = DEFAULT_GRIPPER_THRESHOLD,
@@ -293,12 +302,14 @@ class TurboVLAPolicyRunner:
                 bert_path = "google-bert/bert-base-uncased"
 
         # Resolve DINOv3 path
-        dino_cache = Path(
-            os.path.expanduser(
-                "~/.cache/huggingface/hub/models--facebook--dinov3-vitb16-pretrain-lvd1689m/snapshots/3a0fa61ff39414e2d3be4a1d50c7dfbf459aa8b8"
+        dino_path = vision_path
+        if dino_path is None:
+            dino_cache = Path(
+                os.path.expanduser(
+                    "~/.cache/huggingface/hub/models--facebook--dinov3-vitb16-pretrain-lvd1689m/snapshots/3a0fa61ff39414e2d3be4a1d50c7dfbf459aa8b8"
+                )
             )
-        )
-        dino_path = str(dino_cache) if dino_cache.exists() else "facebook/dinov3-vitb16-pretrain-lvd1689m"
+            dino_path = str(dino_cache) if dino_cache.exists() else "facebook/dinov3-vitb16-pretrain-lvd1689m"
 
         # TurboVLA config for NexArm, matching the training-time contract saved with the checkpoint.
         self.checkpoint_config = load_checkpoint_config(checkpoint_path)
@@ -606,6 +617,7 @@ def main():
         stats_path=args.stats_path,
         device=args.device,
         bert_path=args.bert_path,
+        vision_path=args.vision_path,
         allow_hf_download=args.allow_hf_download,
         binarize_gripper=args.binarize_gripper,
         gripper_threshold=args.gripper_threshold,

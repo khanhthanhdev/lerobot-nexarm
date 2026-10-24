@@ -58,7 +58,7 @@ lerobot-nexarm/
 | 02 | [Upstream sync and retire core edits](./phase-02-upstream-sync-and-retire-core-edits.md) | P1 | 2-3d | 01 | in-progress |
 | 03 | [Workspace and experiments layout](./phase-03-workspace-and-experiments-layout.md) | P1 | 3h | 02 | completed |
 | 04 | [TurboVLA as a pinned dependency](./phase-04-turbovla-pinned-dependency.md) | P1 | 0.5-1d | 03 | completed |
-| 05 | [TurboVLA policy plugin, inference](./phase-05-turbovla-policy-inference.md) | P1 | 2-3d | 04 | pending |
+| 05 | [TurboVLA policy plugin, inference](./phase-05-turbovla-policy-inference.md) | P1 | 2-3d | 04 | in-progress |
 | 06 | [TurboVLA training and LIBERO benchmark](./phase-06-turbovla-training-and-benchmark.md) | P2 | 3-5d + GPU | 05 | pending |
 | 07 | [B-spline Policy port](./phase-07-bspline-policy-port.md) | P2 | 3-5d + GPU | 03 | in-progress |
 | 08 | [NexArm plugins on upstream LeRobot](./phase-08-nexarm-plugins-on-upstream-lerobot.md) | P2 | 3-5d | 02, 05 | pending |

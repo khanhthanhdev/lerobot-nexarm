@@ -36,6 +36,7 @@ resolution-markers = [
 members = [
     "lerobot",
     "lerobot-policy-bspline",
+    "lerobot-policy-turbovla",
 ]
 
 [[package]]
@@ -3648,6 +3649,7 @@ transformers-dep = [
     { name = "transformers" },
 ]
 turbovla = [
+    { name = "lerobot-policy-turbovla" },
     { name = "transformers" },
     { name = "turbovla" },
 ]
@@ -3888,6 +3890,7 @@ requires-dist = [
     { name = "lerobot", extras = ["wallx"], marker = "extra == 'all'" },
     { name = "lerobot", extras = ["xvla"], marker = "extra == 'all'" },
     { name = "lerobot-lancedb", marker = "extra == 'lancedb-convert'", specifier = ">=0.3.1,<0.4.0" },
+    { name = "lerobot-policy-turbovla", marker = "extra == 'turbovla'", editable = "policies/lerobot_policy_turbovla" },
     { name = "liger-kernel", marker = "sys_platform == 'linux' and extra == 'fineart-vla-kernels'", specifier = ">=0.8.0,<0.9.0" },
     { name = "matplotlib", marker = "extra == 'matplotlib-dep'", specifier = ">=3.10.3,<4.0.0" },
     { name = "meshcat", marker = "extra == 'unitree-g1'", specifier = ">=0.3.0,<0.4.0" },
@@ -3990,6 +3993,21 @@ dependencies = [
 requires-dist = [
     { name = "lerobot", extras = ["diffusion"], editable = "." },
     { name = "scipy", specifier = ">=1.15.0,<2.0.0" },
+]
+
+[[package]]
+name = "lerobot-policy-turbovla"
+version = "0.1.0"
+source = { editable = "policies/lerobot_policy_turbovla" }
+dependencies = [
+    { name = "lerobot" },
+    { name = "turbovla" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "lerobot", editable = "." },
+    { name = "turbovla", git = "https://github.com/khanhthanhdev/TurboVLA?rev=28bc1e7e8cf259aacee4fd928258caa669cbaaae" },
 ]
 
 [[package]]
