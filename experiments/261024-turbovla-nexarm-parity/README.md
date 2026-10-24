@@ -119,5 +119,5 @@ Hub ids, steps and W&B run links: pending.
 ## Notes
 
 - EMA: `--ema.enable=true --ema.decay=0.999` uses diffusers' `EMAModel`, whose first update copies the weights instead of blending them. This changes the EMA weights a little early in training, not the loss curve.
-- Not available through lerobot-train: sim/real co-training with `--real-ratio`, and `--pretrained-checkpoint` (partial loading of TurboVLA release weights). Keep using the script for those until the plugin covers them.
+- Not available through lerobot-train: sim/real co-training with `--real-ratio`, and `--pretrained-checkpoint` (partial loading of TurboVLA release weights). The script that had them is retired; check out the `pre-reorg` tag to use them.
 - When a batch has no task, the script uses "Complete the robotic manipulation task." and the plugin uses `--policy.default_task` (empty by default). NexArm datasets always have a task.
