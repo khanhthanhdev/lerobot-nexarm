@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=71.0.0,<82.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lerobot_policy_bspline"
+version = "0.1.0"
+description = "B-spline Policy (arXiv 2607.09648) as a LeRobot policy plugin, built on LeRobot's diffusion policy."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.12"
+dependencies = [
+    "lerobot[diffusion]",
+    "scipy>=1.15.0,<2.0.0",  # scipy.interpolate.generate_knots
+]
+
+[tool.uv.sources]
+lerobot = { workspace = true }
+
+[tool.setuptools.packages.find]
+where = ["src"]

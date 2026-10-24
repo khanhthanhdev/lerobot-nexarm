@@ -437,7 +437,16 @@ explicit = true
 [tool.uv.workspace]
 members = ["policies/*", "packages/*"]
 
+# Plain `uv sync` installs the workspace policy plugins through this default group. A dependency group
+# (not `project.dependencies`) keeps them out of the published `lerobot` wheel metadata.
+[dependency-groups]
+policies = ["lerobot_policy_bspline"]
+
+[tool.uv]
+default-groups = ["policies"]
+
 [tool.uv.sources]
+lerobot_policy_bspline = { workspace = true }
 torch = [{ index = "pytorch-cu128", marker = "sys_platform == 'linux'" }]
 torchvision = [{ index = "pytorch-cu128", marker = "sys_platform == 'linux'" }]
 # LeRobot decodes videos on CPU; avoid GPU-only TorchCodec dependencies without changing GPU training.
@@ -457,7 +466,6 @@ exclude = [
     "tests/artifacts/**/*.safetensors",
     "*_pb2.py",
     "*_pb2_grpc.py",
-    "bspline-policy",
     "TurboVLA",
 ]
 [tool.ruff.lint]
@@ -498,6 +506,7 @@ ignore = [
 # Not part of the API reference and not planned for conversion: tests, examples, benchmarks, templates,
 # CI helper scripts and the packaging shim.
 "tests/**" = ["D"]
+"policies/*/tests/**" = ["D"]
 "examples/**" = ["D"]
 "benchmarks/**" = ["D"]
 "scripts/**" = ["D"]

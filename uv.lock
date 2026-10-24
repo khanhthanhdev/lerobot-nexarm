@@ -32,6 +32,12 @@ resolution-markers = [
     "python_full_version < '3.13' and sys_platform == 'win32'",
 ]
 
+[manifest]
+members = [
+    "lerobot",
+    "lerobot-policy-bspline",
+]
+
 [[package]]
 name = "absl-py"
 version = "2.5.0"
@@ -3128,6 +3134,7 @@ wheels = [
 name = "lerobot"
 version = "0.6.2"
 source = { editable = "." }
+default-groups = ["policies"]
 dependencies = [
     { name = "cmake" },
     { name = "draccus" },
@@ -3676,6 +3683,11 @@ xvla = [
     { name = "transformers" },
 ]
 
+[package.dev-dependencies]
+policies = [
+    { name = "lerobot-policy-bspline" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "accelerate", marker = "extra == 'accelerate-dep'", specifier = ">=1.14.0,<2.0.0" },
@@ -3941,6 +3953,9 @@ requires-dist = [
 ]
 provides-extras = ["lancedb", "lancedb-convert", "dataset", "training", "hardware", "viz", "core-scripts", "evaluation", "dataset-viz", "av-dep", "pygame-dep", "placo-dep", "transformers-dep", "sentencepiece-dep", "grpcio-dep", "accelerate-dep", "can-dep", "peft-dep", "scipy-dep", "diffusers-dep", "qwen-vl-utils-dep", "matplotlib-dep", "pyserial-dep", "rustypot-dep", "deepdiff-dep", "pynput-dep", "pyzmq-dep", "motorbridge-dep", "motorbridge-smart-servo-dep", "timm-dep", "nexarm", "service", "serial-motors", "feetech", "dynamixel", "damiao", "robstride", "openarms", "gamepad", "hopejr", "lekiwi", "unitree-g1", "reachy2", "rebot", "kinematics", "intelrealsense", "phone", "diffusion", "wallx", "pi", "dm05", "molmoact2", "smolvla", "multi-task-dit", "groot", "sarm", "robometer", "topreward", "xvla", "eo1", "fastwam", "flux3", "evo1", "fineart-vla", "fineart-vla-kernels", "hilserl", "vla-jepa", "lingbot-va", "lingbot-vla-v2", "wall-oss-05", "lawam", "remote", "peft", "annotations", "dev", "notebook", "test", "video-benchmark", "aloha", "pusht", "libero", "metaworld", "all"]
 
+[package.metadata.requires-dev]
+policies = [{ name = "lerobot-policy-bspline", editable = "policies/lerobot_policy_bspline" }]
+
 [[package]]
 name = "lerobot-lancedb"
 version = "0.3.1"
@@ -3954,6 +3969,21 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/29/46/3efb8955b2727ac79a08be4c0a05070d11b98d21947a8ac742151156f63d/lerobot_lancedb-0.3.1.tar.gz", hash = "sha256:435c52abd38c6e491659e35961f79500b952080b3f3eddf501b3c29cbecbc71e", size = 35199, upload-time = "2026-08-13T08:32:59.151Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/30/b1/9dbc390b53843baac622607a64aeaaac4b9fcf33c6a33d6d7138583080ab/lerobot_lancedb-0.3.1-py3-none-any.whl", hash = "sha256:dacd40414990803bac00ce9961e9f9bad0a4c78d2009703ff9f00be96eed9200", size = 33295, upload-time = "2026-08-13T08:32:58.324Z" },
+]
+
+[[package]]
+name = "lerobot-policy-bspline"
+version = "0.1.0"
+source = { editable = "policies/lerobot_policy_bspline" }
+dependencies = [
+    { name = "lerobot", extra = ["diffusion"] },
+    { name = "scipy" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "lerobot", extras = ["diffusion"], editable = "." },
+    { name = "scipy", specifier = ">=1.15.0,<2.0.0" },
 ]
 
 [[package]]
