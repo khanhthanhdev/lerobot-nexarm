@@ -82,6 +82,22 @@ The merged root lives at `~/.cache/huggingface/lerobot/thanhkt/nexarm_stack_bowl
 
 ## 3. Training TurboVLA
 
+### Through `lerobot-train` (replaces `train_turbovla.py` once parity is confirmed)
+
+The same training runs through LeRobot's trainer with `--policy.type=turbovla`; the checkpoint loads directly in `lerobot-eval` and `lerobot-rollout`:
+
+```bash
+uv run lerobot-train --policy.type=turbovla \
+    --dataset.repo_id=local/nexarm_stack_bowls --dataset.root=outputs/datasets/nexarm_stack_bowls \
+    --policy.device=cuda --policy.push_to_hub=false \
+    --policy.vision_compute_precision=bf16_autocast --policy.interaction_compute_precision=bf16_autocast \
+    --accelerator.mixed_precision=bf16 --ema.enable=true --ema.decay=0.999 \
+    --batch_size=16 --steps=50000 --save_freq=5000 --seed=1000 \
+    --output_dir=outputs/train/nexarm_turbovla_lerobot
+```
+
+Multi-GPU: `uv run accelerate launch --num_processes=<N> .venv/bin/lerobot-train <same flags>`. The script commands below stay the reference until the GPU parity run in [`experiments/261024-turbovla-nexarm-parity`](../../../experiments/261024-turbovla-nexarm-parity/README.md) passes; the flag mapping and what only the script supports (co-training with `--real-ratio`, `--pretrained-checkpoint`) are in [`SERVER_TRAINING_GUIDE.md`](../../../SERVER_TRAINING_GUIDE.md#through-lerobot-train-replaces-the-scripts-below-once-parity-is-confirmed).
+
 ### Standard Training (from scratch with DINOv3 + BERT)
 
 ```bash
@@ -182,7 +198,7 @@ The `top` RealSense is opened by default. A 2-view checkpoint needs `--no-top-ca
 
 ### Through LeRobot (`lerobot-eval`, `lerobot-rollout`, desktop app)
 
-The `turbovla` extra also installs the policy plugin [`policies/lerobot_policy_turbovla`](../../../policies/lerobot_policy_turbovla/README.md) (`--policy.type=turbovla`, inference only). Convert a checkpoint once, then pass the folder as `--policy.path`:
+The `turbovla` extra also installs the policy plugin [`policies/lerobot_policy_turbovla`](../../../policies/lerobot_policy_turbovla/README.md) (`--policy.type=turbovla`). Checkpoints trained with `lerobot-train --policy.type=turbovla` load directly; convert a `train_turbovla.py` checkpoint once, then pass the folder as `--policy.path`:
 
 ```bash
 uv run python -m lerobot_policy_turbovla.convert_checkpoint \

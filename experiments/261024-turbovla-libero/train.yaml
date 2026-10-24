@@ -1,0 +1,44 @@
+# TurboVLA through lerobot-train on LIBERO (all four suites, LeRobot format). Load with:
+#   uv run lerobot-train --config_path experiments/261024-turbovla-libero/train.yaml
+dataset:
+  repo_id: lerobot/libero
+  revision: a1aaacb7f6cd6ee5fb43120f673cebb0cfea7dd4
+
+policy:
+  type: turbovla
+  push_to_hub: false
+  device: cuda
+  # Agent view, then wrist view (LIBERO's agentview_image and robot0_eye_in_hand_image).
+  camera_keys: [observation.images.image, observation.images.image2]
+  chunk_size: 16
+  text_model_name_or_path: google-bert/bert-base-uncased
+  vision_model_name_or_path: facebook/dinov3-vitb16-pretrain-lvd1689m
+  vision_compute_precision: bf16_autocast
+  interaction_compute_precision: bf16_autocast
+  # LIBERO actions are 7-D with the gripper last; the NexArm gripper snapping does not apply.
+  gripper_index: 6
+  binarize_gripper: false
+  optimizer_lr: 5.0e-5
+  optimizer_vision_lr: 5.0e-5
+  scheduler_warmup_steps: 1000
+
+accelerator:
+  mixed_precision: bf16
+
+ema:
+  enable: true
+  decay: 0.999
+
+output_dir: experiments/261024-turbovla-libero/outputs/train
+job_name: 261024-turbovla-libero
+seed: 1000
+batch_size: 16
+steps: 50000
+save_freq: 10000
+log_freq: 100
+num_workers: 8
+env_eval_freq: 0
+
+wandb:
+  enable: true
+  project: nexarm-turbovla

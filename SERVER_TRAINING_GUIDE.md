@@ -103,6 +103,32 @@ uv run python examples/nexarm/upload_dataset.py \
 
 ## 3. Training on the Server
 
+### Through `lerobot-train` (replaces the scripts below once parity is confirmed)
+
+The TurboVLA plugin (`--policy.type=turbovla`) trains through LeRobot's own trainer with the loss, parameter groups, frozen BERT, AdamW settings and warmup-cosine schedule of `train_turbovla.py`, and its checkpoints load directly in `lerobot-eval` and `lerobot-rollout` (no conversion). The launchers in Options 1-3 keep calling `train_turbovla.py` until the 2k-step GPU parity run in [`experiments/261024-turbovla-nexarm-parity`](experiments/261024-turbovla-nexarm-parity/README.md) passes; after that, these commands replace them.
+
+```bash
+# Single GPU:
+uv run lerobot-train --policy.type=turbovla \
+    --dataset.repo_id=local/nexarm_stack_bowls --dataset.root=outputs/datasets/nexarm_stack_bowls \
+    --policy.device=cuda --policy.push_to_hub=false \
+    --policy.vision_compute_precision=bf16_autocast --policy.interaction_compute_precision=bf16_autocast \
+    --accelerator.mixed_precision=bf16 --ema.enable=true --ema.decay=0.999 \
+    --batch_size=16 --steps=50000 --save_freq=5000 --seed=1000 \
+    --output_dir=outputs/train/nexarm_turbovla_lerobot
+
+# Multi-GPU (4 GPUs, batch 16 per GPU), same flags:
+uv run accelerate launch --num_processes=4 .venv/bin/lerobot-train --policy.type=turbovla \
+    --dataset.repo_id=local/nexarm_stack_bowls --dataset.root=outputs/datasets/nexarm_stack_bowls \
+    --policy.device=cuda --policy.push_to_hub=false \
+    --policy.vision_compute_precision=bf16_autocast --policy.interaction_compute_precision=bf16_autocast \
+    --accelerator.mixed_precision=bf16 --ema.enable=true --ema.decay=0.999 \
+    --batch_size=16 --steps=50000 --save_freq=5000 --seed=1000 \
+    --output_dir=outputs/train/nexarm_turbovla_lerobot
+```
+
+The script flags map to `--policy.optimizer_lr` (`--lr`), `--policy.optimizer_vision_lr` (`--dinov3-lr`), `--policy.scheduler_warmup_steps` (`--warmup-steps`), `--policy.freeze_text/freeze_vision/freeze_interaction`, `--policy.loss_type`, `--policy.gripper_loss_weight` and `--policy.camera_keys` (`--cameras`). Keep gradient accumulation at 1 to reproduce the script's schedule: lerobot-train steps the scheduler once per batch. Sim/real co-training with `--real-ratio` and `--pretrained-checkpoint` are only in `train_turbovla.py` for now.
+
 ### Option 1: Single-GPU Training
 
 Ideal for a workstation or single GPU (RTX 3090, 4090, A5000, A100):

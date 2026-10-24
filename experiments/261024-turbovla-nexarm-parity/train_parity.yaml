@@ -1,0 +1,42 @@
+# TurboVLA through lerobot-train, 2k-step parity run against examples/nexarm/train_turbovla.py. Load with:
+#   uv run lerobot-train --config_path experiments/261024-turbovla-nexarm-parity/train_parity.yaml
+# Every value matches the script command in README.md (same data, seed, batch, schedule, bf16).
+dataset:
+  repo_id: thanhkt/nexarm_stack_bowls
+  revision: 64ce8aeb1d3968293c0290c4110bcea7424325b1
+
+policy:
+  type: turbovla
+  push_to_hub: false
+  device: cuda
+  camera_keys: [observation.images.front, observation.images.wrist]
+  chunk_size: 16
+  text_model_name_or_path: google-bert/bert-base-uncased
+  vision_model_name_or_path: facebook/dinov3-vitb16-pretrain-lvd1689m
+  # train_turbovla.py --precision bf16 runs both blocks under bf16 autocast.
+  vision_compute_precision: bf16_autocast
+  interaction_compute_precision: bf16_autocast
+  optimizer_lr: 5.0e-5
+  optimizer_vision_lr: 5.0e-5
+  scheduler_warmup_steps: 1000
+
+accelerator:
+  mixed_precision: bf16
+
+ema:
+  enable: true
+  decay: 0.999
+
+output_dir: experiments/261024-turbovla-nexarm-parity/outputs/lerobot_parity
+job_name: 261024-turbovla-nexarm-parity
+seed: 1000
+batch_size: 16
+steps: 2000
+save_freq: 2000
+log_freq: 20
+num_workers: 8
+env_eval_freq: 0
+
+wandb:
+  enable: true
+  project: nexarm-turbovla
