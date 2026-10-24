@@ -1,9 +1,13 @@
 """The NexArm collection wrapper keeps lerobot-record's collection flags outside upstream code."""
 
+import threading
+import time
+
 import pytest
 
 from examples.nexarm import record_collection as wrapper
 from lerobot.configs.dataset import DatasetRecordConfig
+from lerobot.datasets import LeRobotDataset, collection_merge
 from lerobot.scripts import lerobot_record
 from tests.mocks.mock_robot import MockRobotConfig
 from tests.mocks.mock_teleop import MockTeleopConfig
@@ -59,3 +63,54 @@ def test_without_collection_flags_the_wrapper_is_plain_lerobot_record(tmp_path):
 
     assert dataset.num_episodes == 1
     assert dataset.root == tmp_path / "session"
+
+
+class _StoppedListener:
+    def stop(self):
+        pass
+
+
+def _press_enter_when_enabled(events, presses):
+    """Simulate the operator pressing Enter: each press ends the current wait or episode once controls are on."""
+
+    def run():
+        for _ in range(presses):
+            time.sleep(0.3)
+            while not events.get("controls_enabled"):
+                time.sleep(0.01)
+            events["exit_early"] = True
+
+    threading.Thread(target=run, daemon=True).start()
+
+
+@pytest.mark.parametrize("merge_into_root", [False, True])
+def test_manual_control_records_and_merges(monkeypatch, tmp_path, merge_into_root):
+    events = {
+        "exit_early": False,
+        "rerecord_episode": False,
+        "stop_recording": False,
+        "quiet": True,
+        "controls_enabled": False,
+    }
+
+    def fake_listener(**kwargs):
+        assert kwargs == {"manual_control": True}
+        # One press starts the episode, the second ends it.
+        _press_enter_when_enabled(events, 2)
+        return _StoppedListener(), events
+
+    monkeypatch.setattr(wrapper, "init_keyboard_listener", fake_listener)
+    monkeypatch.setattr(collection_merge, "hub_root_info", lambda _: None)
+    merge_flags = (
+        {"root_repo_id": "test/root", "merge_root": str(tmp_path / "root")} if merge_into_root else {}
+    )
+    recording_log = tmp_path / "log" / "recording.log"
+
+    dataset = wrapper.record_collection(
+        make_config(tmp_path, manual_control=True, recording_log=str(recording_log), **merge_flags)
+    )
+
+    assert dataset.num_episodes == 1
+    assert recording_log.exists()
+    if merge_into_root:
+        assert LeRobotDataset("test/root", root=tmp_path / "root").num_episodes == 1
