@@ -30,7 +30,7 @@ from lerobot.cameras import make_cameras_from_configs
 from lerobot.motors import MotorCalibration
 from lerobot.motors.nexarm import NexArmMotorsBus
 from lerobot.motors.nexarm.nexarm import JOINT_NAMES, POSITION_CENTER, POSITION_MAX, POSITION_MIN
-from lerobot.types import RobotAction, RobotObservation
+from lerobot.lerobot_types import RobotAction, RobotObservation
 from lerobot.utils.decorators import check_if_already_connected, check_if_not_connected
 
 from ..robot import Robot
