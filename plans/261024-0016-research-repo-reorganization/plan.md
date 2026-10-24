@@ -1,7 +1,7 @@
 ---
 title: "Research repo reorganization"
 description: "Turn lerobot-nexarm into a research repo: custom policies as LeRobot plugins, TurboVLA and B-spline Policy running through lerobot-train/eval/rollout, NexArm hardware as plugins, and upstream LeRobot as a dependency."
-status: pending
+status: in-progress
 priority: P1
 effort: "3-5 weeks (phases 06-07 need GPU time)"
 branch: main
@@ -54,7 +54,7 @@ lerobot-nexarm/
 
 | # | Phase | Priority | Effort | Depends on | Status |
 |---|---|---|---|---|---|
-| 01 | [Housekeeping and baseline](./phase-01-housekeeping-and-baseline.md) | P1 | 2h | none | pending |
+| 01 | [Housekeeping and baseline](./phase-01-housekeeping-and-baseline.md) | P1 | 2h | none | completed |
 | 02 | [Upstream sync and retire core edits](./phase-02-upstream-sync-and-retire-core-edits.md) | P1 | 2-3d | 01 | pending |
 | 03 | [Workspace and experiments layout](./phase-03-workspace-and-experiments-layout.md) | P1 | 3h | 02 | pending |
 | 04 | [TurboVLA as a pinned dependency](./phase-04-turbovla-pinned-dependency.md) | P1 | 0.5-1d | 03 | pending |
