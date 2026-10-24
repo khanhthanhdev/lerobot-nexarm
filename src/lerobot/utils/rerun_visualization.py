@@ -78,7 +78,9 @@ def init_rerun(
     output_path = Path(save_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     if url is None:
-        rr.spawn(memory_limit=memory_limit, connect=False)
+        spawn_port = 9876
+        rr.spawn(port=spawn_port, memory_limit=memory_limit, connect=False)
+        url = f"rerun+http://127.0.0.1:{spawn_port}/proxy"
     rr.set_sinks(rr.GrpcSink(url), rr.FileSink(str(output_path)))
 
 
