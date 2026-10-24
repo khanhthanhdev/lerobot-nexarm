@@ -136,7 +136,7 @@ Keep the arm clear of obstacles and a hand near power the first time you run a n
 
 ## 4. Benchmark
 
-`lerobot-nexarm-sim-benchmark` evaluates LeRobot-format checkpoints on the single-arm **pick-and-place** task (red cube into the green zone) on identical seeds and reports success rate and latency. It does not benchmark stack-bowls policies; evaluate those with `lerobot-eval --env.type=nexarm --env.task=NexArmStackBowls-v0` (section 3) or a `sentry` rollout. `lerobot-eval` reports `pc_success`. For how far the failed episodes got, run `lerobot-nexarm-eval` with the same flags: it adds `pc_<stage>` (`pc_picked_middle`, `pc_nested_middle`, ...) to the log and to `eval_info.json`, and each episode's stage flags to its task's metrics.
+`lerobot-nexarm-sim-benchmark` evaluates LeRobot-format checkpoints on the single-arm **pick-and-place** task (red cube into the green zone) on identical seeds and reports success rate and latency. It does not benchmark stack-bowls policies; evaluate those with `lerobot-eval --env.type=nexarm --env.task=NexArmStackBowls-v0` (section 3) or a `sentry` rollout. `lerobot-eval` reports `pc_success`. For how far the failed episodes got, run `lerobot-nexarm-eval` with the same flags: it adds `pc_<stage>` (`pc_picked_middle`, `pc_nested_middle`, ...) to the log and to `eval_info.json`, and each episode's stage flags to its task's metrics. It logs seeded episodes only, so keep `--seed` set (1000 by default).
 
 ```bash
 MUJOCO_GL=egl uv run lerobot-nexarm-sim-benchmark \
