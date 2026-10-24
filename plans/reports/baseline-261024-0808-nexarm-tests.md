@@ -33,6 +33,7 @@ Recorded on 2026-10-24 on `marinelab` (Ubuntu 24.04, RTX 5050 8 GB, `MUJOCO_GL=e
 |---|---|---|
 | `uv run pytest tests -k nexarm -q` | 348 passed, 26 skipped | 348 passed, 26 skipped |
 | `uv run pytest tests/nexarm_service -q` | 128 passed | 128 passed |
+| `uv run pytest tests -k nexarm -q` at `255d29e5` (adds the 3 `_max_episode_steps` env tests) | n/a | 351 passed, 26 skipped |
 | `make test-nexarm-ete` | 3 passed | 3 passed |
 
 On the branch, `uv run pytest policies packages tests/utils/test_rerun_save_path.py tests/scripts/test_record_collection.py` gives 26 passed. With `TURBOVLA_PARITY_DATASET_ROOT` pointing at a full download of `thanhkt/nexarm_stack_bowls@64ce8aeb`, the TurboVLA plugin tests give 14 passed; the 2 `[trained]` inference-parity cases do not apply to the only trained checkpoint on the server, which uses three cameras while that dataset has two.
