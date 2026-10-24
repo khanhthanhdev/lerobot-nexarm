@@ -4,7 +4,7 @@ This file provides guidance to AI agents when working with code in this reposito
 
 ## Project Overview
 
-This is the **Hiwonder NexArm** fork of LeRobot — focused exclusively on the Hiwonder NexArm 6-axis robot platform. Non-NexArm robot formats and motor drivers have been pruned to keep the codebase lean and focused. It integrates with Hugging Face Hub for model/dataset sharing.
+This is the **Hiwonder NexArm** fork of LeRobot — focused exclusively on the Hiwonder NexArm 6-axis robot platform. It tracks upstream LeRobot: upstream's robots, teleoperators and motor drivers are kept alongside the NexArm ones. It integrates with Hugging Face Hub for model/dataset sharing.
 
 **NexArm-specific modules:**
 
@@ -78,7 +78,7 @@ Run the full pre-commit suite before submitting changes. `pyproject.toml` owns R
 
 ## Scope of the Fork
 
-Only the hardware layers (`robots/`, `motors/`, `teleoperators/`) were pruned to NexArm (plus keyboard/gamepad teleop). Upstream policies (`act`, `diffusion`, `smolvla`, `pi0*`, `groot`, ...) and simulation envs (`aloha`, `pusht`, `libero`, `metaworld`, ...) are still registered, and the `make test-end-to-end` targets still train on upstream `aloha` datasets.
+The hardware layers (`robots/`, `motors/`, `teleoperators/`) are no longer pruned: upstream's robots, motors and teleoperators are back, and the NexArm types are registered next to them. Edits to upstream files are limited to the `nexarm_*` registration imports plus a few generic patches listed in `plans/261024-0016-research-repo-reorganization/phase-02-upstream-sync-and-retire-core-edits.md`. The NexArm collection flags for recording (`--manual_control`, `--recording_log`, `--root_repo_id`, `--merge_root`, `--rerun_save_path`) live in the wrapper `examples/nexarm/record_collection.py`, not in `lerobot-record`. Upstream policies (`act`, `diffusion`, `smolvla`, `pi0*`, `groot`, ...) and simulation envs (`aloha`, `pusht`, `libero`, `metaworld`, ...) are still registered, and the `make test-end-to-end` targets still train on upstream `aloha` datasets.
 
 ## Git Submodules and TurboVLA
 
