@@ -100,7 +100,7 @@ def test_update_last_checkpoint(tmp_path):
     checkpoint.mkdir()
     update_last_checkpoint(checkpoint)
     last_checkpoint = tmp_path / LAST_CHECKPOINT_LINK
-    assert last_checkpoint.is_symlink() or last_checkpoint.is_junction()  # a junction on Windows
+    assert last_checkpoint.is_symlink()
     assert last_checkpoint.resolve() == checkpoint
 
 
@@ -176,9 +176,9 @@ def test_resolve_resume_checkpoint_downloads_latest_and_links(tmp_path, monkeypa
 
     assert checkpoint_dir == out / CHECKPOINTS_DIR / "020000"
     last = out / CHECKPOINTS_DIR / LAST_CHECKPOINT_LINK
-    assert last.is_symlink() or last.is_junction()  # a junction on Windows
+    assert last.is_symlink()
     # `last` points at the downloaded step dir.
-    assert last.resolve() == checkpoint_dir.resolve()
+    assert (last.parent / last.readlink()).resolve() == checkpoint_dir.resolve()
 
 
 def test_resolve_resume_checkpoint_raises_without_checkpoints(tmp_path, monkeypatch):

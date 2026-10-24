@@ -387,8 +387,14 @@ Open episode 0 in Rerun:
 uv run lerobot-dataset-viz \
   --repo-id=local/nexarm_sim_pick_place \
   --root=outputs/datasets/nexarm_sim_pick_place \
-  --video-backend=pyav \
   --episode-index=0
+```
+
+`lerobot-dataset-viz` decodes with TorchCodec when it is installed. If TorchCodec is installed but
+cannot decode the videos (a common Windows case), open the episode with PyAV instead:
+
+```bash
+uv run python -c "from lerobot.datasets import LeRobotDataset; from lerobot.scripts.lerobot_dataset_viz import visualize_dataset; visualize_dataset(LeRobotDataset('local/nexarm_sim_pick_place', root='outputs/datasets/nexarm_sim_pick_place', episodes=[0], video_backend='pyav'), episode_index=0)"
 ```
 
 Rerun shows every camera stream next to the six state and six action curves, so
@@ -400,7 +406,6 @@ the viewer immediately with:
 uv run lerobot-dataset-viz \
   --repo-id=local/nexarm_sim_pick_place \
   --root=outputs/datasets/nexarm_sim_pick_place \
-  --video-backend=pyav \
   --episode-index=0 \
   --save=1 \
   --output-dir=outputs/dataset_visualizations
