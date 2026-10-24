@@ -58,13 +58,22 @@ from lerobot.robots import (  # noqa: F401
     mobile_bi_nexarm_sim,
     nexarm_follower,
     nexarm_sim,
+    so_follower,
 )
 from lerobot.robots.robot import Robot
+from lerobot.robots.so_follower.robot_kinematic_processor import (
+    EEBoundsAndSafety,
+    EEReferenceAndDelta,
+    ForwardKinematicsJointsToEEObservation,
+    GripperVelocityToJoint,
+    InverseKinematicsRLStep,
+)
 from lerobot.teleoperators import (
     gamepad,  # noqa: F401
     keyboard,  # noqa: F401
     make_teleoperator_from_config,
     nexarm_leader,  # noqa: F401
+    so_leader,  # noqa: F401
 )
 from lerobot.teleoperators.teleoperator import Teleoperator
 from lerobot.teleoperators.utils import TeleopEvents
@@ -74,13 +83,6 @@ from lerobot.utils.robot_utils import precise_sleep
 from lerobot.utils.utils import log_say
 
 from .joint_observations_processor import JointVelocityProcessorStep, MotorCurrentProcessorStep
-from .robot_kinematic_processor import (
-    EEBoundsAndSafety,
-    EEReferenceAndDelta,
-    ForwardKinematicsJointsToEEObservation,
-    GripperVelocityToJoint,
-    InverseKinematicsRLStep,
-)
 
 logging.basicConfig(level=logging.INFO)
 

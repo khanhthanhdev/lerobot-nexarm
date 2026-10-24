@@ -25,11 +25,12 @@ from lerobot.robots import (  # noqa: F401
     mobile_bi_nexarm_sim,
     nexarm_follower,
     nexarm_sim,
+    so_follower,
 )
-from lerobot.teleoperators import (  # noqa: F401
-    gamepad,
-    keyboard,
-    nexarm_leader,
+from lerobot.teleoperators import (
+    gamepad,  # noqa: F401
+    nexarm_leader,  # noqa: F401
+    so_leader,  # noqa: F401
 )
 
 from .gym_manipulator import make_robot_env

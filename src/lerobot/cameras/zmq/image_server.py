@@ -26,16 +26,13 @@ import logging
 import threading
 import time
 from collections import deque
-from typing import Any
 
 import cv2
 import numpy as np
-import zmq as _zmq
+import zmq
 
 from ..configs import ColorMode
 from ..opencv import OpenCVCamera, OpenCVCameraConfig
-
-zmq: Any = _zmq
 
 logger = logging.getLogger(__name__)
 
@@ -105,6 +102,7 @@ class ImageServer:
                 fps=self.fps,
                 width=shape[1],
                 height=shape[0],
+                fourcc=cfg.get("fourcc", "MJPG"),
                 color_mode=ColorMode.RGB,
             )
             camera = OpenCVCamera(cam_config)

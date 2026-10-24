@@ -40,3 +40,10 @@ Replace the `TurboVLA` submodule with a pinned `turbovla` package dependency, so
 
 ## Risk / Rollback
 If TurboVLA does not work with numpy 2, keep the submodule for now and solve the blocker inside TurboVLA first. Phases 05-06 wait on this; phase 07 does not.
+
+## Scouted facts (2026-10-24, TurboVLA at `98ee1be3`)
+- `turbovla/` imports none of `vla_adapter`, `starVLA`, `experiments` or `deployment`. Only the console scripts in TurboVLA's `pyproject.toml` (`turbovla-libero-eval`, `turbovla-robotwin-train/eval`) reference them. So the package list can be narrowed to `turbovla*`, with those scripts moved to repo-only use or an extra.
+- `third_party/vla_adapter` and `third_party/starvla_runtime` are ordinary tracked files (46 files, no gitlinks), and TurboVLA has no `.gitmodules`. A git install needs no nested submodule fetch.
+- Core pins to change: `numpy>=1.26,<2`, `transformers>=4.56,<5`. `robosuite==1.4.1` and `tensorflow` are already in the `libero` extra, not core.
+- `turbovla/data/libero_rlds.py` and `turbovla/data/mixed_suite.py` import `tensorflow`, but tensorflow is not a core dependency. Keep those imports lazy, or keep them out of the import path used by `turbovla.models`.
+- `turbovla.models.configuration.TurboVLAConfig` is a dataclass made of `text`, `vision`, `interaction` and `action` sub-configs (`ActionHeadConfig`: `action_dim`, `state_dim`, `horizon`, ...). Alias it as `TurboVLAModelConfig` in phase 05.

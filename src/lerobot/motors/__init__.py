@@ -15,10 +15,12 @@
 # limitations under the License.
 
 from .motors_bus import (
+    DriveMode,
     Motor,
     MotorCalibration,
     MotorNormMode,
+    SerialMotorsBus,
 )
 from .nexarm import NexArmMotorsBus
 
-__all__ = ["Motor", "MotorCalibration", "MotorNormMode", "NexArmMotorsBus"]
+__all__ = ["DriveMode", "Motor", "MotorCalibration", "MotorNormMode", "NexArmMotorsBus", "SerialMotorsBus"]

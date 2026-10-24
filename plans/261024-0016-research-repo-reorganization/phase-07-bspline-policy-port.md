@@ -39,3 +39,7 @@ Port B-spline Policy into `lerobot_policy_bspline` so it trains, evaluates and r
 
 ## Risk / Rollback
 Porting fidelity: compare against at least one upstream number before trusting NexArm results.
+
+## Scouted facts (2026-10-24)
+- License: MIT (Copyright (c) 2026 Haoyu Xiong) in both `khanhthanhdev/bspline-policy` and `B-spline-policy/bspline-policy`, which is compatible with Apache-2.0. Keep the MIT notice in the plugin README and in ported files.
+- The recorded submodule commit `61ed5f42` ("hello bspline policy", 2026-07-22) exists on the fork. Use it as the pinned reference for the port.

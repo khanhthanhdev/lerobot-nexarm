@@ -17,15 +17,17 @@ Simple script to control a robot from teleoperation.
 
 Requires: pip install 'lerobot[hardware]'
 
-Example with NexArm:
+Example:
 
 ```shell
 lerobot-teleoperate \
-    --robot.type=nexarm_follower \
-    --robot.port=/dev/ttyUSB0 \
-    --robot.cameras="{ front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30}, wrist: {type: opencv, index_or_path: 1, width: 640, height: 480, fps: 30}}" \
-    --teleop.type=nexarm_leader \
-    --teleop.port=/dev/ttyUSB1 \
+    --robot.type=so101_follower \
+    --robot.port=/dev/tty.usbmodem58760431541 \
+    --robot.cameras="{ front: {type: opencv, index_or_path: 0, width: 1920, height: 1080, fps: 30}}" \
+    --robot.id=black \
+    --teleop.type=so101_leader \
+    --teleop.port=/dev/tty.usbmodem58760431551 \
+    --teleop.id=blue \
     --display_data=true
 ```
 
@@ -34,12 +36,35 @@ To stream the data to Foxglove instead of Rerun, add ``--display_mode=foxglove``
 
 ```shell
 lerobot-teleoperate \
-    --robot.type=nexarm_follower \
-    --robot.port=/dev/ttyUSB0 \
-    --teleop.type=nexarm_leader \
-    --teleop.port=/dev/ttyUSB1 \
+    --robot.type=so101_follower \
+    --robot.port=/dev/tty.usbmodem58760431541 \
+    --robot.cameras="{ front: {type: opencv, index_or_path: 0, width: 1920, height: 1080, fps: 30}}" \
+    --robot.id=black \
+    --teleop.type=so101_leader \
+    --teleop.port=/dev/tty.usbmodem58760431551 \
+    --teleop.id=blue \
     --display_data=true \
     --display_mode=foxglove
+```
+
+Example teleoperation with bimanual so100:
+
+```shell
+lerobot-teleoperate \
+  --robot.type=bi_so_follower \
+  --robot.left_arm_config.port=/dev/tty.usbmodem5A460822851 \
+  --robot.right_arm_config.port=/dev/tty.usbmodem5A460814411 \
+  --robot.id=bimanual_follower \
+  --robot.left_arm_config.cameras='{
+    wrist: {"type": "opencv", "index_or_path": 1, "width": 640, "height": 480, "fps": 30},
+  }' --robot.right_arm_config.cameras='{
+    wrist: {"type": "opencv", "index_or_path": 2, "width": 640, "height": 480, "fps": 30},
+  }' \
+  --teleop.type=bi_so_leader \
+  --teleop.left_arm_config.port=/dev/tty.usbmodem5A460852721 \
+  --teleop.right_arm_config.port=/dev/tty.usbmodem5A460819811 \
+  --teleop.id=bimanual_leader \
+  --display_data=true
 ```
 
 """
@@ -62,21 +87,46 @@ from lerobot.processor import (
 from lerobot.robots import (  # noqa: F401
     Robot,
     RobotConfig,
+    bi_openarm_follower,
+    bi_rebot_b601_follower,
+    bi_so_follower,
+    earthrover_mini_plus,
+    hope_jr,
+    koch_follower,
     make_robot_from_config,
     mobile_bi_nexarm_sim,
     nexarm_follower,
     nexarm_sim,
+    omx_follower,
+    openarm_follower,
+    reachy2,
+    rebot_b601_follower,
+    so_follower,
+    unitree_g1 as unitree_g1_robot,
 )
 from lerobot.teleoperators import (  # noqa: F401
     Teleoperator,
     TeleoperatorConfig,
+    bi_openarm_leader,
+    bi_openarm_mini,
+    bi_rebot_102_leader,
+    bi_so_leader,
     gamepad,
+    homunculus,
     keyboard,
+    koch_leader,
     make_teleoperator_from_config,
     nexarm_leader,
+    omx_leader,
+    openarm_leader,
+    openarm_mini,
+    reachy2_teleoperator,
+    rebot_102_leader,
+    so_leader,
+    unitree_g1,
 )
+from lerobot.utils.cycle_timer import CycleTimer
 from lerobot.utils.import_utils import register_third_party_plugins
-from lerobot.utils.robot_utils import precise_sleep
 from lerobot.utils.utils import init_logging, move_cursor_up
 from lerobot.utils.visualization_utils import (
     init_visualization,
@@ -138,57 +188,69 @@ def teleop_loop(
     """
 
     display_len = max(len(key) for key in robot.action_features)
+    # Teleoperation writes no dataset, so a missed deadline costs control smoothness
+    # only.  The live readout below is the instantaneous rate; the timer adds the
+    # warning when the loop cannot keep up and the summary of where the time went.
+    timer = CycleTimer(fps, records_data=False)
     start = time.perf_counter()
-    while True:
-        loop_start = time.perf_counter()
+    try:
+        while True:
+            timer.tick()
+            loop_start = time.perf_counter()  # for the live readout below
 
-        # Get robot observation
-        # Not really needed for now other than for visualization
-        # teleop_action_processor can take None as an observation
-        # given that it is the identity processor as default
-        obs = robot.get_observation()
+            with timer.section("observe"):
+                # Get robot observation
+                # Not really needed for now other than for visualization
+                # teleop_action_processor can take None as an observation
+                # given that it is the identity processor as default
+                obs = robot.get_observation()
 
-        if robot.name == "unitree_g1":
-            teleop.send_feedback(obs)
+                if robot.name == "unitree_g1":
+                    teleop.send_feedback(obs)
 
-        # Get teleop action
-        raw_action = teleop.get_action()
+            with timer.section("teleop"):
+                # Get teleop action
+                raw_action = teleop.get_action()
 
-        # Process teleop action through pipeline
-        teleop_action = teleop_action_processor((raw_action, obs))
+                # Process teleop action through pipeline
+                teleop_action = teleop_action_processor((raw_action, obs))
 
-        # Process action for robot through pipeline
-        robot_action_to_send = robot_action_processor((teleop_action, obs))
+                # Process action for robot through pipeline
+                robot_action_to_send = robot_action_processor((teleop_action, obs))
 
-        # Send processed action to robot (robot_action_processor.to_output should return RobotAction)
-        _ = robot.send_action(robot_action_to_send)
+            with timer.section("send"):
+                # Send processed action to robot (robot_action_processor.to_output should return RobotAction)
+                _ = robot.send_action(robot_action_to_send)
 
-        if display_data:
-            # Process robot observation through pipeline
-            obs_transition = robot_observation_processor(obs)
+            if display_data:
+                with timer.section("telemetry"):
+                    # Process robot observation through pipeline
+                    obs_transition = robot_observation_processor(obs)
 
-            log_visualization_data(
-                display_mode,
-                observation=obs_transition,
-                action=teleop_action,
-                compress_images=display_compressed_images,
-            )
+                    log_visualization_data(
+                        display_mode,
+                        observation=obs_transition,
+                        action=teleop_action,
+                        compress_images=display_compressed_images,
+                    )
 
-            print("\n" + "-" * (display_len + 10))
-            print(f"{'NAME':<{display_len}} | {'NORM':>7}")
-            # Display the final robot action that was sent
-            for motor, value in robot_action_to_send.items():
-                print(f"{motor:<{display_len}} | {value:>7.2f}")
-            move_cursor_up(len(robot_action_to_send) + 3)
+                    print("\n" + "-" * (display_len + 10))
+                    print(f"{'NAME':<{display_len}} | {'NORM':>7}")
+                    # Display the final robot action that was sent
+                    for motor, value in robot_action_to_send.items():
+                        print(f"{motor:<{display_len}} | {value:>7.2f}")
+                    move_cursor_up(len(robot_action_to_send) + 3)
 
-        dt_s = time.perf_counter() - loop_start
-        precise_sleep(max(1 / fps - dt_s, 0.0))
-        loop_s = time.perf_counter() - loop_start
-        print(f"Teleop loop time: {loop_s * 1e3:.2f}ms ({1 / loop_s:.0f} Hz)")
-        move_cursor_up(1)
+            timer.wait()
+            loop_s = time.perf_counter() - loop_start
+            print(f"Teleop loop time: {loop_s * 1e3:.2f}ms ({1 / loop_s:.0f} Hz)")
+            move_cursor_up(1)
 
-        if duration is not None and time.perf_counter() - start >= duration:
-            return
+            if duration is not None and time.perf_counter() - start >= duration:
+                return
+    finally:
+        # In `finally` so ^C — how a teleop session normally ends — still reports.
+        timer.log_run_summary()
 
 
 @parser.wrap()

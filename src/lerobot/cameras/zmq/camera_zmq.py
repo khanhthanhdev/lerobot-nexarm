@@ -23,8 +23,6 @@ following format:
     }
 """
 
-from __future__ import annotations
-
 import base64
 import json
 import logging
@@ -36,22 +34,19 @@ import cv2
 import numpy as np
 from numpy.typing import NDArray
 
-from lerobot.utils.decorators import check_if_already_connected, check_if_not_connected
-from lerobot.utils.errors import DeviceNotConnectedError
 from lerobot.utils.import_utils import _zmq_available, require_package
 
-from ..camera import Camera
-from ..configs import ColorMode
-from .configuration_zmq import ZMQCameraConfig
-
-if TYPE_CHECKING:
-    # PyZMQ's incomplete inline stubs omit runtime members such as Context and SUB.
-    zmq: Any
-elif _zmq_available:
+if TYPE_CHECKING or _zmq_available:
     import zmq
 else:
     zmq = None
 
+from lerobot.utils.decorators import check_if_already_connected, check_if_not_connected
+from lerobot.utils.errors import DeviceNotConnectedError
+
+from ..camera import Camera
+from ..configs import ColorMode
+from .configuration_zmq import ZMQCameraConfig
 
 logger = logging.getLogger(__name__)
 

@@ -65,11 +65,6 @@ def find_port():
 
 
 def main():
-    import sys
-
-    if "-h" in sys.argv or "--help" in sys.argv:
-        print(__doc__)
-        return
     find_port()
 
 
