@@ -102,6 +102,16 @@ The differences change sign from window to window and stay within 4%, which fits
 
 LeRobot is 31% slower (2.13 against 3.10 steps/s). Its log shows `updt_s` 0.314 s, about the script's whole step, plus `prep_s` 0.129 s: `turbovla_image_processor` converts every frame to PIL and resizes it in the training process, while the script does the same work in DataLoader workers. Moving that step off the main process would close the gap; it changes no numbers but needs the parity tests rerun.
 
+## Smoke check (2026-10-25)
+
+`marinelab` (RTX 5050 8 GB), `main` at `76422ee3`, 20 steps, W&B off, `--num_workers=4`:
+
+- `train_parity.yaml` trains at batch 16 (peak 6.7 GB), and `lerobot-eval` on its EMA checkpoint runs 2 sim episodes.
+- `train_full.yaml` on a 4-episode sim dataset from `generate_stack_bowls_dataset.py` runs out of memory at batch 16 with the three cameras; at `--batch_size=8` it trains (peak 5.8 GB), and the sim eval command runs 2 episodes on its EMA checkpoint. Batch 16 needs a larger GPU.
+- Not run: the 2-GPU check (one GPU) and the script side of the full run (`train_turbovla.py` is retired; it runs only at the `pre-reorg` tag).
+
+This checks the commands, not the policy.
+
 ## Checkpoint
 
 Hub ids, steps and W&B run links: pending.

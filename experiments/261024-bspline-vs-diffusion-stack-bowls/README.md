@@ -1,6 +1,6 @@
 # 261024-bspline-vs-diffusion-stack-bowls
 
-**Status: pending (needs a Linux GPU machine with EGL for sim generation and eval, and the real arm).** Nothing below has been run yet; the results tables are empty on purpose.
+**Status: pending (needs a Linux GPU machine with EGL for sim generation and eval, and the real arm).** Only the smoke check below has run; the results tables are empty on purpose.
 
 ## Hypothesis
 
@@ -24,7 +24,7 @@ MUJOCO_GL=egl uv run python examples/nexarm/generate_stack_bowls_dataset.py \
     --episodes 300 --gpus 0,1,2,3
 ```
 
-Train both policies with the same data, seed, batch size, image size and steps. Both configs resize the 480x640 frames to 120x160 (`resize_shape`): at full size, batch 8 already exceeds an 8 GB GPU, while at 120x160 batch 32 fits. On a larger GPU you can drop or raise `resize_shape`, as long as both configs keep the same value.
+Train both policies with the same data, seed, batch size, image size and steps. Both configs resize the 480x640 frames to 120x160 (`resize_shape`) and use batch 64, which needs more than 8 GB. With the three sim cameras an 8 GB GPU fits batch 16 (peak 7.2 GB), not 32; pass `--batch_size=16` to both commands there. On a larger GPU you can drop or raise `resize_shape`, as long as both configs keep the same value.
 
 ```bash
 uv run lerobot-train --config_path experiments/261024-bspline-vs-diffusion-stack-bowls/train_bspline.yaml
@@ -69,6 +69,19 @@ Hub id, step and W&B run link: _pending_.
 | bspline   | sim      | 50       |              |                   | `bspline_speed_up=2.0` |
 | diffusion | real arm | 10       |              |                   |                        |
 | bspline   | real arm | 10       |              |                   |                        |
+
+## Smoke check (2026-10-25)
+
+`marinelab` (RTX 5050 8 GB), `main` at `76422ee3`, on a 4-episode dataset from the generator command (`--episodes 4`), 50 steps, W&B off:
+
+| Batch | B-spline        | Diffusion       |
+| ----- | --------------- | --------------- |
+| 64    | out of memory   | out of memory   |
+| 32    | out of memory   | out of memory   |
+| 16    | trains (7.2 GB) | trains (7.2 GB) |
+| 8     | trains (6.5 GB) | trains (6.6 GB) |
+
+The three eval commands run on the batch-16 checkpoints with `--eval.n_episodes=2`. This checks the commands, not the policies.
 
 ## Notes
 
