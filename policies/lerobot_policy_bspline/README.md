@@ -18,6 +18,15 @@ uv run lerobot-train --policy.type=bspline --dataset.repo_id=<repo_id> --policy.
 uv run lerobot-eval --policy.path=<checkpoint>/pretrained_model --env.type=<env>
 ```
 
+On the real NexArm, roll out the checkpoint like any other policy ([the pipeline guide, section 3](../../docs/guides/pipeline.md#3-rollout)); open exactly the cameras it was trained on (`--no-top-cam` for front and wrist only):
+
+```bash
+uv run python examples/nexarm/rollout.py --follower-port /dev/ttyUSB1 \
+    --policy-path outputs/train/<run>/checkpoints/last/pretrained_model
+```
+
+`--policy.bspline_speed_up` is saved in the checkpoint's `config.json`; edit it there to execute the plan faster or slower without retraining.
+
 Options specific to this policy (all others are the `diffusion` options):
 
 | Flag                          | Default | Meaning                                                                                  |
