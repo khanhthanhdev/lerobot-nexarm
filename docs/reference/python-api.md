@@ -10,29 +10,29 @@ from lerobot_robot_nexarm.motors import NexArmKinematicsDynamics
 
 kd = NexArmKinematicsDynamics()
 
-# 5 arm joint positions in radians
+# 5 arm joint positions in radians (an array), or a {joint_name: raw servo value} mapping
 q = np.array([0.0, 0.4, 0.8, -0.4, 0.0])
 
-# 1. Forward Kinematics
+# 1. Forward Kinematics: position, rotation_matrix, quaternion_wxyz, rpy_rad, rpy_deg
 fk = kd.forward_kinematics(q)
 print("EE Position [x, y, z]:", fk["position"])
-print("EE RPY (degrees):", np.rad2deg(fk["rpy"]))
+print("EE RPY (degrees):", fk["rpy_deg"])
 
 # 2. Geometric Jacobian (6 x 5)
-J = kd.jacobian(q)
+J = kd.compute_jacobian(q)
 print("Jacobian shape:", J.shape)
 
-# 3. Damped Least-Squares Inverse Kinematics
+# 3. Damped Least-Squares Inverse Kinematics: raw servo positions per joint, or None
 target_pos = np.array([0.22, 0.0, 0.15])
-success, q_sol = kd.inverse_kinematics(target_pos, q_init=q)
-if success:
-    print("IK Solution (rad):", q_sol)
+q_sol = kd.inverse_kinematics(target_pos)  # optional: target_rpy=..., current_joint_positions={name: raw}
+if q_sol is not None:
+    print("IK Solution (raw):", q_sol)
 
 # 4. Mass / Inertia Matrix M(q)
 M = kd.mass_matrix(q)
 
-# 5. Gravity Compensation Torques
-tau_g = kd.gravity_torques(q)
+# 5. Gravity Compensation Torques, per joint
+tau_g = kd.gravity_compensation_torques(q)
 print("Gravity torques (Nm):", tau_g)
 ```
 
@@ -46,8 +46,8 @@ from lerobot_robot_nexarm.motors import NexArmMotorsBus
 bus = NexArmMotorsBus(port="/dev/ttyUSB1")
 bus.connect()
 
-# Set motion profile: speed (0-3400 raw units/s), acceleration ramp (0-254)
-bus.set_motion_profile(speed=2000, acc=100)
+# CMD 56: acceleration ramp (0-254) and speed limit (0-3400 raw units/s, 0 = no limit)
+bus.write_motion_params(acc=50, speed=0)
 
 # Read 6 servo positions (0-4095 range)
 positions = bus.read_positions()

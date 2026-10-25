@@ -176,7 +176,7 @@ away with the former `train_turbovla.py`; see [the TurboVLA guide](turbovla.md#3
 - To match a single-GPU recipe exactly, divide its batch by the GPU count, or keep the per-GPU batch and expect
   fewer steps to be needed. Start with the default `--policy.optimizer_lr=5e-5`; if loss is unstable at a large
   effective batch, lower it or raise `--policy.scheduler_warmup_steps`.
-- `--steps` and `--save_freq` count optimizer updates, not samples, so 4 GPUs see 4x the data per step.
+- `--steps` and `--save_freq` count steps, not samples (with accumulation at 1, each step is one optimizer update), so 4 GPUs see 4x the data per step.
 - `--num_workers` is per GPU: 4 GPUs x 8 workers starts 32 video-decoding processes. Lower it if CPU or RAM runs
   out.
 - `--accelerator.mixed_precision=bf16` needs Ampere or newer; use `fp16` on older GPUs.

@@ -9,7 +9,7 @@ LeRobot = **datasets + policies + envs + robot control**, unified by a small set
 - **`LeRobotDataset`** — episode-aware dataset (video or images + actions + state), loadable from the Hub or disk.
 - **Policies** (`ACT`, `Diffusion`, `SmolVLA`, `π0`, `π0.5`, `Wall-X`, `X-VLA`, `VQ-BeT`, `TD-MPC`, …) — all inherit `PreTrainedPolicy` and can be pushed/pulled from the Hub.
 - **Processors** — small composable transforms between dataset → policy → robot.
-- **Envs** (sim: `nexarm`, etc.) and **Robots** (real: `nexarm_follower`, `nexarm_sim`) — same action/observation contract so code swaps cleanly.
+- **Envs** (sim: `nexarm`, etc.) and **Robots** (real: `nexarm_follower`; simulated: `nexarm_sim`) — same action/observation contract so code swaps cleanly.
 - **CLI** — `lerobot-record`, `lerobot-train`, `lerobot-eval`, `lerobot-teleoperate`, `lerobot-calibrate`, `lerobot-find-port`, `lerobot-replay`, `lerobot-rollout`.
 
 LeRobot's own documentation is at <https://huggingface.co/docs/lerobot>.

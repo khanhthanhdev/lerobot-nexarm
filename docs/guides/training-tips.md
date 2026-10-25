@@ -121,7 +121,7 @@ Robotics imitation learning usually converges in a **few epochs over the dataset
 
 ```
 total_frames     = sum of frames over all episodes      # e.g. 50 eps × 30 fps × 30 s ≈ 45,000
-steps_per_epoch  = ceil(total_frames / batch_size)
+steps_per_epoch  = ceil(total_frames / (batch_size × num_gpus))
 total_steps      = epochs × steps_per_epoch
 ```
 
@@ -154,7 +154,7 @@ Pass the resulting total with `--steps=<N>`; eval at intermediate checkpoints (`
     --batch_size=2 \
     --accelerator.gradient_accumulation.steps=4
   ```
-  Effective batch size will be $2 \times 4 = 8$ samples per update step.
+  Effective batch size will be $2 \times 4 = 8$ samples per update step. `--steps` and `--save_freq` count micro-batches, not optimizer updates, so this run applies one update every 4 steps: multiply `--steps` by the accumulation factor to keep the same number of updates.
 - Scale **learning rate** gently with batch; most LeRobot defaults work fine for a 2–4× batch change.
 
 ### 3.5 Scale LR schedule & checkpoints with `--steps`

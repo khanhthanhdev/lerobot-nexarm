@@ -26,7 +26,7 @@ git remote add upstream https://github.com/Hiwonder-official/lerobot-nexarm.git
 
 ### 2. Environment Installation
 
-Follow [Dependency profiles in the install guide](./docs/getting-started/install.md#dependency-profiles). All user guides are indexed in [`docs/README.md`](./docs/README.md). `uv sync` installs the pinned `lerobot`, the NexArm plugins and the policy plugins; always run commands through `uv run`.
+Follow [Dependency profiles in the install guide](./docs/getting-started/install.md#dependency-profiles). All user guides are indexed in [`docs/README.md`](./docs/README.md). `uv sync` installs the pinned `lerobot`, the NexArm plugins and the B-spline policy plugin; `--extra turbovla` adds TurboVLA and its plugin. Always run commands through `uv run`.
 
 ## Running Tests & Quality Checks
 

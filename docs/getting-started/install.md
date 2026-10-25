@@ -55,8 +55,7 @@ uv run hf auth login
 On Linux (Ubuntu/Debian), grant your user read/write access to the arms' serial ports:
 
 ```bash
-sudo usermod -a -G dialout $USER   # permanent, after you log out and back in
-sudo chmod 666 /dev/ttyUSB*        # for the current session
+sudo usermod -a -G dialout $USER   # then log out and back in
 ```
 
 ## Platform support
