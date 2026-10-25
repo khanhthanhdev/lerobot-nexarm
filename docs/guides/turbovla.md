@@ -21,7 +21,7 @@ This guide covers setting up, training, and deploying **TurboVLA** (Vision-Langu
 Verify your environment dependencies and cache base foundation models:
 
 ```bash
-# 1. Install the full NexArm profile (run.md, Dependency Profiles) plus the TurboVLA extra
+# 1. Install the full NexArm profile (docs/getting-started/install.md) plus the TurboVLA extra
 uv sync --locked --extra test --extra dev --extra core_scripts --extra training --extra nexarm --extra intelrealsense --extra turbovla
 
 # 2. Check health and download vision/language backbones
@@ -66,11 +66,11 @@ Each episode automatically records:
 - 6-DOF action targets
 - Language instruction for the episode's bowl order, e.g. _"Stack the bowls with red on bottom, blue in middle, and black on top."_
 
-Domain randomization is on by default (`--no-dr` disables it). Generation flags (`--gpus`, `--resume`, `--calibration`, ...) are listed in [`pipeline.md`, section 1a](pipeline.md#1a-simulation-scripted-demonstrations).
+Domain randomization is on by default (`--no-dr` disables it). Generation flags (`--gpus`, `--resume`, `--calibration`, ...) are listed in [the pipeline guide, section 1a](pipeline.md#1a-simulation-scripted-demonstrations).
 
 ### Option B: Real Hardware Demonstration Recording
 
-Collect real stack-bowls demonstrations with the collection launcher, which merges sessions into the local root `thanhkt/nexarm_stack_bowls_top` (front, wrist, top). See [`DATA_COLLECTION_GUIDE.md`](../../../DATA_COLLECTION_GUIDE.md):
+Collect real stack-bowls demonstrations with the collection launcher, which merges sessions into the local root `thanhkt/nexarm_stack_bowls_top` (front, wrist, top). See [Data collection](data-collection.md):
 
 ```bash
 ./scripts/nexarm/collect.sh --num-episodes 50
@@ -82,7 +82,7 @@ The merged root lives at `~/.cache/huggingface/lerobot/thanhkt/nexarm_stack_bowl
 
 ## 3. Training TurboVLA
 
-TurboVLA trains through LeRobot's trainer with the policy plugin (`--policy.type=turbovla`), and the checkpoint loads directly in `lerobot-eval`, `lerobot-rollout` and the desktop app. The loss, parameter groups, frozen BERT, AdamW settings and warmup-cosine schedule are those of the former `train_turbovla.py`; a 2k-step GPU run gave loss curves within 4% of it ([`experiments/261024-turbovla-nexarm-parity`](../../../experiments/261024-turbovla-nexarm-parity/README.md)).
+TurboVLA trains through LeRobot's trainer with the policy plugin (`--policy.type=turbovla`), and the checkpoint loads directly in `lerobot-eval`, `lerobot-rollout` and the desktop app. The loss, parameter groups, frozen BERT, AdamW settings and warmup-cosine schedule are those of the former `train_turbovla.py`; a 2k-step GPU run gave loss curves within 4% of it ([`experiments/261024-turbovla-nexarm-parity`](../../experiments/261024-turbovla-nexarm-parity/README.md)).
 
 ```bash
 uv run lerobot-train --policy.type=turbovla \
@@ -95,7 +95,7 @@ uv run lerobot-train --policy.type=turbovla \
     --output_dir=outputs/train/nexarm_turbovla
 ```
 
-`scripts/nexarm/train_turbovla_single_gpu.sh` runs the same command. For several GPUs, use `scripts/nexarm/train_turbovla_multi_gpu.sh` or `uv run accelerate launch --multi_gpu --num_processes=<N> -m lerobot.scripts.lerobot_train <same flags>`. To train on real data, pass the real dataset instead, for example `--dataset.repo_id=thanhkt/nexarm_stack_bowls_top --dataset.root=$HOME/.cache/huggingface/lerobot/thanhkt/nexarm_stack_bowls_top`. `--policy.freeze_vision=true` trains only the interaction layers and the action head. `--policy.camera_keys` sets the views and their order; by default the model uses every camera of the dataset. A legacy 2-camera dataset such as `thanhkt/nexarm_stack_bowls` gives a 2-view checkpoint, which runs on the real robot without the `top` camera. The mapping of the former script's flags is in [`SERVER_TRAINING_GUIDE.md`](../../../SERVER_TRAINING_GUIDE.md#3-training-on-the-server).
+`scripts/nexarm/train_turbovla_single_gpu.sh` runs the same command. For several GPUs, use `scripts/nexarm/train_turbovla_multi_gpu.sh` or `uv run accelerate launch --multi_gpu --num_processes=<N> -m lerobot.scripts.lerobot_train <same flags>`. To train on real data, pass the real dataset instead, for example `--dataset.repo_id=thanhkt/nexarm_stack_bowls_top --dataset.root=$HOME/.cache/huggingface/lerobot/thanhkt/nexarm_stack_bowls_top`. `--policy.freeze_vision=true` trains only the interaction layers and the action head. `--policy.camera_keys` sets the views and their order; by default the model uses every camera of the dataset. A legacy 2-camera dataset such as `thanhkt/nexarm_stack_bowls` gives a 2-view checkpoint, which runs on the real robot without the `top` camera. The mapping of the former script's flags is in [Server training](server-training.md#3-training-on-the-server).
 
 `--dataset.root` must be the folder that contains `meta/info.json`, the recorded `data/` and any referenced `videos/`. If startup reports missing local metadata, locate the actual dataset root:
 
@@ -144,7 +144,7 @@ Give the policy exactly the cameras it was trained on; a 2-view checkpoint needs
 
 ### Checkpoints from the former `train_turbovla.py`
 
-The `turbovla` extra installs the policy plugin [`policies/lerobot_policy_turbovla`](../../../policies/lerobot_policy_turbovla/README.md) (`--policy.type=turbovla`). Checkpoints trained with `lerobot-train --policy.type=turbovla` load directly. Convert a checkpoint from the former `train_turbovla.py` once, then pass the folder as `--policy.path`:
+The `turbovla` extra installs the policy plugin [`policies/lerobot_policy_turbovla`](../../policies/lerobot_policy_turbovla/README.md) (`--policy.type=turbovla`). Checkpoints trained with `lerobot-train --policy.type=turbovla` load directly. Convert a checkpoint from the former `train_turbovla.py` once, then pass the folder as `--policy.path`:
 
 ```bash
 uv run python -m lerobot_policy_turbovla.convert_checkpoint \

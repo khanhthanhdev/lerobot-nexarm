@@ -1,13 +1,15 @@
 ---
 phase: 5
 title: "TurboVLA policy plugin, inference"
-status: in-progress
+status: completed
 priority: P1
 effort: "2-3d"
 dependencies: [4]
 ---
 
 # Phase 05: TurboVLA policy plugin, inference
+
+Closed 2026-10-25 (plan decision 11): the code is merged; the open runs below are tracked in [`plans/README.md`](../README.md) and the experiment READMEs.
 
 ## Goal
 

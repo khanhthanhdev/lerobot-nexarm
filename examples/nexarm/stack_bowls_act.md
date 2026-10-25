@@ -2,9 +2,9 @@
 
 Run from the repository root. By default the launcher uses the legacy 2-camera Hub dataset [thanhkt/nexarm_stack_bowls](https://huggingface.co/datasets/thanhkt/nexarm_stack_bowls), pins its Hub revision, and checks `robot_type`, the six joint/gripper channels and the front/wrist cameras (plus `top` when the dataset has it). fps and camera resolution are read from the dataset metadata. ACT is conditioned on images and joint state; it does not consume the task text.
 
-Install the full NexArm profile from [`run.md`, Dependency Profiles](../../run.md#dependency-profiles).
+Install the full NexArm profile from [Install, Dependency profiles](../../docs/getting-started/install.md#dependency-profiles).
 
-To train on the 3-camera root built by the collection launcher (local only, see [`DATA_COLLECTION_GUIDE.md`](../../DATA_COLLECTION_GUIDE.md)), pass both the id and its directory:
+To train on the 3-camera root built by the collection launcher (local only, see [Data collection](../../docs/guides/data-collection.md)), pass both the id and its directory:
 
 ```bash
 uv run python examples/nexarm/train_stack_bowls_act.py \

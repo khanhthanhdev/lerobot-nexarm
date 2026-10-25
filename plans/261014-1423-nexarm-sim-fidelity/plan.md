@@ -1,12 +1,12 @@
 ---
 title: "NexArm single-arm sim fidelity"
 description: "Make the single-arm MuJoCo twin match the real follower's servos, object masses and asset layout."
-status: pending
+status: backlog
 priority: P1
 effort: 14h
 branch: main
 tags: [bugfix, infra, tech-debt]
-blockedBy: []
+blockedBy: [261019-1440-nexarm-cad-home-pose]
 blocks: []
 created: 2026-10-14
 ---

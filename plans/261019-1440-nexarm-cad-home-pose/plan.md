@@ -1,7 +1,7 @@
 ---
 title: "NexArm CAD zero pose = real Home pose"
 description: "Re-pose the Fusion CAD so raw 2048 means the same arm pose in sim and on the real follower, then rebuild everything that depends on it."
-status: in-progress
+status: backlog
 priority: P0
 effort: "CAD session + 4h + robot session"
 branch: main

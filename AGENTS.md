@@ -1,6 +1,6 @@
 This file provides guidance to AI agents when working with code in this repository.
 
-> **User-facing help → [`AGENT_GUIDE.md`](./AGENT_GUIDE.md)** (NexArm setup, recording, picking a policy, training duration, eval — with copy-pasteable commands).
+> **User-facing help → [`docs/README.md`](./docs/README.md)** (start-here index: install, sim and hardware quickstarts, recording, training, picking a policy, eval — with copy-pasteable commands).
 
 ## Project Overview
 
@@ -85,7 +85,7 @@ To move to a newer LeRobot, follow "Upgrading LeRobot" in `CONTRIBUTING.md`.
 - **`packages/`** — NexArm plugins (table above); **`policies/`** — research policy plugins (TurboVLA adapter, B-spline Policy). Both are uv workspace members.
 - **`tests/`** — Pytest suite for the NexArm plugins, examples and scripts, organized by module; mocks in `tests/mocks/`. Policy tests sit in `policies/*/tests/`.
 - **`.github/workflows/`** — CI: `quality.yml` (pre-commit), `tests.yml` (NexArm and policy tests plus `make test-nexarm-ete`), `security.yml` (TruffleHog), `mobile_nexarm_sim.yml` (manual).
-- **`docs/`** — the numbered NexArm hardware tutorials; `docs/source/nexarm/` holds the pipeline, sim and TurboVLA guides. LeRobot's own docs are at <https://huggingface.co/docs/lerobot>.
+- **`docs/`** — all user guides, indexed by `docs/README.md`: `getting-started/` (install, simulation, hardware), `guides/` (pipeline, data collection, training tips, TurboVLA, sim and server training, sim calibration, desktop app), `reference/` (architecture and conventions, Python API, troubleshooting), `hiwonder/` (the vendor tutorials) and `service/` (the engine's API snapshots). LeRobot's own docs are at <https://huggingface.co/docs/lerobot>.
 - **`examples/nexarm/`** — ready-to-run NexArm tutorials; **`tools/nexarm/`** — calibration, probes and dataset tools; **`experiments/`** — one folder per experiment; **`scripts/`** — protocol vectors, GPU bootstrap, multi-GPU and Slurm launchers.
 - **`sim/`, `firmware/`, `hardware/`** — sim assets and exporters, vendor firmware, hardware files.
 - **`docker/`** — `Dockerfile.user` (CPU image of this repo).
@@ -97,11 +97,11 @@ LeRobot is used unmodified: the NexArm types register through the plugins, and N
 
 ## TurboVLA and B-spline Policy
 
-There are no git submodules. TurboVLA is the `turbovla` package from its own repo (<https://github.com/khanhthanhdev/TurboVLA>), pinned by commit in `[tool.uv.sources]` and installed by `uv sync --extra turbovla`. For local TurboVLA development, temporarily point that source at a checkout (`turbovla = { path = "../TurboVLA", editable = true }`) and never commit the change; see `docs/source/nexarm/turbovla_guide.md`. The same extra installs the workspace plugin `policies/lerobot_policy_turbovla/` (`--policy.type=turbovla`; it trains with `lerobot-train` and runs with `lerobot-eval`/`lerobot-rollout`; `convert_checkpoint.py` turns a checkpoint from the former `train_turbovla.py` into a LeRobot policy folder). B-spline Policy is the workspace plugin `policies/lerobot_policy_bspline/` (`--policy.type=bspline`), installed by plain `uv sync`. The TurboVLA workflow lives in `examples/nexarm/` (`setup_turbovla.py`) and imports the installed package. Multi-GPU and Slurm launchers are in `scripts/nexarm/`.
+There are no git submodules. TurboVLA is the `turbovla` package from its own repo (<https://github.com/khanhthanhdev/TurboVLA>), pinned by commit in `[tool.uv.sources]` and installed by `uv sync --extra turbovla`. For local TurboVLA development, temporarily point that source at a checkout (`turbovla = { path = "../TurboVLA", editable = true }`) and never commit the change; see `docs/guides/turbovla.md`. The same extra installs the workspace plugin `policies/lerobot_policy_turbovla/` (`--policy.type=turbovla`; it trains with `lerobot-train` and runs with `lerobot-eval`/`lerobot-rollout`; `convert_checkpoint.py` turns a checkpoint from the former `train_turbovla.py` into a LeRobot policy folder). B-spline Policy is the workspace plugin `policies/lerobot_policy_bspline/` (`--policy.type=bspline`), installed by plain `uv sync`. The TurboVLA workflow lives in `examples/nexarm/` (`setup_turbovla.py`) and imports the installed package. Multi-GPU and Slurm launchers are in `scripts/nexarm/`.
 
 ## User-Facing Guides
 
-Point to these rather than re-deriving workflows: `run.md` (sim, hardware, teleop, training, sim2real commands), `AGENT_GUIDE.md`, `DATA_COLLECTION_GUIDE.md`, `SERVER_TRAINING_GUIDE.md`, the numbered hardware tutorials in `docs/`, and `sim/README.md` (MuJoCo/URDF/Isaac Lab assets and exporters).
+Point to these rather than re-deriving workflows. `docs/README.md` indexes them; each topic has one owning page and the others link to it, so update the owner when behaviour changes. Install and dependency profiles: `docs/getting-started/install.md`; sim and hardware quickstarts: `docs/getting-started/`; record, train, roll out, benchmark: `docs/guides/pipeline.md`; the collection rig: `docs/guides/data-collection.md`; policy choice and training length: `docs/guides/training-tips.md`; TurboVLA, multi-GPU and server training: `docs/guides/`; conventions and troubleshooting: `docs/reference/`; tests: `CONTRIBUTING.md`; MuJoCo/URDF/Isaac Lab assets and exporters: `sim/README.md`. When helping a user (not developing the repo), ask the questions in `docs/README.md`, "For AI assistants helping someone use NexArm", before suggesting commands.
 
 ## Notes
 

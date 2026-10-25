@@ -2,7 +2,7 @@
 
 This document provides a concise, step-by-step guide to collecting teleoperation demonstration datasets using the Hiwonder NexArm (Leader-Follower dual arm rig) with LeRobot.
 
-Install the full NexArm profile from [`run.md`, Dependency Profiles](run.md#dependency-profiles) first. It includes `intelrealsense`, which the default `top` camera needs; `collect.sh` runs with `uv run --no-sync`, so it never installs missing extras for you.
+Install the full NexArm profile from [Install, Dependency profiles](../getting-started/install.md#dependency-profiles) first. It includes `intelrealsense`, which the default `top` camera needs; `collect.sh` runs with `uv run --no-sync`, so it never installs missing extras for you.
 
 ## One-command manual collection
 
@@ -71,88 +71,30 @@ uv run --no-sync python tools/nexarm/merge_collection.py \
 
 Use `--no-merge` to keep each recording session separate, or `--merge-root /path/to/local/root` to choose the local merged directory. `--root-repo-id` changes the root dataset ID used for metadata and the optional initial download. Camera/USB preflight checks never merge anything.
 
-To train on the merged root, pass its local directory as shown in [`pipeline.md`, section 2](docs/source/nexarm/pipeline.md#2-training).
+To train on the merged root, pass its local directory as shown in [the pipeline guide, section 2](pipeline.md#2-training).
 
 Called directly, `prepare_collection.py` defaults to `--front-cam 0 --wrist-cam 1` with automatic pixel formats; `collect.sh` passes the rig's by-id paths with MJPG (front) and YUYV (wrist). Override with `--front-cam` / `--wrist-cam` (index or device path) and `--front-fourcc` / `--wrist-fourcc`.
 
 ---
 
-## 1. Physical Hardware Checklist
+## 1. Before you record
 
-1. **Follower Arm (Slave / Actuated)**:
-   - Connect the **12V / 5A DC power supply** (barrel jack). Servos will not have torque without external 12V power.
-   - Connect the USB-C cable from the follower ESP32 base to the host PC.
-2. **Leader Arm (Master / Passive)**:
-   - Connect the USB-C cable from the leader ESP32 base to the host PC (powered directly via USB).
-3. **Cameras**:
-   - **Front camera** (overlooking the workspace): e.g. `/dev/video0` (Logitech C270).
-   - **Wrist camera** (mounted near gripper end-effector): e.g. `/dev/video2`.
-   - **Top camera** (Intel RealSense D435i looking down at the table; only RGB is recorded). Skip it with `--no-top-cam`.
+Wire the arms and cameras, find the ports and check teleoperation as in the [Hardware quickstart](../getting-started/hardware.md). On this rig the front camera is a Logitech C270 (MJPG) and the wrist camera an icSpring (YUYV); `collect.sh` opens them by their `/dev/v4l/by-id/` paths. `collect.sh` sets the serial permissions itself; for the manual command below, see [Install, Linux serial permissions](../getting-started/install.md#linux-serial-permissions).
 
 ---
 
-## 2. Linux Permissions & Port Setup
-
-Grant read/write permissions to serial ports:
-
-```bash
-# Option A: Grant access for current session
-sudo chmod 666 /dev/ttyUSB*
-
-# Option B: Permanent permission (requires logout/login)
-sudo usermod -a -G dialout $USER
-```
-
-Identify Leader and Follower serial ports:
-
-```bash
-uv run lerobot-find-port
-```
-
-- Default assignment on Linux (used by every script in this repository):
-  - Leader (`nexarm_leader`): `/dev/ttyUSB0`
-  - Follower (`nexarm_follower`): `/dev/ttyUSB1`
-
-Verify cameras:
-
-```bash
-uv run lerobot-find-cameras opencv
-uv run lerobot-find-cameras realsense
-```
-
----
-
-## 3. Pre-Flight Check: Teleoperation Test
-
-Before recording full datasets, verify that the leader mirrors smoothly to the follower:
-
-```bash
-uv run python examples/nexarm/teleoperate.py \
-    --leader-port /dev/ttyUSB0 \
-    --follower-port /dev/ttyUSB1 \
-    --front-cam 0 \
-    --wrist-cam 2 \
-    --fps 30
-```
-
-- Move the leader arm by hand.
-- Confirm the follower tracks all 6 joints (including gripper) with low latency.
-- Press `Ctrl+C` to stop.
-
----
-
-## 4. Record Demonstrations
+## 2. Record Demonstrations
 
 `collect.sh` above is the recommended path. The equivalent command follows. It runs `examples/nexarm/record_collection.py`, which is `lerobot-record` plus the NexArm collection flags (`--manual_control`, `--root_repo_id`, `--merge_root`, `--rerun_save_path`); its cameras must match the root (`thanhkt/nexarm_stack_bowls_top` has front, wrist and top).
 
-### Step 4.1: Set Hugging Face User
+### Step 2.1: Set Hugging Face User
 
 ```bash
 export HF_USER="$(NO_COLOR=1 hf auth whoami | awk -F': *' 'NR==1 {print $2}')"
 : "${HF_USER:?Run 'uv run hf auth login' first or export HF_USER manually}"
 ```
 
-### Step 4.2: Run Recording Command
+### Step 2.2: Run Recording Command
 
 ```bash
 uv run python examples/nexarm/record_collection.py \
@@ -192,7 +134,7 @@ The recorder appends `_YYYYMMDD_HHMMSS` to `--dataset.repo_id` and prints the fi
 
 ---
 
-## 5. Keyboard Controls During Recording
+## 3. Keyboard Controls During Recording
 
 With `--manual_control=true`, wait for READY and press **Enter / →** to start. Complete your demonstration, then press **Enter / →** once to end the episode and enter reset mode. Reset the props and return the arm to its starting pose; these reset movements are not recorded, but the follower still follows the leader. Press **Enter / →** again when ready to record the next episode. Neither phase has a timeout.
 
@@ -208,9 +150,9 @@ Run in an interactive terminal so keyboard controls are available. On Wayland or
 
 ---
 
-## 6. Inspect & Validate Recorded Dataset
+## 4. Inspect & Validate Recorded Dataset
 
-### 6.1 Replay on Physical Robot
+### 4.1 Replay on Physical Robot
 
 Test that the follower robot faithfully reproduces recorded demonstration 0 of a session:
 
@@ -222,7 +164,7 @@ uv run lerobot-replay \
     --dataset.episode=0
 ```
 
-### 6.2 Visualize in Browser / Rerun
+### 4.2 Visualize in Browser / Rerun
 
 Inspect synchronized videos and joint angle trajectories:
 
@@ -236,7 +178,7 @@ Use `--repo-id thanhkt/nexarm_stack_bowls_top` (or `--dataset.repo_id=` for repl
 
 ---
 
-## 7. Troubleshooting
+## 5. Troubleshooting
 
 - **Record loop runs at 5.0 Hz**:
   The follower arm was not in LeRobot bridge mode, so the recorder parsed the 5 Hz telemetry stream. Ensure the 12V power supply is on and restart the command.

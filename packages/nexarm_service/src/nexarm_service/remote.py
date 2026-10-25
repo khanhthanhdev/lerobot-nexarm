@@ -7,7 +7,7 @@
 Flow: open an SSH tunnel to the server's loopback engine, start that engine if it is not running, upload
 the dataset through the engine's archive endpoint, submit the same training request to the remote jobs
 API, mirror its log and metrics into the local job, then download the checkpoints. This replaces the manual
-rsync steps in SERVER_TRAINING_GUIDE.md.
+rsync steps in docs/guides/server-training.md.
 """
 
 import logging

@@ -1,13 +1,15 @@
 ---
 phase: 7
 title: "B-spline Policy port"
-status: in-progress
+status: completed
 priority: P2
 effort: "3-5d + GPU time"
 dependencies: [3]
 ---
 
 # Phase 07: B-spline Policy port
+
+Closed 2026-10-25 (plan decision 11): the code is merged; the open runs below are tracked in [`plans/README.md`](../README.md) and the experiment READMEs.
 
 ## Goal
 

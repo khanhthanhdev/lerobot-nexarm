@@ -1,13 +1,15 @@
 ---
 phase: 6
 title: "TurboVLA training and LIBERO benchmark"
-status: in-progress
+status: completed
 priority: P2
 effort: "3-5d + GPU time"
 dependencies: [5]
 ---
 
 # Phase 06: TurboVLA training and LIBERO benchmark
+
+Closed 2026-10-25 (plan decision 11): the code is merged; the open runs below are tracked in [`plans/README.md`](../README.md) and the experiment READMEs.
 
 ## Goal
 

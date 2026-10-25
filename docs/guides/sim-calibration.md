@@ -199,7 +199,19 @@ Then adjust the visual randomization range in `DomainRandomizationRanges` (`pack
 
 ## Step 9. Train and iterate
 
-1. Train with real and simulated data mixed. Start with real data about 25–50% of the batches, as in `pipeline.md`, section 2.
+1. Train with real and simulated data mixed. `lerobot-train` takes one dataset, so merge the real and sim datasets first (they share `robot_type="nexarm_follower"`; they also need the same cameras and fps), and set the mix through the episode counts; start with real data at about 25–50% of the episodes:
+
+   ```bash
+   uv run lerobot-edit-dataset \
+       --new_repo_id local/nexarm_real_sim_mix \
+       --new_root outputs/datasets/nexarm_real_sim_mix \
+       --operation.type merge \
+       --operation.repo_ids "['thanhkt/nexarm_stack_bowls_top', 'local/nexarm_stack_bowls']" \
+       --operation.roots "['$HOME/.cache/huggingface/lerobot/thanhkt/nexarm_stack_bowls_top', 'outputs/datasets/nexarm_stack_bowls']"
+   ```
+
+   Then train on it as in [the pipeline guide, section 2](pipeline.md#2-training).
+
 2. Evaluate on **real held-out trials**, not on simulated ones.
 3. Look at how the real rollouts fail: late or early motion points to delay or gains (repeat Steps 1–5), missed grasps point to the scene or contact (Step 8).
 4. Regenerate and retrain.

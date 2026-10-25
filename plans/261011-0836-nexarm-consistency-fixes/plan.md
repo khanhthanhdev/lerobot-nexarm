@@ -1,6 +1,6 @@
 # NexArm Consistency Fixes
 
-Status: implemented, uncommitted on the branch · Branch: `fix/nexarm-consistency` · Source: `plans/reports/review-261011-0754-cross-project-consistency.md`
+Status: completed (landed on `main` in `8e216eb28` and `d15b42d34`) · Branch: `fix/nexarm-consistency` · Source: `plans/reports/review-261011-0754-cross-project-consistency.md`
 
 ## Outcome
 

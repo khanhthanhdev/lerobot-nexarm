@@ -1,7 +1,7 @@
 ---
 title: "Research repo reorganization"
 description: "Turn lerobot-nexarm into a research repo: custom policies as LeRobot plugins, TurboVLA and B-spline Policy running through lerobot-train/eval/rollout, NexArm hardware as plugins, and upstream LeRobot as a dependency."
-status: in-progress
+status: completed
 priority: P1
 effort: "3-5 weeks (phases 06-07 need GPU time)"
 branch: main
@@ -56,17 +56,17 @@ lerobot-nexarm/
 
 ## Phases
 
-| #   | Phase                                                                                    | Priority | Effort     | Depends on | Status                       |
-| --- | ---------------------------------------------------------------------------------------- | -------- | ---------- | ---------- | ---------------------------- |
-| 01  | [Housekeeping and baseline](./phase-01-housekeeping-and-baseline.md)                     | P1       | 2h         | none       | completed                    |
-| 02  | [Upstream sync and retire core edits](./phase-02-upstream-sync-and-retire-core-edits.md) | P1       | 2-3d       | 01         | completed (real arm skipped) |
-| 03  | [Workspace and experiments layout](./phase-03-workspace-and-experiments-layout.md)       | P1       | 3h         | 02         | completed                    |
-| 04  | [TurboVLA as a pinned dependency](./phase-04-turbovla-pinned-dependency.md)              | P1       | 0.5-1d     | 03         | completed                    |
-| 05  | [TurboVLA policy plugin, inference](./phase-05-turbovla-policy-inference.md)             | P1       | 2-3d       | 04         | in-progress                  |
-| 06  | [TurboVLA training and LIBERO benchmark](./phase-06-turbovla-training-and-benchmark.md)  | P2       | 3-5d + GPU | 05         | in-progress                  |
-| 07  | [B-spline Policy port](./phase-07-bspline-policy-port.md)                                | P2       | 3-5d + GPU | 03         | in-progress                  |
-| 08  | [NexArm plugins on upstream LeRobot](./phase-08-nexarm-plugins-on-upstream-lerobot.md)   | P2       | 3-5d       | 02, 05     | completed                    |
-| 09  | [Tools/examples split and docs sweep](./phase-09-tools-examples-split-and-docs.md)       | P2       | 1d         | 06, 07, 08 | completed                    |
+| #   | Phase                                                                                    | Priority | Effort     | Depends on | Status                        |
+| --- | ---------------------------------------------------------------------------------------- | -------- | ---------- | ---------- | ----------------------------- |
+| 01  | [Housekeeping and baseline](./phase-01-housekeeping-and-baseline.md)                     | P1       | 2h         | none       | completed                     |
+| 02  | [Upstream sync and retire core edits](./phase-02-upstream-sync-and-retire-core-edits.md) | P1       | 2-3d       | 01         | completed (real arm skipped)  |
+| 03  | [Workspace and experiments layout](./phase-03-workspace-and-experiments-layout.md)       | P1       | 3h         | 02         | completed                     |
+| 04  | [TurboVLA as a pinned dependency](./phase-04-turbovla-pinned-dependency.md)              | P1       | 0.5-1d     | 03         | completed                     |
+| 05  | [TurboVLA policy plugin, inference](./phase-05-turbovla-policy-inference.md)             | P1       | 2-3d       | 04         | completed (runs: experiments) |
+| 06  | [TurboVLA training and LIBERO benchmark](./phase-06-turbovla-training-and-benchmark.md)  | P2       | 3-5d + GPU | 05         | completed (runs: experiments) |
+| 07  | [B-spline Policy port](./phase-07-bspline-policy-port.md)                                | P2       | 3-5d + GPU | 03         | completed (runs: experiments) |
+| 08  | [NexArm plugins on upstream LeRobot](./phase-08-nexarm-plugins-on-upstream-lerobot.md)   | P2       | 3-5d       | 02, 05     | completed                     |
+| 09  | [Tools/examples split and docs sweep](./phase-09-tools-examples-split-and-docs.md)       | P2       | 1d         | 06, 07, 08 | completed                     |
 
 Phase 07 can run alongside 04-06. Phase 08 can start once phase 05 has shown the plugin pattern works.
 
@@ -110,5 +110,6 @@ Phase 01 tags `pre-reorg`. Each phase lands as its own branch and merge, so any 
 8. (2026-10-24) `lerobot-find-joint-limits` and the HIL-SERL commands stay without plugin loading; documented, no wrapper and no upstream PR.
 9. (2026-10-24) `NexArmSim.name` stays `nexarm_follower`, so plain `lerobot-record`/`lerobot-rollout` stamp sim datasets with the physical type.
 10. (2026-10-25) Merge `chore/upstream-sync` into `main` once CI passes, without the phase-02 real-arm smoke test (PR #3).
+11. (2026-10-25) Close the plan. The code of phases 05-07 is merged and smoke-checked on a GPU; the long runs (full TurboVLA runs, LIBERO, B-spline vs diffusion) and the real-arm episodes are research results, tracked in their experiment READMEs and in [`plans/README.md`](../README.md), not in this plan.
 
 <!-- slug: research-repo-reorganization -->
