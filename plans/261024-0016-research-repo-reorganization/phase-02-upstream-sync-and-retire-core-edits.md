@@ -1,7 +1,7 @@
 ---
 phase: 2
 title: "Upstream sync and retire core edits"
-status: in-progress
+status: completed
 priority: P1
 effort: "2-3d"
 dependencies: [1]
@@ -122,10 +122,13 @@ Without those files, 25 upstream files differ by +233/-25. That diff is only the
 | `uv sync --locked --extra all --extra test --extra dev`                                                                                                                 | fails on `main` too               | fails: `kinematics` and `hilserl` pull `placo` -> `pin` -> `cmeel-*` sdists, which do not build on Windows (CMake 4 policy error; `cmeel-tinyxml2` fails even with `CMAKE_POLICY_VERSION_MINIMUM=3.5`). Synced with every other `all` extra plus `test`, `dev` and `service`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | Sim smoke test, `generate_stack_bowls_dataset.py --episodes 2`                                                                                                          | n/a                               | fails only on OpenGL: `mujoco.FatalError: gladLoadGL error` at the first camera render. Needs a box with EGL/OSMesa.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 
-### Open checks
+### Checks after the pin (2026-10-25)
 
-- Run on the Linux GPU server: `uv run pytest tests policies -q` and `make test-nexarm-ete`.
-- Sim dataset smoke test (2 episodes of `examples/nexarm/generate_stack_bowls_dataset.py`) on a machine with OpenGL.
-- `uv sync --locked --extra all` on Linux, where the `cmeel-*` wheels exist.
-- Real-arm smoke test before merging to `main`: teleoperate, record 2 episodes with `examples/nexarm/record_collection.py --merge_root ...`, then replay 1 episode.
-- Resolved (2026-10-24): no upstream PRs; every patch above got its NexArm-side fallback in phase 08, and `lerobot` is now pinned upstream. The branch is pushed and not merged into `main`.
+Linux server `marinelab` (Ubuntu 24.04), branch at `5d886134`, system Python 3.12.3 (uv's `cpython-3.12.0` build passes the clang-only `-fdebug-default-version=4` to gcc, so the `evdev` sdist does not build on it):
+
+- `uv sync --locked` with the CI extras: passes. `uv run pytest tests policies -q`: 451 passed, 7 skipped. `make test-nexarm-ete`: 3 passed.
+- `generate_stack_bowls_dataset.py --episodes 2`: 2 of 2 episodes written, none rejected.
+- `uv sync --locked --extra all`: passes, and the NexArm plugins import from it.
+- No upstream PRs; every patch above got its NexArm-side fallback in phase 08, and `lerobot` is pinned upstream.
+- Merged into `main` as PR #3 (`76422ee3`) after `quality.yml`, `tests.yml` and `security.yml` passed on `00e5b3dc`.
+- Skipped by user decision (2026-10-25): the real-arm smoke test (teleoperate, record 2 episodes with `examples/nexarm/record_collection.py --merge_root ...`, replay 1 episode). It has not been run on the merged code.
