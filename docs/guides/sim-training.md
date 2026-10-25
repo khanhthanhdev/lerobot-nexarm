@@ -1,7 +1,7 @@
 # Train NexArm policies on simulation data with several GPUs
 
-This guide goes from an empty machine to trained TurboVLA and ACT checkpoints, using datasets generated in the
-MuJoCo simulation. Run every command from the repository root on a Linux machine with NVIDIA GPUs.
+This guide goes from an empty machine to trained TurboVLA, ACT and B-spline Policy checkpoints, using datasets
+generated in the MuJoCo simulation. Run every command from the repository root on a Linux machine with NVIDIA GPUs.
 
 The steps:
 
@@ -9,7 +9,8 @@ The steps:
 2. Generate the simulation datasets (rendering spread across GPUs).
 3. Train TurboVLA with Accelerate.
 4. Train ACT with Accelerate.
-5. Evaluate the checkpoints in simulation.
+5. Train B-spline Policy with Accelerate.
+6. Evaluate the checkpoints in simulation.
 
 For single-GPU training, real-robot collection and rollout, see [the pipeline guide](pipeline.md).
 
@@ -251,7 +252,42 @@ This restores weights, optimizer state and step count.
 
 Checkpoints are under `--output-dir/checkpoints/<step>/pretrained_model`, with `last` pointing to the newest.
 
-## 4. Evaluate in simulation
+## 4. Train B-spline Policy on several GPUs
+
+B-spline Policy (`--policy.type=bspline`, [plugin README](../../policies/lerobot_policy_bspline/README.md)) is a
+diffusion policy and trains through Accelerate (DDP) like TurboVLA. Before each step, every GPU process fits a
+B-spline to each action window of its part of the batch. That fit runs on the CPU, about 2 ms per window, and the
+GPU waits for it. `--policy.bspline_fit_workers=N` spreads it over N processes per GPU; 4 workers cut it about 3x.
+
+### Stack bowls, 4 GPUs
+
+The experiment config [`train_bspline.yaml`](../../experiments/261024-bspline-vs-diffusion-stack-bowls/train_bspline.yaml)
+trains at batch 64, which does not fit an 8 GB GPU. Four GPUs at 16 each reproduce it:
+
+```bash
+CUDA_VISIBLE_DEVICES=0,1,2,3 uv run accelerate launch --multi_gpu --num_processes=4 --main_process_port=29500 \
+    -m lerobot.scripts.lerobot_train \
+    --config_path=experiments/261024-bspline-vs-diffusion-stack-bowls/train_bspline.yaml \
+    --batch_size=16 --policy.bspline_fit_workers=4 --num_workers=4
+```
+
+`scripts/nexarm/train_bspline_multi_gpu.sh DATASET_ROOT OUTPUT_DIR BATCH MAX_STEPS SAVE_STEPS` runs B-spline Policy
+with its default options on every visible GPU (`NUM_GPUS=4` to choose, `FIT_WORKERS` for the fit pool, default 4);
+extra `lerobot-train` flags, such as `--policy.resize_shape='[120,160]'`, go after the five arguments. It adds no
+EMA or mixed precision, so its runs stay comparable with a plain `diffusion` run.
+
+### Settings
+
+- `--batch_size`, `--steps`, `--save_freq` and `--num_workers` behave as for TurboVLA (section 2): batch and
+  workers are per GPU, steps count optimizer updates.
+- `--policy.bspline_fit_workers` is per GPU too. Each fit worker loads PyTorch and LeRobot once (a few seconds and
+  a few hundred MB of RAM). The example above starts 4 x (4 + 4) = 32 worker processes; keep
+  `GPUs x (num_workers + bspline_fit_workers)` at or below the CPU core count.
+- The option only affects training speed; the fit, and so the trained policy, is the same for any value.
+- Resume with `--config_path=<output_dir>/checkpoints/last/pretrained_model/train_config.json --resume=true` under
+  the same `accelerate launch` line, as for ACT.
+
+## 5. Evaluate in simulation
 
 ### TurboVLA
 
@@ -268,6 +304,12 @@ gives each episode the prompt of its sampled bowl order. Up to 10 episode videos
 same flags: it adds `pc_<stage>` (`pc_picked_middle`, `pc_nested_middle`, ...) to the log and to
 `eval_info.json`, and each episode's stage flags to its task's metrics. It logs seeded episodes only, so keep `--seed` set (1000 by default).
 
+### B-spline Policy
+
+Same `lerobot-eval` command with `--policy.path=<output_dir>/checkpoints/last/pretrained_model`. The experiment
+README lists the [stack-bowls eval commands](../../experiments/261024-bspline-vs-diffusion-stack-bowls/README.md#command),
+including a run with `--policy.bspline_speed_up=2.0`.
+
 ### ACT (pick and place)
 
 ```bash
@@ -283,7 +325,7 @@ check stack-bowls ACT policies with a `sentry` rollout ([the pipeline guide, sec
 Held-out loss tells you training is working, not that the arm succeeds. Judge checkpoints by simulated success
 rate, then on the real arm.
 
-## 5. Before running on the real arm
+## 6. Before running on the real arm
 
 - Measure the follower's joint directions once with `tools/nexarm/probe_joint_mapping.py` (see
   [Sim calibration](sim-calibration.md)). If it reports a sign or offset that is not the identity,

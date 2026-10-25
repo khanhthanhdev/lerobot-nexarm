@@ -29,6 +29,8 @@ class BsplineConfig(DiffusionConfig):
         bspline_max_error: Max abs fitting error, in normalized action units, when choosing knots.
         bspline_speed_up: Frames of spline time advanced per control step at inference. Values above
             1 execute the demonstrated motion faster (upstream `speed_up_times`).
+        bspline_fit_workers: Processes that fit the training windows in parallel; 0 fits them in the
+            training process. Under multi-GPU training every GPU process starts its own pool.
     """
 
     n_obs_steps: int = 2
@@ -44,6 +46,7 @@ class BsplineConfig(DiffusionConfig):
     bspline_window: int = 64
     bspline_max_error: float = 0.01
     bspline_speed_up: float = 1.0
+    bspline_fit_workers: int = 0
 
     def __post_init__(self):
         """Validate the diffusion options, then the B-spline options."""
@@ -64,6 +67,8 @@ class BsplineConfig(DiffusionConfig):
             raise ValueError(f"`bspline_max_error` must be > 0. Got {self.bspline_max_error}.")
         if self.bspline_speed_up <= 0:
             raise ValueError(f"`bspline_speed_up` must be > 0. Got {self.bspline_speed_up}.")
+        if self.bspline_fit_workers < 0:
+            raise ValueError(f"`bspline_fit_workers` must be >= 0. Got {self.bspline_fit_workers}.")
         if self.do_mask_loss_for_padding:
             raise ValueError(
                 "`do_mask_loss_for_padding` is not supported: padded frames are dropped before the "

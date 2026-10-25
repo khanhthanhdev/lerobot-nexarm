@@ -69,6 +69,8 @@ def test_config_validation():
         make_config(horizon=32)
     with pytest.raises(ValueError, match="do_mask_loss_for_padding"):
         make_config(do_mask_loss_for_padding=True)
+    with pytest.raises(ValueError, match="bspline_fit_workers"):
+        make_config(bspline_fit_workers=-1)
 
 
 def test_forward_and_param_shapes():

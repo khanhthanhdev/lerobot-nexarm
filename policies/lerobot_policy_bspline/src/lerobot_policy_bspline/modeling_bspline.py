@@ -73,6 +73,7 @@ class BsplinePolicy(DiffusionPolicy):
             degree=self.config.bspline_degree,
             max_error=self.config.bspline_max_error,
             time_scale=self.config.bspline_time_scale,
+            num_workers=self.config.bspline_fit_workers,
         )
 
     def decode_params(self, params: Tensor) -> Tensor:
