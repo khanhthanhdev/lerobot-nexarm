@@ -9,6 +9,8 @@ dependencies: [3]
 
 # Phase 07: B-spline Policy port
 
+Closed 2026-10-25 (plan decision 11): the code is merged; the open runs below are tracked in [`plans/README.md`](../README.md) and the experiment READMEs.
+
 ## Goal
 
 Port B-spline Policy into `lerobot_policy_bspline` so it trains, evaluates and runs on NexArm with LeRobot tools, next to the diffusion baseline.

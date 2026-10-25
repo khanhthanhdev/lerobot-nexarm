@@ -27,7 +27,7 @@ A new contributor opens `docs/README.md`, picks their role, and reaches every gu
 
 - No change to code behaviour, commands or flags. Commands are moved, not rewritten.
 - The Hiwonder vendor tutorials move unchanged.
-- `docs/service/` stays where it is: `openapi.json` and `events.json` are a machine contract that the engine, its tests and the desktop app's sync script read by path. The index links its README.
+- `docs/service/openapi.json` and `events.json` stay where they are: they are a machine contract that the engine, its tests and the desktop app's sync script read by path. Only the README moves, to `docs/guides/desktop-app.md`.
 - READMEs that sit next to what they describe stay there: `sim/`, `firmware/`, `hardware/`, `docker/`, `policies/*`, `examples/nexarm/stack_bowls_act.md`, `experiments/`.
 - Dated records in `plans/` and `plans/reports/` keep their old links.
 
@@ -46,6 +46,7 @@ A new contributor opens `docs/README.md`, picks their role, and reaches every gu
 | `docs/guides/server-training.md`     | TurboVLA on a remote server or Slurm                                                      | `SERVER_TRAINING_GUIDE.md`                                            |
 | `docs/guides/turbovla.md`            | TurboVLA install, local dev, training, conversion                                         | `docs/source/nexarm/turbovla_guide.md`                                |
 | `docs/guides/sim-calibration.md`     | Sim system identification                                                                 | `docs/source/nexarm/sim_calibration.md`                               |
+| `docs/guides/desktop-app.md`         | The desktop-app engine                                                                    | `docs/service/README.md`, README path C                               |
 | `docs/reference/architecture.md`     | LeRobot in 60 s, package layout, conventions                                              | AGENT_GUIDE §2, README architecture, AGENTS.md conventions            |
 | `docs/reference/python-api.md`       | Kinematics/dynamics, motor bus, idle torque timeout                                       | run.md §5, README kinematics                                          |
 | `docs/reference/troubleshooting.md`  | General FAQs (permissions, timeouts, cameras, slow loops)                                 | run.md §7, README troubleshooting                                     |
@@ -53,7 +54,7 @@ A new contributor opens `docs/README.md`, picks their role, and reaches every gu
 | `CONTRIBUTING.md`                    | Tests and quality checks (already)                                                        | run.md §6 and README testing become links                             |
 | `AGENTS.md`                          | Agent rules, including AGENT_GUIDE §1 (ask the user first)                                | AGENT_GUIDE §1                                                        |
 
-Removed: `run.md`, `AGENT_GUIDE.md`, `DATA_COLLECTION_GUIDE.md`, `SERVER_TRAINING_GUIDE.md`, `docs/source/`. Moves use `git mv` so history follows the file.
+Removed: `run.md`, `AGENT_GUIDE.md`, `DATA_COLLECTION_GUIDE.md`, `SERVER_TRAINING_GUIDE.md`, `docs/source/`. Moves use `git mv`. `run.md` and `AGENT_GUIDE.md` were split, so git records them as deleted and their successors (`install.md`, `training-tips.md`) as new; `git log --follow` does not cross them.
 
 ## Steps
 

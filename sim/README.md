@@ -1,5 +1,10 @@
 # NexArm MuJoCo simulation
 
+> This page documents the simulation assets, joint mapping and exporters. For the
+> everyday commands, start with the
+> [simulation quickstart](../docs/getting-started/simulation.md) and the
+> [pipeline guide](../docs/guides/pipeline.md), which own those workflows.
+
 The NexArm simulation is ready for interactive control, physical-leader
 teleoperation, LeRobot data collection, dataset replay, and policy rollout. It
 is not a firmware-in-the-loop simulator: the simulated follower uses MuJoCo

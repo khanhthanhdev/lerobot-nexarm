@@ -9,6 +9,8 @@ dependencies: [4]
 
 # Phase 05: TurboVLA policy plugin, inference
 
+Closed 2026-10-25 (plan decision 11): the code is merged; the open runs below are tracked in [`plans/README.md`](../README.md) and the experiment READMEs.
+
 ## Goal
 
 Package `lerobot_policy_turbovla` so an existing TurboVLA checkpoint runs through `lerobot-eval`, `lerobot-rollout` and the desktop app (`nexarm_service` rollout, eval and DAgger coaching), giving the same actions as `rollout_turbovla.py`.

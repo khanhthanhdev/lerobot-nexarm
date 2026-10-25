@@ -9,6 +9,8 @@ dependencies: [5]
 
 # Phase 06: TurboVLA training and LIBERO benchmark
 
+Closed 2026-10-25 (plan decision 11): the code is merged; the open runs below are tracked in [`plans/README.md`](../README.md) and the experiment READMEs.
+
 ## Goal
 
 Train TurboVLA with `lerobot-train` on NexArm datasets, benchmark it on LIBERO through LeRobot, and retire the custom TurboVLA train and rollout scripts.
