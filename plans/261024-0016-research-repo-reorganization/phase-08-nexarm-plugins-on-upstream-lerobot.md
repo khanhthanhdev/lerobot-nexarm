@@ -167,7 +167,7 @@ Consequences: `rerun-sdk` resolves to 0.33.1 (upstream's `<0.34` cap; the fork h
 
 - `lerobot-find-joint-limits` and the HIL-SERL entry points (`rl/actor.py`, `rl/learner.py`, `rl/gym_manipulator.py`, `rl/eval_policy.py`) do not call `register_third_party_plugins()`, and upstream's don't either. `--robot.type=nexarm_*` therefore no longer parses there. No NexArm doc or example uses these commands, and adding the call would be a new core patch.
 - Publishing: done, `all` leaves the NexArm packages out. `--extra nexarm` and `--extra turbovla` still name packages that are not on PyPI, so they only work from this repo.
-- The desktop app against the real arm: health, sessions, teleop and recording.
+- Skipped by user decision (2026-10-25), like the phase-02 real-arm smoke test: the desktop app against the real arm (health, sessions, teleop and recording). Phase 08 is closed without it; the service's 128 tests (hardware mocked) pass.
 
 ### Linux checks on the pinned layout (done 2026-10-25)
 
