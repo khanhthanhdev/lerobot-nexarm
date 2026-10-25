@@ -1,9 +1,11 @@
 # NexArm MuJoCo simulation
 
-> This page documents the simulation assets, joint mapping and exporters. For the
-> everyday commands, start with the
-> [simulation quickstart](../docs/getting-started/simulation.md) and the
-> [pipeline guide](../docs/guides/pipeline.md), which own those workflows.
+> This page documents the simulation assets, joint mapping and exporters, and the
+> sim-only workflows (driving the sim with the physical leader, recording,
+> replaying and rolling out on `nexarm_sim`). For a first look start with the
+> [simulation quickstart](../docs/getting-started/simulation.md); dataset
+> generation flags, training and benchmarking are owned by the
+> [pipeline guide](../docs/guides/pipeline.md).
 
 The NexArm simulation is ready for interactive control, physical-leader
 teleoperation, LeRobot data collection, dataset replay, and policy rollout. It
@@ -310,14 +312,12 @@ command exits nonzero if it cannot produce the requested accepted episode count.
 camera/FPS contract, and model SHA-256 so a dataset can be reproduced against
 the same scene; `generation_episodes.jsonl` logs one line per attempt.
 
-Visual, dynamics and object domain randomization is on by default (`--no-dr`
-disables it). `--calibration PATH` applies a `SimCalibration` from
-`calibrate_sim.py` (its fps must equal `--fps`), `--action-delay-steps N`
-overrides its delay (explicit value > calibration > 0), `--split eval` uses a
-held-out seed range, and `--gpus 0,1` takes comma-separated GPU ids (one worker
-per id by default). `generate_stack_bowls_dataset.py` accepts the same options.
-Datasets and calibrations made before the servo-constant joint mapping above
-encode different angles and must be regenerated.
+Domain randomization, calibration, held-out splits, multi-GPU workers and
+`--resume` are described in
+[the pipeline guide, section 1a](../docs/guides/pipeline.md#1a-simulation-scripted-demonstrations);
+`generate_stack_bowls_dataset.py` accepts the same options. Datasets and
+calibrations made before the servo-constant joint mapping above encode
+different angles and must be regenerated.
 
 Use a small image-backed dataset to verify a new machine before committing to
 full-resolution video rendering:
@@ -531,32 +531,11 @@ MUJOCO_GL=egl uv run lerobot-nexarm-sim-benchmark \
   --output-dir=outputs/nexarm_sim_benchmark
 ```
 
-The command runs the same seed range for every policy and writes
-`benchmark.json` plus a flat `benchmark.csv`. Results include pick/place
-success rate, termination reasons, inference mean/p50/p95 latency, achieved
-control rate, load time, parameter count, and peak CUDA memory. Add
-`--realtime` when wall-clock control timing matters; without it, MuJoCo runs as
-fast as inference and rendering allow.
-
-`--calibration PATH` loads a `SimCalibration` JSON from
-`tools/nexarm/calibrate_sim.py` (its fps must equal `--fps`, otherwise the
-run is refused), `--action-delay-steps N` overrides its latency (precedence:
-explicit value > calibration > 0), and `--dr` enables per-episode domain
-randomization (off by default for reproducible comparisons). The gym
-environment (`--env.type=nexarm`) exposes the same options as
-`--env.calibration_path`, `--env.action_delay_steps` and
-`--env.enable_domain_randomization`.
-
-Treat success rate as the primary task metric, then use termination reasons to
-separate drops from timeouts and p95 latency to check whether a policy can
-sustain the target control rate. The benchmark intentionally does not encode
-videos because rendering and encoding would distort timing; use a recorded
-`sentry` rollout for qualitative video comparison.
-
-Each checkpoint must have been trained or fine-tuned on the six NexArm action
-features and the configured cameras (`front`, `wrist`, `top` by default). A generic base VLA
-checkpoint does not have the NexArm normalization statistics or action
-contract, so it is not directly comparable.
+Its flags, outputs, metrics and checkpoint requirements are described in
+[the pipeline guide, section 4](../docs/guides/pipeline.md#4-benchmark). The gym
+environment (`--env.type=nexarm`) exposes the benchmark's calibration, delay and
+randomization options as `--env.calibration_path`, `--env.action_delay_steps`
+and `--env.enable_domain_randomization`.
 
 The same entry point is available as:
 
