@@ -11,7 +11,7 @@ The steps:
 4. Train ACT with Accelerate.
 5. Evaluate the checkpoints in simulation.
 
-For single-GPU training, real-robot collection and rollout, see [`pipeline.md`](pipeline.md).
+For single-GPU training, real-robot collection and rollout, see [the pipeline guide](pipeline.md).
 
 ## Before you start
 
@@ -31,6 +31,15 @@ forearm and closed gripper horizontal. Each dataset's `generation_report.json` r
 `joint_mapping: servo_4096_v2`. Sim datasets or calibrations made before this mapping (`servo_4096_v1` or no
 `joint_mapping` at all) describe a different pose for the same numbers. Regenerate them; do not mix them in.
 
+### How the stack-bowls generator grasps bowls
+
+The scripted demonstrations grasp thin-walled objects such as bowls and cups by the rim:
+
+- **Never plunge straight into the cavity**: Grippers should straddle the outer rim radially.
+- **Radial rim straddle angle**: Calculate the vector from bowl center to gripper jaw pad $\mathbf{u}_{rad}$, orienting wrist pitch around $75^\circ$ and roll around $\pm 80^\circ$ relative to the radial approach vector.
+- **Centering jaw pads**: Account for the physical distance between the gripper base site frame and the active rubber jaw contact pads (`JAW_CENTER_OFFSET = [0.0, 0.033, 0.0]`).
+- **Dynamic transit steps**: When moving across large joint angular differences (e.g. $>500$ encoder ticks), scale interpolation steps (`max(steps, ceil(max_delta / 25.0))`) to prevent simulated PD motors from lagging and missing grasp latches.
+
 ### Machine
 
 - Linux with NVIDIA GPUs and drivers that support EGL (headless OpenGL). Check with `nvidia-smi`.
@@ -46,7 +55,7 @@ uv sync --locked --extra test --extra dev --extra core_scripts --extra training 
 export MUJOCO_GL=egl
 ```
 
-This is the full NexArm profile from [`run.md`](../../../run.md#dependency-profiles) plus the TurboVLA extras.
+This is the full NexArm profile from [Install](../getting-started/install.md#dependency-profiles) plus the TurboVLA extras.
 `uv sync` removes extras you do not list, so keep the whole line.
 
 TurboVLA needs its DINOv3 and BERT backbones. DINOv3 is gated on Hugging Face: accept its licence on the
@@ -102,7 +111,7 @@ Useful flags (both generators):
 | `--no-dr`               | Turn off domain randomization (lighting, materials, camera jitter, dynamics, object friction and mass). Keep it on for training data. |
 | `--split eval`          | Write a held-out set. Eval seeds start at 1,000,000 and never overlap the training seeds.                                             |
 | `--resume`              | Add episodes to an existing `--root`. Refused if the existing data used another joint mapping.                                        |
-| `--calibration PATH`    | Apply a fitted sim calibration (`sim_calibration.md`), including its action delay.                                                    |
+| `--calibration PATH`    | Apply a fitted sim calibration ([Sim calibration](sim-calibration.md)), including its action delay.                                   |
 | `--joint-mapping PATH`  | Use a joint mapping measured on your follower with `probe_joint_mapping.py`.                                                          |
 | `--no-video`            | Store PNG frames instead of video (larger on disk, faster to decode).                                                                 |
 
@@ -157,7 +166,7 @@ task.
 
 Add `--policy.freeze_vision=true` to train only the interaction layers and action head (less memory, faster
 per step). Fine-tuning from the official TurboVLA weights and sim/real co-training with a mixing ratio went
-away with the former `train_turbovla.py`; see [`turbovla_guide.md`](turbovla_guide.md#3-training-turbovla).
+away with the former `train_turbovla.py`; see [the TurboVLA guide](turbovla.md#3-training-turbovla).
 
 ### Batch size, learning rate and precision
 
@@ -269,7 +278,7 @@ MUJOCO_GL=egl uv run lerobot-nexarm-sim-benchmark \
 ```
 
 It reports success rate, failure reasons and inference latency on fixed seeds. It covers pick and place only;
-check stack-bowls ACT policies with a `sentry` rollout (`pipeline.md`, section 3).
+check stack-bowls ACT policies with a `sentry` rollout ([the pipeline guide, section 3](pipeline.md#3-rollout)).
 
 Held-out loss tells you training is working, not that the arm succeeds. Judge checkpoints by simulated success
 rate, then on the real arm.
@@ -277,7 +286,7 @@ rate, then on the real arm.
 ## 5. Before running on the real arm
 
 - Measure the follower's joint directions once with `tools/nexarm/probe_joint_mapping.py` (see
-  [`sim_calibration.md`](sim_calibration.md)). If it reports a sign or offset that is not the identity,
+  [Sim calibration](sim-calibration.md)). If it reports a sign or offset that is not the identity,
   regenerate the sim data with `--joint-mapping outputs/nexarm/joint_mapping_probe.json`; otherwise sim-trained
   policies move those joints the wrong way.
 - Run the real arm with exactly the cameras the policy was trained on; `rollout.py` refuses a

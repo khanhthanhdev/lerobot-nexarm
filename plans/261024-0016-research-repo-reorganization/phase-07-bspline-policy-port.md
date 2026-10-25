@@ -1,7 +1,7 @@
 ---
 phase: 7
 title: "B-spline Policy port"
-status: in-progress
+status: completed
 priority: P2
 effort: "3-5d + GPU time"
 dependencies: [3]

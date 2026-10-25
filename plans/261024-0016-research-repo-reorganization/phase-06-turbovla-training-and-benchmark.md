@@ -1,7 +1,7 @@
 ---
 phase: 6
 title: "TurboVLA training and LIBERO benchmark"
-status: in-progress
+status: completed
 priority: P2
 effort: "3-5d + GPU time"
 dependencies: [5]

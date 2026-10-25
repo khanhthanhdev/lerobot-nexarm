@@ -9,7 +9,7 @@ Status: training and inference. `lerobot-train --policy.type=turbovla` trains wi
 The package is a workspace member pulled by the `turbovla` extra; plain `uv sync` does not install it.
 
 ```bash
-uv sync --locked --extra turbovla   # plus the extras of your profile, see run.md
+uv sync --locked --extra turbovla   # plus the extras of your profile, see docs/getting-started/install.md
 ```
 
 ## Convert a checkpoint from the former `train_turbovla.py`

@@ -1,6 +1,8 @@
-# NexArm engine
+# Desktop app and engine
 
-`lerobot-nexarm-service` is the local engine behind the NexArm desktop app (`nexarm-desktop`, Lab pages). It runs the hardware sessions and the ML work on your machine and talks to the app over HTTP and one WebSocket. The app can start and stop it for you; you can also run it yourself.
+The NexArm desktop app (`nexarm-desktop`) has Lab pages for the whole policy loop: record, view and curate datasets, train locally or on a GPU server, deploy, coach a running policy (DAgger) and drive a follower on another machine.
+
+`lerobot-nexarm-service` is the local engine behind those pages. It runs the hardware sessions and the ML work on your machine and talks to the app over HTTP and one WebSocket. The app can start and stop it for you; you can also run it yourself. While a session runs the engine owns the robot's USB ports; the app releases and re-opens its own connection automatically.
 
 ## Run it
 
@@ -14,11 +16,11 @@ State lives under `~/.cache/lerobot/nexarm_service` by default (override with `-
 
 ## The contract
 
-| File                           | What it is                                                                            |
-| ------------------------------ | ------------------------------------------------------------------------------------- |
-| [`openapi.json`](openapi.json) | Every HTTP route, committed. A test fails when it is stale.                           |
-| [`events.json`](events.json)   | The `WS /api/v1/ws/events` event types (OpenAPI does not describe WebSockets).        |
-| `/api/v1/health`               | `version`, `api_version` and `capabilities`; the desktop refuses another API version. |
+| File                                      | What it is                                                                            |
+| ----------------------------------------- | ------------------------------------------------------------------------------------- |
+| [`openapi.json`](../service/openapi.json) | Every HTTP route, committed. A test fails when it is stale.                           |
+| [`events.json`](../service/events.json)   | The `WS /api/v1/ws/events` event types (OpenAPI does not describe WebSockets).        |
+| `/api/v1/health`                          | `version`, `api_version` and `capabilities`; the desktop refuses another API version. |
 
 Regenerate the snapshots after a route change, then refresh the desktop's copies with its `scripts/sync-engine-contract`:
 

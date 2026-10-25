@@ -377,7 +377,7 @@ Install the local dataset viewer:
 uv sync --locked --extra dataset_viz
 ```
 
-The full NexArm profile from [`run.md`](../run.md#dependency-profiles) already
+The full NexArm profile from [install guide](../docs/getting-started/install.md#dependency-profiles) already
 includes it; add `--extra dataset_viz` to your existing extras rather than
 syncing it alone, because `uv sync` removes extras you do not list.
 
@@ -511,7 +511,7 @@ uv sync --locked --extra dataset --extra pi --extra smolvla
 ```
 
 On a machine with the full NexArm profile, add `--extra pi --extra smolvla` to
-that line instead (see [`run.md`](../run.md#dependency-profiles)).
+that line instead (see [the install guide](../docs/getting-started/install.md#dependency-profiles)).
 
 Pass each trained checkpoint with a unique label. Policies are loaded one at a
 time so large VLA checkpoints do not remain together in GPU memory:
@@ -683,7 +683,7 @@ use record or rollout without launching `examples/nexarm/simulate.py`.
 1. Confirm on hardware that the physical follower's raw zero and direction
    match the simulation for all six joints (especially `shoulder_lift`).
    `calibrate_sim.py` already fits latency and per-joint gain, damping and
-   friction from real recordings (see `docs/source/nexarm/sim_calibration.md`).
+   friction from real recordings (see `docs/guides/sim-calibration.md`).
 2. Identify HX-30HM torque, velocity limit (the follower's `motion_speed` cap
    is not modelled), deadband and backlash instead of relying on generic
    position gains.

@@ -1,7 +1,7 @@
 ---
 phase: 5
 title: "TurboVLA policy plugin, inference"
-status: in-progress
+status: completed
 priority: P1
 effort: "2-3d"
 dependencies: [4]

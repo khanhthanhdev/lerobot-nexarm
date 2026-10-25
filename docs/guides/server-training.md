@@ -2,20 +2,11 @@
 
 This guide provides complete, copy-pasteable instructions to set up, prepare datasets, train, and deploy **TurboVLA** for the **Hiwonder NexArm** (6-DOF manipulator) on a remote GPU server or cluster.
 
-> **Using the desktop app?** The NexArm desktop app can do the server steps below for you: add the server in Lab: Train, pick it as the runner, and it uploads the dataset over an SSH tunnel, trains there and brings the checkpoints back. Prepare a fresh server once with `scripts/nexarm-gpu-bootstrap.sh` (see [`docs/service/README.md`](docs/service/README.md)). The manual steps in this guide remain valid for TurboVLA and anything the app does not cover.
+> **Using the desktop app?** The NexArm desktop app can do the server steps below for you: add the server in Lab: Train, pick it as the runner, and it uploads the dataset over an SSH tunnel, trains there and brings the checkpoints back. Prepare a fresh server once with `scripts/nexarm-gpu-bootstrap.sh` (see [Desktop app](desktop-app.md#remote-training)). The manual steps in this guide remain valid for TurboVLA and anything the app does not cover.
 
 ---
 
-## Architecture Summary
-
-| Component                  | NexArm TurboVLA Configuration                                                                                 |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| **Robot Platform**         | Hiwonder NexArm (6-DOF: `shoulder_pan`, `shoulder_lift`, `elbow_flex`, `wrist_flex`, `wrist_roll`, `gripper`) |
-| **Vision Backbone**        | DINOv3 ViT-B over the dataset's views (`front`, `wrist`, and `top` when present) at 224×224 by default        |
-| **Language Encoder**       | Online BERT (`google-bert/bert-base-uncased`)                                                                 |
-| **Interaction**            | 6-layer bidirectional cross-attention                                                                         |
-| **Action Head**            | ACT-style transformer decoder (horizon: 16 steps, action dim: 6, state dim: 6)                                |
-| **Control Rate / Latency** | 32 Hz closed-loop control with < 1 GB VRAM at inference time                                                  |
+What TurboVLA is, its local development setup and checkpoint conversion are in [the TurboVLA guide](turbovla.md). This page covers running it on a server.
 
 ---
 
@@ -38,9 +29,9 @@ The script automatically:
 2. Syncs the environment with PyTorch, CUDA, Transformers, DINOv3 (timm), the pinned `turbovla` package, and LeRobot.
 3. Caches foundation models (`facebook/dinov3-vitb16-pretrain-lvd1689m` and `google-bert/bert-base-uncased`).
 
-The script syncs the full NexArm profile from [`run.md`, Dependency Profiles](run.md#dependency-profiles) plus `--extra turbovla`, which installs the pinned TurboVLA package. Use the same line on any other machine that trains or runs TurboVLA.
+The script syncs the full NexArm profile from [Install, Dependency profiles](../getting-started/install.md#dependency-profiles) plus `--extra turbovla`, which installs the pinned TurboVLA package. Use the same line on any other machine that trains or runs TurboVLA.
 
-_(Optional)_ Download the official released TurboVLA weights. `lerobot-train` has no partial loading for weights whose heads differ from the NexArm model (the former `--pretrained-checkpoint`), so they cannot seed a NexArm run directly; a converted NexArm checkpoint can be fine-tuned with `--policy.path`. See the dropped features in [section 3](#3-training-on-the-server).
+_(Optional)_ Download the official released TurboVLA weights. `lerobot-train` has no partial loading for weights whose heads differ from the NexArm model (the former `--pretrained-checkpoint`), so they cannot seed a NexArm run directly; a converted NexArm checkpoint can be fine-tuned with `--policy.path`.
 
 ```bash
 uv run python examples/nexarm/setup_turbovla.py --download-pretrained
@@ -71,7 +62,7 @@ MUJOCO_GL=egl uv run python examples/nexarm/generate_stack_bowls_dataset.py \
     --episodes 50 --gpus 0,1 --resume
 ```
 
-Domain randomization (lighting, textures, colors, dynamics, bowl friction/mass) is on by default; `--no-dr` disables it. A fresh run on an existing `--root` is an error; `--resume` continues after the last logged seed and needs `generation_episodes.jsonl` at the root. Datasets generated before the servo-constant joint mapping change are stale: regenerate them. More flags: [`pipeline.md`, section 1a](docs/source/nexarm/pipeline.md#1a-simulation-scripted-demonstrations).
+Domain randomization (lighting, textures, colors, dynamics, bowl friction/mass) is on by default; `--no-dr` disables it. A fresh run on an existing `--root` is an error; `--resume` continues after the last logged seed and needs `generation_episodes.jsonl` at the root. Datasets generated before the servo-constant joint mapping change are stale: regenerate them. More flags: [the pipeline guide, section 1a](pipeline.md#1a-simulation-scripted-demonstrations).
 
 ### Path B: Transfer Locally Recorded Teleoperation Dataset to Server
 
@@ -103,13 +94,13 @@ uv run python tools/nexarm/upload_dataset.py \
 
 ## 3. Training on the Server
 
-TurboVLA trains through LeRobot's own trainer with the policy plugin (`--policy.type=turbovla`). The loss, parameter groups, frozen BERT, AdamW settings and warmup-cosine schedule are those of the former `train_turbovla.py`, and a 2k-step GPU run gave loss curves within 4% of it ([`experiments/261024-turbovla-nexarm-parity`](experiments/261024-turbovla-nexarm-parity/README.md)). The checkpoints load directly in `lerobot-eval`, `lerobot-rollout` and the desktop app.
+TurboVLA trains through LeRobot's own trainer with the policy plugin (`--policy.type=turbovla`). The loss, parameter groups, frozen BERT, AdamW settings and warmup-cosine schedule are those of the former `train_turbovla.py`, and a 2k-step GPU run gave loss curves within 4% of it ([`experiments/261024-turbovla-nexarm-parity`](../../experiments/261024-turbovla-nexarm-parity/README.md)). The checkpoints load directly in `lerobot-eval`, `lerobot-rollout` and the desktop app.
 
-The launchers take `DATASET_ROOT OUTPUT_DIR BATCH_SIZE MAX_STEPS SAVE_STEPS` as positional arguments, followed by any extra `lerobot-train` flags. The dataset id defaults to `local/<folder name of DATASET_ROOT>`; set `REPO_ID` to use another one. A complete run is also written as a config file in [`experiments/261024-turbovla-nexarm-parity/train_full.yaml`](experiments/261024-turbovla-nexarm-parity/train_full.yaml), which you start with `uv run lerobot-train --config_path <file>`.
+The launchers take `DATASET_ROOT OUTPUT_DIR BATCH_SIZE MAX_STEPS SAVE_STEPS` as positional arguments, followed by any extra `lerobot-train` flags. The dataset id defaults to `local/<folder name of DATASET_ROOT>`; set `REPO_ID` to use another one. A complete run is also written as a config file in [`experiments/261024-turbovla-nexarm-parity/train_full.yaml`](../../experiments/261024-turbovla-nexarm-parity/train_full.yaml), which you start with `uv run lerobot-train --config_path <file>`.
 
 The former script's flags map to `--policy.optimizer_lr` (`--lr`), `--policy.optimizer_vision_lr` (`--dinov3-lr`), `--policy.scheduler_warmup_steps` (`--warmup-steps`), `--policy.camera_keys` (`--cameras`), `--policy.chunk_size` (`--horizon`), `--steps` (`--max-steps`), `--save_freq` (`--save-steps`) and `--batch_size` (`--batch-size`). `--precision bf16` becomes `--accelerator.mixed_precision=bf16` plus `--policy.vision_compute_precision=bf16_autocast --policy.interaction_compute_precision=bf16_autocast`, and EMA becomes `--ema.enable=true --ema.decay=0.999`. `--policy.freeze_text/freeze_vision/freeze_interaction`, `--policy.loss_type` and `--policy.gripper_loss_weight` keep their meaning. Keep gradient accumulation at 1, because lerobot-train steps the scheduler once per batch.
 
-Retiring the script dropped three features: sim/real co-training that mixes two datasets with `--real-ratio`, partial weight loading with `--pretrained-checkpoint` (fine-tuning from the official TurboVLA weights), and the offline gripper-transition report of `diagnose_turbovla.py`. The EMA also differs slightly: diffusers' EMA copies the weights on its first update, where the script blended them. If you need any of these, check out the tag `pre-reorg` or an earlier commit. Checkpoints trained with the former script still run after a one-time conversion; see [`turbovla_guide.md`](docs/source/nexarm/turbovla_guide.md#checkpoints-from-the-former-train_turbovlapy).
+The features that went away with the former script are listed in [the TurboVLA guide, section 3](turbovla.md#3-training-turbovla). Checkpoints trained with the former script still run after a one-time conversion; see [the TurboVLA guide](turbovla.md#checkpoints-from-the-former-train_turbovlapy).
 
 ### Option 1: Single-GPU Training
 
@@ -239,7 +230,7 @@ uv run lerobot-rollout \
     --task="Stack the bowls with red on bottom, blue in middle, and black on top."
 ```
 
-Give the policy exactly the cameras it was trained on; for a 2-view checkpoint, remove the `top` entry. Keep `--task` identical to the training prompt. See [`turbovla_guide.md`](docs/source/nexarm/turbovla_guide.md#4-rollout--evaluation) for checkpoints from the former script.
+Give the policy exactly the cameras it was trained on; for a 2-view checkpoint, remove the `top` entry. Keep `--task` identical to the training prompt. See [the TurboVLA guide](turbovla.md#4-rollout--evaluation) for checkpoints from the former script.
 
 ---
 
