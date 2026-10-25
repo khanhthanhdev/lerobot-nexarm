@@ -1,6 +1,6 @@
 # 261024-turbovla-libero
 
-**Status: pending (needs a Linux GPU machine with EGL and the `libero` extra).** Nothing below has been run yet; the results table is empty on purpose.
+**Status: pending (needs a Linux GPU machine with EGL and the `libero` extra).** Only the smoke check below has run; the results table is empty on purpose.
 
 ## Hypothesis
 
@@ -19,7 +19,7 @@ TurboVLA trained with `lerobot-train --policy.type=turbovla` on LeRobot-format L
 ## Command
 
 ```bash
-uv sync --locked --extra turbovla --extra libero
+uv sync --locked --extra turbovla --extra libero --extra training
 uv run lerobot-train --config_path experiments/261024-turbovla-libero/train.yaml
 ```
 
@@ -50,5 +50,10 @@ Hub id, step and W&B run link: pending.
 ## Notes
 
 - `gripper_index: 6` puts the gripper loss weight on LIBERO's gripper action; `binarize_gripper: false` because the snapping thresholds are NexArm raw positions.
-- `--eval.n_episodes` counting per task comes from reading `lerobot_eval.py` (it evaluates each task separately); confirm the per-task episode count in the eval output before trusting the 50.
+- `--eval.n_episodes` counts per task: the smoke eval below with `--eval.n_episodes=1` on `libero_spatial` ran 10 episodes.
+- On first import LIBERO asks for its dataset folder and then writes `config.yaml` to `$LIBERO_CONFIG_PATH` (default `~/.libero`). Answer it once (`uv run python -c "import libero.libero"`, answer `n` for the default) before a run under `nohup`, or the eval stops with `EOFError`.
 - TurboVLA's own mixed-suite RLDS training stays in the TurboVLA repo; this run does not reproduce it.
+
+## Smoke check (2026-10-25)
+
+`marinelab` (RTX 5050 8 GB), `main` at `76422ee3`: the training command above with `--steps=20 "--dataset.episodes=[0,1,2,3]" --num_workers=4 --wandb.enable=false` trains at batch 16 (peak 6.6 GB), and the eval command on its EMA checkpoint with `--env.task=libero_spatial --eval.n_episodes=1` runs 10 episodes. This checks the commands, not the policy.

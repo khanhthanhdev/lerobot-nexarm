@@ -1,7 +1,7 @@
 ---
 phase: 8
 title: "NexArm plugins on upstream LeRobot"
-status: in-progress
+status: completed
 priority: P2
 effort: "3-5d"
 dependencies: [2, 5]
@@ -166,7 +166,9 @@ Consequences: `rerun-sdk` resolves to 0.33.1 (upstream's `<0.34` cap; the fork h
 ### Open
 
 - `lerobot-find-joint-limits` and the HIL-SERL entry points (`rl/actor.py`, `rl/learner.py`, `rl/gym_manipulator.py`, `rl/eval_policy.py`) do not call `register_third_party_plugins()`, and upstream's don't either. `--robot.type=nexarm_*` therefore no longer parses there. No NexArm doc or example uses these commands, and adding the call would be a new core patch.
-- On Linux: `pytest tests policies` and `make test-nexarm-ete` on the pinned layout (the `tests.yml` workflow runs both).
 - Publishing: done, `all` leaves the NexArm packages out. `--extra nexarm` and `--extra turbovla` still name packages that are not on PyPI, so they only work from this repo.
-- `Dockerfile.user` builds on Linux (2026-10-24, `marinelab`, from `86d7f4b5`, image 20.2 GB). Inside it, `register_third_party_plugins()` registers `nexarm_follower`, `nexarm_sim`, `mobile_bi_nexarm_sim`, `nexarm_leader`, env `nexarm` and policy `bspline`. `turbovla` is absent as expected: the `all` extra does not include the `turbovla` or `service` extras. `Dockerfile.internal` was removed with the pin. Rebuild `Dockerfile.user` from the pinned layout on Linux.
-- The desktop app against the real arm: health, sessions, teleop and recording.
+- Skipped by user decision (2026-10-25), like the phase-02 real-arm smoke test: the desktop app against the real arm (health, sessions, teleop and recording). Phase 08 is closed without it; the service's 128 tests (hardware mocked) pass.
+
+### Linux checks on the pinned layout (done 2026-10-25)
+
+`marinelab`, branch at `5d886134`; details in phase 02 "Checks after the pin". `pytest tests policies` (451 passed, 7 skipped) and `make test-nexarm-ete` (3 passed) pass, and so do the same jobs in `tests.yml` on PR #3. `Dockerfile.user` builds from the pinned layout (image 43 GB), and inside it `lerobot` loads from the image's `.venv` and `lerobot_robot_nexarm` and `lerobot_env_nexarm` import.
