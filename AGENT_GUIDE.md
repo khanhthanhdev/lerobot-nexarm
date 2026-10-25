@@ -54,7 +54,7 @@ Use `nexarm_sim` or simulation scripts in `examples/nexarm/`:
 
 ### Path C — "I just want to understand the codebase"
 
-Read §2 above, then `AGENTS.md` "Architecture", then open `src/lerobot/motors/nexarm/nexarm.py`, `src/lerobot/robots/nexarm_follower/`, and `src/lerobot/policies/act/`.
+Read §2 above, then `AGENTS.md` "LeRobot (upstream, pinned)", then open `packages/lerobot_robot_nexarm/src/lerobot_robot_nexarm/motors/nexarm.py`, `packages/lerobot_robot_nexarm/src/lerobot_robot_nexarm/nexarm_follower/`, and the installed `lerobot.policies.act` (`uv run python -c "import lerobot.policies.act as m; print(m.__path__[0])"`). Operational tools (calibration, probes, dataset audits, merges, uploads) are in `tools/nexarm/`.
 
 ---
 
@@ -68,7 +68,7 @@ Use the canonical full NexArm profile from [`run.md`, Dependency Profiles](./run
 
 ```bash
 uv sync --locked --extra test --extra dev --extra core_scripts --extra training --extra nexarm --extra intelrealsense
-# Add to that line: --extra diffusion (Diffusion), --extra smolvla (SmolVLA), --extra smolvla --extra groot (TurboVLA)
+# Add to that line: --extra diffusion (Diffusion), --extra smolvla (SmolVLA), --extra turbovla (TurboVLA)
 
 git lfs install && git lfs pull
 uv run hf auth login                         # required to push datasets/policies
@@ -116,7 +116,7 @@ The `lerobot-*` CLIs open only the cameras in `--robot.cameras`; drop the `top` 
 ```bash
 HF_USER=$(NO_COLOR=1 hf auth whoami | awk -F': *' 'NR==1 {print $2}')
 
-uv run lerobot-record \
+uv run python examples/nexarm/record_collection.py \
   --robot.type=nexarm_follower --robot.port=/dev/ttyUSB1 \
   --teleop.type=nexarm_leader  --teleop.port=/dev/ttyUSB0 \
   --robot.cameras="{ front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30}, wrist: {type: opencv, index_or_path: 1, width: 640, height: 480, fps: 30}, top: {type: intelrealsense, serial_number_or_name: <REALSENSE_SERIAL>, width: 640, height: 480, fps: 30}}" \
@@ -128,7 +128,7 @@ uv run lerobot-record \
   --display_data=true
 ```
 
-`lerobot-record` appends `_YYYYMMDD_HHMMSS` to the repo id (e.g. `${HF_USER}/nexarm_cube_pick_20261011_093000`) and prints the final `Dataset repo_id:` and `Dataset root:` at the end. Use that printed id in §4.6–4.7 (shown as `<YYYYMMDD_HHMMSS>`). Leave `--dataset.root` unset (a fixed root fails on the second run).
+`record_collection.py` is `lerobot-record` with the NexArm collection flags added and takes the same flags. It appends `_YYYYMMDD_HHMMSS` to the repo id (e.g. `${HF_USER}/nexarm_cube_pick_20261011_093000`) and, unlike upstream's plain `lerobot-record`, prints the final `Dataset repo_id:` and `Dataset root:` at the end. Use that printed id in §4.6–4.7 (shown as `<YYYYMMDD_HHMMSS>`). Leave `--dataset.root` unset (a fixed root fails on the second run).
 
 **4.6 Replay an episode** (sanity check)
 
@@ -230,7 +230,7 @@ Match the policy to the user's **GPU memory** and **time budget**. Numbers below
 
 All policies typically train for **5–10 epochs** (see §7).
 
-> **Human-facing version:** the [Compute Hardware Guide](./docs/source/hardware_guide.mdx) reuses the table below and adds a cloud-GPU tier guide and a Hugging Face Jobs pointer.
+> **Human-facing version:** the [Compute Hardware Guide](https://huggingface.co/docs/lerobot/hardware_guide) reuses the table below and adds a cloud-GPU tier guide and a Hugging Face Jobs pointer.
 
 | Policy      | Batch | Update (ms) | Peak GPU mem (GB) | Best for                                                                                         |
 | ----------- | ----: | ----------: | ----------------: | ------------------------------------------------------------------------------------------------ |
@@ -253,7 +253,7 @@ All policies typically train for **5–10 epochs** (see §7).
 - **12–16 GB VRAM (4070/4080, A4000):** → `smolvla` with defaults, or `act`/`diffusion` with larger batch. `pi0`/`pi05`/`wall_x`/`xvla` feasible only with small batch + gradient accumulation.
 - **24+ GB VRAM (3090/4090/A5000):** → any policy. Prefer `smolvla` (unfrozen) for multi-task; `act` for single-task grasp-and-place (still often the best ROI). Could experiment with `pi0` or `pi05` or `xvla`
 - **80 GB (A100/H100):** → any, with healthy batch. `pi05`, `xvla`, `wall_x` become comfortable.
-- **CPU only:** → don't train here. Use Google Colab (see [`docs/source/notebooks.mdx`](./docs/source/notebooks.mdx)) or a rented GPU.
+- **CPU only:** → don't train here. Use Google Colab (see [`docs/source/notebooks.mdx`](https://huggingface.co/docs/lerobot/notebooks)) or a rented GPU.
 
 ### 6.3 Policy Compatibility Matrix on NexArm
 
@@ -310,11 +310,11 @@ Pass the resulting total with `--steps=<N>`; eval at intermediate checkpoints (`
 ### 7.4 Batch size & gradient accumulation
 
 - **Bigger batch is preferable** for stable gradients on teleop data.
-- If GPU memory is the bottleneck, use **gradient accumulation** via `--gradient_accumulation_steps=<N>` to raise _effective_ batch without raising peak memory:
+- If GPU memory is the bottleneck, use **gradient accumulation** via `--accelerator.gradient_accumulation.steps=<N>` to raise _effective_ batch without raising peak memory:
   ```bash
   uv run lerobot-train ... \
     --batch_size=2 \
-    --gradient_accumulation_steps=4
+    --accelerator.gradient_accumulation.steps=4
   ```
   Effective batch size will be $2 \times 4 = 8$ samples per update step.
 - Scale **learning rate** gently with batch; most LeRobot defaults work fine for a 2–4× batch change.
@@ -384,33 +384,12 @@ lerobot-eval \
 
 - Use `--policy.path=outputs/train/.../checkpoints/<step>/pretrained_model` for local checkpoints.
 - `--eval.n_episodes` should be ≥ 50 for a stable success-rate estimate.
-- Available envs live in `src/lerobot/envs/`. See [`docs/source/libero.mdx`](./docs/source/libero.mdx), [`metaworld.mdx`](./docs/source/metaworld.mdx), [`robocasa.mdx`](./docs/source/robocasa.mdx), [`vlabench.mdx`](./docs/source/vlabench.mdx) for specific benchmarks.
-- To add a new benchmark, see [`docs/source/adding_benchmarks.mdx`](./docs/source/adding_benchmarks.mdx) and [`envhub.mdx`](./docs/source/envhub.mdx).
+- Upstream envs live in the installed `lerobot.envs` package; the NexArm env is `--env.type=nexarm` (`packages/lerobot_env_nexarm/`). See [`docs/source/libero.mdx`](https://huggingface.co/docs/lerobot/libero), [`metaworld.mdx`](https://huggingface.co/docs/lerobot/metaworld), [`robocasa.mdx`](https://huggingface.co/docs/lerobot/robocasa), [`vlabench.mdx`](https://huggingface.co/docs/lerobot/vlabench) for specific benchmarks.
+- To add a new benchmark, see [`docs/source/adding_benchmarks.mdx`](https://huggingface.co/docs/lerobot/adding_benchmarks) and [`envhub.mdx`](https://huggingface.co/docs/lerobot/envhub).
 
 ### 8.2b Dockerfiles for benchmark eval
 
-Benchmark envs have native dependencies that are painful to install locally. The repo ships **pre-baked Dockerfiles** for each supported benchmark — use these to run `lerobot-eval` in a reproducible environment:
-
-| Benchmark   | Dockerfile                                                                             |
-| ----------- | -------------------------------------------------------------------------------------- |
-| LIBERO      | [`docker/Dockerfile.benchmark.libero`](./docker/Dockerfile.benchmark.libero)           |
-| LIBERO+     | [`docker/Dockerfile.benchmark.libero_plus`](./docker/Dockerfile.benchmark.libero_plus) |
-| MetaWorld   | [`docker/Dockerfile.benchmark.metaworld`](./docker/Dockerfile.benchmark.metaworld)     |
-| RoboCasa    | [`docker/Dockerfile.benchmark.robocasa`](./docker/Dockerfile.benchmark.robocasa)       |
-| RoboCerebra | [`docker/Dockerfile.benchmark.robocerebra`](./docker/Dockerfile.benchmark.robocerebra) |
-| RoboMME     | [`docker/Dockerfile.benchmark.robomme`](./docker/Dockerfile.benchmark.robomme)         |
-| RoboTwin    | [`docker/Dockerfile.benchmark.robotwin`](./docker/Dockerfile.benchmark.robotwin)       |
-| VLABench    | [`docker/Dockerfile.benchmark.vlabench`](./docker/Dockerfile.benchmark.vlabench)       |
-
-Build and run (adapt to your benchmark):
-
-```bash
-docker build -f docker/Dockerfile.benchmark.robomme -t lerobot-bench-robomme .
-docker run --gpus all --rm -it \
-  -v $HOME/.cache/huggingface:/root/.cache/huggingface \
-  lerobot-bench-robomme \
-  lerobot-eval --policy.path=<your_policy> --env.type=<env> --eval.n_episodes=50
-```
+Benchmark envs have native dependencies that are painful to install locally. Upstream LeRobot ships a pre-baked `Dockerfile.benchmark.<name>` for LIBERO, LIBERO+, MetaWorld, RoboCasa, RoboCerebra, RoboMME, RoboTwin and VLABench in [huggingface/lerobot `docker/`](https://github.com/huggingface/lerobot/tree/main/docker). Those images contain upstream LeRobot only, so use them for upstream policies; for TurboVLA on LIBERO, install `--extra libero --extra turbovla` here (see [`experiments/261024-turbovla-libero`](./experiments/261024-turbovla-libero/README.md)).
 
 See [`docker/README.md`](./docker/README.md) for base-image details.
 
@@ -460,8 +439,8 @@ For manipulation and stacking tasks, the recommended 3-camera layout consists of
 
 ## 11. Further reading & resources
 
-- **Getting started:** [`installation.mdx`](./docs/source/installation.mdx) · [`il_robots.mdx`](./docs/source/il_robots.mdx) · [What makes a good dataset](https://huggingface.co/blog/lerobot-datasets)
-- **Per-policy docs:** browse [`docs/source/*.mdx`](./docs/source/) (policies, hardware, benchmarks, advanced training).
+- **Getting started:** [`installation.mdx`](https://huggingface.co/docs/lerobot/installation) · [`il_robots.mdx`](https://huggingface.co/docs/lerobot/il_robots) · [What makes a good dataset](https://huggingface.co/blog/lerobot-datasets)
+- **Per-policy docs:** browse [the LeRobot docs](https://huggingface.co/docs/lerobot) (policies, hardware, benchmarks, advanced training).
 - **Community:** [Discord](https://discord.com/invite/s3KuuzsPFb) · [Hub `LeRobot` tag](https://huggingface.co/datasets?other=LeRobot) · [Dataset visualizer](https://huggingface.co/spaces/lerobot/visualize_dataset)
 
 > Keep this file current. If you learn a rule that would prevent a class of user mistakes, add it here and in [`AGENTS.md`](./AGENTS.md).

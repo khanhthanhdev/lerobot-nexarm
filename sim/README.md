@@ -100,7 +100,7 @@ Every model loads from one tree, with no symlinks, from any working directory:
   and `fusion_extract.json` before `apply_fusion_extract.py` merges them.
 - `run_export.py` extracts meshes, inertials and the workcell from Fusion, and
   `apply_fusion_extract.py` merges them into the committed models (section 11).
-- `../src/lerobot/robots/nexarm_sim/` contains the LeRobot simulation backend
+- `../packages/lerobot_robot_nexarm/src/lerobot_robot_nexarm/nexarm_sim/` contains the LeRobot simulation backend
   and `NexArmSim` robot implementation. `pick_place_task.py` adds the optional
   seeded single-arm task without changing the six-feature robot contract.
 - `../examples/nexarm/simulate.py` launches the viewer and optional leader
@@ -148,7 +148,7 @@ The gripper maps its raw range linearly and inverted onto the jaw slide joint
 slide_m = slide_min + (2833 - raw) / (2833 - 1195) * (slide_max - slide_min)
 ```
 
-One implementation, `src/lerobot/motors/nexarm/mujoco_mapping.py`
+One implementation, `packages/lerobot_robot_nexarm/src/lerobot_robot_nexarm/motors/mujoco_mapping.py`
 (`raw_to_joint_position` / `joint_position_to_raw`), is shared by the simulator
 backend and `NexArmKinematicsDynamics`. It reads the MuJoCo joint range, not the
 actuator `ctrlrange`, so kinematics-only models work too. Datasets and
@@ -176,7 +176,7 @@ real follower (un-energised, posed by hand straight up, then a quarter turn per
 joint; the readings need not be `2048`):
 
 ```bash
-uv run python examples/nexarm/probe_joint_mapping.py --port /dev/ttyUSB1
+uv run python tools/nexarm/probe_joint_mapping.py --port /dev/ttyUSB1
 ```
 
 It writes `outputs/nexarm/joint_mapping_probe.json`, which changes the arm
@@ -340,7 +340,7 @@ after the last seed logged in `generation_episodes.jsonl`, which it requires.
 Set a Hub-compatible repository ID even when keeping the dataset local:
 
 ```bash
-uv run lerobot-record \
+uv run python examples/nexarm/record_collection.py \
   --robot.type=nexarm_sim \
   --robot.id=nexarm_sim \
   --robot.model_path=sim/description/mjcf/scene.xml \
@@ -358,8 +358,8 @@ uv run lerobot-record \
 ```
 
 The dataset contains six raw joint state values, six raw action values, and the
-front, wrist and top RGB streams. `lerobot-record` appends `_YYYYMMDD_HHMMSS`
-to the repo id and prints the final `Dataset repo_id:` and `Dataset root:`
+front, wrist and top RGB streams. `record_collection.py` takes the `lerobot-record`
+flags, appends `_YYYYMMDD_HHMMSS` to the repo id and prints the final `Dataset repo_id:` and `Dataset root:`
 (under `~/.cache/huggingface/lerobot/`); pass those to visualization, replay
 and training. A fixed `--dataset.root` is not timestamped and fails with
 `FileExistsError` on the second run, so leave it unset or make it unique per
@@ -387,8 +387,14 @@ Open episode 0 in Rerun:
 uv run lerobot-dataset-viz \
   --repo-id=local/nexarm_sim_pick_place \
   --root=outputs/datasets/nexarm_sim_pick_place \
-  --video-backend=pyav \
   --episode-index=0
+```
+
+`lerobot-dataset-viz` decodes with TorchCodec when it is installed. If TorchCodec is installed but
+cannot decode the videos (a common Windows case), open the episode with PyAV instead:
+
+```bash
+uv run python -c "from lerobot.datasets import LeRobotDataset; from lerobot.scripts.lerobot_dataset_viz import visualize_dataset; visualize_dataset(LeRobotDataset('local/nexarm_sim_pick_place', root='outputs/datasets/nexarm_sim_pick_place', episodes=[0], video_backend='pyav'), episode_index=0)"
 ```
 
 Rerun shows every camera stream next to the six state and six action curves, so
@@ -400,7 +406,6 @@ the viewer immediately with:
 uv run lerobot-dataset-viz \
   --repo-id=local/nexarm_sim_pick_place \
   --root=outputs/datasets/nexarm_sim_pick_place \
-  --video-backend=pyav \
   --episode-index=0 \
   --save=1 \
   --output-dir=outputs/dataset_visualizations
@@ -454,7 +459,7 @@ when CUDA is unavailable.
 For a quick autonomous test without recording a dataset:
 
 ```bash
-uv run lerobot-rollout \
+uv run lerobot-nexarm-rollout \
   --strategy.type=base \
   --policy.path=outputs/train/act_nexarm_sim/checkpoints/last/pretrained_model \
   --robot.type=nexarm_sim \
@@ -470,7 +475,8 @@ uv run lerobot-rollout \
 `base` runs the policy autonomously and exits after `--duration` seconds. It
 does not save a dataset. `--display_data=true` streams the simulated camera
 observations to Rerun; it does not open the interactive MuJoCo viewer.
-`--rerun_save_path` preserves the visual trace so it can be opened again with
+`lerobot-nexarm-rollout` is `lerobot-rollout` plus `--rerun_save_path`, which
+preserves the visual trace so it can be opened again with
 `uv run rerun outputs/rollouts/act_nexarm_sim.rrd`.
 
 To record the policy rollout as an evaluation dataset, switch to `sentry` and
@@ -528,7 +534,7 @@ control rate, load time, parameter count, and peak CUDA memory. Add
 fast as inference and rendering allow.
 
 `--calibration PATH` loads a `SimCalibration` JSON from
-`examples/nexarm/calibrate_sim.py` (its fps must equal `--fps`, otherwise the
+`tools/nexarm/calibrate_sim.py` (its fps must equal `--fps`, otherwise the
 run is refused), `--action-delay-steps N` overrides its latency (precedence:
 explicit value > calibration > 0), and `--dr` enables per-episode domain
 randomization (off by default for reproducible comparisons). The gym
@@ -550,7 +556,7 @@ contract, so it is not directly comparable.
 The same entry point is available as:
 
 ```bash
-MUJOCO_GL=egl uv run python examples/nexarm/benchmark_sim.py --policy act=PATH
+MUJOCO_GL=egl uv run python tools/nexarm/benchmark_sim.py --policy act=PATH
 ```
 
 ## 11. Re-export from Fusion 360
@@ -640,7 +646,7 @@ The tests verify:
 Run the style check for the simulation implementation:
 
 ```bash
-uv run --locked --extra dev ruff check src/lerobot/robots/nexarm_sim examples/nexarm/simulate.py tests/robots/test_nexarm_sim.py sim/export_fusion_to_mujoco.py
+uv run --locked --extra dev ruff check packages/lerobot_robot_nexarm/src/lerobot_robot_nexarm/nexarm_sim examples/nexarm/simulate.py tests/robots/test_nexarm_sim.py sim/export_fusion_to_mujoco.py
 ```
 
 ## 13. Troubleshooting

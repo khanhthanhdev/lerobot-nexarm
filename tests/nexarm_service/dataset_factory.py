@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 
 from lerobot.datasets import LeRobotDataset
-from lerobot.motors.nexarm.nexarm import JOINT_NAMES
+from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES
 
 JOINT_FEATURE_NAMES = [f"{n}.pos" for n in JOINT_NAMES]
 FPS = 10

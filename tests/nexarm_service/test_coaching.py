@@ -5,7 +5,7 @@
 """Coaching (DAgger) session: handover controls, leader follow and release, discard, reset and finish.
 
 The strategy loop is a small fake that uses the library's real ``DAggerEvents`` and
-``DAggerStrategy._apply_transition``, so the phase machine and its leader side effects are the library's.
+``DAggerStrategy._apply_transition`` (on a real, never-started strategy), so the phase machine and its leader side effects are the library's.
 """
 
 import time
@@ -19,9 +19,10 @@ pytest.importorskip("serial", reason="pyserial is required (install lerobot[hard
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from lerobot.motors.nexarm.nexarm import JOINT_NAMES, map_follower_to_leader  # noqa: E402
-from lerobot.nexarm_service.app import API_PREFIX, create_app  # noqa: E402
+from lerobot.rollout.configs import DAggerStrategyConfig  # noqa: E402
 from lerobot.rollout.strategies.dagger import DAggerEvents, DAggerPhase, DAggerStrategy  # noqa: E402
+from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES, map_follower_to_leader  # noqa: E402
+from nexarm_service.app import API_PREFIX, create_app  # noqa: E402
 from tests.nexarm_service.fakes import FakeBus, FakeFollower  # noqa: E402
 
 REST = [2000, 2100, 1900, 2050, 2048, 2000]
@@ -95,6 +96,8 @@ class FakeDagger:
         self._events = DAggerEvents()
         self.config = types.SimpleNamespace(num_episodes=3)
         self.engine, self.interpolator = MagicMock(), MagicMock()
+        # Owns only the library's transition side effects; its own loop never runs.
+        self._library = DAggerStrategy(DAggerStrategyConfig(num_episodes=3))
         self.sent_log = []
 
     def setup(self, ctx):
@@ -107,7 +110,9 @@ class FakeDagger:
             transition = events.consume_transition()
             if transition is not None:
                 old, new = transition
-                DAggerStrategy._apply_transition(old, new, self.engine, self.interpolator, ctx, last_action)
+                self._library._apply_transition(
+                    old, new, self.engine, self.interpolator, teleop, ctx, last_action
+                )
                 if new == DAggerPhase.AUTONOMOUS:
                     last_action = None
                 if old == DAggerPhase.CORRECTING and new == DAggerPhase.PAUSED:
@@ -151,6 +156,7 @@ class FakeCoachApi:
             inner=self.follower,
             send_action=lambda a: self.follower.send_action(a),
             get_observation=lambda: self.follower.get_observation(),
+            supports_hold=False,
         )
         return types.SimpleNamespace(
             hardware=types.SimpleNamespace(robot_wrapper=wrapper, teleop=self.leader),

@@ -10,8 +10,8 @@ from typing import Any
 
 import numpy as np
 
-from lerobot.datasets.mobile_nexarm_artifact import load_episode_artifact
-from lerobot.robots.mobile_bi_nexarm_sim.contract import ARM_FEATURES, load_contract
+from lerobot_robot_nexarm.mobile_bi_nexarm_sim.contract import ARM_FEATURES, load_contract
+from lerobot_robot_nexarm.mobile_nexarm_artifact import load_episode_artifact
 
 
 def resolve_dof_indices(dof_names: list[str], required: list[str]) -> list[int]:

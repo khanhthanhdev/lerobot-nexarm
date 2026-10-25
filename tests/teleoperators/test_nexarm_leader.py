@@ -16,9 +16,9 @@ import pytest
 
 pytest.importorskip("serial", reason="pyserial is required (install lerobot[hardware])")
 
-from lerobot.motors.nexarm.nexarm import JOINT_NAMES  # noqa: E402
-from lerobot.teleoperators.nexarm_leader import NexArmLeader, NexArmLeaderConfig  # noqa: E402
 from lerobot.utils.errors import DeviceAlreadyConnectedError, DeviceNotConnectedError  # noqa: E402
+from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES  # noqa: E402
+from lerobot_teleoperator_nexarm import NexArmLeader, NexArmLeaderConfig  # noqa: E402
 
 
 def make_bus(positions: list[int] | None = None) -> MagicMock:
@@ -33,7 +33,7 @@ def make_bus(positions: list[int] | None = None) -> MagicMock:
 @pytest.fixture
 def leader(tmp_path):
     bus = make_bus()
-    with patch("lerobot.teleoperators.nexarm_leader.nexarm_leader.NexArmMotorsBus", return_value=bus):
+    with patch("lerobot_teleoperator_nexarm.nexarm_leader.NexArmMotorsBus", return_value=bus):
         config = NexArmLeaderConfig(port="/dev/null", id="test_leader", calibration_dir=tmp_path)
         teleop = NexArmLeader(config)
         yield teleop, bus
@@ -81,7 +81,7 @@ def test_leader_get_action_maps_positions(leader) -> None:
 
 def test_leader_follow_api_inverts_the_follower_mapping(leader) -> None:
     from lerobot.common.control_utils import teleop_supports_feedback
-    from lerobot.motors.nexarm.nexarm import (
+    from lerobot_robot_nexarm.motors.nexarm import (
         GRIPPER_CLOSED_POS,
         GRIPPER_OPEN_POS,
         map_follower_to_leader,

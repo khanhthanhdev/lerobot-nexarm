@@ -17,11 +17,11 @@ pytest.importorskip("serial", reason="pyserial is required (install lerobot[hard
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from lerobot.motors.nexarm.nexarm import GRIPPER_CLOSED_POS, JOINT_NAMES  # noqa: E402
-from lerobot.nexarm_service import local_runner  # noqa: E402
-from lerobot.nexarm_service.app import API_PREFIX, create_app  # noqa: E402
-from lerobot.nexarm_service.events import EventHub  # noqa: E402
-from lerobot.nexarm_service.jobs import (  # noqa: E402
+from lerobot_robot_nexarm.motors.nexarm import GRIPPER_CLOSED_POS, JOINT_NAMES  # noqa: E402
+from nexarm_service import local_runner  # noqa: E402
+from nexarm_service.app import API_PREFIX, create_app  # noqa: E402
+from nexarm_service.events import EventHub  # noqa: E402
+from nexarm_service.jobs import (  # noqa: E402
     JobManager,
     JobRunner,
     JobState,
@@ -467,8 +467,8 @@ def test_a_rollout_without_strategy_events_rejects_controls(deploy_env):
 
 
 def test_the_engine_never_installs_global_input_listeners():
-    from lerobot.nexarm_service.rollout import disable_input_listeners
     from lerobot.rollout.strategies import dagger, episodic
+    from nexarm_service.rollout import disable_input_listeners
 
     disable_input_listeners()
     listener, events = episodic.init_keyboard_listener()

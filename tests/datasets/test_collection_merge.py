@@ -6,7 +6,8 @@ import numpy as np
 import pytest
 from huggingface_hub import HfApi
 
-from lerobot.datasets import LeRobotDataset, collection_merge as merge
+from lerobot.datasets import LeRobotDataset
+from lerobot_robot_nexarm import collection_merge as merge
 
 FEATURES = {
     "action": {"dtype": "float32", "shape": (1,), "names": ["joint"]},
@@ -189,8 +190,8 @@ def test_precheck_new_root_is_allowed(monkeypatch, tmp_path):
 
 
 def record_config(tmp_path, root_dir):
+    from examples.nexarm.record_collection import CollectionRecordConfig
     from lerobot.configs.dataset import DatasetRecordConfig
-    from lerobot.scripts.lerobot_record import RecordConfig
     from tests.mocks.mock_robot import MockRobotConfig
     from tests.mocks.mock_teleop import MockTeleopConfig
 
@@ -203,7 +204,7 @@ def record_config(tmp_path, root_dir):
         reset_time_s=0,
         push_to_hub=False,
     )
-    return RecordConfig(
+    return CollectionRecordConfig(
         robot=MockRobotConfig(),
         dataset=dataset_cfg,
         teleop=MockTeleopConfig(),
@@ -215,7 +216,7 @@ def record_config(tmp_path, root_dir):
 
 def test_record_fails_before_recording_when_root_is_incompatible(tmp_path):
     pytest.importorskip("deepdiff")
-    from lerobot.scripts.lerobot_record import record
+    from examples.nexarm.record_collection import record_collection as record
 
     root_dir = tmp_path / "root"
     make_dataset("test/root", root_dir, 1)
@@ -226,7 +227,7 @@ def test_record_fails_before_recording_when_root_is_incompatible(tmp_path):
 
 def test_record_first_session_creates_root(monkeypatch, tmp_path):
     pytest.importorskip("deepdiff")
-    from lerobot.scripts.lerobot_record import record
+    from examples.nexarm.record_collection import record_collection as record
 
     monkeypatch.setattr(merge, "hub_root_info", lambda _: None)
     root_dir = tmp_path / "root"

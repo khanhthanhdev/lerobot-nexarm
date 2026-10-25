@@ -124,7 +124,7 @@ Install the full NexArm profile (simulation data generation, real collection and
 uv sync --locked --extra test --extra dev --extra core_scripts --extra training --extra nexarm --extra intelrealsense
 ```
 
-Add policy extras to that line (TurboVLA: `--extra smolvla --extra groot`), or use `--extra all` for everything. `uv sync` uninstalls extras you do not list. The full table is in [`run.md`, Dependency Profiles](run.md#dependency-profiles).
+Add policy extras to that line (TurboVLA: `--extra turbovla`), or use `--extra all` for everything. `uv sync` uninstalls extras you do not list. The full table is in [`run.md`, Dependency Profiles](run.md#dependency-profiles).
 
 > **Important**: Always run commands through `uv run <command>` (e.g. `uv run python ...` or `uv run lerobot-train`). Do not manually activate the `.venv` or install packages with `pip`.
 
@@ -166,7 +166,7 @@ _(Log out and log back in for the group membership change to take effect)._
 ### Verify Installation
 
 ```bash
-uv run python -c "from lerobot.robots.nexarm_sim import NexArmSim; from lerobot.robots.nexarm_follower import NexArmFollower; print('NexArm installation OK!')"
+uv run python -c "from lerobot_robot_nexarm.nexarm_sim import NexArmSim; from lerobot_robot_nexarm.nexarm_follower import NexArmFollower; print('NexArm installation OK!')"
 ```
 
 ---
@@ -458,7 +458,7 @@ The engine runs the hardware sessions, so it owns the robot's USB ports while a 
 Before deploying a policy trained in simulation onto the real arm, verify that the physical camera perspective and workspace match the simulation:
 
 ```bash
-uv run python examples/nexarm/calibrate_camera_alignment.py \
+uv run python tools/nexarm/calibrate_camera_alignment.py \
   --camera-name front \
   --cam-index 0
 ```
@@ -474,11 +474,11 @@ Full procedure: [`docs/source/nexarm/sim_calibration.md`](docs/source/nexarm/sim
 
 ## Kinematics & Dynamics Python API
 
-Module: [`src/lerobot/motors/nexarm/kinematics_dynamics.py`](src/lerobot/motors/nexarm/kinematics_dynamics.py)
+Module: [`packages/lerobot_robot_nexarm/src/lerobot_robot_nexarm/motors/kinematics_dynamics.py`](packages/lerobot_robot_nexarm/src/lerobot_robot_nexarm/motors/kinematics_dynamics.py)
 
 ```python
 import numpy as np
-from lerobot.motors.nexarm import NexArmKinematicsDynamics
+from lerobot_robot_nexarm.motors import NexArmKinematicsDynamics
 
 kd = NexArmKinematicsDynamics()
 
@@ -513,17 +513,15 @@ To protect the bus servos against thermal degradation and mechanical fatigue, `N
 ## Code Architecture
 
 ```
-src/lerobot/
-├── motors/nexarm/
-│   ├── __init__.py                  # Exports NexArmMotorsBus, NexArmKinematicsDynamics
-│   ├── nexarm.py                    # CommProtocol UART framing, read/write, torque, bridge mode
-│   └── kinematics_dynamics.py       # C-accelerated FK, IK, Jacobian, M(q), g(q)
-├── robots/
+packages/                            # LeRobot plugins, each under <package>/src/<package>/
+├── lerobot_robot_nexarm/
+│   ├── motors/                      # NexArmMotorsBus (UART framing, torque, bridge mode), kinematics_dynamics.py
 │   ├── nexarm_follower/             # Follower robot driver (connect, observe, send_action)
-│   ├── nexarm_sim/                  # MuJoCo single-arm simulation & pick-and-place task
+│   ├── nexarm_sim/                  # MuJoCo single-arm simulation, pick-and-place and stack-bowls tasks
 │   └── mobile_bi_nexarm_sim/        # Bimanual mobile robot simulation
-├── teleoperators/nexarm_leader/     # Leader arm driver (torque disable, joint mirroring)
-└── envs/nexarm.py                   # Gymnasium environments (NexArmPickPlace-v0, NexArmStackBowls-v0)
+├── lerobot_teleoperator_nexarm/     # Leader arm driver (torque disable, joint mirroring)
+├── lerobot_env_nexarm/              # Gymnasium environments (NexArmPickPlace-v0, NexArmStackBowls-v0), sim benchmark
+└── nexarm_service/                  # Desktop-app engine (lerobot-nexarm-service)
 ```
 
 ---

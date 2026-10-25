@@ -16,7 +16,7 @@ import json
 import struct
 import sys
 
-from lerobot.motors.nexarm.nexarm import (
+from lerobot_robot_nexarm.motors.nexarm import (
     CMD_LEROBOT_MODE,
     CMD_READ_POS,
     CMD_SET_MOTION_PARAMS,

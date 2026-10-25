@@ -15,11 +15,11 @@ pytest.importorskip("serial", reason="pyserial is required (install lerobot[hard
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from lerobot.motors.nexarm.nexarm import GRIPPER_CLOSED_POS, GRIPPER_OPEN_POS, JOINT_NAMES  # noqa: E402
-from lerobot.nexarm_service import calibration, safety  # noqa: E402
-from lerobot.nexarm_service.app import API_PREFIX, create_app  # noqa: E402
-from lerobot.nexarm_service.events import EventHub  # noqa: E402
-from lerobot.nexarm_service.session import SessionKind, SessionManager  # noqa: E402
+from lerobot_robot_nexarm.motors.nexarm import GRIPPER_CLOSED_POS, GRIPPER_OPEN_POS, JOINT_NAMES  # noqa: E402
+from nexarm_service import calibration, safety  # noqa: E402
+from nexarm_service.app import API_PREFIX, create_app  # noqa: E402
+from nexarm_service.events import EventHub  # noqa: E402
+from nexarm_service.session import SessionKind, SessionManager  # noqa: E402
 from tests.nexarm_service.fakes import FakeBus, FakeHardware  # noqa: E402
 
 PROFILE = {"name": "bench", "follower_port": "FOLLOWER", "leader_port": "LEADER"}

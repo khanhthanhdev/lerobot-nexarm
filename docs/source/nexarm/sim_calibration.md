@@ -14,19 +14,19 @@ This guide makes the MuJoCo twin behave like your physical arm, then generates s
 
 ## Step 0. Before you start
 
-- Zero positions are set in the servos (follower: desktop Servo Advanced page; leader: Synchronizer page) and checked with `examples/nexarm/calibrate_arms.py`, which reports leader/follower deltas at the Home pose and keeps the calibration files identity (`lerobot-calibrate` writes the same identity files). Teleoperation works.
+- Zero positions are set in the servos (follower: desktop Servo Advanced page; leader: Synchronizer page) and checked with `tools/nexarm/calibrate_arms.py`, which reports leader/follower deltas at the Home pose and keeps the calibration files identity (`lerobot-calibrate` writes the same identity files). Teleoperation works.
 - You can generate simulation data (see `pipeline.md`, section 1a) and `MUJOCO_GL=egl` works on your machine.
 - Check that the sim joint mapping matches your arm. The sim maps raw 2048 onto the exported CAD pose, which is the follower's Home pose (an L: upper-arm tube vertical, forearm and closed gripper horizontal). Servo signs and zero errors still vary per arm, and until they are measured the sim can pose real joint values slightly differently from the real arm.
   1. Measure the per-joint sign and zero offset by posing the un-energised follower by hand. The probe uses a straight-up pose as its reference and reads where it is, so it works whatever shape Home has. Close any app that holds the follower's serial port (such as the Hiwonder desktop app) first:
 
      ```bash
-     uv run python examples/nexarm/probe_joint_mapping.py --port /dev/ttyUSB1
+     uv run python tools/nexarm/probe_joint_mapping.py --port /dev/ttyUSB1
      ```
 
   2. Confirm the result on a recorded episode. This needs OpenGL; use `MUJOCO_GL=egl` on headless Linux.
 
      ```bash
-     uv run python examples/nexarm/overlay_recorded_frames.py --repo-id <real_repo_id> --episode 0 --mapping outputs/nexarm/joint_mapping_probe.json
+     uv run python tools/nexarm/overlay_recorded_frames.py --repo-id <real_repo_id> --episode 0 --mapping outputs/nexarm/joint_mapping_probe.json
      ```
 
      The wrist-camera overlays should line up. Fitting dynamics with a wrong mapping gives meaningless numbers.
@@ -74,7 +74,7 @@ EOF
 Then audit the joint data:
 
 ```bash
-uv run python examples/nexarm/audit_real_dataset.py --repo-id <sysid_repo_id> --episode-time-s <episode_time_s>
+uv run python tools/nexarm/audit_real_dataset.py --repo-id <sysid_repo_id> --episode-time-s <episode_time_s>
 ```
 
 The audit reports:
@@ -84,7 +84,7 @@ The audit reports:
 - **episodes whose command-to-state lag differs from the rest.** These usually come from a session that logged differently; skip them with `--exclude-episodes` in `calibrate_sim.py`.
 - **gripper levels.** If releases stay above the stack-bowls grasp-assist release threshold, raise `assist_release_pos` on `NexArmStackBowlsTask` before replaying real demos in the sim.
 
-To measure servo speed and lag directly with real timestamps, run `examples/nexarm/servo_step_test.py --port /dev/ttyUSB1 --joint elbow_flex`. It compares `motion_speed` 2000 with 0.
+To measure servo speed and lag directly with real timestamps, run `tools/nexarm/servo_step_test.py --port /dev/ttyUSB1 --joint elbow_flex`. It compares `motion_speed` 2000 with 0.
 
 Confirm that:
 
@@ -95,7 +95,7 @@ Confirm that:
 ## Step 3. Fit the simulation
 
 ```bash
-MUJOCO_GL=egl uv run python examples/nexarm/calibrate_sim.py \
+MUJOCO_GL=egl uv run python tools/nexarm/calibrate_sim.py \
     --repo-id <sysid_repo_id> \
     --episodes 20 \
     --out outputs/calibration/nexarm_sim_calibration.json
@@ -182,10 +182,10 @@ Do these checks before training:
 Policies see images, so wrong camera geometry causes a bigger sim-to-real gap than the dynamics.
 
 ```bash
-uv run python examples/nexarm/calibrate_camera_alignment.py --cam-index 0 --camera-name front
+uv run python tools/nexarm/calibrate_camera_alignment.py --cam-index 0 --camera-name front
 ```
 
-The tool overlays the simulated view on the live camera. Keys: `m` switches mode, `+` and `-` change the blend, `s` saves a snapshot, `q` quits. Compare the table edge, the base of the arm and the target zone. If they do not line up, edit the camera `pos`, `quat`/`xyaxes` or `fovy` in the scene XML (`sim/description/mjcf/`) until they do, then repeat with `--camera-name wrist` and `--camera-name top`. For the RealSense `top` camera, `uv run python examples/nexarm/realsense_fovy.py` reads the colour intrinsics and prints the matching `fovy`. For `top`, pass the RealSense RGB V4L2 node as `--cam-index` (e.g. `/dev/video4`); the sim top camera looks straight down from 0.75 m. Check that the resolution and fps match your real cameras.
+The tool overlays the simulated view on the live camera. Keys: `m` switches mode, `+` and `-` change the blend, `s` saves a snapshot, `q` quits. Compare the table edge, the base of the arm and the target zone. If they do not line up, edit the camera `pos`, `quat`/`xyaxes` or `fovy` in the scene XML (`sim/description/mjcf/`) until they do, then repeat with `--camera-name wrist` and `--camera-name top`. For the RealSense `top` camera, `uv run python tools/nexarm/realsense_fovy.py` reads the colour intrinsics and prints the matching `fovy`. For `top`, pass the RealSense RGB V4L2 node as `--cam-index` (e.g. `/dev/video4`); the sim top camera looks straight down from 0.75 m. Check that the resolution and fps match your real cameras.
 
 ## Step 8. Match the scene
 
@@ -195,7 +195,7 @@ Measure these on your real setup and update the scene XML if they differ:
 - table height and the target zone size,
 - background and table color.
 
-Then adjust the visual randomization range in `DomainRandomizationRanges` (`src/lerobot/robots/nexarm_sim/mujoco_backend.py`) so it covers the lighting and color you actually see.
+Then adjust the visual randomization range in `DomainRandomizationRanges` (`packages/lerobot_robot_nexarm/src/lerobot_robot_nexarm/nexarm_sim/mujoco_backend.py`) so it covers the lighting and color you actually see.
 
 ## Step 9. Train and iterate
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from lerobot.datasets.mobile_nexarm_artifact import write_artifacts_to_lerobot
+from lerobot_robot_nexarm.mobile_nexarm_artifact import write_artifacts_to_lerobot
 
 
 def main() -> None:

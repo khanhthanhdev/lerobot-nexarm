@@ -15,10 +15,11 @@ from huggingface_hub import HfApi, snapshot_download
 
 from lerobot.configs import FeatureType, PreTrainedConfig
 from lerobot.datasets import LeRobotDataset, LeRobotDatasetMetadata
-from lerobot.motors.nexarm.nexarm import JOINT_NAMES as MOTOR_NAMES
 from lerobot.policies.act import ACTConfig
 from lerobot.utils.constants import HF_LEROBOT_HOME
 from lerobot.utils.feature_utils import dataset_to_policy_features
+from lerobot_robot_nexarm.local_dataset import load_local_dataset, load_local_metadata
+from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES as MOTOR_NAMES
 
 # Existing 2-camera real dataset; pass --repo-id thanhkt/nexarm_stack_bowls_top for the 3-camera root.
 REPO_ID = "thanhkt/nexarm_stack_bowls"
@@ -93,10 +94,10 @@ def check_data(
     meta: LeRobotDatasetMetadata, cfg: ACTConfig, root: Path | None, *, local_files_only: bool = False
 ) -> None:
     """Decode real frames and verify episode-end action padding without running training."""
-    dataset = LeRobotDataset(
+    load = load_local_dataset if local_files_only else LeRobotDataset
+    dataset = load(
         meta.repo_id,
         root=root,
-        local_files_only=local_files_only,
         revision=meta.revision,
         episodes=[0],
         video_backend="pyav",
@@ -181,9 +182,8 @@ def main() -> None:
             local_dir=root,
             allow_patterns="meta/**",
         )
-    meta = LeRobotDatasetMetadata(
-        args.repo_id, root=root, revision=revision, local_files_only=args.dataset_root is not None
-    )
+    load_metadata = load_local_metadata if args.dataset_root is not None else LeRobotDatasetMetadata
+    meta = load_metadata(args.repo_id, root=root, revision=revision)
     validate_metadata(meta)
     cfg = resolve_policy(meta, args.pretrained)
     print(

@@ -21,8 +21,8 @@ from examples.nexarm.generate_sim_dataset import (
     generate_episode,
     main as generator_main,
 )
-from lerobot.motors.nexarm.mujoco_mapping import JOINT_MAPPING_VERSION
-from lerobot.robots.nexarm_sim import NexArmPickPlaceTask, NexArmSim, NexArmSimConfig
+from lerobot_robot_nexarm.motors.mujoco_mapping import JOINT_MAPPING_VERSION
+from lerobot_robot_nexarm.nexarm_sim import NexArmPickPlaceTask, NexArmSim, NexArmSimConfig
 
 MODEL_PATH = Path(__file__).resolve().parents[2] / "sim" / "description" / "mjcf" / "scene.xml"
 

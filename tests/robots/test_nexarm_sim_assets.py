@@ -10,9 +10,9 @@ import mujoco
 import numpy as np
 import pytest
 
-from lerobot.envs.nexarm import DEFAULT_SCENE_PATH
-from lerobot.robots.nexarm_sim.config_nexarm_sim import NexArmSimConfig
-from lerobot.robots.nexarm_sim.mujoco_backend import resolve_model_path
+from lerobot_env_nexarm.nexarm import DEFAULT_SCENE_PATH
+from lerobot_robot_nexarm.nexarm_sim.config_nexarm_sim import NexArmSimConfig
+from lerobot_robot_nexarm.nexarm_sim.mujoco_backend import resolve_model_path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DESCRIPTION = REPO_ROOT / "sim" / "description"

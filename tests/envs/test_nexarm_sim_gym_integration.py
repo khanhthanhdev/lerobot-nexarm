@@ -17,11 +17,12 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from lerobot.configs.accelerator import AcceleratorConfig, GradientAccumulationConfig
 from lerobot.configs.train import TrainPipelineConfig
 from lerobot.datasets.lerobot_dataset import LeRobotDataset
-from lerobot.motors.nexarm.nexarm import JOINT_NAMES
-from lerobot.robots.nexarm_sim.mujoco_backend import HOME_POSITIONS
 from lerobot.utils.constants import ACTION, OBS_STR
+from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES
+from lerobot_robot_nexarm.nexarm_sim.mujoco_backend import HOME_POSITIONS
 
 
 def create_synthetic_nexarm_dataset(root_dir: Path, repo_id: str, num_frames: int = 20) -> LeRobotDataset:
@@ -73,28 +74,28 @@ def create_synthetic_nexarm_dataset(root_dir: Path, repo_id: str, num_frames: in
 
 
 def test_gradient_accumulation_config_validation():
-    """Verify gradient_accumulation_steps configuration and validation in TrainPipelineConfig."""
+    """Verify gradient accumulation configuration and validation in TrainPipelineConfig."""
     from lerobot.configs.default import DatasetConfig
 
     dataset_cfg = DatasetConfig(repo_id="dummy/repo", root="outputs/dummy")
     train_cfg = TrainPipelineConfig(
         dataset=dataset_cfg,
-        gradient_accumulation_steps=2,
+        accelerator=AcceleratorConfig(gradient_accumulation=GradientAccumulationConfig(steps=2)),
     )
-    assert train_cfg.gradient_accumulation_steps == 2
+    assert train_cfg.accelerator.gradient_accumulation.steps == 2
 
-    with pytest.raises(ValueError, match="gradient_accumulation_steps must be >= 1"):
+    with pytest.raises(ValueError, match="gradient_accumulation.steps must be >= 1"):
         invalid_cfg = TrainPipelineConfig(
             dataset=dataset_cfg,
-            gradient_accumulation_steps=0,
+            accelerator=AcceleratorConfig(gradient_accumulation=GradientAccumulationConfig(steps=0)),
         )
         invalid_cfg.validate()
 
 
 def test_nexarm_sim_gym_raw_position_contract(tmp_path: Path):
     """Verify that a policy trained on raw positions evaluates in Gym without unit mismatch (e.g. jumping to 4095)."""
-    from lerobot.envs.configs import NexArmEnv
     from lerobot.envs.factory import make_env
+    from lerobot_env_nexarm import NexArmEnv
 
     # 1. Verify NexArmEnv defaults to control_mode="raw"
     env_cfg = NexArmEnv(
@@ -135,10 +136,10 @@ def test_nexarm_train_eval_integration(tmp_path: Path):
     from lerobot.configs.default import DatasetConfig, EvalConfig
     from lerobot.configs.eval import EvalPipelineConfig
     from lerobot.configs.policies import PreTrainedConfig
-    from lerobot.envs.configs import NexArmEnv
     from lerobot.policies.act.configuration_act import ACTConfig
     from lerobot.scripts.lerobot_eval import eval_main
     from lerobot.scripts.lerobot_train import train
+    from lerobot_env_nexarm import NexArmEnv
 
     dataset_dir = tmp_path / "dataset"
     train_dir = tmp_path / "train_output"
@@ -174,7 +175,7 @@ def test_nexarm_train_eval_integration(tmp_path: Path):
         output_dir=train_dir,
         job_name="nexarm_ete_test",
         batch_size=2,
-        gradient_accumulation_steps=2,
+        accelerator=AcceleratorConfig(gradient_accumulation=GradientAccumulationConfig(steps=2)),
         steps=2,
         save_freq=2,
         log_freq=1,

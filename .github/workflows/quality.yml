@@ -14,8 +14,6 @@
 
 # This workflow handles linting, formatting, and static analysis checks for the codebase.
 name: Quality
-permissions:
-  contents: read
 
 on:
   # Allows running this workflow manually from the Actions tab
@@ -36,19 +34,23 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
 
+permissions: {}
+
 jobs:
   # This job runs pre-commit hooks to check code style and formatting.
   pre-commit-checks:
+    permissions:
+      contents: read
     name: Run Pre-commit Hooks (Lint, Format & Static Analysis)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
 
       - name: Set up Python
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v6
         with:
           python-version: '3.12'
 

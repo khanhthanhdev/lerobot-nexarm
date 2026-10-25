@@ -12,7 +12,8 @@ pytest.importorskip("datasets", reason="datasets is required (install lerobot[da
 
 from lerobot.configs import FeatureType, PolicyFeature
 from lerobot.policies.act.configuration_act import ACTConfig
-from lerobot.scripts.lerobot_nexarm_sim_benchmark import (
+from lerobot.utils.constants import ACTION, OBS_STATE
+from lerobot_env_nexarm.sim_benchmark import (
     EpisodeMetrics,
     _write_results,
     parse_args,
@@ -20,7 +21,6 @@ from lerobot.scripts.lerobot_nexarm_sim_benchmark import (
     summarize_episodes,
     validate_policy_contract,
 )
-from lerobot.utils.constants import ACTION, OBS_STATE
 
 
 def test_parse_policy_spec_accepts_label_and_bare_path() -> None:

@@ -8,8 +8,8 @@ import mujoco
 import numpy as np
 import pytest
 
-from lerobot.motors.nexarm.mujoco_mapping import reachable_raw_range
-from lerobot.motors.nexarm.nexarm import (
+from lerobot_robot_nexarm.motors.mujoco_mapping import reachable_raw_range
+from lerobot_robot_nexarm.motors.nexarm import (
     GRIPPER_CLOSED_POS,
     GRIPPER_OPEN_POS,
     JOINT_NAMES,
@@ -17,12 +17,12 @@ from lerobot.motors.nexarm.nexarm import (
     POSITION_MIN,
     raw_to_radians,
 )
-from lerobot.robots.nexarm_sim import (
+from lerobot_robot_nexarm.nexarm_sim import (
     NexArmPickPlaceTask,
     NexArmSim,
     NexArmSimConfig,
 )
-from lerobot.robots.nexarm_sim.mujoco_backend import HOME_POSITIONS, RAW_RANGES, NexArmMujocoBackend
+from lerobot_robot_nexarm.nexarm_sim.mujoco_backend import HOME_POSITIONS, RAW_RANGES, NexArmMujocoBackend
 
 MODEL_PATH = Path(__file__).resolve().parents[2] / "sim" / "description" / "mjcf" / "scene.xml"
 
@@ -89,8 +89,8 @@ def test_sim_robot_reports_follower_type_and_returns_commanded_action() -> None:
             id="test", model_path=MODEL_PATH, camera_names=(), settle_steps=0, action_delay_steps=2
         )
     )
-    assert robot.name == "nexarm_sim"
-    assert robot.robot_type == "nexarm_follower"
+    # lerobot-record and lerobot-rollout write robot.name into the dataset's robot_type.
+    assert robot.name == robot.robot_type == "nexarm_follower"
     robot.connect()
     try:
         action = {f"{name}.pos": HOME_POSITIONS[name] + 100 for name in JOINT_NAMES}

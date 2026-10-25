@@ -7,7 +7,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from examples.nexarm import camera_config, prepare_collection, rollout
+from examples.nexarm import rollout
+from lerobot_robot_nexarm import camera_config
+from tools.nexarm import prepare_collection
 
 
 def parse(*argv):

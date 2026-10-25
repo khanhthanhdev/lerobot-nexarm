@@ -17,9 +17,9 @@ from pathlib import Path
 
 import mujoco.viewer
 
-from lerobot.robots.nexarm_sim import NexArmSim, NexArmSimConfig
-from lerobot.teleoperators.nexarm_leader import NexArmLeader, NexArmLeaderConfig
 from lerobot.utils.robot_utils import precise_sleep
+from lerobot_robot_nexarm.nexarm_sim import NexArmSim, NexArmSimConfig
+from lerobot_teleoperator_nexarm import NexArmLeader, NexArmLeaderConfig
 
 
 def parse_args() -> argparse.Namespace:

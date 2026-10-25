@@ -1,6 +1,0 @@
-[submodule "bspline-policy"]
-	path = bspline-policy
-	url = https://github.com/khanhthanhdev/bspline-policy
-[submodule "TurboVLA"]
-	path = TurboVLA
-	url = https://github.com/khanhthanhdev/TurboVLA

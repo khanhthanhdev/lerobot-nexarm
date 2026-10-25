@@ -8,8 +8,8 @@ from pathlib import Path
 
 import numpy as np
 
-from lerobot.datasets.mobile_nexarm_artifact import EpisodeArtifactWriter, EpisodeMetadata
-from lerobot.robots.mobile_bi_nexarm_sim import MobileBiNexArmSim, MobileBiNexArmSimConfig
+from lerobot_robot_nexarm.mobile_bi_nexarm_sim import MobileBiNexArmSim, MobileBiNexArmSimConfig
+from lerobot_robot_nexarm.mobile_nexarm_artifact import EpisodeArtifactWriter, EpisodeMetadata
 
 
 def _move(

@@ -7,10 +7,10 @@
 import contextlib
 import shutil
 
-from lerobot.nexarm_service.app import create_app
-from lerobot.nexarm_service.jobs import TrainRequest
-from lerobot.nexarm_service.remote import RemoteRunner
-from lerobot.nexarm_service.servers import RemoteServer
+from nexarm_service.app import create_app
+from nexarm_service.jobs import TrainRequest
+from nexarm_service.remote import RemoteRunner
+from nexarm_service.servers import RemoteServer
 
 SERVER = RemoteServer(name="gpu1", host="gpu.example.com", user="ubuntu", key_path="/keys/id_ed25519")
 

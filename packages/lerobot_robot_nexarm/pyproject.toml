@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=71.0.0,<82.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lerobot_robot_nexarm"
+version = "0.1.0"
+description = "Hiwonder NexArm as a LeRobot robot plugin: the servo driver, the `nexarm_follower` arm and the `nexarm_sim` / `mobile_bi_nexarm_sim` MuJoCo robots."
+license = "Apache-2.0"
+requires-python = ">=3.12"
+# The collection tools (collection_merge, recording_session, mobile_nexarm_artifact) also need lerobot[dataset].
+dependencies = [
+    "lerobot[pyserial-dep,deepdiff-dep]",
+    # The nexarm_sim and mobile_bi_nexarm_sim robots.
+    "mujoco>=3.8.1",
+]
+
+[project.scripts]
+lerobot-nexarm-rollout = "lerobot_robot_nexarm.rerun_recording:rollout_main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -55,7 +55,7 @@ TOP_CAMERA_OCCURRENCE_PREFIX = "d435i"
 TOP_CAMERA_CLAMP_MARKER = "clamp"
 FRONT_CAMERA_OCCURRENCE_PREFIX = "c270"
 # The C270 mount holds no camera model. Its lens sits about this far above the shelf face and ahead of the
-# shelf centre (half the webcam's height and depth); verify with examples/nexarm/overlay_recorded_frames.py.
+# shelf centre (half the webcam's height and depth); verify with tools/nexarm/overlay_recorded_frames.py.
 C270_LENS_ABOVE_SHELF_MM = 16.0
 C270_LENS_FORWARD_MM = 15.0
 # A fixture body becomes a MuJoCo box only if it fills its bounding box this well.

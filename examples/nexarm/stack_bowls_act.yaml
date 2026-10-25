@@ -17,7 +17,9 @@ job_name: nexarm_stack_bowls_act
 seed: 1000
 # Conservative starting point for an 8 GB GPU. Effective batch size = 16.
 batch_size: 2
-gradient_accumulation_steps: 8
+accelerator:
+  gradient_accumulation:
+    steps: 8
 num_workers: 2
 prefetch_factor: 2
 steps: 100000

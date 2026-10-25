@@ -9,15 +9,15 @@ import mujoco
 import numpy as np
 import pytest
 
-from lerobot.motors.nexarm.mujoco_mapping import reachable_raw_range
-from lerobot.motors.nexarm.nexarm import raw_to_radians
-from lerobot.robots.mobile_bi_nexarm_sim import (
+from lerobot_robot_nexarm.mobile_bi_nexarm_sim import (
     ARM_FEATURES,
     STATE_ACTION_NAMES,
     MobileBiNexArmSim,
     MobileBiNexArmSimConfig,
     load_contract,
 )
+from lerobot_robot_nexarm.motors.mujoco_mapping import reachable_raw_range
+from lerobot_robot_nexarm.motors.nexarm import raw_to_radians
 
 ROOT = Path(__file__).resolve().parents[2]
 MODEL = ROOT / "sim/mobile_nexarm/generated/mobile_bi_nexarm.xml"

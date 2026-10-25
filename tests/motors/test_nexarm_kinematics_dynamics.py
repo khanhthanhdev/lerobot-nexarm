@@ -7,9 +7,9 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from lerobot.motors.nexarm import NexArmKinematicsDynamics
-from lerobot.motors.nexarm.kinematics_dynamics import HOME_POSITIONS, JOINT_NAMES
-from lerobot.motors.nexarm.mujoco_mapping import (
+from lerobot_robot_nexarm.motors import NexArmKinematicsDynamics
+from lerobot_robot_nexarm.motors.kinematics_dynamics import HOME_POSITIONS, JOINT_NAMES
+from lerobot_robot_nexarm.motors.mujoco_mapping import (
     IDENTITY_MAPPING,
     JOINT_MAPPING_VERSION,
     JointMapping,
@@ -18,7 +18,7 @@ from lerobot.motors.nexarm.mujoco_mapping import (
     raw_to_joint_position,
     reachable_raw_range,
 )
-from lerobot.motors.nexarm.nexarm import (
+from lerobot_robot_nexarm.motors.nexarm import (
     GRIPPER_CLOSED_POS,
     GRIPPER_OPEN_POS,
     POSITION_CENTER,
@@ -191,7 +191,7 @@ def test_joint_mapping_loads_probe_json(tmp_path) -> None:
 
 
 def test_backend_honours_the_joint_mapping(kd: NexArmKinematicsDynamics) -> None:
-    from lerobot.robots.nexarm_sim.mujoco_backend import NexArmMujocoBackend
+    from lerobot_robot_nexarm.nexarm_sim.mujoco_backend import NexArmMujocoBackend
 
     backend = NexArmMujocoBackend(
         model_path=kd.model_path,
@@ -213,7 +213,7 @@ def test_backend_honours_the_joint_mapping(kd: NexArmKinematicsDynamics) -> None
 
 
 def test_kinematics_and_backend_agree_on_every_joint(kd: NexArmKinematicsDynamics) -> None:
-    from lerobot.robots.nexarm_sim.mujoco_backend import NexArmMujocoBackend
+    from lerobot_robot_nexarm.nexarm_sim.mujoco_backend import NexArmMujocoBackend
 
     backend = NexArmMujocoBackend(
         model_path=kd.model_path, fps=30, camera_width=64, camera_height=48, camera_names=()

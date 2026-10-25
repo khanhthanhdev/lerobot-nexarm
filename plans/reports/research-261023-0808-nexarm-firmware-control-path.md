@@ -22,7 +22,7 @@ PC ──USB (CH340, 1 Mbps)── ESP32 UART0 ──┐
   CMD 96/97/98 frame from the PC is re-framed with ID 0xFF and written to
   Serial1; the AT32 does the bus work and answers with ID 0xFF
   (`system_task_handle.cpp:99-134`, `bridge_at32_callback`).
-- The ESP32 *does* write raw servo frames on the same UART in ESP-NOW teach
+- The ESP32 _does_ write raw servo frames on the same UART in ESP-NOW teach
   mode (`EspNow_Ctrl.cpp:76`, `sync_write_pos_speed` to ID 0xFE) and for torque
   and acceleration broadcasts (`set_servo_realtime_mode`). The AT32 application
   drops every frame whose ID is not 0xFF (main loop at `0x800561c`), so those
@@ -55,18 +55,18 @@ PC ──USB (CH340, 1 Mbps)── ESP32 UART0 ──┐
 commands 6..104, indexed by cmd − 6. Frames with ID ≠ 0xFF never reach it.
 Entries that matter here:
 
-| CMD | Handler | What it does |
-|---|---|---|
-| 56 `SET_MOVE_ACC` | `0x8004570` | Stores **one byte** `args[0]` into `arm.move_acc` (`0x200000b0+0x39`). Nothing else. The speed bytes LeRobot sends are ignored. |
-| 59 `SET_PID_PARAM` | `0x80045dc` | Writes 5 bytes at servo register 21: `{args[1], args[3], args[2], args[4], args[5]}` to servo `args[0]`. |
-| 60 `GET_PID_PARAM` | `0x8004614` | Reads 5 bytes at register 21 from servo `args[0]`; replies cmd 60 with `{id, b0, b2, b1, b3, b4}` (ID 0x5A). |
-| 71 / 72 | `0x8004890` / `0x80048f4` | Read / write 3 bytes at register 34 (protection torque, protection time, overload torque). |
-| 75 / 76 | `0x8004988` / `0x80049ce` | Read / write the 16-bit register 48 (max torque). |
-| 57 / 58 | `0x8004584` / `0x800459c` | Write / read the 16-bit position offset at register 31. |
-| 96 `LR_READ_POS` | `0x8004c78` | Sets flag `0x200001ed = 1`, then **one sync read** of IDs 1..6 at register 56, length 8, and replies cmd 96 with six int16 positions. |
-| 97 `LR_WRITE_POS` | `0x8004cd6` | Builds six records `{id, acc = 0, speed = 0, pos}` and issues **one sync write** at register 41 (length 7 per servo). No queue, no interpolation, no speed cap. |
-| 98 `LR_TORQUE` | `0x8004d22` | Six individual torque-enable writes. |
-| 104 `SERVO_STREAM` | `0x8004d4c` | Sets `0x200001ee` (stream on/off). |
+| CMD                | Handler                   | What it does                                                                                                                                                    |
+| ------------------ | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 56 `SET_MOVE_ACC`  | `0x8004570`               | Stores **one byte** `args[0]` into `arm.move_acc` (`0x200000b0+0x39`). Nothing else. The speed bytes LeRobot sends are ignored.                                 |
+| 59 `SET_PID_PARAM` | `0x80045dc`               | Writes 5 bytes at servo register 21: `{args[1], args[3], args[2], args[4], args[5]}` to servo `args[0]`.                                                        |
+| 60 `GET_PID_PARAM` | `0x8004614`               | Reads 5 bytes at register 21 from servo `args[0]`; replies cmd 60 with `{id, b0, b2, b1, b3, b4}` (ID 0x5A).                                                    |
+| 71 / 72            | `0x8004890` / `0x80048f4` | Read / write 3 bytes at register 34 (protection torque, protection time, overload torque).                                                                      |
+| 75 / 76            | `0x8004988` / `0x80049ce` | Read / write the 16-bit register 48 (max torque).                                                                                                               |
+| 57 / 58            | `0x8004584` / `0x800459c` | Write / read the 16-bit position offset at register 31.                                                                                                         |
+| 96 `LR_READ_POS`   | `0x8004c78`               | Sets flag `0x200001ed = 1`, then **one sync read** of IDs 1..6 at register 56, length 8, and replies cmd 96 with six int16 positions.                           |
+| 97 `LR_WRITE_POS`  | `0x8004cd6`               | Builds six records `{id, acc = 0, speed = 0, pos}` and issues **one sync write** at register 41 (length 7 per servo). No queue, no interpolation, no speed cap. |
+| 98 `LR_TORQUE`     | `0x8004d22`               | Six individual torque-enable writes.                                                                                                                            |
+| 104 `SERVO_STREAM` | `0x8004d4c`               | Sets `0x200001ee` (stream on/off).                                                                                                                              |
 
 Not handled by the AT32 (falls to default): 69 `PC_SYNC_TEACH`, 70
 `SYNC_WRITE_SERVOS`. The ESP32 handles those itself with raw bus frames.
@@ -148,20 +148,20 @@ write settles it.
      (69) and temperature (63) are readable per servo;
    - bridge mode: enable CMD 104 and relay cmd 0x68 frames in
      `bridge_at32_callback` to get a 100 Hz position stream without polling.
-   Neither gives load inside the CMD 96 reply itself; that would need the AT32.
+     Neither gives load inside the CMD 96 reply itself; that would need the AT32.
 5. The "status byte 0x41" and "HX-30HM register table" in the pasted proposal
    were half right: register 41 is acceleration, and the 20 % overload default
    is the Feetech protection-torque default behind CMD 71/72.
 
 ## 5. Latency budget per 30 Hz frame (estimate)
 
-| Step | Where | Time |
-|---|---|---|
-| CMD 96 USB → ESP32 → AT32 | CH340 + two 1 Mbps hops | 1 to 3 ms |
-| Sync read of 6 servos, 8 bytes each | AT32 USART2 | 1.5 to 2.5 ms |
-| Reply AT32 → ESP32 → USB → Python poll loop (1 ms sleep) | | 2 to 4 ms |
-| Leader read, six sequential register reads | leader ESP32 | 7 to 10 ms |
-| CMD 97 PC → bus (56-byte sync write) | | 1 to 2 ms |
+| Step                                                     | Where                   | Time          |
+| -------------------------------------------------------- | ----------------------- | ------------- |
+| CMD 96 USB → ESP32 → AT32                                | CH340 + two 1 Mbps hops | 1 to 3 ms     |
+| Sync read of 6 servos, 8 bytes each                      | AT32 USART2             | 1.5 to 2.5 ms |
+| Reply AT32 → ESP32 → USB → Python poll loop (1 ms sleep) |                         | 2 to 4 ms     |
+| Leader read, six sequential register reads               | leader ESP32            | 7 to 10 ms    |
+| CMD 97 PC → bus (56-byte sync write)                     |                         | 1 to 2 ms     |
 
 The host loop spends roughly 15 to 20 ms of every 33 ms frame in serial I/O,
 which is why `lerobot-record` printed "loop is running slower" so often. The

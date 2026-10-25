@@ -25,11 +25,13 @@ analysis scripts are in the session scratchpad and are not committed.
 > 17% above the vendor no-load figure, hints at this.
 >
 > Either check settles it:
+>
 > - confirm that `lerobot-record` never printed "Record loop is running slower" during recording;
 > - or time one joint on the robot with `perf_counter`, at `motion_speed=2000` and again at 0.
 >
 > **Update (user, 2026-10-14):** the warning was printed often during recording, so the time base is unreliable
 > and Finding 1 is unproven.
+>
 > - Six episodes end at 448–449 frames, which looks like a time limit. At 15 s that would mean an average of
 >   about 30 Hz with short stalls; at 20 s it would mean about 22 Hz. The configured `episode_time_s` is unknown.
 > - The elbow moves more than 67 ticks in one frame (the most 2000 ticks/s allows at 30 Hz) 946 times. Some
@@ -38,6 +40,7 @@ analysis scripts are in the session scratchpad and are not committed.
 >   replay and latency fits.
 >
 > **Update 2 (user: `episode_time_s=15`):** the episodes that ran the full 15 s settle Finding 1.
+>
 > - Seven episodes ran to the limit with 440–449 frames: 2, 19, 23, 25, 26, 29 and 37. Their loop therefore
 >   averaged 29.3–29.9 Hz, and stalls totalled at most about 0.3 s per episode.
 > - In those episodes:
@@ -52,14 +55,14 @@ analysis scripts are in the session scratchpad and are not committed.
 
 Speeds were measured over 200 ms windows (6 frames) to suppress frame jitter.
 
-| Joint | p95 | p99.9 | max | Windows above 2100 ticks/s |
-|---|---|---|---|---|
-| 1 pan | 725 | 1601 | 2495 | 7 |
-| 2 lift | 925 | 1540 | 1965 | 0 |
-| 3 elbow | 1540 | 2783 | 3190 | 632 windows in 92 of 163 episodes |
-| 4 wrist flex | 1080 | 2410 | 3050 | 126 windows in 28 episodes |
-| 5 wrist roll | 810 | 1690 | 2215 | 2 |
-| gripper | 2750 | 3770 | 4020 | — |
+| Joint        | p95  | p99.9 | max  | Windows above 2100 ticks/s        |
+| ------------ | ---- | ----- | ---- | --------------------------------- |
+| 1 pan        | 725  | 1601  | 2495 | 7                                 |
+| 2 lift       | 925  | 1540  | 1965 | 0                                 |
+| 3 elbow      | 1540 | 2783  | 3190 | 632 windows in 92 of 163 episodes |
+| 4 wrist flex | 1080 | 2410  | 3050 | 126 windows in 28 episodes        |
+| 5 wrist roll | 810  | 1690  | 2215 | 2                                 |
+| gripper      | 2750 | 3770  | 4020 | —                                 |
 
 - **The excess appears across the whole dataset, so mixed recording settings don't explain it.** Every
   10-episode block except episodes 30–39 and 70–79 has an elbow maximum above 2100 ticks/s, and the median per-episode
@@ -88,6 +91,7 @@ until checked.
 ## Finding 3: the gripper is compliant when closed
 
 While the gripper is commanded closed (above 2700) and has stopped moving:
+
 - the median measured position is 72 ticks short of the command (interquartile range 49–83);
 - the 5th percentile is 619 ticks short, where the jaws stop on a bowl rim.
 
@@ -114,10 +118,10 @@ Real states were run through sim forward kinematics (`sim/description/mjcf/scene
 `servo_4096_v1`: rad = (raw − 2048)·2π/4096 with no per-joint sign or offset). The results were compared with
 the real camera frames.
 
-| Episode 70 frame | Real state (raw) | Real camera shows | Sim forward kinematics says |
-|---|---|---|---|
-| 0 (start) | 1798, 1833, 1479, 2264, 1517 | Wrist camera looks down at the red bowl from close range | Wrist camera at z 0.39 m, looking almost horizontal (direction −0.95 y, −0.28 z) |
-| 88 (grasp) | 2166, 1653, 2169, 2717, 1503 | Jaws closing on the blue bowl rim, near the table | Jaw at (−0.003, −0.015, 0.079), directly above the robot base, with the camera looking backward (+y) |
+| Episode 70 frame | Real state (raw)             | Real camera shows                                        | Sim forward kinematics says                                                                          |
+| ---------------- | ---------------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| 0 (start)        | 1798, 1833, 1479, 2264, 1517 | Wrist camera looks down at the red bowl from close range | Wrist camera at z 0.39 m, looking almost horizontal (direction −0.95 y, −0.28 z)                     |
+| 88 (grasp)       | 2166, 1653, 2169, 2717, 1503 | Jaws closing on the blue bowl rim, near the table        | Jaw at (−0.003, −0.015, 0.079), directly above the robot base, with the camera looking backward (+y) |
 
 - **Confirmed on a clean episode.** Episode 150 has a correct side-view `front` stream and normal lag. At frame
   233 (state 1578, 1258, 2772, 3073, 684) the side view shows the jaws on the blue bowl rim near the table, about
@@ -147,14 +151,14 @@ figure was response lag.
 
 Measured on the 7 full-length episodes:
 
-| Joint | p99.9 (ticks/s) | max | Tracking ratio at fastest commands | Verdict |
-|---|---|---|---|---|
-| shoulder_pan | 1525 | 1600 | 1.01 | not saturated; lower bound only |
-| shoulder_lift | 1628 | 1690 | 0.98 | not saturated |
-| elbow_flex | 2145 | 2340 | 1.00 | not saturated |
-| wrist_flex | 2926 | 3050 | 0.98 | not saturated; still above 2000 |
-| wrist_roll | 1625 | 1750 | 0.98 | not saturated |
-| gripper | 3725 | 3750 | 0.66 | saturated: cap about 3700 |
+| Joint         | p99.9 (ticks/s) | max  | Tracking ratio at fastest commands | Verdict                         |
+| ------------- | --------------- | ---- | ---------------------------------- | ------------------------------- |
+| shoulder_pan  | 1525            | 1600 | 1.01                               | not saturated; lower bound only |
+| shoulder_lift | 1628            | 1690 | 0.98                               | not saturated                   |
+| elbow_flex    | 2145            | 2340 | 1.00                               | not saturated                   |
+| wrist_flex    | 2926            | 3050 | 0.98                               | not saturated; still above 2000 |
+| wrist_roll    | 1625            | 1750 | 0.98                               | not saturated                   |
+| gripper       | 3725            | 3750 | 0.66                               | saturated: cap about 3700       |
 
 - `motion_speed=2000` still does not cap moves: wrist flex tracks its command at 3050 ticks/s.
 - No arm joint reached its servo limit in these demos. Arm caps stay at the 3413 spec; only the gripper cap

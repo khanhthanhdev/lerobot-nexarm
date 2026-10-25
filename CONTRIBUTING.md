@@ -1,24 +1,18 @@
-# How to contribute to 🤗 LeRobot
+# How to contribute to LeRobot NexArm
 
-Everyone is welcome to contribute, and we value everybody's contribution. Code is not the only way to help the community. Answering questions, helping others, reaching out, and improving the documentation are immensely valuable.
+Everyone is welcome to contribute. Please respect our [code of conduct](./CODE_OF_CONDUCT.md) and our [AI policy](./AI_POLICY.md).
 
-Whichever way you choose to contribute, please be mindful to respect our [code of conduct](./CODE_OF_CONDUCT.md) and our [AI policy](./AI_POLICY.md).
+This repository holds the NexArm plugins, research policies, sim assets and tools; LeRobot itself is an upstream dependency. Bugs and features in LeRobot's own code (training, datasets, upstream robots and policies) belong in [huggingface/lerobot](https://github.com/huggingface/lerobot).
 
 ## Ways to Contribute
 
-You can contribute in many ways:
-
-- **Fixing issues:** Resolve bugs or improve existing code.
-- **New features:** Develop new features.
-- **Extend:** Implement new models/policies, robots, or simulation environments and upload datasets to the Hugging Face Hub.
-- **Documentation:** Improve examples, guides, and docstrings.
-- **Feedback:** Submit tickets related to bugs or desired new features.
-
-If you are unsure where to start, join our [Discord Channel](https://discord.gg/q8Dzzpym3f).
+- **Fixing issues:** resolve bugs or improve the NexArm code.
+- **New features:** NexArm hardware support, sim tasks, tools.
+- **Research policies:** add a LeRobot policy plugin under `policies/`.
+- **Documentation:** improve the NexArm guides and examples.
+- **Feedback:** open an issue for bugs or wanted features.
 
 ## Development Setup
-
-To contribute code, you need to set up a development environment.
 
 ### 1. Fork and Clone
 
@@ -32,55 +26,49 @@ git remote add upstream https://github.com/Hiwonder-official/lerobot-nexarm.git
 
 ### 2. Environment Installation
 
-Please follow the [Installation Guide](./README.md#installation) for environment setup & installation from source.
+Follow [Dependency Profiles in `run.md`](./run.md#dependency-profiles). `uv sync` installs the pinned `lerobot`, the NexArm plugins and the policy plugins; always run commands through `uv run`.
 
 ## Running Tests & Quality Checks
 
 ### Code Style (Pre-commit)
 
-Install `pre-commit` hooks to run checks automatically before you commit:
-
 ```bash
-pre-commit install
-```
-
-To run checks manually on all files:
-
-```bash
-pre-commit run --all-files
+uv run pre-commit install --install-hooks             # once per clone
+uv run pre-commit run --all-files --show-diff-on-failure
 ```
 
 ### Running Tests
 
-We use `pytest`. First, ensure you have test artifacts by installing **git-lfs**:
+Pull the test artifacts with **git-lfs** first:
 
 ```bash
 git lfs install
 git lfs pull
 ```
 
-Run the full suite (this may require extras installed):
+Run the suite (hardware is mocked; the MuJoCo rendering tests need OpenGL/EGL):
 
 ```bash
-pytest -sv ./tests
+uv run pytest tests policies -sv
+uv run pytest tests/robots/test_nexarm_follower.py -sv   # one file
+make test-nexarm-ete                                    # NexArm sim end-to-end
 ```
 
-Or run a specific test file during development:
+## Upgrading LeRobot
 
-```bash
-pytest -sv tests/test_specific_feature.py
-```
+`lerobot` is pinned to an upstream commit in `[tool.uv.sources]` of the root `pyproject.toml`. To move to a newer one:
+
+1. Set `rev` to the new upstream commit (prefer a release tag's commit).
+2. Run `uv lock`, then `uv sync --locked` with the extras you use.
+3. Run `uv run pytest tests policies`, `make test-nexarm-ete` and `uv run pre-commit run --all-files`.
+4. Check the CLIs still see the plugins: `uv run lerobot-record --help` lists `nexarm_follower`, `uv run lerobot-eval --env.type=nexarm --help` parses, and `lerobot-nexarm-eval`, `lerobot-nexarm-rollout` and `lerobot-nexarm-service --dump-openapi` start.
+5. Where a test fails because LeRobot changed an API, fix the plugin. The wrappers `lerobot-nexarm-eval` and `lerobot-nexarm-rollout` replace a function inside `lerobot.scripts.lerobot_eval` / `lerobot_rollout`, so check those names first.
+
+mypy does not see LeRobot's types (no `py.typed`), so the tests are what catch API changes.
 
 ## Submitting Issues & Pull Requests
 
-Use the templates for required fields and examples.
+- **Issues:** use the [issue tracker](https://github.com/Hiwonder-official/lerobot-nexarm/issues/new).
+- **Pull requests:** rebase on `upstream/main`, use a descriptive branch (don't work on `main`), run `pre-commit` and the tests locally, and follow the [PR template](https://github.com/Hiwonder-official/lerobot-nexarm/blob/main/.github/PULL_REQUEST_TEMPLATE.md).
 
-- **Issues:** Follow the [ticket template](https://github.com/Hiwonder-official/lerobot-nexarm/issues/new).
-- **Pull requests:** Rebase on `upstream/main`, use a descriptive branch (don't work on `main`), run `pre-commit` and tests locally, and follow the [PR template](https://github.com/Hiwonder-official/lerobot-nexarm/blob/main/.github/PULL_REQUEST_TEMPLATE.md).
-
-> [!IMPORTANT]
-> Community Review Policy: To help scale our efforts and foster a collaborative environment, we ask contributors to review at least one other person's open PR before their own receives attention. This shared responsibility multiplies our review capacity and helps everyone's code get merged faster!
-
-Once you have submitted your PR and completed a peer review, a member of the LeRobot team will review your contribution.
-
-Thank you for contributing to LeRobot!
+Thank you for contributing!

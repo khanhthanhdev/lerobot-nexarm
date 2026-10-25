@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=71.0.0,<82.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lerobot_policy_turbovla"
+version = "0.1.0"
+description = "TurboVLA as a LeRobot policy plugin. The model code comes from the turbovla package."
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.12"
+dependencies = [
+    "lerobot",
+    # NexArm gripper constants for the gripper post-processor.
+    "lerobot_robot_nexarm",
+    # Pinned by commit in the workspace root's [tool.uv.sources].
+    "turbovla",
+]
+
+[tool.uv.sources]
+lerobot_robot_nexarm = { workspace = true }
+
+[tool.setuptools.packages.find]
+where = ["src"]

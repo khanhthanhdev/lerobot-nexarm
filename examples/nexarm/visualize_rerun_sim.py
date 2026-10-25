@@ -48,8 +48,8 @@ except ImportError:
     print("Error: rerun-sdk is required. Install via: uv sync --extra viz")
     sys.exit(1)
 
-from lerobot.motors.nexarm.mujoco_mapping import HOME_POSITIONS
-from lerobot.motors.nexarm.nexarm import (
+from lerobot_robot_nexarm.motors.mujoco_mapping import HOME_POSITIONS
+from lerobot_robot_nexarm.motors.nexarm import (
     GRIPPER_CLOSED_POS,
     GRIPPER_MID_POS,
     GRIPPER_OPEN_POS,
@@ -58,7 +58,7 @@ from lerobot.motors.nexarm.nexarm import (
     POSITION_MIN,
     radians_to_raw,
 )
-from lerobot.robots.nexarm_sim import (
+from lerobot_robot_nexarm.nexarm_sim import (
     NexArmPickPlaceTask,
     NexArmSim,
     NexArmSimConfig,

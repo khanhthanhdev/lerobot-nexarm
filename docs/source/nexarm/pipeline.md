@@ -12,9 +12,9 @@ All stages use up to three RGB cameras. Names must match between collection, tra
 | `wrist` | USB webcam on the gripper (OpenCV) | `wrist`                  | `observation.images.wrist` |
 | `top`   | Intel RealSense D435i              | `top`                    | `observation.images.top`   |
 
-All are 640x480 at 30 FPS. The `top` camera is on by default everywhere (real collection, record, teleoperate, rollout, `inference.yaml`, simulation); pass `--no-top-cam` to run with `front` and `wrist` only. A policy must be given exactly the cameras it was trained on: `rollout.py` and `rollout_turbovla.py` exit at startup when the opened cameras differ from the policy's image inputs. Legacy 2-camera models and datasets (for example `thanhkt/nexarm_stack_bowls`) need `--no-top-cam`.
+All are 640x480 at 30 FPS. The `top` camera is on by default everywhere (real collection, record, teleoperate, rollout, `inference.yaml`, simulation); pass `--no-top-cam` to run with `front` and `wrist` only. A policy must be given exactly the cameras it was trained on: `rollout.py` exits at startup when the opened cameras differ from the policy's image inputs. Legacy 2-camera models and datasets (for example `thanhkt/nexarm_stack_bowls`) need `--no-top-cam`.
 
-Install: use the full NexArm profile from [`run.md`, Dependency Profiles](../../../run.md#dependency-profiles), which includes `intelrealsense`. Add `--extra smolvla --extra groot` to it for TurboVLA. `uv sync` removes extras you do not list, so do not sync a smaller set.
+Install: use the full NexArm profile from [`run.md`, Dependency Profiles](../../../run.md#dependency-profiles), which includes `intelrealsense`. Add `--extra turbovla` to it for TurboVLA. `uv sync` removes extras you do not list, so do not sync a smaller set.
 
 ## 1. Data collection
 
@@ -41,7 +41,7 @@ The pick-and-place generator `generate_sim_dataset.py` takes the same generation
 Find the serial ports first (`uv run lerobot-find-port`; defaults are leader `/dev/ttyUSB0`, follower `/dev/ttyUSB1`), then check cameras and record in one step. On the collection rig, `./scripts/nexarm/collect.sh` runs the same script with the rig's ports, by-id camera paths and pixel formats:
 
 ```bash
-uv run python examples/nexarm/prepare_collection.py \
+uv run python tools/nexarm/prepare_collection.py \
     --leader-port /dev/ttyUSB0 --follower-port /dev/ttyUSB1 \
     --front-cam 0 --wrist-cam 1 --num-episodes 50
 ```
@@ -51,13 +51,13 @@ uv run python examples/nexarm/prepare_collection.py \
 - Only RGB is recorded for `top`. Depth and a point cloud are checked during the test and saved to `outputs/collection/<timestamp>/`, but not stored in the dataset.
 - Sessions merge into the local root `thanhkt/nexarm_stack_bowls_top` (3 cameras, created by the first session after `hf auth login`) at `~/.cache/huggingface/lerobot/thanhkt/nexarm_stack_bowls_top`; nothing is uploaded. For the old 2-camera root use `--no-top-cam --root-repo-id thanhkt/nexarm_stack_bowls`. Details, keys and merge recovery: [`DATA_COLLECTION_GUIDE.md`](../../../DATA_COLLECTION_GUIDE.md).
 
-Simpler alternatives with the same camera flags (`--front-cam`, `--wrist-cam`, `--front-fourcc`, `--wrist-fourcc`, `--top-cam`, `--no-top-cam`): `examples/nexarm/record.py` and `examples/nexarm/teleoperate.py`, or `lerobot-record` with `--robot.cameras` including `top: {type: intelrealsense, serial_number_or_name: <serial>, width: 640, height: 480, fps: 30}`. `lerobot-record` (and `record.py`) appends `_YYYYMMDD_HHMMSS` to the repo id and prints the final `Dataset repo_id:` and `Dataset root:`; use those in later commands.
+Simpler alternatives with the same camera flags (`--front-cam`, `--wrist-cam`, `--front-fourcc`, `--wrist-fourcc`, `--top-cam`, `--no-top-cam`): `examples/nexarm/record.py` and `examples/nexarm/teleoperate.py`, or `lerobot-record` with `--robot.cameras` including `top: {type: intelrealsense, serial_number_or_name: <serial>, width: 640, height: 480, fps: 30}`. Both append `_YYYYMMDD_HHMMSS` to the repo id. `record.py` and `examples/nexarm/record_collection.py` (same flags as `lerobot-record`) print the final `Dataset repo_id:` and `Dataset root:`; plain `lerobot-record` does not, so use the newest `<name>_YYYYMMDD_HHMMSS` folder under `~/.cache/huggingface/lerobot/`. Use that id in later commands.
 
-Check a recorded episode with `examples/nexarm/export_episode_video.py` (side-by-side front, wrist and top).
+Check a recorded episode with `tools/nexarm/export_episode_video.py` (side-by-side front, wrist and top).
 
 ## 2. Training
 
-For simulation datasets trained on several GPUs (generation, TurboVLA with `torchrun`, ACT with Accelerate,
+For simulation datasets trained on several GPUs (generation, TurboVLA and ACT with Accelerate,
 evaluation), follow [`sim_training.md`](sim_training.md).
 
 Train from the dataset you collected. The merged real root is local only, so pass its directory (or your `--merge-root`):
@@ -69,20 +69,21 @@ REAL_ROOT=~/.cache/huggingface/lerobot/thanhkt/nexarm_stack_bowls_top
 ### TurboVLA
 
 ```bash
-# Simulation data only
-uv run python examples/nexarm/train_turbovla.py \
-    --sim-dataset-root outputs/datasets/nexarm_stack_bowls \
-    --output-dir outputs/train/nexarm_turbovla \
-    --batch-size 16 --max-steps 50000 --save-steps 5000
+# Simulation data (same flags as scripts/nexarm/train_turbovla_single_gpu.sh)
+uv run lerobot-train --policy.type=turbovla \
+    --dataset.repo_id=local/nexarm_stack_bowls --dataset.root=outputs/datasets/nexarm_stack_bowls \
+    --policy.device=cuda --policy.push_to_hub=false \
+    --policy.vision_compute_precision=bf16_autocast --policy.interaction_compute_precision=bf16_autocast \
+    --accelerator.mixed_precision=bf16 --ema.enable=true --ema.decay=0.999 \
+    --batch_size=16 --steps=50000 --save_freq=5000 \
+    --output_dir=outputs/train/nexarm_turbovla
 
-# Co-train simulation + collected real data (real drawn 50% of the time)
-uv run python examples/nexarm/train_turbovla.py \
-    --sim-dataset-root outputs/datasets/nexarm_stack_bowls \
-    --real-dataset-root "$REAL_ROOT" --real-ratio 0.5 \
-    --output-dir outputs/train/nexarm_turbovla_cotrain
+# Collected real data: the same command with the real dataset
+#   --dataset.repo_id=thanhkt/nexarm_stack_bowls_top --dataset.root="$REAL_ROOT" \
+#   --output_dir=outputs/train/nexarm_turbovla_real
 ```
 
-Use `--no-sim --real-dataset-root "$REAL_ROOT"` for real data only. `--cameras` defaults to the camera keys common to all datasets; `--front-cam-key` / `--wrist-cam-key` select exactly two views instead. `--task-type auto` saves `stack_bowls` or `pick_place` from the training prompts. The checkpoint's `config.json` records `task_type`, `camera_keys`, `image_size`, `fps` and `task`, which rollout reads. See [`turbovla_guide.md`](turbovla_guide.md) for fine-tuning from a pretrained checkpoint.
+The policy uses every camera of the dataset unless `--policy.camera_keys` selects and orders them. The checkpoint folder records the cameras, image size and normalization statistics, which rollout reads. Mixing sim and real data with a ratio and fine-tuning from the official TurboVLA weights are not supported; see [`turbovla_guide.md`](turbovla_guide.md#3-training-turbovla).
 
 ### ACT on the real stack-bowls dataset
 
@@ -104,21 +105,23 @@ Use `lerobot-train` with a dataset that contains the cameras you intend to use a
 
 ### TurboVLA
 
+TurboVLA checkpoints are LeRobot policies, so they run like the policies below. Use the EMA weights in `pretrained_model_ema`:
+
 ```bash
-# Simulation (task, cameras, fps and image size come from the checkpoint; the stack-bowls
-# prompt follows the sampled bowl order)
-uv run python examples/nexarm/rollout_turbovla.py --robot sim \
-    --checkpoint outputs/train/nexarm_turbovla/final_ema_pytorch_model.pt \
-    --save-video outputs/rollout.mp4
+# Simulation (the stack-bowls prompt follows the sampled bowl order; videos go to --output_dir)
+MUJOCO_GL=egl uv run lerobot-eval \
+    --policy.path=outputs/train/nexarm_turbovla/checkpoints/last/pretrained_model_ema \
+    --env.type=nexarm --env.task=NexArmStackBowls-v0 --eval.n_episodes=20 \
+    --output_dir=outputs/eval/nexarm_turbovla
 
 # Real robot (front, wrist and auto-detected top camera)
-uv run python examples/nexarm/rollout_turbovla.py --robot real \
-    --follower-port /dev/ttyUSB1 --front-cam 0 --wrist-cam 1 \
-    --checkpoint outputs/train/nexarm_turbovla/final_ema_pytorch_model.pt \
+uv run python examples/nexarm/rollout.py --follower-port /dev/ttyUSB1 \
+    --policy-path outputs/train/nexarm_turbovla/checkpoints/last/pretrained_model_ema \
+    --front-cam 0 --wrist-cam 1 \
     --task "Stack the bowls with red on bottom, blue in middle, and black on top."
 ```
 
-`--task` defaults to the prompt saved with the checkpoint; keep it identical to the training prompt. A 2-view checkpoint needs `--no-top-cam`; a camera mismatch exits with an error. Checkpoints without the new `config.json` fields fall back to front/wrist[/top] by view count, 224 px images, 30 fps and a task-type guess (override with `--task-type`). Ctrl+C stops the rollout.
+Keep the task identical to the training prompt. A 2-view checkpoint needs `--no-top-cam`; a camera mismatch exits with an error. `lerobot-rollout --strategy.type=base --policy.path=... --robot.type=nexarm_follower ...` works as well ([`turbovla_guide.md`, section 4](turbovla_guide.md#4-rollout--evaluation)). Checkpoints from the former `train_turbovla.py` need a one-time conversion first, described in the same section. Ctrl+C stops the rollout.
 
 ### LeRobot policies (ACT, pi0, SmolVLA, ...)
 
@@ -133,7 +136,7 @@ Keep the arm clear of obstacles and a hand near power the first time you run a n
 
 ## 4. Benchmark
 
-`lerobot-nexarm-sim-benchmark` evaluates LeRobot-format checkpoints on the single-arm **pick-and-place** task (red cube into the green zone) on identical seeds and reports success rate and latency. It does not benchmark stack-bowls policies; evaluate those with `rollout_turbovla.py --robot sim` or a `sentry` rollout.
+`lerobot-nexarm-sim-benchmark` evaluates LeRobot-format checkpoints on the single-arm **pick-and-place** task (red cube into the green zone) on identical seeds and reports success rate and latency. It does not benchmark stack-bowls policies; evaluate those with `lerobot-eval --env.type=nexarm --env.task=NexArmStackBowls-v0` (section 3) or a `sentry` rollout. `lerobot-eval` reports `pc_success`. For how far the failed episodes got, run `lerobot-nexarm-eval` with the same flags: it adds `pc_<stage>` (`pc_picked_middle`, `pc_nested_middle`, ...) to the log and to `eval_info.json`, and each episode's stage flags to its task's metrics. It logs seeded episodes only, so keep `--seed` set (1000 by default).
 
 ```bash
 MUJOCO_GL=egl uv run lerobot-nexarm-sim-benchmark \
@@ -148,8 +151,8 @@ MUJOCO_GL=egl uv run lerobot-nexarm-sim-benchmark \
 - `--calibration PATH` (fitted at `--fps`), `--action-delay-steps N` (explicit value > calibration > 0) and `--dr` (domain randomization, off by default for reproducible comparisons) match the generator options.
 - Output: `benchmark.json` and `benchmark.csv` with pick/place success, termination reasons, inference mean/p50/p95 latency, achieved control rate, load time, parameter count and peak CUDA memory.
 - Success rate is the primary metric; use termination reasons to separate drops from timeouts and p95 latency to check the policy can sustain 30 FPS. `--realtime` throttles to the control rate; `--seed-start` and `--episode-timeout` control the episode set.
-- The benchmark does not encode video, to avoid distorting timing. For a qualitative comparison use a `sentry` rollout or `--save-video` in `rollout_turbovla.py`.
+- The benchmark does not encode video, to avoid distorting timing. For a qualitative comparison use a `sentry` rollout or the episode videos that `lerobot-eval` saves.
 
-Real-robot throughput check: `uv run python examples/nexarm/prepare_collection.py --test-cameras --stress-test 30`.
+Real-robot throughput check: `uv run python tools/nexarm/prepare_collection.py --test-cameras --stress-test 30`.
 
 See also `sim/README.md` (simulation details) and `AGENT_GUIDE.md` (setup and policy selection).

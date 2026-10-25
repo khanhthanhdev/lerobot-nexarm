@@ -31,22 +31,13 @@ import json
 import subprocess
 import sys
 
-try:  # imported as a package module (tests) or run as a script
-    from examples.nexarm.camera_config import (
-        CameraSetupError,
-        add_camera_args,
-        build_camera_dicts,
-        camera_names,
-        check_policy_cameras,
-    )
-except ModuleNotFoundError:
-    from camera_config import (  # type: ignore[no-redef]
-        CameraSetupError,
-        add_camera_args,
-        build_camera_dicts,
-        camera_names,
-        check_policy_cameras,
-    )
+from lerobot_robot_nexarm.camera_config import (
+    CameraSetupError,
+    add_camera_args,
+    build_camera_dicts,
+    camera_names,
+    check_policy_cameras,
+)
 
 IMAGE_PREFIX = "observation.images."
 
@@ -112,7 +103,7 @@ def main():
     cmd = [
         sys.executable,
         "-m",
-        "lerobot.scripts.lerobot_rollout",
+        "lerobot_robot_nexarm.rerun_recording",  # lerobot-rollout plus --rerun_save_path
         f"--strategy.type={args.strategy}",
         f"--policy.path={args.policy_path}",
         "--robot.type=nexarm_follower",

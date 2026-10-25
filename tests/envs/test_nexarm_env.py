@@ -20,9 +20,9 @@ import numpy as np
 import pytest
 from gymnasium.utils.env_checker import check_env
 
-import lerobot.envs.nexarm  # noqa: F401
-from lerobot.envs.configs import NexArmEnv
+import lerobot_env_nexarm.nexarm  # noqa: F401
 from lerobot.envs.factory import make_env
+from lerobot_env_nexarm import NexArmEnv
 
 
 def test_nexarm_env_registration():
@@ -170,9 +170,21 @@ def test_nexarm_env_lerobot_factory():
     vec_env.close()
 
 
+@pytest.mark.parametrize(
+    ("task", "episode_length", "expected"),
+    [("NexArmPickPlace-v0", None, 400), ("NexArmStackBowls-v0", None, 900), ("NexArmStackBowls-v0", 50, 50)],
+)
+def test_nexarm_env_exposes_max_episode_steps_to_lerobot_eval(task, episode_length, expected):
+    """lerobot-eval reads `_max_episode_steps` through the vector env, with or without --env.episode_length."""
+    cfg = NexArmEnv(task=task, obs_type="state", episode_length=episode_length)
+    vec_env = make_env(cfg, n_envs=1)["nexarm"][0]
+    assert vec_env.call("_max_episode_steps")[0] == expected
+    vec_env.close()
+
+
 def test_nexarm_env_control_modes():
-    from lerobot.motors.nexarm.nexarm import JOINT_NAMES
-    from lerobot.robots.nexarm_sim.mujoco_backend import RAW_RANGES
+    from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES
+    from lerobot_robot_nexarm.nexarm_sim.mujoco_backend import RAW_RANGES
 
     # 1. Raw mode (default)
     env_raw = gym.make("NexArmPickPlace-v0", obs_type="state", control_mode="raw")
@@ -224,9 +236,9 @@ def test_nexarm_env_config_forwards_calibration_and_domain_randomization():
 
 
 def test_nexarm_env_applies_calibration_latency_and_domain_randomization(tmp_path):
-    from lerobot.motors.nexarm.nexarm import JOINT_NAMES
-    from lerobot.robots.nexarm_sim import SimCalibration
-    from lerobot.robots.nexarm_sim.mujoco_backend import HOME_POSITIONS
+    from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES
+    from lerobot_robot_nexarm.nexarm_sim import SimCalibration
+    from lerobot_robot_nexarm.nexarm_sim.mujoco_backend import HOME_POSITIONS
 
     path = tmp_path / "calibration.json"
     SimCalibration(action_delay_steps=2, fps=30).save(path)
@@ -272,7 +284,7 @@ def test_nexarm_stack_bowls_env_contract():
 def test_nexarm_stack_bowls_env_rewards_a_released_stack():
     import mujoco
 
-    from lerobot.motors.nexarm.nexarm import GRIPPER_OPEN_POS
+    from lerobot_robot_nexarm.motors.nexarm import GRIPPER_OPEN_POS
 
     env = gym.make("NexArmStackBowls-v0", obs_type="state")
     obs, _ = env.reset(seed=0)
@@ -371,8 +383,8 @@ def test_nexarm_env_reward_components_name_each_term():
 
 
 def test_nexarm_env_initial_pose_noise_is_seeded_and_bounded():
-    from lerobot.motors.nexarm.nexarm import JOINT_NAMES
-    from lerobot.robots.nexarm_sim.mujoco_backend import HOME_POSITIONS
+    from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES
+    from lerobot_robot_nexarm.nexarm_sim.mujoco_backend import HOME_POSITIONS
 
     def start(noise: float, seed: int) -> np.ndarray:
         env = gym.make("NexArmPickPlace-v0", obs_type="state", init_qpos_noise_rad=noise)
@@ -428,7 +440,7 @@ class _ScriptedEnvRobot:
         return {}
 
     def send_action(self, action: dict[str, float]) -> dict[str, float]:
-        from lerobot.motors.nexarm.nexarm import JOINT_NAMES
+        from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES
 
         task = self.env.task
         command = np.array([action[f"{name}.pos"] for name in JOINT_NAMES], dtype=np.float32)
@@ -464,7 +476,7 @@ _SOLVED_SEED = 1
 @functools.cache
 def _scripted_stack_bowls(seed: int, **kwargs) -> _ScriptedEnvRobot:
     from examples.nexarm.generate_stack_bowls_dataset import generate_episode
-    from lerobot.motors.nexarm.nexarm import JOINT_NAMES
+    from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES
 
     env_kwargs = {key: kwargs.pop(key) for key in ("assist_release_pos", "grasp_mode") if key in kwargs}
     env = gym.make("NexArmStackBowls-v0", obs_type="state", **env_kwargs).unwrapped
@@ -539,7 +551,7 @@ def test_nexarm_stack_bowls_physical_grasp_holds_by_friction_alone(monkeypatch):
 
 
 def test_nexarm_stack_bowls_info_reports_stages():
-    from lerobot.robots.nexarm_sim.stack_bowls_task import STAGES
+    from lerobot_robot_nexarm.nexarm_sim.stack_bowls_task import STAGES
 
     released = _scripted_stack_bowls(_SOLVED_SEED, min_open_while_held=1990)
     first, last = released.infos[0], released.infos[-1]
@@ -569,6 +581,25 @@ def test_nexarm_env_config_forwards_assist_thresholds_to_stack_bowls_only():
         NexArmEnv(grasp_mode="physical")
 
 
+def test_stage_log_keeps_only_seeded_episodes(tmp_path):
+    import json
+
+    env = gym.make("NexArmStackBowls-v0", obs_type="state", max_episode_steps=2)
+    env.unwrapped.log_stages_to(str(tmp_path / "stages"))
+    env.reset(seed=7)
+    hold = env.unwrapped._get_agent_pos()
+    env.step(hold)
+    env.step(hold)  # truncated: the seeded episode is written
+    env.reset()  # an autoreset-style episode without a seed is not logged
+    env.step(hold)
+    env.close()
+
+    (log,) = tmp_path.glob("stages.*.jsonl")
+    records = [json.loads(line) for line in log.read_text().splitlines()]
+    assert [record["seed"] for record in records] == [7]
+    assert records[0]["success"] is False and not any(records[0]["stages"].values())
+
+
 def test_lerobot_eval_reports_stack_bowls_success_and_stage_rates():
     import mujoco
     from torch import nn
@@ -576,6 +607,7 @@ def test_lerobot_eval_reports_stack_bowls_success_and_stage_rates():
     from lerobot.configs.policies import PreTrainedConfig
     from lerobot.policies import PreTrainedPolicy
     from lerobot.scripts.lerobot_eval import eval_policy_all
+    from lerobot_env_nexarm.stage_eval import eval_policy_all_with_stages
 
     cfg = NexArmEnv(task="NexArmStackBowls-v0", obs_type="state", episode_length=30)
     envs = make_env(cfg, n_envs=1)
@@ -604,10 +636,19 @@ def test_lerobot_eval_reports_stack_bowls_success_and_stage_rates():
             self.stacked = True
             return observation["observation.state"].clone()
 
-    def identity(x):
-        return x
+    class Identity:
+        """A pass-through processor; eval resets processors before each batch of episodes."""
 
-    info = eval_policy_all(
+        def __call__(self, x):
+            return x
+
+        def reset(self):
+            pass
+
+    identity = Identity()
+
+    info = eval_policy_all_with_stages(
+        eval_policy_all,
         envs=envs,
         policy=StackThenHold(),
         env_preprocessor=identity,

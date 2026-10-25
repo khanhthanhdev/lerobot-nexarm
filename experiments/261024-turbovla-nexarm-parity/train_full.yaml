@@ -1,0 +1,43 @@
+# Full TurboVLA run through lerobot-train on the NexArm stack-bowls sim dataset. Load with:
+#   uv run lerobot-train --config_path experiments/261024-turbovla-nexarm-parity/train_full.yaml
+# Same settings as the full train_turbovla.py run in README.md (the script defaults, bf16).
+dataset:
+  repo_id: local/nexarm_stack_bowls
+  root: outputs/datasets/nexarm_stack_bowls
+  # revision: <commit hash or generation_report.json hash of the sim dataset you trained on>
+
+policy:
+  type: turbovla
+  push_to_hub: false
+  device: cuda
+  # The script's order (it prints "Resolved N camera views"); both commands pass the same list.
+  camera_keys: [observation.images.front, observation.images.wrist, observation.images.top]
+  chunk_size: 16
+  text_model_name_or_path: google-bert/bert-base-uncased
+  vision_model_name_or_path: facebook/dinov3-vitb16-pretrain-lvd1689m
+  vision_compute_precision: bf16_autocast
+  interaction_compute_precision: bf16_autocast
+  optimizer_lr: 5.0e-5
+  optimizer_vision_lr: 5.0e-5
+  scheduler_warmup_steps: 1000
+
+accelerator:
+  mixed_precision: bf16
+
+ema:
+  enable: true
+  decay: 0.999
+
+output_dir: experiments/261024-turbovla-nexarm-parity/outputs/lerobot_full
+job_name: 261024-turbovla-nexarm-full
+seed: 1000
+batch_size: 16
+steps: 50000
+save_freq: 5000
+log_freq: 20
+num_workers: 8
+env_eval_freq: 0
+
+wandb:
+  enable: true
+  project: nexarm-turbovla

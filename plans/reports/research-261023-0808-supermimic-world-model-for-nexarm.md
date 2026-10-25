@@ -48,13 +48,13 @@ tracking reward**. Those three ingredients are what make the gains real.
 
 ## 2. Does the premise transfer to the NexArm?
 
-| Ingredient in the paper | NexArm situation | Verdict |
-|---|---|---|
-| Thousands of motions; cluster-scale PPO is the bottleneck | 6-DOF arm, one task family; PPO in MuJoCo with 4096 envs trains a 6-DOF tracker in minutes (estimate) | The headline gain does not apply |
-| Low-gain PD so setpoints act as torque | Bus servos with a stiff internal position loop; the bridge exposes only CMD 97 position write and CMD 96 position read (repo, `motors/nexarm/nexarm.py`) | The learned controller can only reshape setpoints |
-| Dense per-step tracking reward | Available for joint tracking; end-effector reward needs correct forward kinematics | Possible, but see §3.3 |
-| Contact-free (flat ground, no objects) | Stack-bowls is contact-rich; grasp and release are discontinuities | The paper's own open problem |
-| Sim context xi with friction, offsets, CoM | Delay, payload, gripper compliance, firmware motion profile | Needs a servo model that does not exist yet |
+| Ingredient in the paper                                   | NexArm situation                                                                                                                                         | Verdict                                           |
+| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| Thousands of motions; cluster-scale PPO is the bottleneck | 6-DOF arm, one task family; PPO in MuJoCo with 4096 envs trains a 6-DOF tracker in minutes (estimate)                                                    | The headline gain does not apply                  |
+| Low-gain PD so setpoints act as torque                    | Bus servos with a stiff internal position loop; the bridge exposes only CMD 97 position write and CMD 96 position read (repo, `motors/nexarm/nexarm.py`) | The learned controller can only reshape setpoints |
+| Dense per-step tracking reward                            | Available for joint tracking; end-effector reward needs correct forward kinematics                                                                       | Possible, but see §3.3                            |
+| Contact-free (flat ground, no objects)                    | Stack-bowls is contact-rich; grasp and release are discontinuities                                                                                       | The paper's own open problem                      |
+| Sim context xi with friction, offsets, CoM                | Delay, payload, gripper compliance, firmware motion profile                                                                                              | Needs a servo model that does not exist yet       |
 
 ## 3. Critique of the pasted "SuperMimic-style tracker" proposal
 
@@ -121,7 +121,7 @@ current MJCF (`sim/description/mjcf/nexarm.xml`) uses position actuators with
 kp 20 to 80 and torque-limited force ranges; it reproduces stall torque but not
 the firmware's motion profile. A rate-and-acceleration-limited first-order
 response fitted per joint from real step data is closer to the hardware and
-has two parameters per joint that *are* identifiable.
+has two parameters per joint that _are_ identifiable.
 
 ### 3.6 The world model buys nothing on a 6-DOF arm
 

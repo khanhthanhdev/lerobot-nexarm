@@ -76,12 +76,12 @@ uv sync --locked --extra test --extra dev --extra core_scripts --extra training 
 
 Add extras to that line instead of syncing a smaller set:
 
-| Workflow                                | Add                                |
-| --------------------------------------- | ---------------------------------- |
-| TurboVLA (`train_turbovla.py`, rollout) | `--extra smolvla --extra groot`    |
-| Benchmarking pi0 / SmolVLA checkpoints  | `--extra pi --extra smolvla`       |
-| Diffusion policy                        | `--extra diffusion`                |
-| Everything (all policies and tools)     | use `uv sync --locked --extra all` |
+| Workflow                               | Add                                |
+| -------------------------------------- | ---------------------------------- |
+| TurboVLA (`--policy.type=turbovla`)    | `--extra turbovla`                 |
+| Benchmarking pi0 / SmolVLA checkpoints | `--extra pi --extra smolvla`       |
+| Diffusion policy                       | `--extra diffusion`                |
+| Everything (all policies and tools)    | use `uv sync --locked --extra all` |
 
 `uv sync --locked` alone is enough for the MuJoCo viewer and keyboard demos (sections 2.1–2.4), but not for dataset generation, recording or training. `uv sync` uninstalls every extra you do not list, so always repeat the full line.
 
@@ -350,7 +350,7 @@ uv run python examples/nexarm/vision_grasp.py --robot sim
 Overlay live physical camera frames onto the MuJoCo simulated camera view to align field of view, focal angle, and table placement:
 
 ```bash
-uv run python examples/nexarm/calibrate_camera_alignment.py \
+uv run python tools/nexarm/calibrate_camera_alignment.py \
     --camera-name front \
     --cam-index 0
 ```
@@ -383,8 +383,8 @@ uv run python examples/nexarm/record.py \
     --episode-time 12 \
     --reset-time 8
 
-# Using lerobot-record CLI directly
-uv run lerobot-record \
+# Using the lerobot-record flags directly (record_collection.py is lerobot-record plus the NexArm collection flags)
+uv run python examples/nexarm/record_collection.py \
     --robot.type=nexarm_follower --robot.port=/dev/ttyUSB1 \
     --teleop.type=nexarm_leader  --teleop.port=/dev/ttyUSB0 \
     --robot.cameras='{"front":{"type":"opencv","index_or_path":0,"width":640,"height":480,"fps":30},"wrist":{"type":"opencv","index_or_path":1,"width":640,"height":480,"fps":30},"top":{"type":"intelrealsense","serial_number_or_name":"<REALSENSE_SERIAL>","width":640,"height":480,"fps":30}}' \
@@ -399,7 +399,7 @@ uv run lerobot-record \
 
 `lerobot-record` pushes to the Hub by default; keep `--dataset.push_to_hub=false` for a `local/` id (use `<hf_user>/...` to upload). `record.py` records front, wrist and the RealSense top camera by default (add `--no-top-cam` for front and wrist only); `--fps` sets both the camera and dataset frame rate. For the stack-bowls collection rig with automatic merging, use [`DATA_COLLECTION_GUIDE.md`](DATA_COLLECTION_GUIDE.md) instead.
 
-**The recorder appends a timestamp to the repo id.** `local/nexarm_pick_cube` is saved as e.g. `local/nexarm_pick_cube_20261011_093000` under `~/.cache/huggingface/lerobot/`, and the final `Dataset repo_id:` and `Dataset root:` are printed when recording ends. Use that printed id in every follow-up command below (shown as `local/nexarm_pick_cube_<YYYYMMDD_HHMMSS>`).
+**The recorder appends a timestamp to the repo id.** `local/nexarm_pick_cube` is saved as e.g. `local/nexarm_pick_cube_20261011_093000` under `~/.cache/huggingface/lerobot/`, and `record.py` / `record_collection.py` print the final `Dataset repo_id:` and `Dataset root:` when recording ends (upstream's plain `lerobot-record` does not print them; use the newest `<name>_YYYYMMDD_HHMMSS` folder in the cache instead). Use that printed id in every follow-up command below (shown as `local/nexarm_pick_cube_<YYYYMMDD_HHMMSS>`).
 
 **Episode Controls During Recording:**
 
@@ -454,21 +454,18 @@ Train the real-time 32 Hz Vision-Language-Action model (DINOv3 visual backbone +
 # 1. Verify dependencies and download backbones
 uv run python examples/nexarm/setup_turbovla.py --download-backbones
 
-# 2. Train TurboVLA on the simulated stack-bowls dataset
-uv run python examples/nexarm/train_turbovla.py \
-    --sim-dataset-root outputs/datasets/nexarm_stack_bowls \
-    --output-dir outputs/train/nexarm_turbovla \
-    --batch-size 16 \
-    --max-steps 50000 \
-    --save-steps 5000
+# 2. Train TurboVLA on the simulated stack-bowls dataset (bf16, EMA; positional args:
+#    DATASET_ROOT OUTPUT_DIR BATCH_SIZE MAX_STEPS SAVE_STEPS, then extra lerobot-train flags)
+bash scripts/nexarm/train_turbovla_single_gpu.sh \
+    outputs/datasets/nexarm_stack_bowls outputs/train/nexarm_turbovla 16 50000 5000
 
-# 3. Rollout trained TurboVLA policy in MuJoCo simulation
-uv run python examples/nexarm/rollout_turbovla.py \
-    --robot sim \
-    --checkpoint outputs/train/nexarm_turbovla/final_ema_pytorch_model.pt
+# 3. Evaluate the EMA weights in MuJoCo simulation
+MUJOCO_GL=egl uv run lerobot-eval \
+    --policy.path=outputs/train/nexarm_turbovla/checkpoints/last/pretrained_model_ema \
+    --env.type=nexarm --env.task=NexArmStackBowls-v0 --eval.n_episodes=20
 ```
 
-TurboVLA needs `--extra smolvla --extra groot` added to the [full profile](#dependency-profiles). The checkpoint's `config.json` stores the task type, camera keys, image size, fps and training prompt, and rollout uses them; in the stack-bowls sim the prompt follows the sampled bowl order, so omit `--task`. Real data, co-training and real-robot rollout are in [`turbovla_guide.md`](docs/source/nexarm/turbovla_guide.md).
+TurboVLA needs `--extra turbovla` added to the [full profile](#dependency-profiles). The launcher runs `lerobot-train --policy.type=turbovla`, so the checkpoints are ordinary LeRobot policy folders; in the stack-bowls sim the environment supplies the prompt of the sampled bowl order. On the real arm, run the checkpoint like the other policies in section 4.5, with `--task` set to the training prompt. Real data, multi-GPU training and checkpoints from the former `train_turbovla.py` are in [`turbovla_guide.md`](docs/source/nexarm/turbovla_guide.md).
 
 ### 4.5 Deploy & Rollout Trained Policy
 
@@ -505,7 +502,7 @@ Import the kinematics/dynamics solver backed by MuJoCo:
 
 ```python
 import numpy as np
-from lerobot.motors.nexarm import NexArmKinematicsDynamics
+from lerobot_robot_nexarm.motors import NexArmKinematicsDynamics
 
 kd = NexArmKinematicsDynamics()
 
@@ -540,7 +537,7 @@ print("Gravity torques (Nm):", tau_g)
 Directly query and command the 6 HX-30HM servos via `NexArmMotorsBus`:
 
 ```python
-from lerobot.motors.nexarm import NexArmMotorsBus
+from lerobot_robot_nexarm.motors import NexArmMotorsBus
 
 bus = NexArmMotorsBus(port="/dev/ttyUSB1")
 bus.connect()
@@ -648,7 +645,7 @@ Then keep `--dataset.repo_id="${HF_USER}/nexarm_stack_bowls"` in your normal com
 1. **Follower Serial Firmware Desync (5.0 Hz Telemetry)**:
    - When the physical follower arm is in default/standalone mode (not in LeRobot bridge mode), its AT32 coprocessor broadcasts telemetry packets (`CMD_GET_CUR_COORDS = 11`) at exactly **5.0 Hz (every 200 ms)**.
    - If `read_positions()` accepted these unrequested telemetry frames without verifying the reply command ID (`CMD_READ_POS = 96`), every read would block for ~200 ms, throttling the record loop to 5.0 Hz and confusing Cartesian coordinates with servo positions.
-   - The driver has been updated in [`src/lerobot/motors/nexarm/nexarm.py`](src/lerobot/motors/nexarm/nexarm.py) to filter incoming packets strictly for the expected command reply (`CMD_READ_POS`), and `rtscts=False` prevents Linux serial driver write blocking on CH340 USB converters.
+   - The driver has been updated in [`packages/lerobot_robot_nexarm/src/lerobot_robot_nexarm/motors/nexarm.py`](packages/lerobot_robot_nexarm/src/lerobot_robot_nexarm/motors/nexarm.py) to filter incoming packets strictly for the expected command reply (`CMD_READ_POS`), and `rtscts=False` prevents Linux serial driver write blocking on CH340 USB converters.
 
 2. **USB 2.0 Camera Bandwidth Contention (YUYV vs MJPG)**:
    - By default on Linux, OpenCV requests raw uncompressed `YUYV` (4:2:2). Two 640x480 @ 30 FPS cameras streaming uncompressed video consume ~37 MB/s, which exceeds single USB 2.0 controller bandwidth and causes the UVC driver to throttle or drop frames down to 5–15 FPS.

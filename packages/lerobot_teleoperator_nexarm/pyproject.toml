@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=71.0.0,<82.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lerobot_teleoperator_nexarm"
+version = "0.1.0"
+description = "Hiwonder NexArm leader arm as a LeRobot teleoperator plugin (`--teleop.type=nexarm_leader`)."
+license = "Apache-2.0"
+requires-python = ">=3.12"
+dependencies = [
+    "lerobot[pyserial-dep,deepdiff-dep]",
+    # The NexArm servo driver.
+    "lerobot_robot_nexarm",
+]
+
+[tool.uv.sources]
+lerobot_robot_nexarm = { workspace = true }
+
+[tool.setuptools.packages.find]
+where = ["src"]

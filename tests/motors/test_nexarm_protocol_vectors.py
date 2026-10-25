@@ -12,7 +12,7 @@ import pytest
 
 pytest.importorskip("serial", reason="pyserial is required (install lerobot[hardware])")
 
-from lerobot.motors.nexarm.nexarm import build_frame, parse_frame  # noqa: E402
+from lerobot_robot_nexarm.motors.nexarm import build_frame, parse_frame  # noqa: E402
 
 ROOT = Path(__file__).parents[2]
 FIXTURE = ROOT / "tests" / "fixtures" / "nexarm_protocol_vectors.json"
