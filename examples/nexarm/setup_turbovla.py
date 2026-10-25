@@ -54,9 +54,8 @@ def check_dependencies() -> bool:
 
     # Check the installed TurboVLA package (the `turbovla` extra)
     try:
-        from turbovla.models import TurboVLAConfig
-
         import turbovla
+        from turbovla.models import TurboVLAConfig
 
         cfg = TurboVLAConfig()
         cfg.vision.num_views = 2

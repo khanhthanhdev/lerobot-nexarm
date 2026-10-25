@@ -77,7 +77,9 @@ class LocalRunner(JobRunner):
     def start(self, job: Job, sink: JobSink, output_dir: Path) -> None:
         command = build_train_command(job, self._store, output_dir)
         env = {**os.environ, "PYTHONUNBUFFERED": "1", "PYTHONIOENCODING": "utf-8"}
-        flags = subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0
+        flags = 0
+        if sys.platform == "win32":
+            flags = subprocess.CREATE_NEW_PROCESS_GROUP
         proc = subprocess.Popen(  # noqa: S603  (argument list, no shell; values validated by the request model)
             command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env, creationflags=flags
         )
