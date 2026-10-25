@@ -33,6 +33,11 @@ that the decoder ignores, exactly as in the upstream representation.
 
 from __future__ import annotations
 
+import atexit
+import multiprocessing as mp
+from concurrent.futures import ProcessPoolExecutor
+from functools import partial
+
 import numpy as np
 import torch
 from scipy.interpolate import BSpline, generate_knots, make_lsq_spline
@@ -41,6 +46,9 @@ type TensorOrArray = torch.Tensor | np.ndarray
 
 # Knot spacing below this (in frames) counts as a repeated knot.
 _KNOT_EPS = 1e-6
+
+# Fit pools of this process, by worker count. Each training process (each DDP rank) owns its own.
+_FIT_POOLS: dict[int, ProcessPoolExecutor] = {}
 
 
 def n_param_rows(chunk_size: int, degree: int) -> int:
@@ -142,6 +150,35 @@ def unnormalize_knots(knots: TensorOrArray, time_scale: float):
     return (knots + 1.0) * (time_scale / 2.0)
 
 
+def _fit_pool(num_workers: int) -> ProcessPoolExecutor:
+    """Process pool for the spline fits, created on first use and shut down at exit.
+
+    Workers are spawned, never forked: forking a process that already initialized CUDA or NCCL can
+    deadlock. The fit holds the GIL, so threads would not run it in parallel.
+    """
+    pool = _FIT_POOLS.get(num_workers)
+    if pool is None:
+        pool = ProcessPoolExecutor(num_workers, mp_context=mp.get_context("spawn"))
+        _FIT_POOLS[num_workers] = pool
+    return pool
+
+
+@atexit.register
+def _shutdown_fit_pools() -> None:
+    for pool in _FIT_POOLS.values():
+        pool.shutdown(cancel_futures=True)
+    _FIT_POOLS.clear()
+
+
+def _encode_window(
+    window: np.ndarray, chunk_size: int, degree: int, max_error: float, time_scale: float
+) -> np.ndarray:
+    """Encode one unpadded action window and normalize its knot column."""
+    params = encode_actions(window, chunk_size, degree, max_error)
+    params[:, 0] = normalize_knots(params[:, 0], time_scale)
+    return params
+
+
 def encode_action_batch(
     actions: torch.Tensor,
     action_is_pad: torch.Tensor | None,
@@ -149,20 +186,28 @@ def encode_action_batch(
     degree: int,
     max_error: float,
     time_scale: float,
+    num_workers: int = 0,
 ) -> torch.Tensor:
     """Encode ``(B, T, D)`` action windows into ``(B, chunk_size + 2 * degree, 1 + D)`` parameters.
 
     Copy-padded frames past the episode end are dropped before fitting, so the spline ends where the
-    episode ends. The knot column is normalized with `normalize_knots`.
+    episode ends. The knot column is normalized with `normalize_knots`. With ``num_workers > 0`` the
+    windows are fitted in a pool of that many processes; the result is identical.
     """
     actions_np = actions.detach().to("cpu", torch.float64).numpy()
     pad_np = None if action_is_pad is None else action_is_pad.detach().cpu().numpy()
-    out = []
+    windows = []
     for i, window in enumerate(actions_np):
         n_valid = len(window) if pad_np is None else int((~pad_np[i]).sum())
-        params = encode_actions(window[: max(n_valid, 1)], chunk_size, degree, max_error)
-        params[:, 0] = normalize_knots(params[:, 0], time_scale)
-        out.append(params)
+        windows.append(window[: max(n_valid, 1)])
+    encode = partial(
+        _encode_window, chunk_size=chunk_size, degree=degree, max_error=max_error, time_scale=time_scale
+    )
+    if num_workers > 0:
+        chunksize = max(1, len(windows) // num_workers)
+        out = list(_fit_pool(num_workers).map(encode, windows, chunksize=chunksize))
+    else:
+        out = [encode(window) for window in windows]
     return torch.as_tensor(np.stack(out), dtype=actions.dtype, device=actions.device)
 
 

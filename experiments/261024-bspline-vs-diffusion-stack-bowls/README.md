@@ -24,7 +24,7 @@ MUJOCO_GL=egl uv run python examples/nexarm/generate_stack_bowls_dataset.py \
     --episodes 300 --gpus 0,1,2,3
 ```
 
-Train both policies with the same data, seed, batch size, image size and steps. Both configs resize the 480x640 frames to 120x160 (`resize_shape`) and use batch 64, which needs more than 8 GB. With the three sim cameras an 8 GB GPU fits batch 16 (peak 7.2 GB), not 32; pass `--batch_size=16` to both commands there. On a larger GPU you can drop or raise `resize_shape`, as long as both configs keep the same value.
+Train both policies with the same data, seed, batch size, image size and steps. Both configs resize the 480x640 frames to 120x160 (`resize_shape`) and use batch 64, which needs more than 8 GB. With the three sim cameras an 8 GB GPU fits batch 16 (peak 7.2 GB), not 32; pass `--batch_size=16` to both commands there. On a larger GPU you can drop or raise `resize_shape`, as long as both configs keep the same value. With four 8 GB GPUs, `accelerate launch` at `--batch_size=16` per GPU keeps the configs' batch of 64 ([Sim training, section 4](../../docs/guides/sim-training.md#4-train-b-spline-policy-on-several-gpus)); train diffusion the same way, without `--policy.bspline_fit_workers`.
 
 ```bash
 uv run lerobot-train --config_path experiments/261024-bspline-vs-diffusion-stack-bowls/train_bspline.yaml

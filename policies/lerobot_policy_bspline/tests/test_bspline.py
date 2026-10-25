@@ -102,6 +102,15 @@ def test_batch_round_trip_with_episode_padding():
     np.testing.assert_allclose(decoded.numpy(), actions[:, :20], atol=0.011)
 
 
+def test_batch_fit_in_worker_pool_matches_serial_fit():
+    window = 64
+    actions = torch.tensor(np.stack([smooth_actions(window, seed=s) for s in range(5)]), dtype=torch.float32)
+    is_pad = torch.zeros((5, window), dtype=torch.bool)
+    is_pad[4, 30:] = True
+    args = (actions, is_pad, CHUNK, DEGREE, 0.01, window - 1)
+    assert torch.equal(encode_action_batch(*args, num_workers=2), encode_action_batch(*args))
+
+
 def test_decode_speed_up_samples_spline_faster():
     window = 64
     actions = smooth_actions(window, seed=3)

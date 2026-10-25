@@ -20,15 +20,18 @@ uv run lerobot-eval --policy.path=<checkpoint>/pretrained_model --env.type=<env>
 
 Options specific to this policy (all others are the `diffusion` options):
 
-| Flag                          | Default | Meaning                                                                                  |
-| ----------------------------- | ------- | ---------------------------------------------------------------------------------------- |
-| `--policy.bspline_degree`     | 3       | Spline degree (cubic)                                                                    |
-| `--policy.bspline_chunk_size` | 10      | Knot intervals in one parameter chunk                                                    |
-| `--policy.horizon`            | 16      | Parameter rows; must equal `bspline_chunk_size + 2 * bspline_degree`                     |
-| `--policy.bspline_window`     | 64      | Future actions (frames) loaded per training sample; the longest time one chunk can cover |
-| `--policy.bspline_max_error`  | 0.01    | Max fitting error in normalized action units (actions are min-max scaled to [-1, 1])     |
-| `--policy.bspline_speed_up`   | 1.0     | Spline frames advanced per control step at inference; above 1 executes faster            |
-| `--policy.n_action_steps`     | 32      | Max actions queued per prediction (fewer if the predicted spline ends sooner)            |
+| Flag                           | Default | Meaning                                                                                  |
+| ------------------------------ | ------- | ---------------------------------------------------------------------------------------- |
+| `--policy.bspline_degree`      | 3       | Spline degree (cubic)                                                                    |
+| `--policy.bspline_chunk_size`  | 10      | Knot intervals in one parameter chunk                                                    |
+| `--policy.horizon`             | 16      | Parameter rows; must equal `bspline_chunk_size + 2 * bspline_degree`                     |
+| `--policy.bspline_window`      | 64      | Future actions (frames) loaded per training sample; the longest time one chunk can cover |
+| `--policy.bspline_max_error`   | 0.01    | Max fitting error in normalized action units (actions are min-max scaled to [-1, 1])     |
+| `--policy.bspline_speed_up`    | 1.0     | Spline frames advanced per control step at inference; above 1 executes faster            |
+| `--policy.n_action_steps`      | 32      | Max actions queued per prediction (fewer if the predicted spline ends sooner)            |
+| `--policy.bspline_fit_workers` | 0       | Processes that fit the training targets in parallel (0: in the training process)         |
+
+To train on several GPUs, launch `lerobot-train` through `accelerate launch` and set `--policy.bspline_fit_workers`; see [Sim training, section 4](../../docs/guides/sim-training.md#4-train-b-spline-policy-on-several-gpus) and `scripts/nexarm/train_bspline_multi_gpu.sh`.
 
 ## What B-spline Policy changes compared with diffusion policy
 
@@ -54,7 +57,7 @@ Upstream is built on the original `diffusion_policy` codebase. Its policy classe
 - **Per-window fit instead of a per-episode fit and slicing.** Knots are chosen for the window, not for the whole episode. The chunk can therefore cover at most `bspline_window` frames, and the first chunk always starts at the current frame. Upstream's chunk may start a few frames after it.
 - **Time origin.** Upstream's `t = 0` is the first observation of the `n_obs_steps` window; here it is the current frame, matching LeRobot's convention that the executed actions start at the current step.
 - **Not ported.** The asynchronous wall-clock controller: background inference, `predict_before_end` replanning, time alignment of consecutive plans, derivative feed-forward, gripper slowdown and CUDA-graph capture. LeRobot's `select_action` is step-synchronous, so only `bspline_speed_up` is kept and replanning happens when the queue is empty. The transformer variant and relative knots are also not ported.
-- **No cache.** The fit runs on CPU for every training sample, a few ms per window. Upstream fits once per dataset and caches the chunks.
+- **No cache.** The fit runs on CPU for every training sample, a few ms per window. Upstream fits once per dataset and caches the chunks. `bspline_fit_workers` spreads the fit over a pool of spawned processes (threads would not help: the fit holds the GIL); every training process, so every GPU, gets its own pool.
 
 ## Tests
 
@@ -62,4 +65,4 @@ Upstream is built on the original `diffusion_policy` codebase. Its policy classe
 uv run pytest policies/lerobot_policy_bspline/tests -q
 ```
 
-`test_bspline.py` checks that encode then decode reconstructs action chunks within `max_error`, including episode-end padding and speed-up. `test_policy.py` checks plugin discovery, config validation, forward and output shapes, `select_action` on a CPU batch, and the save/load round trip.
+`test_bspline.py` checks that encode then decode reconstructs action chunks within `max_error`, including episode-end padding and speed-up, and that the worker pool gives the same parameters as the serial fit. `test_policy.py` checks plugin discovery, config validation, forward and output shapes, `select_action` on a CPU batch, and the save/load round trip.
