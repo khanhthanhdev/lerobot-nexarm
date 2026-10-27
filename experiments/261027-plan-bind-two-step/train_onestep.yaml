@@ -1,0 +1,31 @@
+# Plan-Bind D1 (RQ1): onestep on the NexArm stack-bowls sim dataset. run_all.sh passes the dataset root,
+# output dir, steps, batch size and workers on the command line; the values here are the defaults.
+dataset:
+  repo_id: local/nexarm_stack_bowls
+  root: outputs/datasets/nexarm_stack_bowls
+
+policy:
+  type: bspline
+  push_to_hub: false
+  device: cuda
+  # Same image size, window and fine knot grid in all three configs, so the comparison stays fair.
+  resize_shape: [120, 160]
+  bspline_window: 64
+  planbind_fine_spacing: 4
+  planbind_subdivision: 4
+  # RQ1 control: one-step regression of the fine control points, same UNet, commit and latency runtime.
+  bspline_mode: onestep
+
+output_dir: experiments/261027-plan-bind-two-step/outputs/full/train_onestep
+job_name: 261027-plan-bind-onestep
+seed: 1000
+# Batch 16 used 7.2 GB at 120x160 with three cameras (RTX 5050); 32 should fit a 24 GB RTX 3090.
+batch_size: 32
+steps: 60000
+save_freq: 10000
+log_freq: 100
+env_eval_freq: 0
+
+wandb:
+  enable: false
+  project: lerobot-nexarm

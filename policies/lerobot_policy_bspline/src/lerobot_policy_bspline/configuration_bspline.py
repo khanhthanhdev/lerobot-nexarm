@@ -31,6 +31,24 @@ class BsplineConfig(DiffusionConfig):
             1 execute the demonstrated motion faster (upstream `speed_up_times`).
         bspline_fit_workers: Processes that fit the training windows in parallel; 0 fits them in the
             training process. Under multi-GPU training every GPU process starts its own pool.
+        bspline_mode: ``diffusion`` (B-spline Policy, the options above), ``onestep`` (one-step regression
+            of fine control points on a fixed knot grid) or ``planbind`` (a coarse plan, then a residual on
+            its exact lift; one shared UNet). The last two use the `planbind_*` options and ignore
+            `bspline_chunk_size`, `bspline_max_error`, `bspline_speed_up`, `bspline_fit_workers` and the
+            diffusion sampling options; `bspline_window` sets the frames one chunk covers.
+        planbind_fine_spacing: Frames between fine knots. The network is called once per fine span.
+        planbind_subdivision: Fine spans per coarse span (coarse spacing = fine spacing * subdivision).
+        planbind_max_plan_age: Oldest plan, in frames, that Bind is trained on and run with; older plans
+            are replaced. A multiple of `planbind_fine_spacing`.
+        planbind_plan_noise: Std of the noise added to the stale plans Bind is trained on.
+        planbind_replan_threshold: Re-plan when Bind's largest residual exceeds this (normalized action
+            units); 0 disables it.
+        planbind_latency: Simulated inference latency at evaluation, in frames: a call's result is used
+            from this many frames after its observation.
+        planbind_commit: Control points kept from the running chunk at each call: ``latency`` (everything
+            up to the swap, exact C2 join), ``now`` (C2 join at the call frame only) or ``none`` (naive swap).
+        planbind_position_limit: Bound on the normalized actions enforced on the control points; 0 is off.
+        planbind_velocity_limit: Bound on the normalized action change per frame; 0 is off.
     """
 
     n_obs_steps: int = 2
@@ -47,6 +65,17 @@ class BsplineConfig(DiffusionConfig):
     bspline_max_error: float = 0.01
     bspline_speed_up: float = 1.0
     bspline_fit_workers: int = 0
+
+    bspline_mode: str = "diffusion"
+    planbind_fine_spacing: int = 4
+    planbind_subdivision: int = 4
+    planbind_max_plan_age: int = 32
+    planbind_plan_noise: float = 0.02
+    planbind_replan_threshold: float = 0.0
+    planbind_latency: int = 0
+    planbind_commit: str = "latency"
+    planbind_position_limit: float = 0.0
+    planbind_velocity_limit: float = 0.0
 
     def __post_init__(self):
         """Validate the diffusion options, then the B-spline options."""
@@ -74,6 +103,44 @@ class BsplineConfig(DiffusionConfig):
                 "`do_mask_loss_for_padding` is not supported: padded frames are dropped before the "
                 "spline fit, so there is no per-row padding mask."
             )
+        if self.bspline_mode not in ("diffusion", "onestep", "planbind"):
+            raise ValueError(
+                f"`bspline_mode` must be 'diffusion', 'onestep' or 'planbind'. Got {self.bspline_mode!r}."
+            )
+        if self.bspline_mode != "diffusion":
+            self._validate_planbind()
+
+    def _validate_planbind(self) -> None:
+        if self.bspline_degree != 3:
+            raise ValueError("`onestep` and `planbind` use cubic splines: set `bspline_degree=3`.")
+        if self.planbind_fine_spacing < 1 or self.planbind_subdivision < 1:
+            raise ValueError("`planbind_fine_spacing` and `planbind_subdivision` must be >= 1.")
+        if self.planbind_max_plan_age < 0 or self.planbind_max_plan_age % self.planbind_fine_spacing:
+            raise ValueError(
+                "`planbind_max_plan_age` must be a non-negative multiple of `planbind_fine_spacing`. "
+                f"Got {self.planbind_max_plan_age} and {self.planbind_fine_spacing}."
+            )
+        if self.planbind_latency < 0:
+            raise ValueError(f"`planbind_latency` must be >= 0. Got {self.planbind_latency}.")
+        if self.planbind_latency + self.planbind_fine_spacing >= self.bspline_window:
+            raise ValueError("`planbind_latency + planbind_fine_spacing` must be below `bspline_window`.")
+        if self.planbind_commit not in ("latency", "now", "none"):
+            raise ValueError(
+                f"`planbind_commit` must be 'latency', 'now' or 'none'. Got {self.planbind_commit!r}."
+            )
+        for name in (
+            "planbind_plan_noise",
+            "planbind_replan_threshold",
+            "planbind_position_limit",
+            "planbind_velocity_limit",
+        ):
+            if getattr(self, name) < 0:
+                raise ValueError(f"`{name}` must be >= 0. Got {getattr(self, name)}.")
+
+    @property
+    def planbind_offset(self) -> int:
+        """Frames of action history loaded before the current frame (stale plans for Bind training)."""
+        return self.planbind_max_plan_age if self.bspline_mode == "planbind" else 0
 
     @property
     def bspline_time_scale(self) -> float:
@@ -82,5 +149,8 @@ class BsplineConfig(DiffusionConfig):
 
     @property
     def action_delta_indices(self) -> list:
-        """Raw action window loaded per sample: the current frame and the next ones."""
-        return list(range(self.bspline_window))
+        """Raw action window loaded per sample: the current frame and the next ones.
+
+        `planbind` also loads `planbind_max_plan_age` earlier frames for the stale plans.
+        """
+        return list(range(-self.planbind_offset, self.bspline_window))

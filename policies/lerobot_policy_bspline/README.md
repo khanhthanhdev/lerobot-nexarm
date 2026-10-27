@@ -59,10 +59,30 @@ Upstream is built on the original `diffusion_policy` codebase. Its policy classe
 - **Not ported.** The asynchronous wall-clock controller: background inference, `predict_before_end` replanning, time alignment of consecutive plans, derivative feed-forward, gripper slowdown and CUDA-graph capture. LeRobot's `select_action` is step-synchronous, so only `bspline_speed_up` is kept and replanning happens when the queue is empty. The transformer variant and relative knots are also not ported.
 - **No cache.** The fit runs on CPU for every training sample, a few ms per window. Upstream fits once per dataset and caches the chunks. `bspline_fit_workers` spreads the fit over a pool of spawned processes (threads would not help: the fit holds the GIL); every training process, so every GPU, gets its own pool.
 
+## One-step and Plan-Bind modes (research)
+
+`--policy.bspline_mode` selects how the policy generates splines. The default, `diffusion`, is B-spline Policy as described above; nothing else in this README changes for it. The other two modes are research variants (a one-step control and the two-step Plan-Bind policy), run by [`experiments/261027-plan-bind-two-step`](../../experiments/261027-plan-bind-two-step/README.md):
+
+| Mode       | What one network call produces                                                                                                                                                                                                                                                                  |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `onestep`  | The fine control points of the next `bspline_window` frames, regressed in one pass. It is the control for Plan-Bind                                                                                                                                                                             |
+| `planbind` | Plan: a coarse spline (knots every `planbind_fine_spacing * planbind_subdivision` frames), made on the first call and again when it is older than `planbind_max_plan_age`. Bind: a residual on the plan's exact lift to the fine grid, conditioned on the newest observation and the plan's age |
+
+Both modes use a fixed, uniform cubic knot grid instead of adaptive knots, regress the trajectory with a masked MSE instead of denoising, and run LeRobot's diffusion UNet as a one-step network. The diffusion timestep embedding carries the role: 0 for Plan and `onestep`, `1 + plan age` for Bind. `planbind` uses the same single UNet for both calls, so its parameter count equals `onestep`'s. The code is in `uniform_spline.py` (basis, exact lift, shift, commit, projection) and `planbind.py` (model and runtime).
+
+At inference, `SplineRuntime` calls the network once per fine knot span and simulates inference latency:
+
+- **Latency:** with `planbind_latency=L` frames, a call made at frame k swaps in at k + L, and calls do not overlap.
+- **Commit:** `planbind_commit=latency` keeps the running control points up to the swap, so swaps are exactly C2; `now` keeps them only up to the call frame, and `none` swaps naively.
+- **Limits:** `planbind_position_limit` and `planbind_velocity_limit` clip the free control points. Because a B-spline stays inside the convex hull of its control points, this bounds the executed actions exactly (in normalized units).
+- **Episode start:** the first call is used at once, without waiting for the latency.
+
+`planbind_replan_threshold` re-plans when Bind's largest residual exceeds it. Override the runtime options at evaluation, for example `lerobot-eval --policy.path=... --policy.planbind_latency=6 --policy.planbind_commit=none`.
+
 ## Tests
 
 ```bash
 uv run pytest policies/lerobot_policy_bspline/tests -q
 ```
 
-`test_bspline.py` checks that encode then decode reconstructs action chunks within `max_error`, including episode-end padding and speed-up, and that the worker pool gives the same parameters as the serial fit. `test_policy.py` checks plugin discovery, config validation, forward and output shapes, `select_action` on a CPU batch, and the save/load round trip.
+`test_bspline.py` checks that encode then decode reconstructs action chunks within `max_error`, including episode-end padding and speed-up, and that the worker pool gives the same parameters as the serial fit. `test_policy.py` checks plugin discovery, config validation, forward and output shapes, `select_action` on a CPU batch, and the save/load round trip. `test_planbind.py` checks the exact lift, the shift, that latency-aware commit leaves the curve unchanged up to the swap, the projection bounds, and that the `onestep` and `planbind` modes train, run with latency without jumps at swaps, and survive a save/load round trip; it also checks that the default mode is unchanged.

@@ -1,0 +1,91 @@
+# 261027-plan-bind-two-step
+
+**Status: pending.** The code is in place, but no GPU run yet. On Windows, unit tests and a CPU pusht smoke run passed: `lerobot-train` for 40 steps in both new modes, then `lerobot-eval` with 6-frame latency. The NexArm sim needs a Linux GPU box.
+
+## Question (RQ1)
+
+Does generating a spline in two steps pay for itself? Plan-Bind makes a coarse plan, then adds a residual on the plan's exact lift. It is compared with a one-step control that has the same network, the same replanning rate, the same latency handling and the same observation freshness.
+
+- **If the control matches Plan-Bind** on success, the two-level structure adds nothing for control, and the research case rests on the interface: certified limits and edits.
+- **Secondary question:** how both policies degrade with inference latency (0 to 300 ms), with latency-aware commit and with naive swapping.
+
+## Policies
+
+All three use the same data, image size (120x160, three cameras), 64-frame window, seed, batch size and number of steps.
+
+| Name       | `bspline_mode` | What it is                                                                                                                                         |
+| ---------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bsp10`    | `diffusion`    | B-spline Policy with DDIM and 10 denoising steps. This is the quality ceiling, evaluated at latency 0 only, because it has no latency machinery    |
+| `onestep`  | `onestep`      | **Control.** One-step regression of the fine control points (knots every 4 frames)                                                                 |
+| `planbind` | `planbind`     | Plan (coarse spline, knots every 16 frames) and Bind (residual on its exact lift), one shared UNet. The plan is replaced when older than 32 frames |
+
+Notes for reading the results:
+
+- **What the control is.** `onestep` is a regression head, not B-spline Policy with one diffusion step. Regression is acceptable here because the scripted stack-bowls demonstrations are expected to be close to unimodal. If that assumption fails, both `onestep` and `planbind` suffer in the same way.
+- **Shared runtime.** Both new modes run under the same `SplineRuntime`: one call per 4 frames (7.5 Hz at 30 fps). At episode start the first call is used at once, without waiting for the latency.
+- **Simulated latency.** Latency is simulated inside the policy. A call made at frame k uses the observation of frame k, and its result is used from frame k + L. Calls do not overlap, so a large L also lowers the update rate.
+- **Statistics.** One seed per policy and 50 seeded episodes per cell (seed 1000, the same episodes for every cell). Differences under about 15 points are within noise.
+
+Details are in [the plugin README](../../policies/lerobot_policy_bspline/README.md#one-step-and-plan-bind-modes-research).
+
+## Run it on a rented GPU
+
+**Box:**
+
+- Ubuntu 22.04 or 24.04, one RTX 3090 (24 GB).
+- NVIDIA driver 570 or newer (the cu128 PyTorch wheels need it).
+- About 40 GB of free disk.
+- `ffmpeg`, `git`, `git-lfs`, `curl`, `libegl1` and `libgl1`. `run_all.sh` checks for them and prints the `apt-get` line if any are missing.
+
+```bash
+git clone https://github.com/khanhthanhdev/lerobot-nexarm.git && cd lerobot-nexarm
+git checkout feat/plan-bind
+tmux new -s planbind                                      # survives a dropped ssh session
+experiments/261027-plan-bind-two-step/run_all.sh          # smoke run, then the full run
+```
+
+`run_all.sh smoke` runs only the short pipeline check. `run_all.sh full` skips it. Rerunning the same command after a disconnect resumes the run:
+
+- finished stages are skipped;
+- training resumes from its last checkpoint;
+- eval cells that are already done are kept.
+
+Override the size of the full run with environment variables, for example `STEPS=30000 N_EVAL=30 run_all.sh full`. W&B runs offline; logs stay in `wandb/` under each training directory.
+
+| Stage                                 | Smoke                         | Full (estimate, RTX 3090)             |
+| ------------------------------------- | ----------------------------- | ------------------------------------- |
+| Setup (`uv sync`, EGL and CUDA check) | 5–10 min                      | same                                  |
+| Sim dataset                           | 4 episodes, about 2 min       | 300 episodes, roughly 1–2 h           |
+| Training, three policies              | 200 steps each, a few minutes | 60k steps each, roughly 3–5 h each    |
+| Evaluation                            | 10 cells × 2 episodes         | 18 cells × 50 episodes, roughly 2–4 h |
+
+The full-run times are estimates; measure the first 1,000 steps and scale. Plan for a 12–20 h rental, or lower `STEPS` and `N_EVAL`.
+
+## Outputs
+
+- `outputs/full/train_<policy>/` — checkpoints (`checkpoints/last/pretrained_model`).
+- `outputs/full/eval/<cell>/eval_info.json` — one directory per cell, named `<policy>_L<latency frames>_<commit>`. Each holds `pc_success` and the per-stage rates (`pc_picked_middle`, ...) from `lerobot-nexarm-eval`.
+- `outputs/full/results.md` — written by `summarize.py`: every cell, plus the paired Plan-Bind minus one-step table for RQ1.
+
+The smoke run writes the same layout under `outputs/smoke/`. Its dataset stays inside that folder. The full dataset goes to `outputs/datasets/nexarm_stack_bowls`; an existing complete dataset there is reused, and a partial one stops the run.
+
+## Results
+
+GPU, commit and date: _pending_.
+
+| Latency  | Commit       | `bsp10` | `onestep` | `planbind` | Plan-Bind minus one-step |
+| -------- | ------------ | ------- | --------- | ---------- | ------------------------ |
+| 0 ms     | latency      |         |           |            |                          |
+| 100 ms   | latency      | –       |           |            |                          |
+| 200 ms   | latency      | –       |           |            |                          |
+| 300 ms   | latency      | –       |           |            |                          |
+| 0–300 ms | none (naive) | –       |           |            |                          |
+
+## Not in this experiment
+
+- **Real arm and certified limits (RQ2).** The projection options exist (`planbind_position_limit`, `planbind_velocity_limit`) but are not in the eval matrix.
+- **Edit preservation (RQ3).**
+- **Moving the bowl mid-episode.**
+- **Temporal ensembling and RTC baselines.**
+- **Adaptive knots.**
+- **Latency conditioning of Bind.** Bind is conditioned on the plan's age, not on the latency.
