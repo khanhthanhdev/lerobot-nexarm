@@ -42,7 +42,7 @@ preflight() {
   fi
   local free_gb
   free_gb=$(df -Pk "$REPO" | awk 'NR==2 {print int($4 / 1048576)}')
-  [ "$free_gb" -ge 40 ] || echo "warning: only ${free_gb} GB free; the dataset, venv and checkpoints need about 40 GB" >&2
+  [ "$free_gb" -ge 100 ] || echo "warning: only ${free_gb} GB free; the venv, dataset and checkpoints (3.5 GB each, 21 in all) need about 100 GB" >&2
 }
 
 setup() {

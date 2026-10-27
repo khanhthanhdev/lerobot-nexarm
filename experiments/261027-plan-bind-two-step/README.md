@@ -34,7 +34,7 @@ Details are in [the plugin README](../../policies/lerobot_policy_bspline/README.
 
 - Ubuntu 22.04 or 24.04, one RTX 3090 (24 GB).
 - NVIDIA driver 570 or newer (the cu128 PyTorch wheels need it).
-- About 40 GB of free disk.
+- About 100 GB of free disk; ask for 120 GB. Each checkpoint (weights and optimizer state) is about 3.5 GB, and the full run keeps 18 of them, plus 3 from the smoke run.
 - `ffmpeg`, `git`, `git-lfs`, `curl`, `libegl1` and `libgl1`. `run_all.sh` checks for them and prints the `apt-get` line if any are missing.
 
 ```bash
