@@ -22,6 +22,10 @@ REPO="$(cd "$EXP_DIR/../.." && pwd)"
 cd "$REPO"
 export PATH="$HOME/.local/bin:$PATH"
 export MUJOCO_GL=egl PYOPENGL_PLATFORM=egl WANDB_MODE=offline PYTHONIOENCODING=utf-8 HF_HUB_DISABLE_TELEMETRY=1
+# Hub uploads (hf_xet): more parallel transfers, and patient timeouts and retries for slow links.
+export HF_XET_HIGH_PERFORMANCE=${HF_XET_HIGH_PERFORMANCE:-1} HF_XET_CLIENT_CONNECT_TIMEOUT=${HF_XET_CLIENT_CONNECT_TIMEOUT:-2m}
+export HF_XET_CLIENT_READ_TIMEOUT=${HF_XET_CLIENT_READ_TIMEOUT:-10m} HF_XET_CLIENT_RETRY_MAX_ATTEMPTS=${HF_XET_CLIENT_RETRY_MAX_ATTEMPTS:-20}
+export HF_XET_CLIENT_RETRY_MAX_DURATION=${HF_XET_CLIENT_RETRY_MAX_DURATION:-1h}
 
 TASK=NexArmStackBowls-v0
 SEED=1000
@@ -82,7 +86,7 @@ PY
 }
 
 # hub_upload <repo> <repo type> <local folder> <path in repo> [extra hf upload args...]
-# Retries 5 times: the Hub's storage backend fails now and then.
+# Retries 5 times, 5 minutes apart: the Hub's storage backend fails now and then.
 hub_upload() {
   local repo=$1 type=$2 folder=$3 path=$4 attempt
   shift 4
@@ -90,7 +94,7 @@ hub_upload() {
     uv run hf upload "$repo" "$folder" "$path" --repo-type="$type" --private --exclude='*checkpoints/last/*' \
       --commit-message="Upload $path from run_all.sh" "$@" && return 0
     echo "warning: upload of $path failed (attempt $attempt of 5)" >&2
-    sleep 60
+    sleep 300
   done
   return 1
 }
