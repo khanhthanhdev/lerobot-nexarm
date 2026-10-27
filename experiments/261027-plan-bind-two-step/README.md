@@ -50,6 +50,14 @@ experiments/261027-plan-bind-two-step/run_all.sh          # smoke run, then the 
 - training resumes from its last checkpoint;
 - eval cells that are already done are kept.
 
+To save the full run to the Hugging Face Hub, log in once (`uv run hf auth login`) and set the repos (both are created private):
+
+```bash
+HF_REPO=<user>/plan-bind-d1 HF_DATASET_REPO=<user>/nexarm-stack-bowls-sim experiments/261027-plan-bind-two-step/run_all.sh
+```
+
+The dataset is uploaded after it is generated. Each policy is uploaded after it is trained, then its local checkpoints except the last one are deleted, so the run fits a 100 GB disk. The eval cells and `results.md` go last.
+
 Override the size of the full run with environment variables, for example `STEPS=30000 N_EVAL=30 run_all.sh full`. W&B runs offline; logs stay in `wandb/` under each training directory.
 
 | Stage                                 | Smoke                         | Full (estimate, RTX 3090)             |

@@ -10,7 +10,11 @@
 #   experiments/261027-plan-bind-two-step/run_all.sh          # smoke run, then the full run
 #   experiments/261027-plan-bind-two-step/run_all.sh smoke    # about 20-30 minutes: proves the pipeline
 #   experiments/261027-plan-bind-two-step/run_all.sh full     # the experiment
-# env overrides (full run): EPISODES=300 STEPS=60000 BATCH=32 N_EVAL=50 EVAL_BATCH=10 NUM_WORKERS=8
+# env overrides (full run): EPISODES=300 STEPS=60000 BATCH=32 N_EVAL=50 EVAL_BATCH=10 NUM_WORKERS=8 GEN_WORKERS=8
+# Hub upload (full run only, private repos, needs `hf auth login`): HF_REPO=<user>/<model repo> gets each
+# policy's checkpoints and logs as soon as it is trained, then the eval cells and results.md;
+# HF_DATASET_REPO=<user>/<dataset repo> gets the sim dataset. After a policy is uploaded, its local
+# checkpoints except the last one are deleted, so the run fits a 100 GB disk.
 set -euo pipefail
 
 EXP_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -66,6 +70,35 @@ assert renderer.render().shape == (32, 32, 3)
 assert torch.cuda.is_available(), "PyTorch does not see the GPU"
 print("EGL rendering and CUDA OK:", torch.cuda.get_device_name(0))
 PY
+  if [ -n "${HF_REPO:-}${HF_DATASET_REPO:-}" ]; then
+    uv run hf auth whoami >/dev/null || die "HF_REPO or HF_DATASET_REPO is set but not logged in: run 'uv run hf auth login'"
+  fi
+}
+
+# hub_upload <repo> <repo type> <local folder> <path in repo>
+hub_upload() {
+  uv run hf upload "$1" "$3" "$4" --repo-type="$2" --private --exclude='*checkpoints/last/*' \
+    --commit-message="Upload $4 from run_all.sh"
+}
+
+# publishing <repo>: true in the full run when that repo is set.
+publishing() { [ "$PUBLISH" = 1 ] && [ -n "$1" ]; }
+
+publish_dataset() { hub_upload "$HF_DATASET_REPO" dataset "$DATA" .; }
+
+# Uploads a trained policy, then keeps only the checkpoint `last` points to.
+publish_train() {
+  local dir="$OUT/train_$1" keep
+  hub_upload "$HF_REPO" model "$dir" "train_$1"
+  keep=$(basename "$(readlink -f "$dir/checkpoints/last")")
+  for ckpt in "$dir"/checkpoints/[0-9]*; do
+    [ "$(basename "$ckpt")" = "$keep" ] || rm -rf "$ckpt"
+  done
+}
+
+publish_eval() {
+  hub_upload "$HF_REPO" model "$OUT/eval" eval
+  uv run hf upload "$HF_REPO" "$OUT/results.md" results.md --repo-type=model --private
 }
 
 # run_stage <name> <command...>: runs once per output root.
@@ -87,7 +120,7 @@ generate_data() {
   fi
   [ ! -e "$DATA" ] || die "$DATA exists but is not a LeRobot dataset; remove it and rerun"
   uv run python examples/nexarm/generate_stack_bowls_dataset.py \
-    --repo-id local/nexarm_stack_bowls --root "$DATA" --episodes "$EPISODES" --gpus 0
+    --repo-id local/nexarm_stack_bowls --root "$DATA" --episodes "$EPISODES" --gpus 0 --workers "$GEN_WORKERS"
 }
 
 train() {
@@ -132,18 +165,21 @@ eval_matrix() {
 run_all() {
   mkdir -p "$OUT"
   run_stage data generate_data
+  if publishing "${HF_DATASET_REPO:-}"; then run_stage hub_data publish_dataset; fi
   for name in bsp10 onestep planbind; do
     run_stage "train_$name" train "$name"
+    if publishing "${HF_REPO:-}"; then run_stage "hub_train_$name" publish_train "$name"; fi
   done
   run_stage eval eval_matrix
   uv run python "$EXP_DIR/summarize.py" "$OUT/eval" > "$OUT/results.md"
+  if publishing "${HF_REPO:-}"; then run_stage hub_eval publish_eval; fi
   say "results: $OUT/results.md"
   cat "$OUT/results.md"
 }
 
 run_smoke() {
   OUT="$EXP_DIR/outputs/smoke" DATA="$EXP_DIR/outputs/smoke/data"
-  EPISODES=4 STEPS=200 BATCH=8 SAVE_FREQ=200 LOG_FREQ=20 NUM_WORKERS=2 N_EVAL=2 EVAL_BATCH=2
+  EPISODES=4 STEPS=200 BATCH=8 SAVE_FREQ=200 LOG_FREQ=20 NUM_WORKERS=2 N_EVAL=2 EVAL_BATCH=2 PUBLISH=0 GEN_WORKERS=2
   LATENCIES=(0 6)
   run_all
 }
@@ -152,6 +188,7 @@ run_full() {
   OUT="$EXP_DIR/outputs/full" DATA="$REPO/outputs/datasets/nexarm_stack_bowls"
   EPISODES=${EPISODES:-300} STEPS=${STEPS:-60000} BATCH=${BATCH:-32} SAVE_FREQ=${SAVE_FREQ:-10000}
   LOG_FREQ=${LOG_FREQ:-100} NUM_WORKERS=${NUM_WORKERS:-8} N_EVAL=${N_EVAL:-50} EVAL_BATCH=${EVAL_BATCH:-10}
+  GEN_WORKERS=${GEN_WORKERS:-8} PUBLISH=1
   run_all
 }
 
