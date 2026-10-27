@@ -82,15 +82,26 @@ PY
 }
 
 # hub_upload <repo> <repo type> <local folder> <path in repo> [extra hf upload args...]
+# Retries 3 times: the Hub's storage backend fails now and then.
 hub_upload() {
-  local repo=$1 type=$2 folder=$3 path=$4
+  local repo=$1 type=$2 folder=$3 path=$4 attempt
   shift 4
-  uv run hf upload "$repo" "$folder" "$path" --repo-type="$type" --private --exclude='*checkpoints/last/*' \
-    --commit-message="Upload $path from run_all.sh" "$@"
+  for attempt in 1 2 3; do
+    uv run hf upload "$repo" "$folder" "$path" --repo-type="$type" --private --exclude='*checkpoints/last/*' \
+      --commit-message="Upload $path from run_all.sh" "$@" && return 0
+    echo "warning: upload of $path failed (attempt $attempt of 3)" >&2
+    sleep 60
+  done
+  return 1
 }
 
 # publishing <repo>: true in the full run when that repo is set.
 publishing() { [ "$PUBLISH" = 1 ] && [ -n "$1" ]; }
+
+# publish <stage> <command...>: a failed upload does not stop the run; its stage reruns next time.
+publish() {
+  run_stage "$@" || echo "warning: $1 failed; rerun this script later to upload it" >&2
+}
 
 # The dataset replaces the repo's content, so files of an earlier upload do not linger.
 publish_dataset() { hub_upload "$HF_DATASET_REPO" dataset "$DATA" . --delete='*'; }
@@ -98,7 +109,7 @@ publish_dataset() { hub_upload "$HF_DATASET_REPO" dataset "$DATA" . --delete='*'
 # Uploads a trained policy, then keeps only the checkpoint `last` points to.
 publish_train() {
   local dir="$OUT/train_$1" keep
-  hub_upload "$HF_REPO" model "$dir" "train_$1"
+  hub_upload "$HF_REPO" model "$dir" "train_$1" || return 1
   keep=$(basename "$(readlink -f "$dir/checkpoints/last")")
   for ckpt in "$dir"/checkpoints/[0-9]*; do
     [ "$(basename "$ckpt")" = "$keep" ] || rm -rf "$ckpt"
@@ -106,7 +117,7 @@ publish_train() {
 }
 
 publish_eval() {
-  hub_upload "$HF_REPO" model "$OUT/eval" eval
+  hub_upload "$HF_REPO" model "$OUT/eval" eval || return 1
   uv run hf upload "$HF_REPO" "$OUT/results.md" results.md --repo-type=model --private
 }
 
@@ -115,7 +126,7 @@ run_stage() {
   local name=$1; shift
   if [ -f "$OUT/.done_$name" ]; then say "skip $name (done)"; return; fi
   say "$name"
-  "$@"
+  "$@" || return 1
   touch "$OUT/.done_$name"
 }
 
@@ -174,14 +185,14 @@ eval_matrix() {
 run_all() {
   mkdir -p "$OUT"
   run_stage data generate_data
-  if publishing "${HF_DATASET_REPO:-}"; then run_stage hub_data publish_dataset; fi
+  if publishing "${HF_DATASET_REPO:-}"; then publish hub_data publish_dataset; fi
   for name in bsp10 onestep planbind; do
     run_stage "train_$name" train "$name"
-    if publishing "${HF_REPO:-}"; then run_stage "hub_train_$name" publish_train "$name"; fi
+    if publishing "${HF_REPO:-}"; then publish "hub_train_$name" publish_train "$name"; fi
   done
   run_stage eval eval_matrix
   uv run python "$EXP_DIR/summarize.py" "$OUT/eval" > "$OUT/results.md"
-  if publishing "${HF_REPO:-}"; then run_stage hub_eval publish_eval; fi
+  if publishing "${HF_REPO:-}"; then publish hub_eval publish_eval; fi
   say "results: $OUT/results.md"
   cat "$OUT/results.md"
 }
