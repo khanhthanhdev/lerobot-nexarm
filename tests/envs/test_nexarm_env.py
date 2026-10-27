@@ -303,6 +303,36 @@ def test_nexarm_stack_bowls_env_fixes_the_order():
         gym.make("NexArmStackBowls-v0", obs_type="state", order=("red", "red", "blue"))
 
 
+def test_nexarm_stack_bowls_env_shifts_the_bottom_bowl_once():
+    from lerobot_robot_nexarm.nexarm_sim.stack_bowls_task import MIN_BOWL_SEPARATION_M
+
+    kwargs = NexArmEnv(task="NexArmStackBowls-v0", obs_type="state", bowl_shift_m=0.03).gym_kwargs
+    env = gym.make("NexArmStackBowls-v0", **kwargs)
+    obs, info = env.reset(seed=5)
+    task = env.unwrapped.sim_task
+    bottom, _, top = task.current_order
+    hold = obs["agent_pos"].copy()
+    _, _, _, _, info = env.step(hold)
+    assert not info["bowl_shifted"]
+    start = task.bowl_position(bottom)[:2]
+    # Lifting the middle bowl is the trigger; latch the stage instead of running a policy.
+    task._stages["picked_middle"] = True
+    _, _, _, _, info = env.step(hold)
+    assert info["bowl_shifted"]
+    moved = task.bowl_position(bottom)[:2]
+    assert np.linalg.norm(moved - start) == pytest.approx(0.03, abs=0.005)
+    assert np.linalg.norm(moved - task.bowl_position(top)[:2]) >= MIN_BOWL_SEPARATION_M - 0.005
+    for _ in range(3):
+        env.step(hold)
+    assert np.linalg.norm(task.bowl_position(bottom)[:2] - moved) < 0.005
+    _, info = env.reset(seed=5)
+    assert not info["bowl_shifted"]
+    env.close()
+    assert "bowl_shift_m" not in NexArmEnv(task="NexArmStackBowls-v0").gym_kwargs
+    with pytest.raises(ValueError, match="bowl_shift_m"):
+        NexArmEnv(bowl_shift_m=0.03)
+
+
 def test_nexarm_stack_bowls_env_rewards_a_released_stack():
     import mujoco
 

@@ -39,6 +39,8 @@ class NexArmEnv(EnvConfig):
     grasp_mode: str | None = None
     # Stack-bowls order as "bottom,middle,top" (e.g. "red,blue,black"); None draws it from the seed.
     stack_order: str | None = None
+    # Stack-bowls perturbation: when the middle bowl is first lifted, slide the bottom bowl this far (m).
+    bowl_shift_m: float = 0.0
     features: dict[str, PolicyFeature] = field(
         default_factory=lambda: {
             ACTION: PolicyFeature(type=FeatureType.ACTION, shape=(6,)),
@@ -62,9 +64,10 @@ class NexArmEnv(EnvConfig):
         assist_set = any(
             value is not None for value in (self.assist_engage_pos, self.assist_release_pos, self.grasp_mode)
         )
-        if assist_set and "StackBowls" not in self.gym_id:
+        if (assist_set or self.bowl_shift_m) and "StackBowls" not in self.gym_id:
             raise ValueError(
-                "assist_engage_pos, assist_release_pos and grasp_mode apply only to NexArmStackBowls-v0"
+                "assist_engage_pos, assist_release_pos, grasp_mode and bowl_shift_m apply only to "
+                "NexArmStackBowls-v0"
             )
         if self.obs_type in ("pixels_agent_pos", "state"):
             self.features["agent_pos"] = PolicyFeature(type=FeatureType.STATE, shape=(6,))
@@ -114,4 +117,6 @@ class NexArmEnv(EnvConfig):
                 kwargs[key] = getattr(self, key)
         if self.stack_order is not None:
             kwargs["order"] = tuple(self.stack_order.split(","))
+        if self.bowl_shift_m:
+            kwargs["bowl_shift_m"] = self.bowl_shift_m
         return kwargs

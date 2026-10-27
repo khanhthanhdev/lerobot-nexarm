@@ -38,6 +38,7 @@ from lerobot_robot_nexarm.nexarm_sim.mujoco_backend import (
 from lerobot_robot_nexarm.nexarm_sim.pick_place_task import NexArmPickPlaceTask
 from lerobot_robot_nexarm.nexarm_sim.stack_bowls_task import (
     GRIPPER_ASSIST_ENGAGE_POS,
+    MIN_BOWL_SEPARATION_M,
     PERMUTATIONS,
     REAL_TELEOP_ASSIST_RELEASE_POS,
     STAGES,
@@ -487,6 +488,11 @@ class NexArmStackBowlsEnv(_NexArmMujocoEnv):
     way a bowl counts as released once the gripper command opens below ``assist_release_pos``; the default
     lets go at the partial openings real operators use.
 
+    ``bowl_shift_m`` > 0 perturbs each episode once: when the middle bowl is first lifted, the bottom bowl
+    slides that far in a direction drawn from the seed (``info["bowl_shifted"]`` turns True), so the policy
+    must notice and re-aim. Directions that would bring it closer than the spawn separation to the top bowl
+    are skipped.
+
     The dense reward is potential-based: each shaping term pays the change in its potential, so over an
     episode the terms sum to the final potential minus the first. Holding a bowl therefore earns nothing per
     step, and every stage, release included, raises the potential, so only finishing pays more.
@@ -507,13 +513,20 @@ class NexArmStackBowlsEnv(_NexArmMujocoEnv):
         assist_release_pos: float = REAL_TELEOP_ASSIST_RELEASE_POS,
         grasp_mode: Literal["contact_assisted", "proximity_assisted", "physical"] = "physical",
         order: tuple[str, str, str] | None = None,
+        bowl_shift_m: float = 0.0,
         **kwargs: Any,
     ) -> None:
         if order is not None and tuple(order) not in PERMUTATIONS:
             raise ValueError(
                 f"order must name red, blue and black once each (bottom, middle, top), got {order}"
             )
+        if bowl_shift_m < 0:
+            raise ValueError(f"bowl_shift_m must be >= 0, got {bowl_shift_m}")
         self.order = None if order is None else tuple(order)
+        self.bowl_shift_m = bowl_shift_m
+        self._shift_done = False
+        self._bowl_shifted = False
+        self._shift_rng = np.random.default_rng(0)
         self.position_jitter_m = position_jitter_m
         self.grasp_mode = grasp_mode
         self.assist_engage_pos = assist_engage_pos
@@ -534,7 +547,30 @@ class NexArmStackBowlsEnv(_NexArmMujocoEnv):
         )
 
     def _reset_task(self, seed: int) -> NexArmStackBowlsStatus:
+        self._shift_done = self._bowl_shifted = False
+        self._shift_rng = np.random.default_rng([seed, 2])
         return self.sim_task.reset(seed=seed, order=self.order, settle_steps=10)
+
+    def step(self, action: np.ndarray) -> tuple[dict[str, np.ndarray], float, bool, bool, dict[str, Any]]:
+        obs, reward, terminated, truncated, info = super().step(action)
+        if self.bowl_shift_m > 0 and not self._shift_done and info["stage/picked_middle"]:
+            self._shift_bottom_bowl()
+        info["bowl_shifted"] = self._bowl_shifted
+        return obs, reward, terminated, truncated, info
+
+    def _shift_bottom_bowl(self) -> None:
+        bottom, _, top = self.sim_task.current_order
+        start = self.sim_task.bowl_position(bottom)[:2]
+        top_xy = self.sim_task.bowl_position(top)[:2]
+        first = self._shift_rng.uniform(0.0, 2 * np.pi)
+        for angle in first + np.arange(8) * np.pi / 4:
+            offset = self.bowl_shift_m * np.array([np.cos(angle), np.sin(angle)])
+            if np.linalg.norm(start + offset - top_xy) >= MIN_BOWL_SEPARATION_M:
+                self.sim_task.move_bowl(bottom, offset)
+                self._bowl_shifted = True
+                break
+        # Latched even when no direction fits, so the episode is perturbed at most once.
+        self._shift_done = True
 
     def reset(
         self,
@@ -543,6 +579,7 @@ class NexArmStackBowlsEnv(_NexArmMujocoEnv):
         options: dict[str, Any] | None = None,
     ) -> tuple[dict[str, np.ndarray], dict[str, Any]]:
         obs, info = super().reset(seed=seed, options=options)
+        info["bowl_shifted"] = False
         self.task_description = info["task"]
         self._last_potential = self._potential()
         return obs, info

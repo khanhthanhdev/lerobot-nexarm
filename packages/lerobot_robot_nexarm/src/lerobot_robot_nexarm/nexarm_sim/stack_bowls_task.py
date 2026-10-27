@@ -160,6 +160,15 @@ class NexArmStackBowlsTask:
     def bowl_position(self, color: str) -> np.ndarray:
         return self.backend.data.xpos[self._body_ids[color]].copy()
 
+    def move_bowl(self, color: str, offset_xy: np.ndarray) -> None:
+        """Slide a bowl by ``offset_xy`` metres on the table and leave it at rest (a perturbation)."""
+        joint_id = self._joint_ids[color]
+        qpos_adr = int(self.backend.model.jnt_qposadr[joint_id])
+        dof_adr = int(self.backend.model.jnt_dofadr[joint_id])
+        self.backend.data.qpos[qpos_adr : qpos_adr + 2] += np.asarray(offset_xy, dtype=float)
+        self.backend.data.qvel[dof_adr : dof_adr + 6] = 0.0
+        mujoco.mj_forward(self.backend.model, self.backend.data)
+
     def bowl_velocity(self, color: str) -> np.ndarray:
         body_id = self._body_ids[color]
         # Linear velocity in world frame
