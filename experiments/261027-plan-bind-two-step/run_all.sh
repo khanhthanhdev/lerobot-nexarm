@@ -82,14 +82,14 @@ PY
 }
 
 # hub_upload <repo> <repo type> <local folder> <path in repo> [extra hf upload args...]
-# Retries 3 times: the Hub's storage backend fails now and then.
+# Retries 5 times: the Hub's storage backend fails now and then.
 hub_upload() {
   local repo=$1 type=$2 folder=$3 path=$4 attempt
   shift 4
-  for attempt in 1 2 3; do
+  for attempt in 1 2 3 4 5; do
     uv run hf upload "$repo" "$folder" "$path" --repo-type="$type" --private --exclude='*checkpoints/last/*' \
       --commit-message="Upload $path from run_all.sh" "$@" && return 0
-    echo "warning: upload of $path failed (attempt $attempt of 3)" >&2
+    echo "warning: upload of $path failed (attempt $attempt of 5)" >&2
     sleep 60
   done
   return 1
@@ -98,9 +98,10 @@ hub_upload() {
 # publishing <repo>: true in the full run when that repo is set.
 publishing() { [ "$PUBLISH" = 1 ] && [ -n "$1" ]; }
 
-# publish <stage> <command...>: a failed upload does not stop the run; its stage reruns next time.
+# publish <stage> <command...>: uploads in the background so the GPU keeps training; a failed upload
+# does not stop the run, and its stage reruns next time.
 publish() {
-  run_stage "$@" || echo "warning: $1 failed; rerun this script later to upload it" >&2
+  (run_stage "$@" || echo "warning: $1 failed; rerun this script later to upload it" >&2) &
 }
 
 # The dataset replaces the repo's content, so files of an earlier upload do not linger.
@@ -193,6 +194,7 @@ run_all() {
   run_stage eval eval_matrix
   uv run python "$EXP_DIR/summarize.py" "$OUT/eval" > "$OUT/results.md"
   if publishing "${HF_REPO:-}"; then publish hub_eval publish_eval; fi
+  wait
   say "results: $OUT/results.md"
   cat "$OUT/results.md"
 }
