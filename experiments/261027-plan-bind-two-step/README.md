@@ -1,6 +1,6 @@
 # 261027-plan-bind-two-step
 
-**Status: pending.** The code is in place, but no GPU run yet. On Windows, unit tests and a CPU pusht smoke run passed: `lerobot-train` for 40 steps in both new modes, then `lerobot-eval` with 6-frame latency. The NexArm sim needs a Linux GPU box.
+**Status: run once (RTX 3090, 2026-10-27).** Plan-Bind beat the one-step control in all eight latency and commit cells, by 16 to 56 points. Results are below. The checkpoints, eval cells and `results.md` are in the private Hub repo `thanhkt/plan-bind-d1`, and the dataset is in `thanhkt/nexarm-stack-bowls-sim-red-blue-black-500`.
 
 ## Question (RQ1)
 
@@ -80,15 +80,29 @@ The smoke run writes the same layout under `outputs/smoke/`. Its dataset stays i
 
 ## Results
 
-GPU, commit and date: _pending_.
+RTX 3090 (Vast.ai), `run_all.sh full` on `feat/plan-bind` at `a1bfdc1f1`, 2026-10-27. Success in percent over 50 episodes (seed 1000, the same episodes in every cell); 95% intervals are in `results.md`.
 
-| Latency  | Commit       | `bsp10` | `onestep` | `planbind` | Plan-Bind minus one-step |
-| -------- | ------------ | ------- | --------- | ---------- | ------------------------ |
-| 0 ms     | latency      |         |           |            |                          |
-| 100 ms   | latency      | –       |           |            |                          |
-| 200 ms   | latency      | –       |           |            |                          |
-| 300 ms   | latency      | –       |           |            |                          |
-| 0–300 ms | none (naive) | –       |           |            |                          |
+| Latency | Commit       | `bsp10` | `onestep` | `planbind` | Plan-Bind minus one-step |
+| ------- | ------------ | ------- | --------- | ---------- | ------------------------ |
+| 0 ms    | latency      | 100     | 68        | 98         | +30                      |
+| 0 ms    | none (naive) | –       | 36        | 92         | +56                      |
+| 100 ms  | latency      | –       | 36        | 86         | +50                      |
+| 100 ms  | none (naive) | –       | 48        | 96         | +48                      |
+| 200 ms  | latency      | –       | 72        | 96         | +24                      |
+| 200 ms  | none (naive) | –       | 72        | 100        | +28                      |
+| 300 ms  | latency      | –       | 72        | 98         | +26                      |
+| 300 ms  | none (naive) | –       | 84        | 100        | +16                      |
+
+Global re-planning on a residual trigger (`planbind_replan_threshold=0.3`, 200 ms, latency commit) dropped Plan-Bind from 96 to 72.
+
+Reading it:
+
+- **RQ1.** The two-level structure pays off here: Plan-Bind is near the diffusion ceiling (`bsp10`, 100) at every latency, and the one-step control is not.
+- **Latency hardly hurts Plan-Bind** in this task (86 to 100 across 0 to 300 ms). Latency-aware commit showed no clear gain over naive swapping for either policy; the differences are mostly within noise.
+- **One-step improves with latency** (36–68 at 0 ms, 72–84 at 300 ms). A plausible cause is that a larger latency also lowers the update rate (calls do not overlap), so the control replans less often and jitters less. Not checked yet.
+- **Limits.** One training seed per policy, one task and stacking order, and scripted demonstrations.
+
+Measured times: dataset 67 min (10 workers); training 5.7 h (`bsp10`), 3.7 h (`onestep`) and 3.9 h (`planbind`); eval 18 cells in 2.8 h.
 
 ## Not in this experiment
 

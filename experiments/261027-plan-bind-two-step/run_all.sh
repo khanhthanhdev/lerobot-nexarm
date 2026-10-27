@@ -173,6 +173,7 @@ eval_cell() {
 }
 
 eval_matrix() {
+  local name latency commit
   eval_cell bsp10_L0 bsp10
   for name in onestep planbind; do
     for latency in "${LATENCIES[@]}"; do
