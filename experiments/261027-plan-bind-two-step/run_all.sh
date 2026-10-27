@@ -26,6 +26,10 @@ export MUJOCO_GL=egl PYOPENGL_PLATFORM=egl WANDB_MODE=offline PYTHONIOENCODING=u
 TASK=NexArmStackBowls-v0
 SEED=1000
 LATENCIES=(0 3 6 9)  # frames at 30 fps: 0, 100, 200, 300 ms
+# Full-run settings, read now: the smoke run reuses these names in `all` mode.
+FULL_EPISODES=${EPISODES:-500} FULL_STEPS=${STEPS:-60000} FULL_BATCH=${BATCH:-32}
+FULL_SAVE_FREQ=${SAVE_FREQ:-10000} FULL_LOG_FREQ=${LOG_FREQ:-100} FULL_NUM_WORKERS=${NUM_WORKERS:-8}
+FULL_N_EVAL=${N_EVAL:-50} FULL_EVAL_BATCH=${EVAL_BATCH:-10} FULL_GEN_WORKERS=${GEN_WORKERS:-8}
 # One stacking order (bottom,middle,top) for the dataset and every eval episode.
 STACK_ORDER=${STACK_ORDER:-red,blue,black}
 
@@ -77,16 +81,19 @@ PY
   fi
 }
 
-# hub_upload <repo> <repo type> <local folder> <path in repo>
+# hub_upload <repo> <repo type> <local folder> <path in repo> [extra hf upload args...]
 hub_upload() {
-  uv run hf upload "$1" "$3" "$4" --repo-type="$2" --private --exclude='*checkpoints/last/*' \
-    --commit-message="Upload $4 from run_all.sh"
+  local repo=$1 type=$2 folder=$3 path=$4
+  shift 4
+  uv run hf upload "$repo" "$folder" "$path" --repo-type="$type" --private --exclude='*checkpoints/last/*' \
+    --commit-message="Upload $path from run_all.sh" "$@"
 }
 
 # publishing <repo>: true in the full run when that repo is set.
 publishing() { [ "$PUBLISH" = 1 ] && [ -n "$1" ]; }
 
-publish_dataset() { hub_upload "$HF_DATASET_REPO" dataset "$DATA" .; }
+# The dataset replaces the repo's content, so files of an earlier upload do not linger.
+publish_dataset() { hub_upload "$HF_DATASET_REPO" dataset "$DATA" . --delete='*'; }
 
 # Uploads a trained policy, then keeps only the checkpoint `last` points to.
 publish_train() {
@@ -188,9 +195,10 @@ run_smoke() {
 
 run_full() {
   OUT="$EXP_DIR/outputs/full" DATA="$REPO/outputs/datasets/nexarm_stack_bowls"
-  EPISODES=${EPISODES:-500} STEPS=${STEPS:-60000} BATCH=${BATCH:-32} SAVE_FREQ=${SAVE_FREQ:-10000}
-  LOG_FREQ=${LOG_FREQ:-100} NUM_WORKERS=${NUM_WORKERS:-8} N_EVAL=${N_EVAL:-50} EVAL_BATCH=${EVAL_BATCH:-10}
-  GEN_WORKERS=${GEN_WORKERS:-8} PUBLISH=1
+  EPISODES=$FULL_EPISODES STEPS=$FULL_STEPS BATCH=$FULL_BATCH SAVE_FREQ=$FULL_SAVE_FREQ
+  LOG_FREQ=$FULL_LOG_FREQ NUM_WORKERS=$FULL_NUM_WORKERS N_EVAL=$FULL_N_EVAL EVAL_BATCH=$FULL_EVAL_BATCH
+  GEN_WORKERS=$FULL_GEN_WORKERS PUBLISH=1
+  LATENCIES=(0 3 6 9)
   run_all
 }
 
