@@ -61,6 +61,16 @@ class _NexArmMujocoEnv(gym.Env):
     default_scene_path: Path = DEFAULT_SCENE_PATH
     environment_state_dim: int = 6
     task_description: str = ""
+
+    @property
+    def task(self) -> str:
+        """The instruction, as LeRobot expects (``sim_task`` is the MuJoCo task).
+
+        LeRobot reads ``task`` from every sub-env of a vector env; with async envs the value is pickled,
+        so it must not be the task object, which holds MuJoCo pointers.
+        """
+        return self.task_description
+
     # Set by log_stages_to: where seeded episodes are logged, and the episode being tracked.
     _stage_log: Path | None = None
     _stage_episode: dict[str, Any] | None = None
@@ -128,7 +138,7 @@ class _NexArmMujocoEnv(gym.Env):
                 self.backend.close()
                 raise
         try:
-            self.task = self._make_task()
+            self.sim_task = self._make_task()
         except BaseException:
             self.backend.close()
             raise
@@ -325,7 +335,7 @@ class _NexArmMujocoEnv(gym.Env):
         return self._get_obs(), info
 
     def _reset_task(self, seed: int) -> Any:
-        return self.task.reset(seed=seed, settle_steps=10)
+        return self.sim_task.reset(seed=seed, settle_steps=10)
 
     def log_stages_to(self, prefix: str | None) -> None:
         """Log each seeded episode's final ``stage/*`` flags to ``<prefix>.<pid>.jsonl``; ``None`` stops.
@@ -357,7 +367,7 @@ class _NexArmMujocoEnv(gym.Env):
         raw_action = self._action_to_raw(action)
         # Step through the backend so calibrated action latency applies, then evaluate the task.
         self.backend.step(raw_action)
-        status = self.task.observe()
+        status = self.sim_task.observe()
 
         obs = self._get_obs()
         reward = self._compute_reward(status)
@@ -414,12 +424,12 @@ class NexArmPickPlaceEnv(_NexArmMujocoEnv):
         )
 
     def _environment_state(self) -> np.ndarray:
-        return np.concatenate([self.task.cube_position, self.task.target_position])
+        return np.concatenate([self.sim_task.cube_position, self.sim_task.target_position])
 
     def _reward_components(self, status: Any) -> dict[str, float]:
         gripper_pos = self.backend.site_position("gripper_frame")
-        cube_pos = self.task.cube_position
-        target_pos = self.task.target_position
+        cube_pos = self.sim_task.cube_position
+        target_pos = self.sim_task.target_position
 
         # 1. Reach bonus
         dist_to_cube = float(np.linalg.norm(gripper_pos - cube_pos))
@@ -510,7 +520,7 @@ class NexArmStackBowlsEnv(_NexArmMujocoEnv):
         self.assist_release_pos = assist_release_pos
         self._last_potential: dict[str, float] | None = None
         super().__init__(max_episode_steps=max_episode_steps, **kwargs)
-        self.task_description = get_task_instruction(*self.task.current_order)
+        self.task_description = get_task_instruction(*self.sim_task.current_order)
 
     def _make_task(self) -> NexArmStackBowlsTask:
         return NexArmStackBowlsTask(
@@ -524,7 +534,7 @@ class NexArmStackBowlsEnv(_NexArmMujocoEnv):
         )
 
     def _reset_task(self, seed: int) -> NexArmStackBowlsStatus:
-        return self.task.reset(seed=seed, order=self.order, settle_steps=10)
+        return self.sim_task.reset(seed=seed, order=self.order, settle_steps=10)
 
     def reset(
         self,
@@ -538,7 +548,7 @@ class NexArmStackBowlsEnv(_NexArmMujocoEnv):
         return obs, info
 
     def _environment_state(self) -> np.ndarray:
-        return np.concatenate([self.task.bowl_position(color) for color in self.task.current_order])
+        return np.concatenate([self.sim_task.bowl_position(color) for color in self.sim_task.current_order])
 
     def _potential(self) -> dict[str, float]:
         """Task progress, split into the shaping terms; their sum rises strictly from stage to stage.
@@ -548,7 +558,7 @@ class NexArmStackBowlsEnv(_NexArmMujocoEnv):
         in [0, 1] each, plus 1 for stage once nested; a nested bowl keeps full reach, grasp and carry until it
         is let go, so opening the gripper never lowers the potential.
         """
-        task = self.task
+        task = self.sim_task
         bottom, middle, top = task.current_order
         placed = 0
         for lower, upper in ((bottom, middle), (middle, top)):
@@ -584,7 +594,7 @@ class NexArmStackBowlsEnv(_NexArmMujocoEnv):
 
     def _info(self, status: NexArmStackBowlsStatus) -> dict[str, Any]:
         return {
-            "held_bowl": self.task.held_bowl or "",
+            "held_bowl": self.sim_task.held_bowl or "",
             "is_concentric": status.is_concentric,
             "is_nested_height": status.is_nested_height,
             "is_released": status.is_released,

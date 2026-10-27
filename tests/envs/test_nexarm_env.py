@@ -14,6 +14,7 @@
 
 import dataclasses
 import functools
+import pickle
 
 import gymnasium as gym
 import numpy as np
@@ -270,7 +271,7 @@ def test_nexarm_stack_bowls_env_contract():
     env = gym.make("NexArmStackBowls-v0", obs_type="state")
     check_env(env.unwrapped, skip_render_check=True)
     obs, info = env.reset(seed=4)
-    task = env.unwrapped.task
+    task = env.unwrapped.sim_task
     assert obs["environment_state"].shape == (9,)
     bottom = task.bowl_position(task.current_order[0])
     np.testing.assert_allclose(obs["environment_state"][:3], bottom, atol=1e-6)
@@ -281,12 +282,21 @@ def test_nexarm_stack_bowls_env_contract():
     env.close()
 
 
+def test_nexarm_env_task_is_the_picklable_instruction():
+    """LeRobot reads `task` from each sub-env; async vector envs pickle it."""
+    env = gym.make("NexArmStackBowls-v0", obs_type="state")
+    env.reset(seed=3)
+    task = env.get_wrapper_attr("task")
+    assert task == env.unwrapped.task_description and pickle.loads(pickle.dumps(task)) == task
+    env.close()
+
+
 def test_nexarm_stack_bowls_env_fixes_the_order():
     kwargs = NexArmEnv(task="NexArmStackBowls-v0", obs_type="state", stack_order="black,red,blue").gym_kwargs
     env = gym.make("NexArmStackBowls-v0", **kwargs)
     for seed in range(4):
         env.reset(seed=seed)
-        assert env.unwrapped.task.current_order == ("black", "red", "blue")
+        assert env.unwrapped.sim_task.current_order == ("black", "red", "blue")
     env.close()
     assert "order" not in NexArmEnv().gym_kwargs
     with pytest.raises(ValueError, match="order"):
@@ -301,7 +311,7 @@ def test_nexarm_stack_bowls_env_rewards_a_released_stack():
     env = gym.make("NexArmStackBowls-v0", obs_type="state")
     obs, _ = env.reset(seed=0)
     unwrapped = env.unwrapped
-    backend, task = unwrapped.backend, unwrapped.task
+    backend, task = unwrapped.backend, unwrapped.sim_task
     for i, color in enumerate(task.current_order):
         qadr = backend.model.jnt_qposadr[task._joint_ids[color]]
         backend.data.qpos[qadr : qadr + 7] = [0, -0.2, 0.02 + 0.03 * i, 1, 0, 0, 0]
@@ -454,7 +464,7 @@ class _ScriptedEnvRobot:
     def send_action(self, action: dict[str, float]) -> dict[str, float]:
         from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES
 
-        task = self.env.task
+        task = self.env.sim_task
         command = np.array([action[f"{name}.pos"] for name in JOINT_NAMES], dtype=np.float32)
         raw_gripper, previous = float(command[-1]), self._last_raw_gripper
         self._last_raw_gripper = raw_gripper
@@ -495,7 +505,7 @@ def _scripted_stack_bowls(seed: int, **kwargs) -> _ScriptedEnvRobot:
     env.reset(seed=seed)
     robot = _ScriptedEnvRobot(env, **kwargs)
     try:
-        generate_episode(robot, env.task, seed=seed)
+        generate_episode(robot, env.sim_task, seed=seed)
         if robot.frozen is not None:
             hold = dict(zip((f"{name}.pos" for name in JOINT_NAMES), robot.frozen.tolist(), strict=True))
             while not robot.done:
@@ -526,8 +536,8 @@ def test_nexarm_stack_bowls_dense_reward_pays_release_and_success_over_holding()
 def test_nexarm_stack_bowls_env_releases_at_real_partial_openings():
     """Real operators open only to about 1990; the env's default threshold drops the bowl there."""
     released = _scripted_stack_bowls(_SOLVED_SEED, min_open_while_held=1990)
-    assert released.env.task.grasp_mode == "physical"
-    assert released.env.task.assist_release_pos == 2300
+    assert released.env.sim_task.grasp_mode == "physical"
+    assert released.env.sim_task.assist_release_pos == 2300
     assert released.infos[-1]["is_success"]
 
     assisted = _scripted_stack_bowls(_SOLVED_SEED, min_open_while_held=1990, grasp_mode="contact_assisted")
@@ -552,9 +562,9 @@ def test_nexarm_stack_bowls_physical_grasp_holds_by_friction_alone(monkeypatch):
     env = gym.make("NexArmStackBowls-v0", obs_type="state").unwrapped
     try:
         env.reset(seed=_SOLVED_SEED)
-        assert env.task.grasp_mode == "physical"
+        assert env.sim_task.grasp_mode == "physical"
         robot = _ScriptedEnvRobot(env, min_open_while_held=0.0)
-        generate_episode(robot, env.task, seed=_SOLVED_SEED)
+        generate_episode(robot, env.sim_task, seed=_SOLVED_SEED)
     finally:
         env.close()
     assert not teleports
@@ -580,14 +590,14 @@ def test_nexarm_env_config_forwards_assist_thresholds_to_stack_bowls_only():
     assert cfg.gym_kwargs["assist_release_pos"] == 2000
     assert "assist_engage_pos" not in cfg.gym_kwargs
     env = gym.make("NexArmStackBowls-v0", **cfg.gym_kwargs)
-    assert env.unwrapped.task.assist_release_pos == 2000
+    assert env.unwrapped.sim_task.assist_release_pos == 2000
     env.close()
     assert "assist_release_pos" not in NexArmEnv().gym_kwargs
     with pytest.raises(ValueError, match="NexArmStackBowls"):
         NexArmEnv(assist_release_pos=2000)
     cfg = NexArmEnv(task="NexArmStackBowls-v0", obs_type="state", grasp_mode="contact_assisted")
     env = gym.make("NexArmStackBowls-v0", **cfg.gym_kwargs)
-    assert env.unwrapped.task.grasp_mode == "contact_assisted"
+    assert env.unwrapped.sim_task.grasp_mode == "contact_assisted"
     env.close()
     with pytest.raises(ValueError, match="NexArmStackBowls"):
         NexArmEnv(grasp_mode="physical")
@@ -640,7 +650,7 @@ def test_lerobot_eval_reports_stack_bowls_success_and_stage_rates():
         forward = get_optim_params = predict_action_chunk = None
 
         def select_action(self, observation):
-            backend, task = env.backend, env.task
+            backend, task = env.backend, env.sim_task
             for i, color in enumerate(task.current_order if not self.stacked else ()):
                 qadr = backend.model.jnt_qposadr[task._joint_ids[color]]
                 backend.data.qpos[qadr : qadr + 7] = [0, -0.2, 0.02 + 0.03 * i, 1, 0, 0, 0]
