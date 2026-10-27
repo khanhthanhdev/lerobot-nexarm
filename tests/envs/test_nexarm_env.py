@@ -281,6 +281,18 @@ def test_nexarm_stack_bowls_env_contract():
     env.close()
 
 
+def test_nexarm_stack_bowls_env_fixes_the_order():
+    kwargs = NexArmEnv(task="NexArmStackBowls-v0", obs_type="state", stack_order="black,red,blue").gym_kwargs
+    env = gym.make("NexArmStackBowls-v0", **kwargs)
+    for seed in range(4):
+        env.reset(seed=seed)
+        assert env.unwrapped.task.current_order == ("black", "red", "blue")
+    env.close()
+    assert "order" not in NexArmEnv().gym_kwargs
+    with pytest.raises(ValueError, match="order"):
+        gym.make("NexArmStackBowls-v0", obs_type="state", order=("red", "red", "blue"))
+
+
 def test_nexarm_stack_bowls_env_rewards_a_released_stack():
     import mujoco
 

@@ -11,7 +11,7 @@ Does generating a spline in two steps pay for itself? Plan-Bind makes a coarse p
 
 ## Policies
 
-All three use the same data, image size (120x160, three cameras), 64-frame window, seed, batch size and number of steps.
+All three use the same data (500 scripted episodes, all with one stacking order: red, blue, black from bottom to top), image size (120x160, three cameras), 64-frame window, seed, batch size and number of steps.
 
 | Name       | `bspline_mode` | What it is                                                                                                                                         |
 | ---------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -24,6 +24,7 @@ Notes for reading the results:
 - **What the control is.** `onestep` is a regression head, not B-spline Policy with one diffusion step. Regression is acceptable here because the scripted stack-bowls demonstrations are expected to be close to unimodal. If that assumption fails, both `onestep` and `planbind` suffer in the same way.
 - **Shared runtime.** Both new modes run under the same `SplineRuntime`: one call per 4 frames (7.5 Hz at 30 fps). At episode start the first call is used at once, without waiting for the latency.
 - **Simulated latency.** Latency is simulated inside the policy. A call made at frame k uses the observation of frame k, and its result is used from frame k + L. Calls do not overlap, so a large L also lowers the update rate.
+- **One stacking order.** The task has six orders; this experiment uses one (`STACK_ORDER`, default `red,blue,black`) for the dataset and every eval episode (`--env.stack_order`), so the policies are not asked to follow an instruction.
 - **Statistics.** One seed per policy and 50 seeded episodes per cell (seed 1000, the same episodes for every cell). Differences under about 15 points are within noise.
 
 Details are in [the plugin README](../../policies/lerobot_policy_bspline/README.md#one-step-and-plan-bind-modes-research).
@@ -63,7 +64,7 @@ Override the size of the full run with environment variables, for example `STEPS
 | Stage                                 | Smoke                         | Full (estimate, RTX 3090)             |
 | ------------------------------------- | ----------------------------- | ------------------------------------- |
 | Setup (`uv sync`, EGL and CUDA check) | 5–10 min                      | same                                  |
-| Sim dataset                           | 4 episodes, about 2 min       | 300 episodes, roughly 1–2 h           |
+| Sim dataset                           | 4 episodes, about 2 min       | 500 episodes, 8 workers, under 1 h    |
 | Training, three policies              | 200 steps each, a few minutes | 60k steps each, roughly 3–5 h each    |
 | Evaluation                            | 10 cells × 2 episodes         | 18 cells × 50 episodes, roughly 2–4 h |
 

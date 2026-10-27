@@ -37,6 +37,8 @@ class NexArmEnv(EnvConfig):
     # Stack-bowls grasp: None keeps the env default ("physical", friction only); "contact_assisted" carries
     # a bowl rigidly once both jaws touch it.
     grasp_mode: str | None = None
+    # Stack-bowls order as "bottom,middle,top" (e.g. "red,blue,black"); None draws it from the seed.
+    stack_order: str | None = None
     features: dict[str, PolicyFeature] = field(
         default_factory=lambda: {
             ACTION: PolicyFeature(type=FeatureType.ACTION, shape=(6,)),
@@ -110,4 +112,6 @@ class NexArmEnv(EnvConfig):
         for key in ("assist_engage_pos", "assist_release_pos", "grasp_mode"):
             if getattr(self, key) is not None:
                 kwargs[key] = getattr(self, key)
+        if self.stack_order is not None:
+            kwargs["order"] = tuple(self.stack_order.split(","))
         return kwargs

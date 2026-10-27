@@ -10,7 +10,7 @@
 #   experiments/261027-plan-bind-two-step/run_all.sh          # smoke run, then the full run
 #   experiments/261027-plan-bind-two-step/run_all.sh smoke    # about 20-30 minutes: proves the pipeline
 #   experiments/261027-plan-bind-two-step/run_all.sh full     # the experiment
-# env overrides (full run): EPISODES=300 STEPS=60000 BATCH=32 N_EVAL=50 EVAL_BATCH=10 NUM_WORKERS=8 GEN_WORKERS=8
+# env overrides (full run): EPISODES=500 STEPS=60000 BATCH=32 N_EVAL=50 EVAL_BATCH=10 NUM_WORKERS=8 GEN_WORKERS=8
 # Hub upload (full run only, private repos, needs `hf auth login`): HF_REPO=<user>/<model repo> gets each
 # policy's checkpoints and logs as soon as it is trained, then the eval cells and results.md;
 # HF_DATASET_REPO=<user>/<dataset repo> gets the sim dataset. After a policy is uploaded, its local
@@ -26,6 +26,8 @@ export MUJOCO_GL=egl PYOPENGL_PLATFORM=egl WANDB_MODE=offline PYTHONIOENCODING=u
 TASK=NexArmStackBowls-v0
 SEED=1000
 LATENCIES=(0 3 6 9)  # frames at 30 fps: 0, 100, 200, 300 ms
+# One stacking order (bottom,middle,top) for the dataset and every eval episode.
+STACK_ORDER=${STACK_ORDER:-red,blue,black}
 
 say() { printf '\n== [%s] %s\n' "$(date +%H:%M:%S)" "$*"; }
 die() { printf 'error: %s\n' "$*" >&2; exit 1; }
@@ -120,7 +122,7 @@ generate_data() {
   fi
   [ ! -e "$DATA" ] || die "$DATA exists but is not a LeRobot dataset; remove it and rerun"
   uv run python examples/nexarm/generate_stack_bowls_dataset.py \
-    --repo-id local/nexarm_stack_bowls --root "$DATA" --episodes "$EPISODES" --gpus 0 --workers "$GEN_WORKERS"
+    --repo-id local/nexarm_stack_bowls --root "$DATA" --episodes "$EPISODES" --order "$STACK_ORDER" --gpus 0 --workers "$GEN_WORKERS"
 }
 
 train() {
@@ -143,7 +145,7 @@ eval_cell() {
   rm -rf "$dir"
   say "eval $cell"
   uv run lerobot-nexarm-eval --policy.path="$OUT/train_$name/checkpoints/last/pretrained_model" \
-    --policy.device=cuda --env.type=nexarm --env.task="$TASK" --seed="$SEED" \
+    --policy.device=cuda --env.type=nexarm --env.task="$TASK" --env.stack_order="$STACK_ORDER" --seed="$SEED" \
     --eval.n_episodes="$N_EVAL" --eval.batch_size="$EVAL_BATCH" --output_dir="$dir" "$@"
 }
 
@@ -186,7 +188,7 @@ run_smoke() {
 
 run_full() {
   OUT="$EXP_DIR/outputs/full" DATA="$REPO/outputs/datasets/nexarm_stack_bowls"
-  EPISODES=${EPISODES:-300} STEPS=${STEPS:-60000} BATCH=${BATCH:-32} SAVE_FREQ=${SAVE_FREQ:-10000}
+  EPISODES=${EPISODES:-500} STEPS=${STEPS:-60000} BATCH=${BATCH:-32} SAVE_FREQ=${SAVE_FREQ:-10000}
   LOG_FREQ=${LOG_FREQ:-100} NUM_WORKERS=${NUM_WORKERS:-8} N_EVAL=${N_EVAL:-50} EVAL_BATCH=${EVAL_BATCH:-10}
   GEN_WORKERS=${GEN_WORKERS:-8} PUBLISH=1
   run_all
