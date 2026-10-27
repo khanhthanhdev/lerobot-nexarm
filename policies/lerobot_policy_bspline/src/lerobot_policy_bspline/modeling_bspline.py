@@ -25,7 +25,7 @@ from lerobot.utils.import_utils import require_package
 
 from .bspline import decode_param_batch, encode_action_batch
 from .configuration_bspline import BsplineConfig
-from .planbind import PlanBindModel, SplineRuntime
+from .planbind import PlanBindModel, SplineRuntime, register_fine_grid
 
 
 def _model_config(config: BsplineConfig) -> BsplineConfig:
@@ -69,6 +69,9 @@ class BsplinePolicy(DiffusionPolicy):
         self.runtime: SplineRuntime | None = None
         if config.bspline_mode == "diffusion":
             self.diffusion = BsplineModel(_model_config(config))
+            if config.bspline_runtime:
+                register_fine_grid(self.diffusion, config)
+                self.runtime = SplineRuntime(self.diffusion, config, chunk_fn=self._diffusion_ctrl)
         else:
             self.diffusion = PlanBindModel(config)
             self.runtime = SplineRuntime(self.diffusion, config)
@@ -114,6 +117,25 @@ class BsplinePolicy(DiffusionPolicy):
             speed_up=self.config.bspline_speed_up,
         )
 
+    def _diffusion_ctrl(self, global_cond: Tensor) -> Tensor:
+        """Denoise a spline, decode one window and fit it to the fine grid ``(B, n_fine, D)``.
+
+        A spline shorter than the window holds its last action, so the fit never extrapolates.
+        """
+        model = self.diffusion
+        params = model.conditional_sample(global_cond.shape[0], global_cond=global_cond)
+        actions = decode_param_batch(
+            params,
+            degree=self.config.bspline_degree,
+            time_scale=self.config.bspline_time_scale,
+            n_actions=self.config.bspline_window,
+            speed_up=self.config.bspline_speed_up,
+        )
+        hold = self.config.bspline_window - actions.shape[1]
+        if hold:
+            actions = torch.cat([actions, actions[:, -1:].expand(-1, hold, -1)], dim=1)
+        return torch.einsum("nt,btd->bnd", model.fine_fit, actions)
+
     @torch.no_grad()
     def predict_action_params(self, batch: dict[str, Tensor], *, noise: Tensor | None = None) -> Tensor:
         """Denoised B-spline parameter chunk ``(B, horizon, 1 + action_dim)``."""
@@ -126,7 +148,7 @@ class BsplinePolicy(DiffusionPolicy):
         In `onestep` and `planbind` modes this is one stateless call (a fresh plan for `planbind`), decoded
         for `n_action_steps` frames.
         """
-        if self.runtime is None:
+        if self.config.bspline_mode == "diffusion":
             return self.decode_params(self.predict_action_params(batch, noise=noise))
         model = self.diffusion
         assert isinstance(model, PlanBindModel)
@@ -162,7 +184,7 @@ class BsplinePolicy(DiffusionPolicy):
 
         `onestep` and `planbind` regress the raw action window directly (`PlanBindModel.compute_loss`).
         """
-        if self.runtime is not None:
+        if self.config.bspline_mode != "diffusion":
             return DiffusionPolicy.forward(self, batch)
         batch = dict(batch)
         params = self.encode_actions(batch[ACTION], batch.get("action_is_pad"))

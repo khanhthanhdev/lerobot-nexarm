@@ -137,6 +137,10 @@ def test_config_validation():
         make_config(planbind_latency=WINDOW)
     with pytest.raises(ValueError, match="cubic"):
         make_config(bspline_degree=2, bspline_chunk_size=12)
+    with pytest.raises(ValueError, match="planbind_call_every"):
+        make_config(planbind_call_every=6)
+    with pytest.raises(ValueError, match="call period"):
+        make_config(planbind_latency=20, planbind_call_every=12)
 
 
 @pytest.mark.parametrize("mode", ["onestep", "planbind"])
@@ -193,6 +197,61 @@ def test_select_action_with_latency_swaps_without_jumps(mode):
     )
     jumps = [float((s["after"] - s["before"]).abs().max()) for s in naive]
     assert max(jumps) > 1e-3
+
+
+def _call_frames(policy: BsplinePolicy, steps: int) -> tuple[list[int], torch.Tensor]:
+    """Frames at which the runtime called the network, and the actions it returned."""
+    runtime, frames = policy.runtime, []
+    call = runtime._call
+
+    def counting_call(global_cond):
+        frames.append(runtime.frame)
+        return call(global_cond)
+
+    runtime._call = counting_call
+    torch.manual_seed(3)
+    policy.reset()
+    obs = {OBS_STATE: torch.randn(BATCH, STATE_DIM), IMAGE_KEY: torch.rand(BATCH, 3, 32, 32)}
+    actions = torch.stack([policy.select_action(dict(obs)) for _ in range(steps)])
+    del runtime._call
+    return frames, actions
+
+
+@pytest.mark.parametrize("mode", ["onestep", "planbind"])
+def test_call_every_sets_the_update_rate(mode):
+    torch.manual_seed(4)
+    policy = BsplinePolicy(make_config(bspline_mode=mode)).eval()
+    default_frames, default_actions = _call_frames(policy, 40)
+    assert default_frames == list(range(0, 40, 4))
+
+    policy.config.planbind_call_every = 4
+    frames, actions = _call_frames(policy, 40)
+    assert frames == default_frames
+    torch.testing.assert_close(actions, default_actions, atol=0, rtol=0)
+
+    policy.config.planbind_call_every = 12
+    assert _call_frames(policy, 40)[0] == [0, 12, 24, 36]
+    # A pending call delays the next one: latency 9 with a call every 4 frames calls every 12.
+    policy.config.planbind_call_every, policy.config.planbind_latency = 4, 9
+    assert _call_frames(policy, 40)[0] == [0, 4, 16, 28]
+
+
+def test_diffusion_runs_through_the_runtime():
+    config = make_config(
+        bspline_mode="diffusion",
+        bspline_runtime=True,
+        noise_scheduler_type="DDIM",
+        num_inference_steps=3,
+        planbind_latency=6,
+    )
+    policy = BsplinePolicy(config).eval()
+    assert isinstance(policy.diffusion, BsplineModel) and policy.runtime is not None
+    assert not any(k.endswith(("fine_basis", "fine_fit")) for k in policy.state_dict())
+    swaps = _run(policy, 30)
+    assert len(swaps) >= 2
+    for swap in swaps:
+        torch.testing.assert_close(swap["after"], swap["before"], atol=1e-5, rtol=0)
+    assert BsplinePolicy(make_config(bspline_mode="diffusion")).runtime is None
 
 
 def test_plan_expires_at_the_trained_age():

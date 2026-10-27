@@ -8,12 +8,16 @@ sequence is the "sample" and the diffusion timestep embedding carries the call's
   the fine grid and shifted to the current frame; the UNet then maps that lifted plan to a residual
   (timestep ``1 + plan age``). One shared UNet keeps the parameter count equal to `onestep`.
 
-`SplineRuntime` runs either mode inside `select_action`: it calls the network every fine knot span,
-simulates an inference latency (the result of a call issued at frame k swaps in at k + latency, and calls
-do not overlap), freezes the control points that the commit rule keeps, and projects the free ones.
+`SplineRuntime` runs either mode inside `select_action`: it calls the network every `call_period` frames
+(one fine knot span by default), simulates an inference latency (the result of a call issued at frame k
+swaps in at k + latency, and calls do not overlap), freezes the control points that the commit rule keeps,
+and projects the free ones. With `bspline_runtime` it also runs `diffusion` mode, whose denoised spline is
+refitted to the fine knot grid at each call.
 """
 
 from __future__ import annotations
+
+from collections.abc import Callable
 
 import torch
 import torch.nn.functional as F  # noqa: N812
@@ -26,6 +30,26 @@ from .configuration_bspline import BsplineConfig
 from .uniform_spline import basis_matrix, lift_matrix, n_ctrl_points, n_frozen, project, shift_ctrl
 
 
+def knot_grid(config: BsplineConfig) -> tuple[int, int]:
+    """Coarse and fine control points of one `bspline_window` on the fixed knot grid."""
+    n_coarse = n_ctrl_points(
+        config.bspline_window, config.planbind_fine_spacing * config.planbind_subdivision
+    )
+    n_fine = 3 + (n_coarse - 3) * config.planbind_subdivision
+    assert n_fine >= n_ctrl_points(config.bspline_window, config.planbind_fine_spacing)
+    return n_coarse, n_fine
+
+
+def register_fine_grid(module: torch.nn.Module, config: BsplineConfig) -> Tensor:
+    """Give `module` the fine basis ``(window, n_fine)`` and its least-squares fit; returns the basis."""
+    frames = torch.arange(config.bspline_window, dtype=torch.float64)
+    fine_basis = basis_matrix(frames, knot_grid(config)[1], config.planbind_fine_spacing)
+    # Derived from the config, so kept out of checkpoints.
+    module.register_buffer("fine_basis", fine_basis.float(), persistent=False)
+    module.register_buffer("fine_fit", torch.linalg.pinv(fine_basis).float(), persistent=False)
+    return fine_basis
+
+
 class PlanBindModel(DiffusionModel):
     """Observation encoders and UNet of the diffusion model, trained as one-step spline regressors."""
 
@@ -34,15 +58,10 @@ class PlanBindModel(DiffusionModel):
         super().__init__(config)
         self.fine_spacing = config.planbind_fine_spacing
         self.subdivision = config.planbind_subdivision
-        window = config.bspline_window
-        self.n_coarse = n_ctrl_points(window, self.fine_spacing * self.subdivision)
-        self.n_fine = 3 + (self.n_coarse - 3) * self.subdivision
-        assert self.n_fine >= n_ctrl_points(window, self.fine_spacing)
-        frames = torch.arange(window, dtype=torch.float64)
-        fine_basis = basis_matrix(frames, self.n_fine, self.fine_spacing)
+        self.n_coarse, self.n_fine = knot_grid(config)
+        frames = torch.arange(config.bspline_window, dtype=torch.float64)
+        register_fine_grid(self, config)
         coarse_basis = basis_matrix(frames, self.n_coarse, self.fine_spacing * self.subdivision)
-        # Derived from the config, so kept out of checkpoints.
-        self.register_buffer("fine_basis", fine_basis.float(), persistent=False)
         self.register_buffer("coarse_basis", coarse_basis.float(), persistent=False)
         self.register_buffer("coarse_fit", torch.linalg.pinv(coarse_basis).float(), persistent=False)
         lift = lift_matrix(self.n_coarse, self.n_fine, self.subdivision)
@@ -120,12 +139,22 @@ class PlanBindModel(DiffusionModel):
 
 
 class SplineRuntime:
-    """Stateful execution of `onestep` / `planbind` chunks for a batch of environments."""
+    """Stateful execution of fine control-point chunks for a batch of environments."""
 
-    def __init__(self, model: PlanBindModel, config: BsplineConfig):
-        """Run `model` with the runtime options of `config`."""
+    def __init__(
+        self,
+        model: DiffusionModel,
+        config: BsplineConfig,
+        chunk_fn: Callable[[Tensor], Tensor] | None = None,
+    ):
+        """Run `model` with the runtime options of `config`.
+
+        `model` holds the fine grid (`register_fine_grid`). `chunk_fn` maps observation features to fine
+        control points ``(B, n_fine, D)`` anchored at the call frame; None calls `model` in its own mode.
+        """
         self.model = model
         self.config = config
+        self.chunk_fn = chunk_fn
         self.reset()
 
     def reset(self) -> None:
@@ -141,7 +170,10 @@ class SplineRuntime:
 
     def _call(self, global_cond: Tensor) -> Tensor:
         """Fine control points anchored at the current frame (before commit and projection)."""
+        if self.chunk_fn is not None:
+            return self.chunk_fn(global_cond)
         model, cfg = self.model, self.config
+        assert isinstance(model, PlanBindModel)
         if cfg.bspline_mode == "onestep":
             return model.onestep(global_cond)
         batch_size = global_cond.shape[0]
@@ -187,7 +219,7 @@ class SplineRuntime:
             self.pending = None
         if (
             self.pending is None
-            and self.frame % spacing == 0
+            and self.frame % cfg.call_period == 0
             and (self.cmd is None or self.frame > self.cmd_anchor)
         ):
             chunk = self._call(global_cond_fn())

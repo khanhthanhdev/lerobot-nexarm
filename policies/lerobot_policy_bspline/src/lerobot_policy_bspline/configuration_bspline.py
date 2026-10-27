@@ -49,6 +49,11 @@ class BsplineConfig(DiffusionConfig):
             up to the swap, exact C2 join), ``now`` (C2 join at the call frame only) or ``none`` (naive swap).
         planbind_position_limit: Bound on the normalized actions enforced on the control points; 0 is off.
         planbind_velocity_limit: Bound on the normalized action change per frame; 0 is off.
+        planbind_call_every: Frames between network calls at evaluation, a multiple of
+            `planbind_fine_spacing`; 0 calls once per fine span. A call never starts while one is pending.
+        bspline_runtime: Evaluation only, `diffusion` mode: run the policy through the same runtime as
+            `onestep` and `planbind` (latency, commit, call rate), refitting each denoised spline to the fine
+            knot grid. Off keeps B-spline Policy's own action queue.
     """
 
     n_obs_steps: int = 2
@@ -76,6 +81,8 @@ class BsplineConfig(DiffusionConfig):
     planbind_commit: str = "latency"
     planbind_position_limit: float = 0.0
     planbind_velocity_limit: float = 0.0
+    planbind_call_every: int = 0
+    bspline_runtime: bool = False
 
     def __post_init__(self):
         """Validate the diffusion options, then the B-spline options."""
@@ -107,11 +114,11 @@ class BsplineConfig(DiffusionConfig):
             raise ValueError(
                 f"`bspline_mode` must be 'diffusion', 'onestep' or 'planbind'. Got {self.bspline_mode!r}."
             )
-        if self.bspline_mode != "diffusion":
+        if self.bspline_mode != "diffusion" or self.bspline_runtime:
             self._validate_planbind()
 
     def _validate_planbind(self) -> None:
-        if self.bspline_degree != 3:
+        if self.bspline_degree != 3 and self.bspline_mode != "diffusion":
             raise ValueError("`onestep` and `planbind` use cubic splines: set `bspline_degree=3`.")
         if self.planbind_fine_spacing < 1 or self.planbind_subdivision < 1:
             raise ValueError("`planbind_fine_spacing` and `planbind_subdivision` must be >= 1.")
@@ -122,8 +129,15 @@ class BsplineConfig(DiffusionConfig):
             )
         if self.planbind_latency < 0:
             raise ValueError(f"`planbind_latency` must be >= 0. Got {self.planbind_latency}.")
-        if self.planbind_latency + self.planbind_fine_spacing >= self.bspline_window:
-            raise ValueError("`planbind_latency + planbind_fine_spacing` must be below `bspline_window`.")
+        if self.planbind_call_every < 0 or self.planbind_call_every % self.planbind_fine_spacing:
+            raise ValueError(
+                "`planbind_call_every` must be 0 or a positive multiple of `planbind_fine_spacing`. "
+                f"Got {self.planbind_call_every} and {self.planbind_fine_spacing}."
+            )
+        if self.planbind_latency + self.call_period >= self.bspline_window:
+            raise ValueError(
+                "`planbind_latency` plus the call period (`planbind_call_every`) must be below `bspline_window`."
+            )
         if self.planbind_commit not in ("latency", "now", "none"):
             raise ValueError(
                 f"`planbind_commit` must be 'latency', 'now' or 'none'. Got {self.planbind_commit!r}."
@@ -136,6 +150,11 @@ class BsplineConfig(DiffusionConfig):
         ):
             if getattr(self, name) < 0:
                 raise ValueError(f"`{name}` must be >= 0. Got {getattr(self, name)}.")
+
+    @property
+    def call_period(self) -> int:
+        """Frames between network calls in the spline runtime."""
+        return self.planbind_call_every or self.planbind_fine_spacing
 
     @property
     def planbind_offset(self) -> int:
