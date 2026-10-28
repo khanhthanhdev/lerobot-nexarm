@@ -4,7 +4,7 @@
 
 ## Questions
 
-1. **Does the B-spline baseline reproduce?** The paper reports a Push-T score of 72 for diffusion policy and 75 for B-spline Policy (its Table 2a). D3 trains both in this repo: LeRobot's diffusion policy and the `bsp10` port. They should land near those numbers. The match cannot be exact: the paper used its own codebase and reported the mean of the best three checkpoints.
+1. **Does the B-spline baseline reproduce?** The paper reports a Push-T score of 72 for diffusion policy and 75 for B-spline Policy (its Table 2a). D3 trains both in this repo: LeRobot's diffusion policy and the `bsp10` port. They should land near those numbers. The match cannot be exact: the paper used its own codebase and does not state its checkpoint selection for that table (its Push-T speed-up study reports the mean of the best three checkpoints).
 2. **Does Plan-Bind hold on human, multimodal data?** `onestep` and `planbind` regress the trajectory instead of sampling it, so on multimodal demonstrations they may average between modes. If Plan-Bind stays near `bsp10` here, the D1 result is not an artifact of scripted data. If both regression modes drop, they need a generative head.
 3. **Seed and checkpoint variance.** Two training seeds per policy (`SEEDS`). Every saved checkpoint is also evaluated, because Push-T scores are known to vary between checkpoints.
 4. **Call rate and latency at 10 fps.** Push-T runs at 10 fps, so a frame of latency is 100 ms. The cells cover latency 0, 100 and 200 ms, a call every 2 frames (default) or every 8 frames (diffusion's rate), and commit `latency` or `none`. `bsp10` also runs through the same spline runtime.
