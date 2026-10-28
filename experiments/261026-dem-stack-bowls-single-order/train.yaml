@@ -1,0 +1,34 @@
+# DEM on single-order NexArm stack-bowls (red bottom, blue middle, black top). Generate the dataset first
+# (see README.md), then:
+#   CUDA_VISIBLE_DEVICES=3 uv run lerobot-train --config_path experiments/261026-dem-stack-bowls-single-order/train.yaml
+dataset:
+  repo_id: local/nexarm_stack_bowls_red_blue_black
+  root: outputs/datasets/nexarm_stack_bowls_red_blue_black
+
+policy:
+  type: dem
+  push_to_hub: false
+  device: cuda
+  # The paper's two views (scene + wrist).
+  camera_keys: [observation.images.front, observation.images.wrist]
+  # global_conditioning=true, lr 5e-5 head / 2.5e-5 vision and 2000 warmup steps are the plugin defaults.
+  scheduler_decay_steps: 50000
+
+ema:
+  enable: true
+  decay: 0.999
+
+output_dir: experiments/261026-dem-stack-bowls-single-order/outputs/train_dem
+job_name: 261026-dem-stack-bowls-single-order
+seed: 1000
+# 18.1 GB on a 24 GB RTX A5000 with two cameras; about 0.58 s/step, so 50k steps take about 8 hours.
+batch_size: 32
+num_workers: 8
+steps: 50000
+save_freq: 10000
+log_freq: 100
+env_eval_freq: 0
+
+wandb:
+  enable: true
+  project: lerobot-nexarm
