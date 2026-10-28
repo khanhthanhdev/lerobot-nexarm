@@ -66,7 +66,7 @@ CUDA_VISIBLE_DEVICES=3 uv run lerobot-train --config_path experiments/261026-dem
 
 # Held-out layouts (eval seeds start at 1000000), the trained order, EMA weights.
 CUDA_VISIBLE_DEVICES=3 MUJOCO_GL=egl uv run lerobot-nexarm-eval \
-    --policy.path=experiments/261026-dem-stack-bowls-single-order/outputs/train_dem/checkpoints/last/pretrained_model_ema \
+    --policy.path=thanhkt/dem-nexarm-stack-bowls-single-order \
     --env.type=nexarm --env.task=NexArmStackBowls-v0 --env.stack_order=red,blue,black \
     --eval.n_episodes=20 --eval.batch_size=1 --seed=1000000 \
     --output_dir=experiments/261026-dem-stack-bowls-single-order/outputs/eval_dem
@@ -76,7 +76,7 @@ Without `--env.stack_order` the env cycles the six orders by seed, and a single-
 
 ## Checkpoint
 
-`outputs/train_dem/checkpoints/050000` (local), 50k steps on the first 500 episodes, 8.5 h on GPU 7; final loss -0.747. W&B run `9bchqoat`.
+[`thanhkt/dem-nexarm-stack-bowls-single-order`](https://huggingface.co/thanhkt/dem-nexarm-stack-bowls-single-order) (private): EMA weights at the root, raw weights in `raw/` (`hf download thanhkt/dem-nexarm-stack-bowls-single-order --include "raw/*" --local-dir <dir>`, then `--policy.path=<dir>/raw`). Step 50k on the first 500 episodes, 8.5 h on GPU 7; final loss -0.747. W&B run `9bchqoat`.
 
 ## Results
 

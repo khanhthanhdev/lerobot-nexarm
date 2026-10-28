@@ -21,7 +21,7 @@ setsid nohup env CUDA_VISIBLE_DEVICES=0 uv run lerobot-train \
 
 # Held-out layouts (eval seeds start at 1000000), the trained order.
 CUDA_VISIBLE_DEVICES=0 MUJOCO_GL=egl uv run lerobot-nexarm-eval \
-    --policy.path=experiments/261027-bspline-stack-bowls-single-order/outputs/train_bspline/checkpoints/last/pretrained_model \
+    --policy.path=thanhkt/bspline-nexarm-stack-bowls-single-order \
     --env.type=nexarm --env.task=NexArmStackBowls-v0 --env.stack_order=red,blue,black \
     --eval.n_episodes=20 --eval.batch_size=1 --seed=1000000 \
     --output_dir=experiments/261027-bspline-stack-bowls-single-order/outputs/eval_bspline
@@ -32,7 +32,7 @@ CUDA_VISIBLE_DEVICES=0 MUJOCO_GL=egl uv run lerobot-nexarm-eval \
 
 ## Checkpoint
 
-Training (started 2026-10-27).
+[`thanhkt/bspline-nexarm-stack-bowls-single-order`](https://huggingface.co/thanhkt/bspline-nexarm-stack-bowls-single-order) (private), step 100k; 13.4 h on GPU 0, final loss about 0.009. W&B run `9ubho2mx`.
 
 ## Results
 
