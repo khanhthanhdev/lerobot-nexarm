@@ -99,7 +99,7 @@ Reading it:
 
 - **RQ1.** The two-level structure pays off here: Plan-Bind is near the diffusion ceiling (`bsp10`, 100) at every latency, and the one-step control is not.
 - **Latency hardly hurts Plan-Bind** in this task (86 to 100 across 0 to 300 ms). Latency-aware commit showed no clear gain over naive swapping for either policy; the differences are mostly within noise.
-- **One-step improves with latency** (36–68 at 0 ms, 72–84 at 300 ms). A plausible cause is that a larger latency also lowers the update rate (calls do not overlap), so the control replans less often and jitters less. Not checked yet.
+- **One-step improves with latency** (36–68 at 0 ms, 72–84 at 300 ms). A plausible cause is that a larger latency also lowers the update rate (calls do not overlap), so the control replans less often and jitters less. [D2](../261028-plan-bind-d2-latency/README.md) tests this, together with measured inference times.
 - **Limits.** One training seed per policy, one task and stacking order, and scripted demonstrations.
 
 Measured times: dataset 67 min (10 workers); training 5.7 h (`bsp10`), 3.7 h (`onestep`) and 3.9 h (`planbind`); eval 18 cells in 2.8 h.
@@ -108,7 +108,7 @@ Measured times: dataset 67 min (10 workers); training 5.7 h (`bsp10`), 3.7 h (`o
 
 - **Real arm and certified limits (RQ2).** The projection options exist (`planbind_position_limit`, `planbind_velocity_limit`) but are not in the eval matrix.
 - **Edit preservation (RQ3).**
-- **Moving the bowl mid-episode.**
+- **Moving the bowl mid-episode.** In D2.
 - **Temporal ensembling and RTC baselines.**
 - **Adaptive knots.**
 - **Latency conditioning of Bind.** Bind is conditioned on the plan's age, not on the latency.
