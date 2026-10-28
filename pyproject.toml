@@ -41,6 +41,9 @@ service = ["nexarm_service"]
 # TurboVLA: the model package comes from its own repo, pinned by commit in [tool.uv.sources], and the
 # workspace plugin `policies/lerobot_policy_turbovla` registers it as `--policy.type=turbovla`.
 turbovla = ["lerobot[transformers-dep]", "turbovla", "lerobot_policy_turbovla"]
+# DEM (Decoupled Embodiment Model): the `dem` package from the paper's repo, pinned by commit in
+# [tool.uv.sources], and the workspace plugin `policies/lerobot_policy_dem` (`--policy.type=dem`).
+dem = ["lerobot[transformers-dep]", "dem", "lerobot_policy_dem"]
 
 # cu128 wheels keep broad hardware reach; the driver floor is 570.86.
 # To use a different CUDA variant, reinstall torch with an explicit index, e.g.:
@@ -68,11 +71,16 @@ nexarm = ["lerobot_robot_nexarm", "lerobot_teleoperator_nexarm", "lerobot_env_ne
 [tool.uv]
 package = false
 default-groups = ["policies", "nexarm"]
+# `dem` asks for transformers>=5.13, which the pinned lerobot (<5.6) rules out. DEM only needs the
+# DINOv3 ConvNeXt model and the BERT tokenizer, and its test suite passes on 5.5.4, so keep lerobot's
+# range. Update this together with the lerobot pin.
+override-dependencies = ["transformers>=5.4.0,<5.6.0"]
 
 [tool.uv.sources]
 # Upstream LeRobot. To upgrade: bump `rev`, run `uv lock`, then the tests (see CONTRIBUTING.md).
 lerobot = { git = "https://github.com/huggingface/lerobot", rev = "d3793b7e36522321c1c455f0dc4826db3793dceb" }
 lerobot_policy_bspline = { workspace = true }
+lerobot_policy_dem = { workspace = true }
 lerobot_policy_turbovla = { workspace = true }
 lerobot_env_nexarm = { workspace = true }
 lerobot_robot_nexarm = { workspace = true }
@@ -81,6 +89,8 @@ nexarm_service = { workspace = true }
 # Bump `rev` to a pushed TurboVLA commit. For local TurboVLA development, temporarily use
 # `turbovla = { path = "../TurboVLA", editable = true }` and never commit it (see docs/guides/turbovla.md).
 turbovla = { git = "https://github.com/khanhthanhdev/TurboVLA", rev = "28bc1e7e8cf259aacee4fd928258caa669cbaaae" }
+# DEM paper code (https://github.com/Apollo-Lab-Yale/decoupled-embodiment-model).
+dem = { git = "https://github.com/Apollo-Lab-Yale/decoupled-embodiment-model", rev = "e5c8f6a81dca59bdfea2d1de067a7ec6f8a3e0ea" }
 torch = [{ index = "pytorch-cu128", marker = "sys_platform == 'linux'" }]
 torchvision = [{ index = "pytorch-cu128", marker = "sys_platform == 'linux'" }]
 # LeRobot decodes videos on CPU; avoid GPU-only TorchCodec dependencies without changing GPU training.

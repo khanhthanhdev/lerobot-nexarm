@@ -1,5 +1,5 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = ">=3.12"
 resolution-markers = [
     "(python_full_version >= '3.15' and platform_machine == 'AMD64' and sys_platform == 'linux') or (python_full_version >= '3.15' and platform_machine == 'x86_64' and sys_platform == 'linux')",
@@ -37,11 +37,13 @@ members = [
     "lerobot-env-nexarm",
     "lerobot-nexarm",
     "lerobot-policy-bspline",
+    "lerobot-policy-dem",
     "lerobot-policy-turbovla",
     "lerobot-robot-nexarm",
     "lerobot-teleoperator-nexarm",
     "nexarm-service",
 ]
+overrides = [{ name = "transformers", specifier = ">=5.4.0,<5.6.0" }]
 
 [[package]]
 name = "absl-py"
@@ -1321,6 +1323,19 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/0f/d5/c66da9b79e5bdb124974bfe172b4daf3c984ebd9c2a06e2b8a4dc7331c72/defusedxml-0.7.1.tar.gz", hash = "sha256:1bb3032db185915b62d7c6209c5a8792be6a32ab2fedacc84e01b52c51aa3e69", size = 75520, upload-time = "2021-03-08T10:59:26.269Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/07/6c/aa3f2f849e01cb6a001cd8554a88d4c77c5c1a31c95bdf1cf9301e6d9ef4/defusedxml-0.7.1-py2.py3-none-any.whl", hash = "sha256:a352e7e428770286cc899e2542b6cdaedb2b4953ff269a210103ec58f6198a61", size = 25604, upload-time = "2021-03-08T10:59:24.45Z" },
+]
+
+[[package]]
+name = "dem"
+version = "0.1.0"
+source = { git = "https://github.com/Apollo-Lab-Yale/decoupled-embodiment-model?rev=e5c8f6a81dca59bdfea2d1de067a7ec6f8a3e0ea#e5c8f6a81dca59bdfea2d1de067a7ec6f8a3e0ea" }
+dependencies = [
+    { name = "huggingface-hub" },
+    { name = "numpy" },
+    { name = "safetensors" },
+    { name = "torch", version = "2.11.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
+    { name = "torch", version = "2.11.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "sys_platform == 'linux'" },
+    { name = "transformers" },
 ]
 
 [[package]]
@@ -3201,7 +3216,6 @@ requires-dist = [
 name = "lerobot-nexarm"
 version = "0.1.0"
 source = { virtual = "." }
-default-groups = ["nexarm", "policies"]
 dependencies = [
     { name = "lerobot" },
 ]
@@ -3218,6 +3232,11 @@ dataset = [
 ]
 dataset-viz = [
     { name = "lerobot", extra = ["dataset-viz"] },
+]
+dem = [
+    { name = "dem" },
+    { name = "lerobot", extra = ["transformers-dep"] },
+    { name = "lerobot-policy-dem" },
 ]
 dev = [
     { name = "lerobot", extra = ["dev"] },
@@ -3279,6 +3298,7 @@ policies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "dem", marker = "extra == 'dem'", git = "https://github.com/Apollo-Lab-Yale/decoupled-embodiment-model?rev=e5c8f6a81dca59bdfea2d1de067a7ec6f8a3e0ea" },
     { name = "lerobot", git = "https://github.com/huggingface/lerobot?rev=d3793b7e36522321c1c455f0dc4826db3793dceb" },
     { name = "lerobot", extras = ["all"], marker = "extra == 'all'", git = "https://github.com/huggingface/lerobot?rev=d3793b7e36522321c1c455f0dc4826db3793dceb" },
     { name = "lerobot", extras = ["core-scripts"], marker = "extra == 'core-scripts'", git = "https://github.com/huggingface/lerobot?rev=d3793b7e36522321c1c455f0dc4826db3793dceb" },
@@ -3294,9 +3314,11 @@ requires-dist = [
     { name = "lerobot", extras = ["smolvla"], marker = "extra == 'smolvla'", git = "https://github.com/huggingface/lerobot?rev=d3793b7e36522321c1c455f0dc4826db3793dceb" },
     { name = "lerobot", extras = ["test"], marker = "extra == 'test'", git = "https://github.com/huggingface/lerobot?rev=d3793b7e36522321c1c455f0dc4826db3793dceb" },
     { name = "lerobot", extras = ["training"], marker = "extra == 'training'", git = "https://github.com/huggingface/lerobot?rev=d3793b7e36522321c1c455f0dc4826db3793dceb" },
+    { name = "lerobot", extras = ["transformers-dep"], marker = "extra == 'dem'", git = "https://github.com/huggingface/lerobot?rev=d3793b7e36522321c1c455f0dc4826db3793dceb" },
     { name = "lerobot", extras = ["transformers-dep"], marker = "extra == 'turbovla'", git = "https://github.com/huggingface/lerobot?rev=d3793b7e36522321c1c455f0dc4826db3793dceb" },
     { name = "lerobot", extras = ["viz"], marker = "extra == 'viz'", git = "https://github.com/huggingface/lerobot?rev=d3793b7e36522321c1c455f0dc4826db3793dceb" },
     { name = "lerobot-env-nexarm", marker = "extra == 'nexarm'", editable = "packages/lerobot_env_nexarm" },
+    { name = "lerobot-policy-dem", marker = "extra == 'dem'", editable = "policies/lerobot_policy_dem" },
     { name = "lerobot-policy-turbovla", marker = "extra == 'turbovla'", editable = "policies/lerobot_policy_turbovla" },
     { name = "lerobot-robot-nexarm", marker = "extra == 'nexarm'", editable = "packages/lerobot_robot_nexarm" },
     { name = "lerobot-teleoperator-nexarm", marker = "extra == 'nexarm'", editable = "packages/lerobot_teleoperator_nexarm" },
@@ -3304,7 +3326,7 @@ requires-dist = [
     { name = "turbovla", marker = "extra == 'turbovla'", git = "https://github.com/khanhthanhdev/TurboVLA?rev=28bc1e7e8cf259aacee4fd928258caa669cbaaae" },
     { name = "xacro", marker = "extra == 'test'", specifier = ">=2.0.0,<3.0.0" },
 ]
-provides-extras = ["all", "core-scripts", "dataset", "dataset-viz", "dev", "diffusion", "feetech", "hardware", "intelrealsense", "libero", "pi", "smolvla", "test", "training", "viz", "nexarm", "service", "turbovla"]
+provides-extras = ["all", "core-scripts", "dataset", "dataset-viz", "dev", "diffusion", "feetech", "hardware", "intelrealsense", "libero", "pi", "smolvla", "test", "training", "viz", "nexarm", "service", "turbovla", "dem"]
 
 [package.metadata.requires-dev]
 nexarm = [
@@ -3327,6 +3349,21 @@ dependencies = [
 requires-dist = [
     { name = "lerobot", extras = ["diffusion"], git = "https://github.com/huggingface/lerobot?rev=d3793b7e36522321c1c455f0dc4826db3793dceb" },
     { name = "scipy", specifier = ">=1.15.0,<2.0.0" },
+]
+
+[[package]]
+name = "lerobot-policy-dem"
+version = "0.1.0"
+source = { editable = "policies/lerobot_policy_dem" }
+dependencies = [
+    { name = "dem" },
+    { name = "lerobot" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "dem", git = "https://github.com/Apollo-Lab-Yale/decoupled-embodiment-model?rev=e5c8f6a81dca59bdfea2d1de067a7ec6f8a3e0ea" },
+    { name = "lerobot", git = "https://github.com/huggingface/lerobot?rev=d3793b7e36522321c1c455f0dc4826db3793dceb" },
 ]
 
 [[package]]

@@ -101,7 +101,7 @@ jobs:
       - name: Install dependencies
         run: >-
           uv sync --locked --extra test --extra core_scripts --extra training --extra nexarm
-          --extra intelrealsense --extra turbovla --extra service
+          --extra intelrealsense --extra turbovla --extra dem --extra service
 
       - name: Test
         run: uv run pytest tests policies -vv --maxfail=10

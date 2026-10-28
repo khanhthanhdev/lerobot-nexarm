@@ -10,25 +10,25 @@ This is the **Hiwonder NexArm** research repo on top of LeRobot. It contains no 
 
 NexArm code is LeRobot plugins in `packages/` (uv workspace members, installed by plain `uv sync`). LeRobot's CLIs import them through `register_third_party_plugins()`; the registered type names are unchanged. Paths below are under `packages/<package>/src/<package>/`.
 
-| Path                                                           | What it does                                                                                                                |
-| -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `lerobot_robot_nexarm/motors/`                                 | CommProtocol UART framing, 6-servo sync read/write, torque, bridge mode (CMD 56/68/96/97/98)                                |
-| `lerobot_robot_nexarm/nexarm_follower/`                        | `NexArmFollowerConfig` + `NexArmFollower` (`nexarm_follower`) — connect, observe, send_action                               |
-| `lerobot_robot_nexarm/nexarm_sim/`                             | `NexArmSimConfig` + `NexArmSim` (`nexarm_sim`) — single-arm MuJoCo simulation                                               |
-| `lerobot_robot_nexarm/mobile_bi_nexarm_sim/`                   | `MobileBiNexArmSimConfig` + `MobileBiNexArmSim` (`mobile_bi_nexarm_sim`) — bimanual mobile sim                              |
-| `lerobot_robot_nexarm/{collection_merge,recording_session}.py` | Collection recording tools behind `examples/nexarm/record_collection.py`, incl. the manual-control keys                     |
-| `lerobot_robot_nexarm/{local_dataset,rerun_recording}.py`      | Local-only dataset loading; `.rrd` recording of the Rerun stream and `lerobot-nexarm-rollout`                               |
-| `lerobot_robot_nexarm/camera_config.py`                        | The `--front-cam`/`--wrist-cam`/`--top-cam` flags and camera configs shared by the examples and tools                       |
-| `lerobot_teleoperator_nexarm/`                                 | `NexArmLeaderConfig` + `NexArmLeader` (`nexarm_leader`) — read positions, leader→follower mapping                           |
-| `lerobot_env_nexarm/`                                          | `NexArmEnv` (`--env.type=nexarm`), the gym envs, `lerobot-nexarm-eval` (per-stage rates) and `lerobot-nexarm-sim-benchmark` |
-| `nexarm_service/`                                              | Desktop-app engine (`lerobot-nexarm-service`, `--extra service`)                                                            |
-| `sim/`                                                         | MuJoCo MJCF, URDF description, Isaac Lab configs, meshes, and exporters                                                     |
-| `sim/mobile_nexarm/`                                           | Mobile bimanual NexArm assets, ManiSkill/Isaac configs and video2sim                                                        |
-| `examples/nexarm/`                                             | Ready-to-run tutorials: teleoperate, record, rollout, the sim demos and sim dataset generators, ACT and TurboVLA launchers  |
-| `tools/nexarm/`                                                | Operational tools: arm/camera/sim calibration, joint-mapping and servo probes, dataset audits, merges, uploads, videos      |
-| `policies/`                                                    | Research policy plugins: `lerobot_policy_turbovla` (adapter for the pinned `turbovla` package), `lerobot_policy_bspline`    |
-| `experiments/`                                                 | One `YYMMDD-<slug>` folder per experiment: README (hypothesis, data, command, results) and its draccus configs              |
-| `firmware/`, `hardware/`                                       | Vendor controller firmware and protocol docs; mechanical, 3D-printing and reliability guidelines                            |
+| Path                                                           | What it does                                                                                                                                              |
+| -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `lerobot_robot_nexarm/motors/`                                 | CommProtocol UART framing, 6-servo sync read/write, torque, bridge mode (CMD 56/68/96/97/98)                                                              |
+| `lerobot_robot_nexarm/nexarm_follower/`                        | `NexArmFollowerConfig` + `NexArmFollower` (`nexarm_follower`) — connect, observe, send_action                                                             |
+| `lerobot_robot_nexarm/nexarm_sim/`                             | `NexArmSimConfig` + `NexArmSim` (`nexarm_sim`) — single-arm MuJoCo simulation                                                                             |
+| `lerobot_robot_nexarm/mobile_bi_nexarm_sim/`                   | `MobileBiNexArmSimConfig` + `MobileBiNexArmSim` (`mobile_bi_nexarm_sim`) — bimanual mobile sim                                                            |
+| `lerobot_robot_nexarm/{collection_merge,recording_session}.py` | Collection recording tools behind `examples/nexarm/record_collection.py`, incl. the manual-control keys                                                   |
+| `lerobot_robot_nexarm/{local_dataset,rerun_recording}.py`      | Local-only dataset loading; `.rrd` recording of the Rerun stream and `lerobot-nexarm-rollout`                                                             |
+| `lerobot_robot_nexarm/camera_config.py`                        | The `--front-cam`/`--wrist-cam`/`--top-cam` flags and camera configs shared by the examples and tools                                                     |
+| `lerobot_teleoperator_nexarm/`                                 | `NexArmLeaderConfig` + `NexArmLeader` (`nexarm_leader`) — read positions, leader→follower mapping                                                         |
+| `lerobot_env_nexarm/`                                          | `NexArmEnv` (`--env.type=nexarm`), the gym envs, `lerobot-nexarm-eval` (per-stage rates) and `lerobot-nexarm-sim-benchmark`                               |
+| `nexarm_service/`                                              | Desktop-app engine (`lerobot-nexarm-service`, `--extra service`)                                                                                          |
+| `sim/`                                                         | MuJoCo MJCF, URDF description, Isaac Lab configs, meshes, and exporters                                                                                   |
+| `sim/mobile_nexarm/`                                           | Mobile bimanual NexArm assets, ManiSkill/Isaac configs and video2sim                                                                                      |
+| `examples/nexarm/`                                             | Ready-to-run tutorials: teleoperate, record, rollout, the sim demos and sim dataset generators, ACT and TurboVLA launchers                                |
+| `tools/nexarm/`                                                | Operational tools: arm/camera/sim calibration, joint-mapping and servo probes, dataset audits, merges, uploads, videos                                    |
+| `policies/`                                                    | Research policy plugins: `lerobot_policy_turbovla` and `lerobot_policy_dem` (adapters for the pinned `turbovla`/`dem` packages), `lerobot_policy_bspline` |
+| `experiments/`                                                 | One `YYMMDD-<slug>` folder per experiment: README (hypothesis, data, command, results) and its draccus configs                                            |
+| `firmware/`, `hardware/`                                       | Vendor controller firmware and protocol docs; mechanical, 3D-printing and reliability guidelines                                                          |
 
 ## Tech Stack
 

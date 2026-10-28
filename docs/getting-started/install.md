@@ -28,6 +28,7 @@ Add extras to that line instead of syncing a smaller set:
 | Workflow                               | Add                                |
 | -------------------------------------- | ---------------------------------- |
 | TurboVLA (`--policy.type=turbovla`)    | `--extra turbovla`                 |
+| DEM (`--policy.type=dem`)              | `--extra dem`                      |
 | Benchmarking pi0 / SmolVLA checkpoints | `--extra pi --extra smolvla`       |
 | Diffusion policy                       | `--extra diffusion`                |
 | LIBERO benchmark                       | `--extra libero`                   |
