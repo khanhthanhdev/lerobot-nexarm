@@ -1,6 +1,6 @@
 # Shared by the Plan-Bind run scripts (D1 run_all.sh, D2 run_all.sh): environment, preflight, setup, Hub
 # upload and once-per-output stage markers. Source it after setting REPO and cd-ing into it; stages use OUT,
-# and publishing() uses PUBLISH.
+# and publishing() uses PUBLISH. EXTRA_SYNC_ARGS adds `uv sync` flags, such as `--extra pusht`.
 
 export PATH="$HOME/.local/bin:$PATH"
 export MUJOCO_GL=egl PYOPENGL_PLATFORM=egl WANDB_MODE=offline PYTHONIOENCODING=utf-8 HF_HUB_DISABLE_TELEMETRY=1
@@ -38,7 +38,8 @@ setup() {
   fi
   # A system Python 3.12 avoids building native packages with uv's own interpreter.
   if [ -z "${UV_PYTHON:-}" ] && [ -x /usr/bin/python3.12 ]; then export UV_PYTHON=/usr/bin/python3.12; fi
-  uv sync --locked --extra test --extra training --extra nexarm --extra diffusion
+  # shellcheck disable=SC2086  # EXTRA_SYNC_ARGS is a list of flags
+  uv sync --locked --extra test --extra training --extra nexarm --extra diffusion ${EXTRA_SYNC_ARGS:-}
   # The sim meshes are Git LFS objects.
   git lfs install --local >/dev/null
   git lfs pull

@@ -31,6 +31,7 @@ Add extras to that line instead of syncing a smaller set:
 | Benchmarking pi0 / SmolVLA checkpoints | `--extra pi --extra smolvla`       |
 | Diffusion policy                       | `--extra diffusion`                |
 | LIBERO benchmark                       | `--extra libero`                   |
+| Push-T benchmark                       | `--extra pusht`                    |
 | Desktop-app engine                     | `--extra service`                  |
 | Everything (all policies and tools)    | use `uv sync --locked --extra all` |
 

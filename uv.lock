@@ -3149,6 +3149,16 @@ pi = [
     { name = "sentencepiece" },
     { name = "transformers" },
 ]
+pusht = [
+    { name = "av" },
+    { name = "datasets" },
+    { name = "gym-pusht" },
+    { name = "jsonlines" },
+    { name = "pandas" },
+    { name = "pyarrow" },
+    { name = "torchcodec", version = "0.11.1", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'arm64' and sys_platform == 'darwin') or (platform_machine == 'aarch64' and sys_platform == 'linux') or (platform_machine == 'arm64' and sys_platform == 'linux') or sys_platform == 'win32'" },
+    { name = "torchcodec", version = "0.11.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine == 'AMD64' and sys_platform == 'linux') or (platform_machine == 'x86_64' and sys_platform == 'linux')" },
+]
 pyserial-dep = [
     { name = "pyserial" },
 ]
@@ -3245,6 +3255,9 @@ nexarm = [
 pi = [
     { name = "lerobot", extra = ["pi"] },
 ]
+pusht = [
+    { name = "lerobot", extra = ["pusht"] },
+]
 service = [
     { name = "nexarm-service" },
 ]
@@ -3291,6 +3304,7 @@ requires-dist = [
     { name = "lerobot", extras = ["intelrealsense"], marker = "extra == 'intelrealsense'", git = "https://github.com/huggingface/lerobot?rev=d3793b7e36522321c1c455f0dc4826db3793dceb" },
     { name = "lerobot", extras = ["libero"], marker = "extra == 'libero'", git = "https://github.com/huggingface/lerobot?rev=d3793b7e36522321c1c455f0dc4826db3793dceb" },
     { name = "lerobot", extras = ["pi"], marker = "extra == 'pi'", git = "https://github.com/huggingface/lerobot?rev=d3793b7e36522321c1c455f0dc4826db3793dceb" },
+    { name = "lerobot", extras = ["pusht"], marker = "extra == 'pusht'", git = "https://github.com/huggingface/lerobot?rev=d3793b7e36522321c1c455f0dc4826db3793dceb" },
     { name = "lerobot", extras = ["smolvla"], marker = "extra == 'smolvla'", git = "https://github.com/huggingface/lerobot?rev=d3793b7e36522321c1c455f0dc4826db3793dceb" },
     { name = "lerobot", extras = ["test"], marker = "extra == 'test'", git = "https://github.com/huggingface/lerobot?rev=d3793b7e36522321c1c455f0dc4826db3793dceb" },
     { name = "lerobot", extras = ["training"], marker = "extra == 'training'", git = "https://github.com/huggingface/lerobot?rev=d3793b7e36522321c1c455f0dc4826db3793dceb" },
@@ -3304,7 +3318,7 @@ requires-dist = [
     { name = "turbovla", marker = "extra == 'turbovla'", git = "https://github.com/khanhthanhdev/TurboVLA?rev=28bc1e7e8cf259aacee4fd928258caa669cbaaae" },
     { name = "xacro", marker = "extra == 'test'", specifier = ">=2.0.0,<3.0.0" },
 ]
-provides-extras = ["all", "core-scripts", "dataset", "dataset-viz", "dev", "diffusion", "feetech", "hardware", "intelrealsense", "libero", "pi", "smolvla", "test", "training", "viz", "nexarm", "service", "turbovla"]
+provides-extras = ["all", "core-scripts", "dataset", "dataset-viz", "dev", "diffusion", "feetech", "hardware", "intelrealsense", "libero", "pi", "pusht", "smolvla", "test", "training", "viz", "nexarm", "service", "turbovla"]
 
 [package.metadata.requires-dev]
 nexarm = [
