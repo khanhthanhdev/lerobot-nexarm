@@ -73,6 +73,8 @@ uv run lerobot-eval --policy.path=outputs/train/act_stack_bowls/checkpoints/last
     --env.type=nexarm --env.task=NexArmStackBowls-v0 --eval.n_episodes=20
 ```
 
+`--env.bowl_shift_m=0.03` tests reactivity: when the middle bowl is first lifted, the bottom bowl slides 3 cm in a seeded random direction that keeps it clear of the top bowl, once per episode. The default, 0, leaves the bowls in place.
+
 The Isaac Lab twin of this task, for parallel training in Isaac Sim, is described in
 [`sim/isaac_lab/README.md`](../../sim/isaac_lab/README.md).
 

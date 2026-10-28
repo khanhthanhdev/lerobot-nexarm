@@ -72,12 +72,15 @@ Both modes use a fixed, uniform cubic knot grid instead of adaptive knots, regre
 
 At inference, `SplineRuntime` calls the network once per fine knot span and simulates inference latency:
 
-- **Latency:** with `planbind_latency=L` frames, a call made at frame k swaps in at k + L, and calls do not overlap.
+- **Rate:** `planbind_call_every` sets the call period in frames, a multiple of `planbind_fine_spacing`; 0 (default) means one call per fine knot span.
+- **Latency:** with `planbind_latency=L` frames, a call made at frame k swaps in at k + L, and calls do not overlap, so a call waits for the first period boundary after the previous swap. L plus the call period must be below `bspline_window`.
 - **Commit:** `planbind_commit=latency` keeps the running control points up to the swap, so swaps are exactly C2; `now` keeps them only up to the call frame, and `none` swaps naively.
 - **Limits:** `planbind_position_limit` and `planbind_velocity_limit` clip the free control points. Because a B-spline stays inside the convex hull of its control points, this bounds the executed actions exactly (in normalized units).
 - **Episode start:** the first call is used at once, without waiting for the latency.
 
 `planbind_replan_threshold` re-plans when Bind's largest residual exceeds it. Override the runtime options at evaluation, for example `lerobot-eval --policy.path=... --policy.planbind_latency=6 --policy.planbind_commit=none`.
+
+`--policy.bspline_runtime=true` runs a `diffusion` checkpoint through the same runtime: each call denoises a spline, decodes `bspline_window` actions (holding the last one if the spline is shorter) and fits them to the cubic fine grid, which then goes through the same latency, commit and limits. It is an evaluation option for comparing B-spline Policy with the one-step modes under one set of rules; training is unchanged. [`experiments/261028-plan-bind-d2-latency`](../../experiments/261028-plan-bind-d2-latency/README.md) uses it and times each mode's inference call.
 
 ## Tests
 
