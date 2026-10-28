@@ -43,7 +43,7 @@ All cells use 50 episodes with eval seed 1000, the same episodes as D1, so any t
 | Bowl moves          | `bsp10_L0_shift3cm`, and all three policies through the runtime at latency 0 and 6 (`_shift3cm`)                        |
 | Seeds (`SEEDS > 1`) | `onestep`, `planbind` × latency 0 and 6 × commit `latency`, `none`, each extra seed (`_s1001`, ...)                     |
 
-Cells with the same name are run once: a measured latency of 0 or 6 frames reuses the matching cell.
+Cells with the same name are run once: a measured latency of 0 or 6 frames reuses the matching cell. A measured latency of 60 frames (2 s) or more does not fit the 64-frame window; that cell is skipped with a warning, and the timing alone is the result.
 
 ## Run it
 
@@ -71,7 +71,7 @@ HF_REPO=<user>/plan-bind-d2 experiments/261028-plan-bind-d2-latency/run_all.sh  
 
 ## Outputs
 
-- `outputs/full/d1/` — the downloaded D1 checkpoints.
+- `outputs/d1/` — the downloaded D1 checkpoints, shared by the smoke and full runs.
 - `outputs/full/bench/{cuda,cuda_amp,cpu}.json` — the timings.
 - `outputs/full/eval/<cell>/eval_info.json` — one directory per cell, as in D1, with up to 10 videos.
 - `outputs/full/results.md` — written by `summarize.py`: the timings, then one table per question with paired differences ("+a/-b" counts the episodes only one of the two cells succeeded in), then every cell with its stage rates.
