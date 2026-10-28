@@ -13,6 +13,7 @@
 #   experiments/261028-plan-bind-d3-pusht/run_all.sh          # smoke run, then the full run
 #   experiments/261028-plan-bind-d3-pusht/run_all.sh smoke    # about 30 minutes: proves the pipeline
 #   experiments/261028-plan-bind-d3-pusht/run_all.sh full     # the experiment
+# GPUS="0 1 2" spreads the trainings, then the eval cells, over those GPUs (one worker each; default one GPU).
 # env overrides: SEEDS=2 STEPS=100000 BATCH=64 SAVE_FREQ=25000 NUM_WORKERS=8 N_EVAL=200 N_SWEEP=100 EVAL_BATCH=50
 # HF_REPO=<user>/<repo> uploads each trained policy (then deletes its local checkpoints except the last),
 # the eval cells and results.md to that private repo (full run only; needs `uv run hf auth login`).
@@ -66,6 +67,12 @@ publish_eval() {
 eval_cell() {
   local cell=$1 path=$2 episodes=$3 dir="$OUT/eval/$1"
   shift 3
+  # With several GPUs every worker walks the same cell list and takes each EVAL_N-th cell. The count comes
+  # first, so a cell finished meanwhile by another worker cannot shift it.
+  if [ -n "${EVAL_N:-}" ]; then
+    EVAL_IDX=$((EVAL_IDX + 1))
+    [ $((EVAL_IDX % EVAL_N)) = "$EVAL_W" ] || return 0
+  fi
   if [ -f "$dir/eval_info.json" ]; then echo "skip eval $cell (done)"; return; fi
   rm -rf "$dir"
   say "eval $cell"
@@ -128,17 +135,41 @@ eval_matrix() {
   done
 }
 
-run_all() {
-  mkdir -p "$OUT/eval"
-  local seed p
+# worker <index> <gpu> <workers>: trains every <workers>-th (policy, seed) job on its GPU, waits for the other
+# workers' trainings, then evaluates every <workers>-th eval cell.
+worker() {
+  local w=$1 gpu=$2 n=$3 job=0 seed p
+  export CUDA_VISIBLE_DEVICES=$gpu
   for seed in $(seeds); do
     for p in "${POLICIES[@]}"; do
-      run_stage "train_${p}_s$seed" train "$p" "$seed"
-      run_stage "sweep_${p}_s$seed" sweep "$p" "$seed"
-      if publishing "${HF_REPO:-}"; then publish "hub_train_${p}_s$seed" publish_train "${p}_s$seed"; fi
+      if [ $((job % n)) = "$w" ]; then
+        run_stage "train_${p}_s$seed" train "$p" "$seed"
+        run_stage "sweep_${p}_s$seed" sweep "$p" "$seed"
+        if publishing "${HF_REPO:-}"; then publish "hub_train_${p}_s$seed" publish_train "${p}_s$seed"; fi
+      fi
+      job=$((job + 1))
     done
   done
-  run_stage eval eval_matrix
+  for seed in $(seeds); do
+    for p in "${POLICIES[@]}"; do
+      while [ ! -f "$OUT/.done_sweep_${p}_s$seed" ]; do sleep 30; done
+    done
+  done
+  EVAL_N=$n EVAL_W=$w EVAL_IDX=0
+  run_stage "eval_w$w" eval_matrix
+  wait
+}
+
+run_all() {
+  mkdir -p "$OUT/eval" "$OUT/logs"
+  local gpus=(${GPUS:-0}) w pids=() failed=0
+  for w in "${!gpus[@]}"; do
+    # Each worker also logs to $OUT/logs/worker_<index>.log, which status.sh reads.
+    worker "$w" "${gpus[$w]}" "${#gpus[@]}" > >(tee -a "$OUT/logs/worker_$w.log") 2>&1 &
+    pids+=($!)
+  done
+  for w in "${pids[@]}"; do wait "$w" || failed=1; done
+  [ "$failed" = 0 ] || die "a GPU worker failed; rerun this script to resume"
   uv run python "$EXP_DIR/summarize.py" "$OUT/eval" > "$OUT/results.md"
   if publishing "${HF_REPO:-}"; then publish hub_eval publish_eval; fi
   wait
