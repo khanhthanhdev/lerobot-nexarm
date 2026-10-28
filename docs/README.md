@@ -29,7 +29,7 @@ Everything you need to use and develop the Hiwonder NexArm on LeRobot. Pick the 
 - [Server training](guides/server-training.md): TurboVLA on a remote GPU server or a Slurm cluster
 - [Sim calibration](guides/sim-calibration.md): fit the simulation to your real arm before sim-to-real
 - [`experiments/`](../experiments/README.md): one folder per experiment, with its configs and results
-- Policy plugins: [`lerobot_policy_turbovla`](../policies/lerobot_policy_turbovla/README.md), [`lerobot_policy_bspline`](../policies/lerobot_policy_bspline/README.md)
+- Policy plugins: [`lerobot_policy_turbovla`](../policies/lerobot_policy_turbovla/README.md), [`lerobot_policy_bspline`](../policies/lerobot_policy_bspline/README.md), [`lerobot_policy_dem`](../policies/lerobot_policy_dem/README.md)
 
 ### I use the desktop app
 

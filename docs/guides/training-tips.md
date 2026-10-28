@@ -95,15 +95,16 @@ All policies typically train for **5–10 epochs** (see section 3).
 
 ### 2.3 Policy Compatibility Matrix on NexArm
 
-| Policy group  | Status on NexArm       | Requirements & Compatibility Notes                                                   |
-| ------------- | ---------------------- | ------------------------------------------------------------------------------------ |
-| **ACT**       | **Validated Baseline** | Fully compatible. front + wrist (+ top) cameras + 6-DoF raw joint positions.         |
-| **TurboVLA**  | **Validated VLA**      | Fully compatible. Real-time 32 Hz VLA with <1GB VRAM. Uses DINOv3 + BERT + ACT head. |
-| **Diffusion** | **Validated Baseline** | Fully compatible. Requires `uv sync --extra diffusion`.                              |
-| **SmolVLA**   | **Validated Baseline** | Compatible VLA. Requires `uv sync --extra smolvla` and `--task` description.         |
-| **TDMPC**     | **Incompatible**       | Rejects 640x480 dual-cam setup (requires square images `H == W` and single camera).  |
-| **VQ-BeT**    | **Incompatible**       | Rejects 2-camera setup (`len(image_features) == 1` enforced at config validation).   |
-| **π0 / π0.5** | Experimental           | Requires 20+ GB VRAM or small batch + gradient accumulation.                         |
+| Policy group  | Status on NexArm       | Requirements & Compatibility Notes                                                                                                                          |
+| ------------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **ACT**       | **Validated Baseline** | Fully compatible. front + wrist (+ top) cameras + 6-DoF raw joint positions.                                                                                |
+| **TurboVLA**  | **Validated VLA**      | Fully compatible. Real-time 32 Hz VLA with <1GB VRAM. Uses DINOv3 + BERT + ACT head.                                                                        |
+| **DEM**       | **Experimental**       | DINOv3 ConvNeXt-B + NeoBERT + MeanFlow head, one-step sampling. The paper's recipe failed on stack-bowls (0/10); use the v2 defaults. Gated DINOv3 weights. |
+| **Diffusion** | **Validated Baseline** | Fully compatible. Requires `uv sync --extra diffusion`.                                                                                                     |
+| **SmolVLA**   | **Validated Baseline** | Compatible VLA. Requires `uv sync --extra smolvla` and `--task` description.                                                                                |
+| **TDMPC**     | **Incompatible**       | Rejects 640x480 dual-cam setup (requires square images `H == W` and single camera).                                                                         |
+| **VQ-BeT**    | **Incompatible**       | Rejects 2-camera setup (`len(image_features) == 1` enforced at config validation).                                                                          |
+| **π0 / π0.5** | Experimental           | Requires 20+ GB VRAM or small batch + gradient accumulation.                                                                                                |
 
 ---
 
@@ -137,13 +138,14 @@ Pass the resulting total with `--steps=<N>`; eval at intermediate checkpoints (`
 
 ### 3.3 Per-policy starting points (single-task, ~50 episodes)
 
-| Policy         | Batch | Steps (first run) | Notes                                                             |
-| -------------- | ----: | ----------------: | ----------------------------------------------------------------- |
-| `act`          |  8–16 |           30k–80k | Usually converges under 50k for single-task.                      |
-| `turbovla`     |  8–16 |           30k–50k | Lightweight VLA. DINOv3 + BERT; <1GB VRAM at 32 Hz inference.     |
-| `diffusion`    |  8–16 |          80k–150k | Benefits from longer training than ACT.                           |
-| `smolvla`      |   4–8 |           30k–80k | Pretrained VLM → converges fast.                                  |
-| `pi0` / `pi05` |   1–4 |           30k–80k | Memory-bound; use gradient accumulation for effective batch ≥ 16! |
+| Policy         | Batch | Steps (first run) | Notes                                                                           |
+| -------------- | ----: | ----------------: | ------------------------------------------------------------------------------- |
+| `act`          |  8–16 |           30k–80k | Usually converges under 50k for single-task.                                    |
+| `turbovla`     |  8–16 |           30k–50k | Lightweight VLA. DINOv3 + BERT; <1GB VRAM at 32 Hz inference.                   |
+| `dem`          |    32 |          50k–100k | 18 GB at batch 32 with front + wrist; EMA on. Watch `meanflow_mse`, not `loss`. |
+| `diffusion`    |  8–16 |          80k–150k | Benefits from longer training than ACT.                                         |
+| `smolvla`      |   4–8 |           30k–80k | Pretrained VLM → converges fast.                                                |
+| `pi0` / `pi05` |   1–4 |           30k–80k | Memory-bound; use gradient accumulation for effective batch ≥ 16!               |
 
 ### 3.4 Batch size & gradient accumulation
 

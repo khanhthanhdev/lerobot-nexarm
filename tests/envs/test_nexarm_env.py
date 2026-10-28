@@ -291,18 +291,6 @@ def test_nexarm_env_task_is_the_picklable_instruction():
     env.close()
 
 
-def test_nexarm_stack_bowls_env_fixes_the_order():
-    kwargs = NexArmEnv(task="NexArmStackBowls-v0", obs_type="state", stack_order="black,red,blue").gym_kwargs
-    env = gym.make("NexArmStackBowls-v0", **kwargs)
-    for seed in range(4):
-        env.reset(seed=seed)
-        assert env.unwrapped.sim_task.current_order == ("black", "red", "blue")
-    env.close()
-    assert "order" not in NexArmEnv().gym_kwargs
-    with pytest.raises(ValueError, match="order"):
-        gym.make("NexArmStackBowls-v0", obs_type="state", order=("red", "red", "blue"))
-
-
 def test_nexarm_stack_bowls_env_shifts_the_bottom_bowl_once():
     from lerobot_robot_nexarm.nexarm_sim.stack_bowls_task import MIN_BOWL_SEPARATION_M
 
@@ -358,6 +346,26 @@ def test_nexarm_stack_bowls_env_rewards_a_released_stack():
     assert rewards[0] >= 9.0  # placing both bowls raises the potential from near 0 to 10
     assert rewards[-1] >= 10.0  # the success bonus
     env.close()
+
+
+def test_nexarm_stack_bowls_env_fixed_order():
+    env = gym.make("NexArmStackBowls-v0", obs_type="state", stack_order="red,blue,black")
+    prompts, layouts = set(), []
+    for seed in range(6):  # without stack_order these six seeds give all six orders
+        _, info = env.reset(seed=seed)
+        assert env.unwrapped.sim_task.current_order == ("red", "blue", "black")
+        prompts.add(info["task"])
+        layouts.append(env.unwrapped.sim_task.bowl_position("red").copy())
+    assert prompts == {"Stack the bowls with red on bottom, blue in middle, and black on top."}
+    assert not np.allclose(layouts[0], layouts[1])  # the layout still follows the seed
+    env.close()
+    with pytest.raises(ValueError, match="stack_order"):
+        gym.make("NexArmStackBowls-v0", obs_type="state", stack_order="red,red,black")
+    with pytest.raises(ValueError, match="stack_order"):
+        NexArmEnv(stack_order="red,blue,black")  # pick-place has no order
+    config = NexArmEnv(task="NexArmStackBowls-v0", stack_order="red,blue,black")
+    assert config.gym_kwargs["stack_order"] == "red,blue,black"
+    assert "stack_order" not in NexArmEnv(task="NexArmStackBowls-v0").gym_kwargs
 
 
 def test_nexarm_env_config_sizes_environment_state_by_task():

@@ -37,7 +37,8 @@ class NexArmEnv(EnvConfig):
     # Stack-bowls grasp: None keeps the env default ("physical", friction only); "contact_assisted" carries
     # a bowl rigidly once both jaws touch it.
     grasp_mode: str | None = None
-    # Stack-bowls order as "bottom,middle,top" (e.g. "red,blue,black"); None draws it from the seed.
+    # Stack-bowls order as bottom,middle,top (e.g. "red,blue,black") for policies trained on a single-order
+    # dataset (generate_stack_bowls_dataset.py --order); None cycles all six orders by seed.
     stack_order: str | None = None
     # Stack-bowls perturbation: when the middle bowl is first lifted, slide the bottom bowl this far (m).
     bowl_shift_m: float = 0.0
@@ -62,11 +63,12 @@ class NexArmEnv(EnvConfig):
 
     def __post_init__(self):
         assist_set = any(
-            value is not None for value in (self.assist_engage_pos, self.assist_release_pos, self.grasp_mode)
+            value is not None
+            for value in (self.assist_engage_pos, self.assist_release_pos, self.grasp_mode, self.stack_order)
         )
         if (assist_set or self.bowl_shift_m) and "StackBowls" not in self.gym_id:
             raise ValueError(
-                "assist_engage_pos, assist_release_pos, grasp_mode and bowl_shift_m apply only to "
+                "assist_engage_pos, assist_release_pos, grasp_mode, stack_order and bowl_shift_m apply only to "
                 "NexArmStackBowls-v0"
             )
         if self.obs_type in ("pixels_agent_pos", "state"):
@@ -112,11 +114,9 @@ class NexArmEnv(EnvConfig):
         }
         if self.episode_length is not None:
             kwargs["max_episode_steps"] = self.episode_length
-        for key in ("assist_engage_pos", "assist_release_pos", "grasp_mode"):
+        for key in ("assist_engage_pos", "assist_release_pos", "grasp_mode", "stack_order"):
             if getattr(self, key) is not None:
                 kwargs[key] = getattr(self, key)
-        if self.stack_order is not None:
-            kwargs["order"] = tuple(self.stack_order.split(","))
         if self.bowl_shift_m:
             kwargs["bowl_shift_m"] = self.bowl_shift_m
         return kwargs

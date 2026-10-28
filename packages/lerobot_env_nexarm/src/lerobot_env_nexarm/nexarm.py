@@ -319,6 +319,10 @@ class _NexArmMujocoEnv(gym.Env):
                 raw_targets[f"{name}.pos"] = float(np.clip(raw_val, raw_min, raw_max))
         return raw_targets
 
+    def _task_reset_kwargs(self) -> dict[str, Any]:
+        """Extra keyword arguments for the task's `reset`."""
+        return {}
+
     def reset(
         self,
         *,
@@ -336,7 +340,7 @@ class _NexArmMujocoEnv(gym.Env):
         return self._get_obs(), info
 
     def _reset_task(self, seed: int) -> Any:
-        return self.sim_task.reset(seed=seed, settle_steps=10)
+        return self.sim_task.reset(seed=seed, settle_steps=10, **self._task_reset_kwargs())
 
     def log_stages_to(self, prefix: str | None) -> None:
         """Log each seeded episode's final ``stage/*`` flags to ``<prefix>.<pid>.jsonl``; ``None`` stops.
@@ -481,8 +485,8 @@ class NexArmStackBowlsEnv(_NexArmMujocoEnv):
     """Stack the red, blue and black bowls in the order named by the episode's instruction.
 
     This is the task of the real ``nexarm_stack_bowls`` recordings. Each reset draws the bowl layout and the
-    stacking order from the seed (``order`` fixes it instead), and ``task_description`` holds the current
-    episode's instruction. By
+    stacking order from the seed (``stack_order`` fixes the order instead, for policies trained on one order),
+    and ``task_description`` holds the current episode's instruction. By
     default the grasp is physical: the jaws hold a bowl by friction alone, as in the scripted dataset
     generator. ``grasp_mode="contact_assisted"`` instead carries a bowl rigidly once both jaws touch it. Either
     way a bowl counts as released once the gripper command opens below ``assist_release_pos``; the default
@@ -512,17 +516,19 @@ class NexArmStackBowlsEnv(_NexArmMujocoEnv):
         assist_engage_pos: float = GRIPPER_ASSIST_ENGAGE_POS,
         assist_release_pos: float = REAL_TELEOP_ASSIST_RELEASE_POS,
         grasp_mode: Literal["contact_assisted", "proximity_assisted", "physical"] = "physical",
-        order: tuple[str, str, str] | None = None,
+        stack_order: str | tuple[str, str, str] | None = None,
         bowl_shift_m: float = 0.0,
         **kwargs: Any,
     ) -> None:
-        if order is not None and tuple(order) not in PERMUTATIONS:
+        if isinstance(stack_order, str):
+            stack_order = tuple(color.strip() for color in stack_order.split(","))  # type: ignore[assignment]
+        if stack_order is not None and tuple(stack_order) not in PERMUTATIONS:
             raise ValueError(
-                f"order must name red, blue and black once each (bottom, middle, top), got {order}"
+                f"stack_order must be bottom,middle,top of red, blue and black; got {stack_order!r}"
             )
         if bowl_shift_m < 0:
             raise ValueError(f"bowl_shift_m must be >= 0, got {bowl_shift_m}")
-        self.order = None if order is None else tuple(order)
+        self.stack_order = tuple(stack_order) if stack_order is not None else None
         self.bowl_shift_m = bowl_shift_m
         self._shift_done = False
         self._bowl_shifted = False
@@ -546,10 +552,14 @@ class NexArmStackBowlsEnv(_NexArmMujocoEnv):
             grasp_mode=self.grasp_mode,
         )
 
+    def _task_reset_kwargs(self) -> dict[str, Any]:
+        """Pass the fixed stacking order, if any, to the task."""
+        return {} if self.stack_order is None else {"order": self.stack_order}
+
     def _reset_task(self, seed: int) -> NexArmStackBowlsStatus:
         self._shift_done = self._bowl_shifted = False
         self._shift_rng = np.random.default_rng([seed, 2])
-        return self.sim_task.reset(seed=seed, order=self.order, settle_steps=10)
+        return super()._reset_task(seed)
 
     def step(self, action: np.ndarray) -> tuple[dict[str, np.ndarray], float, bool, bool, dict[str, Any]]:
         obs, reward, terminated, truncated, info = super().step(action)

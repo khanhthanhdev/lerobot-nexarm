@@ -1,0 +1,28 @@
+# B-spline Policy on single-order NexArm stack-bowls (1000 episodes, red bottom, blue middle, black top):
+#   CUDA_VISIBLE_DEVICES=0 uv run lerobot-train --config_path experiments/261027-bspline-stack-bowls-single-order/train.yaml
+dataset:
+  repo_id: local/nexarm_stack_bowls_red_blue_black_1k
+  root: outputs/datasets/nexarm_stack_bowls_red_blue_black_1k
+
+policy:
+  type: bspline
+  push_to_hub: false
+  device: cuda
+  # Same image size as 261024-bspline-vs-diffusion-stack-bowls; all three sim cameras.
+  resize_shape: [120, 160]
+  # The spline fit runs on CPU for every sample; 4 processes keep RAM low on the shared server.
+  bspline_fit_workers: 4
+
+output_dir: experiments/261027-bspline-stack-bowls-single-order/outputs/train_bspline
+job_name: 261027-bspline-stack-bowls-single-order
+seed: 1000
+batch_size: 64
+num_workers: 4
+steps: 100000
+save_freq: 25000
+log_freq: 100
+env_eval_freq: 0
+
+wandb:
+  enable: true
+  project: lerobot-nexarm
