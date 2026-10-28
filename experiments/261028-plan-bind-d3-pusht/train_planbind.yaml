@@ -1,0 +1,29 @@
+# Plan-Bind D3: Plan-Bind on Push-T. Fine knots every 2 frames, coarse plan knots every 8 (0.8 s), plans
+# replaced when older than 16 frames (1.6 s); the 32-frame window as for onestep. run_all.sh passes the output
+# dir, seed, steps, batch size and workers on the command line.
+dataset:
+  repo_id: lerobot/pusht
+
+policy:
+  type: bspline
+  push_to_hub: false
+  device: cuda
+  bspline_mode: planbind
+  bspline_window: 32
+  planbind_fine_spacing: 2
+  planbind_subdivision: 4
+  planbind_max_plan_age: 16
+  planbind_plan_noise: 0.02
+
+output_dir: experiments/261028-plan-bind-d3-pusht/outputs/full/train_planbind_s1000
+job_name: 261028-plan-bind-d3-planbind
+seed: 1000
+batch_size: 64
+steps: 100000
+save_freq: 25000
+log_freq: 200
+env_eval_freq: 0
+
+wandb:
+  enable: false
+  project: lerobot-nexarm

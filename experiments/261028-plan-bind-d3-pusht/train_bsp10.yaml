@@ -1,0 +1,34 @@
+# Plan-Bind D3: B-spline Policy (DDIM, 10 steps) on Push-T, with diffusion's Push-T recipe otherwise.
+# The fit tolerance is the paper's 1 px: 0.004 in actions min-max scaled to [-1, 1] over Push-T's ~500 px
+# range. It executes at most 8 actions per call, like diffusion. run_all.sh passes the output dir, seed, steps,
+# batch size and workers on the command line; the values here are the defaults.
+dataset:
+  repo_id: lerobot/pusht
+
+policy:
+  type: bspline
+  push_to_hub: false
+  device: cuda
+  bspline_mode: diffusion
+  noise_scheduler_type: DDIM
+  num_inference_steps: 10
+  n_action_steps: 8
+  bspline_max_error: 0.004
+  bspline_fit_workers: 4
+  # The 10 fps grid of all three B-spline configs, also used when bsp10 runs through the spline runtime.
+  bspline_window: 32
+  planbind_fine_spacing: 2
+  planbind_subdivision: 4
+
+output_dir: experiments/261028-plan-bind-d3-pusht/outputs/full/train_bsp10_s1000
+job_name: 261028-plan-bind-d3-bsp10
+seed: 1000
+batch_size: 64
+steps: 100000
+save_freq: 25000
+log_freq: 200
+env_eval_freq: 0
+
+wandb:
+  enable: false
+  project: lerobot-nexarm

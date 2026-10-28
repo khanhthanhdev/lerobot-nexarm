@@ -17,6 +17,7 @@ Research runs that the reorganization made possible, tracked in their experiment
 | [TurboVLA on LIBERO](../experiments/261024-turbovla-libero/README.md)                                  | Training and the four-suite eval                                           | Linux GPU with EGL |
 | [B-spline vs diffusion, stack bowls](../experiments/261024-bspline-vs-diffusion-stack-bowls/README.md) | 50-episode sim comparison and 10 real-arm episodes                         | GPU, real arm      |
 | [Plan-Bind D2: measured latency](../experiments/261028-plan-bind-d2-latency/README.md)                 | Inference timings and about 40 eval cells on D1's checkpoints              | GPU                |
+| [Plan-Bind D3: Push-T](../experiments/261028-plan-bind-d3-pusht/README.md)                             | Four policies, two seeds, 100k steps each, and 66 eval cells               | GPU                |
 | TurboVLA and B-spline on the real arm                                                                  | 10 `lerobot-rollout` episodes and a desktop-app eval session per policy    | Real arm           |
 
 ## Closed

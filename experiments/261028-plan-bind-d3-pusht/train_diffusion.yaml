@@ -1,0 +1,26 @@
+# Plan-Bind D3: LeRobot's diffusion policy on Push-T, the baseline of the B-spline Policy paper. LeRobot's
+# diffusion defaults are its Push-T recipe (84x84 random crop, 2 observation frames, 16-action horizon,
+# 8 actions executed per call); only the sampler is set, to the same DDIM 10 steps as bsp10. run_all.sh passes
+# the output dir, seed, steps, batch size and workers on the command line; the values here are the defaults.
+dataset:
+  repo_id: lerobot/pusht
+
+policy:
+  type: diffusion
+  push_to_hub: false
+  device: cuda
+  noise_scheduler_type: DDIM
+  num_inference_steps: 10
+
+output_dir: experiments/261028-plan-bind-d3-pusht/outputs/full/train_diffusion_s1000
+job_name: 261028-plan-bind-d3-diffusion
+seed: 1000
+batch_size: 64
+steps: 100000
+save_freq: 25000
+log_freq: 200
+env_eval_freq: 0
+
+wandb:
+  enable: false
+  project: lerobot-nexarm

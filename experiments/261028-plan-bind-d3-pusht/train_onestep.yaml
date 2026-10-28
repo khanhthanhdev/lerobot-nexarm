@@ -1,0 +1,27 @@
+# Plan-Bind D3: the one-step control on Push-T. Push-T runs at 10 fps, so the fine knots are every 2 frames
+# (0.2 s; uniform cubic fits of the demonstrations miss by a median 3 px, p95 11 px) over a 32-frame window.
+# run_all.sh passes the output dir, seed, steps, batch size and workers on the command line.
+dataset:
+  repo_id: lerobot/pusht
+
+policy:
+  type: bspline
+  push_to_hub: false
+  device: cuda
+  bspline_mode: onestep
+  bspline_window: 32
+  planbind_fine_spacing: 2
+  planbind_subdivision: 4
+
+output_dir: experiments/261028-plan-bind-d3-pusht/outputs/full/train_onestep_s1000
+job_name: 261028-plan-bind-d3-onestep
+seed: 1000
+batch_size: 64
+steps: 100000
+save_freq: 25000
+log_freq: 200
+env_eval_freq: 0
+
+wandb:
+  enable: false
+  project: lerobot-nexarm
