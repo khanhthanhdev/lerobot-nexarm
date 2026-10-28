@@ -308,6 +308,26 @@ def test_nexarm_stack_bowls_env_rewards_a_released_stack():
     env.close()
 
 
+def test_nexarm_stack_bowls_env_fixed_order():
+    env = gym.make("NexArmStackBowls-v0", obs_type="state", stack_order="red,blue,black")
+    prompts, layouts = set(), []
+    for seed in range(6):  # without stack_order these six seeds give all six orders
+        _, info = env.reset(seed=seed)
+        assert env.unwrapped.task.current_order == ("red", "blue", "black")
+        prompts.add(info["task"])
+        layouts.append(env.unwrapped.task.bowl_position("red").copy())
+    assert prompts == {"Stack the bowls with red on bottom, blue in middle, and black on top."}
+    assert not np.allclose(layouts[0], layouts[1])  # the layout still follows the seed
+    env.close()
+    with pytest.raises(ValueError, match="stack_order"):
+        gym.make("NexArmStackBowls-v0", obs_type="state", stack_order="red,red,black")
+    with pytest.raises(ValueError, match="stack_order"):
+        NexArmEnv(stack_order="red,blue,black")  # pick-place has no order
+    config = NexArmEnv(task="NexArmStackBowls-v0", stack_order="red,blue,black")
+    assert config.gym_kwargs["stack_order"] == "red,blue,black"
+    assert "stack_order" not in NexArmEnv(task="NexArmStackBowls-v0").gym_kwargs
+
+
 def test_nexarm_env_config_sizes_environment_state_by_task():
     assert NexArmEnv(obs_type="state").features["environment_state"].shape == (6,)
     stack = NexArmEnv(task="NexArmStackBowls-v0", obs_type="state")
