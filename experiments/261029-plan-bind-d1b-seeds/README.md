@@ -40,7 +40,7 @@ GPUS="0 1 2" NUM_WORKERS=4 HF_DATASET_REPO=thanhkt/nexarm-stack-bowls-sim-red-bl
 
 In a second terminal: `watch -n 30 experiments/261029-plan-bind-d1b-seeds/status.sh` shows the GPUs, finished stages, each training's latest checkpoint, eval cells done and each worker's last log line. Rerunning the same command after a disconnect resumes.
 
-How the work is split: with `GPUS` set, each GPU worker takes the next unclaimed training (slowest first: `onestep_long`, the three `bsp10`, three `planbind`, three `onestep`, `onestep_k2`), sweeps that run's checkpoints, and uploads it. When all are trained, the workers split the 37 final-checkpoint cells between them. Env overrides: `SEEDS`, `STEPS`, `BATCH`, `SAVE_FREQ`, `NUM_WORKERS`, `N_EVAL`, `N_SWEEP`, `EVAL_BATCH`.
+How the work is split: with `GPUS` set, each GPU worker takes the next unclaimed training (slowest first: `onestep_long`, the three `bsp10`, three `planbind`, three `onestep`, `onestep_k2`), and evaluates that run's last checkpoint at latency 0 (the headline number). When all are trained, the workers split the 37 final-checkpoint cells between them, then the checkpoint sweeps (last checkpoint first; `bsp10` only every 20k steps, because its rollouts are about 10 times slower), and only then upload the policies (an upload deletes all but the last checkpoint). Env overrides: `SEEDS`, `STEPS`, `BATCH`, `SAVE_FREQ`, `NUM_WORKERS`, `N_EVAL`, `N_SWEEP`, `EVAL_BATCH`.
 
 **Time (estimate).** D1 on an RTX 3090 took 5.7 h (`bsp10`), 3.7 h (`onestep`) and 3.9 h (`planbind`) per training. The 11 trainings add up to about 51 GPU-hours on that card, so about 17 h on three GPUs of similar speed (more if the A5000 is slower), plus about 2–4 h of sweeps and eval. Measure the smoke run's `step_s` and scale.
 

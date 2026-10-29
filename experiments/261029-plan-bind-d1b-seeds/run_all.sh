@@ -5,8 +5,10 @@
 #   1. trains bsp10, onestep and planbind with SEEDS training seeds (1000, 1001, ...), plus two controls for
 #      the one-step baseline (seed 1000 only): onestep_k2 (fine knots every 2 frames, so it calls twice as
 #      often) and onestep_long (twice the steps);
-#   2. after each training, evaluates every saved checkpoint at latency 0 (the checkpoint curve);
-#   3. evaluates the last checkpoints: latency 0, 200 and 300 ms, latency commit, and naive swapping at 0 ms.
+#   2. after each training, evaluates its last checkpoint at latency 0 (the headline number);
+#   3. when all are trained, evaluates the last checkpoints: latency 0, 200 and 300 ms, latency commit, and
+#      naive swapping at 0 ms;
+#   4. last, the checkpoint curve at latency 0 (last checkpoint first; bsp10 only every 20k steps).
 # Every stage leaves a .done marker, training resumes from its last checkpoint and finished eval cells are
 # kept, so after a disconnect run the same command again. Run it under tmux; status.sh shows progress.
 #
@@ -121,15 +123,28 @@ eval_cell() {
 stem() { case $1 in bsp10) echo "$1_L$2" ;; *) echo "$1_L$2_${3:-latency}" ;; esac; }
 runtime_args() { case $1 in bsp10) ;; *) echo --policy.planbind_latency="$2" --policy.planbind_commit="${3:-latency}" ;; esac; }
 
-# sweep <variant> <seed>: every saved checkpoint at latency 0, before the upload prunes them.
-sweep() {
-  local name=$1 seed=$2 ckpt step
-  for ckpt in "$OUT/train_${name}_s$seed"/checkpoints/[0-9]*; do
-    [ -d "$ckpt" ] || continue
-    step=$(basename "$ckpt")
-    # shellcheck disable=SC2046  # runtime_args prints a list of flags
-    eval_cell "$(stem "$name" 0)_s${seed}_step$step" "$ckpt/pretrained_model" "$N_SWEEP" $(runtime_args "$name" 0)
-  done
+# final0 <variant> <seed>: the last checkpoint at latency 0, the main comparison's cell (the matrix keeps it),
+# right after training so the headline number of each policy comes first.
+final0() {
+  local name=$1 seed=$2
+  # shellcheck disable=SC2046  # runtime_args prints a list of flags
+  eval_cell "$(stem "$name" 0)_s$seed" "$OUT/train_${name}_s$seed/checkpoints/last/pretrained_model" "$N_EVAL" \
+    $(runtime_args "$name" 0)
+}
+
+# sweep_all: the checkpoint curve at latency 0, last checkpoint first, so a run cut short loses the early ones.
+# bsp10 rollouts are about 10 times slower, so only every 20k steps. Runs before any upload prunes checkpoints.
+sweep_all() {
+  local line name seed ckpt step
+  while read -r line <&3; do
+    name=${line%_s*} seed=${line##*_s}
+    for ckpt in $(ls -d "$OUT/train_$line"/checkpoints/[0-9]* 2>/dev/null | sort -r); do
+      step=$(basename "$ckpt")
+      if [ "$name" = bsp10 ] && [ $((10#$step % 20000)) != 0 ]; then continue; fi
+      # shellcheck disable=SC2046
+      eval_cell "$(stem "$name" 0)_s${seed}_step$step" "$ckpt/pretrained_model" "$N_SWEEP" $(runtime_args "$name" 0)
+    done
+  done 3< <(job_list)
 }
 
 eval_matrix() {
@@ -157,22 +172,39 @@ eval_matrix() {
 }
 
 # worker <index> <gpu> <workers>: takes the next unclaimed job (the list is slowest first), trains it on its GPU,
-# and repeats; then waits for the other workers' trainings and evaluates every <workers>-th eval cell.
+# evaluates its last checkpoint, and repeats; then waits for the other workers' trainings, evaluates every
+# <workers>-th final cell, then every <workers>-th sweep cell, and finally uploads its policies.
+# EXTERNAL_TRAIN="<job> ..." names jobs trained by another process, which touches $OUT/.done_train_<job>.
 worker() {
-  local w=$1 gpu=$2 n=$3 line
+  local w=$1 gpu=$2 n=$3 line i mine=()
   export CUDA_VISIBLE_DEVICES=$gpu
   while read -r line <&3; do
+    case " ${EXTERNAL_TRAIN:-} " in
+      *" $line "*)
+        if [ "$w" = 0 ]; then mine+=("$line"); fi
+        continue
+        ;;
+    esac
     if mkdir "$OUT/.claim_$line" 2>/dev/null; then  # atomic: one worker per job
+      mine+=("$line")
       run_stage "train_$line" train "${line%_s*}" "${line##*_s}"
-      run_stage "sweep_$line" sweep "${line%_s*}" "${line##*_s}"
-      if publishing "${HF_REPO:-}"; then publish "hub_train_$line" publish_train "$line"; fi
+      run_stage "final0_$line" final0 "${line%_s*}" "${line##*_s}"
     fi
   done 3< <(job_list)
   while read -r line <&3; do
-    while [ ! -f "$OUT/.done_sweep_$line" ]; do sleep 30; done
+    while [ ! -f "$OUT/.done_train_$line" ]; do sleep 30; done
   done 3< <(job_list)
   EVAL_N=$n EVAL_W=$w EVAL_IDX=0
   run_stage "eval_w$w" eval_matrix
+  EVAL_IDX=0
+  run_stage "sweep_w$w" sweep_all
+  # Uploads delete all but the last checkpoint, so wait until every worker's sweep is done.
+  for ((i = 0; i < n; i++)); do
+    while [ ! -f "$OUT/.done_sweep_w$i" ]; do sleep 30; done
+  done
+  if publishing "${HF_REPO:-}"; then
+    for line in "${mine[@]}"; do publish "hub_train_$line" publish_train "$line"; done
+  fi
   wait
 }
 
