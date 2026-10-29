@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Plan-Bind D1b: D1 (stack bowls) repeated with training seeds, more eval episodes, checkpoint curves and
+# Plan-Bind D1b: D1 (stack bowls) repeated with training seeds, more eval episodes and
 # stronger one-step controls, on one or several GPUs. Same data, configs and eval as D1
 # (../261027-plan-bind-two-step); only the statistics change.
 #   1. trains bsp10, onestep and planbind with SEEDS training seeds (1000, 1001, ...), plus two controls for
@@ -7,8 +7,8 @@
 #      often) and onestep_long (twice the steps);
 #   2. after each training, evaluates its last checkpoint at latency 0 (the headline number);
 #   3. when all are trained, evaluates the last checkpoints: latency 0, 200 and 300 ms, latency commit, and
-#      naive swapping at 0 ms;
-#   4. last, the checkpoint curve at latency 0 (last checkpoint first; bsp10 only every 20k steps).
+#      naive swapping at 0 ms.
+#   Only each training's last checkpoint is kept (the others are deleted after step 2), so there is no checkpoint curve.
 # Every stage leaves a .done marker, training resumes from its last checkpoint and finished eval cells are
 # kept, so after a disconnect run the same command again. Run it under tmux; status.sh shows progress.
 #
@@ -17,7 +17,7 @@
 #   experiments/261029-plan-bind-d1b-seeds/run_all.sh smoke    # proves the pipeline
 #   experiments/261029-plan-bind-d1b-seeds/run_all.sh full     # the experiment
 # GPUS="0 1 2" spreads the trainings, then the eval cells, over those GPUs (one worker each; default one GPU).
-# env overrides: SEEDS=3 STEPS=60000 BATCH=32 SAVE_FREQ=10000 NUM_WORKERS=4 N_EVAL=100 N_SWEEP=50 EVAL_BATCH=10
+# env overrides: SEEDS=3 STEPS=60000 BATCH=32 SAVE_FREQ=10000 NUM_WORKERS=4 N_EVAL=100 EVAL_BATCH=10
 # The dataset is D1's: with HF_DATASET_REPO=<user>/<repo> it is downloaded when missing, otherwise it is
 # generated (500 episodes, about 1 h). HF_REPO=<user>/<repo> uploads each trained policy (then deletes its
 # local checkpoints except the last), the eval cells and results.md to that private repo (full run only).
@@ -35,7 +35,7 @@ EVAL_SEED=1000  # the same eval episodes in every cell, so cells compare episode
 STACK_ORDER=${STACK_ORDER:-red,blue,black}
 # Full-run settings, read now: the smoke run reuses these names in `all` mode.
 FULL_SEEDS=${SEEDS:-3} FULL_STEPS=${STEPS:-60000} FULL_BATCH=${BATCH:-32} FULL_SAVE_FREQ=${SAVE_FREQ:-10000}
-FULL_NUM_WORKERS=${NUM_WORKERS:-4} FULL_N_EVAL=${N_EVAL:-100} FULL_N_SWEEP=${N_SWEEP:-50}
+FULL_NUM_WORKERS=${NUM_WORKERS:-4} FULL_N_EVAL=${N_EVAL:-100}
 FULL_EVAL_BATCH=${EVAL_BATCH:-10}
 
 seeds() { local i; for ((i = 0; i < SEEDS; i++)); do echo $((1000 + i)); done; }
@@ -73,7 +73,7 @@ get_data() {
 # train <variant> <seed>: resumes from the last checkpoint.
 train() {
   local name=$1 seed=$2 dir="$OUT/train_$1_s$2" steps=$STEPS
-  [ "$name" = onestep_long ] && steps=$((STEPS * 2))  # twice the steps; save_freq stays, so the curve is longer
+  [ "$name" = onestep_long ] && steps=$((STEPS * 2))  # twice the steps
   local last="$dir/checkpoints/last/pretrained_model/train_config.json"
   if [ -f "$last" ]; then
     uv run lerobot-train --config_path="$last" --resume=true
@@ -123,6 +123,15 @@ eval_cell() {
 stem() { case $1 in bsp10) echo "$1_L$2" ;; *) echo "$1_L$2_${3:-latency}" ;; esac; }
 runtime_args() { case $1 in bsp10) ;; *) echo --policy.planbind_latency="$2" --policy.planbind_commit="${3:-latency}" ;; esac; }
 
+# prune <job>: keeps only the checkpoint `last` points to, to save disk.
+prune() {
+  local dir="$OUT/train_$1" keep ckpt
+  keep=$(basename "$(readlink -f "$dir/checkpoints/last")")
+  for ckpt in "$dir"/checkpoints/[0-9]*; do
+    [ "$(basename "$ckpt")" = "$keep" ] || rm -rf "$ckpt"
+  done
+}
+
 # final0 <variant> <seed>: the last checkpoint at latency 0, the main comparison's cell (the matrix keeps it),
 # right after training so the headline number of each policy comes first.
 final0() {
@@ -130,21 +139,6 @@ final0() {
   # shellcheck disable=SC2046  # runtime_args prints a list of flags
   eval_cell "$(stem "$name" 0)_s$seed" "$OUT/train_${name}_s$seed/checkpoints/last/pretrained_model" "$N_EVAL" \
     $(runtime_args "$name" 0)
-}
-
-# sweep_all: the checkpoint curve at latency 0, last checkpoint first, so a run cut short loses the early ones.
-# bsp10 rollouts are about 10 times slower, so only every 20k steps. Runs before any upload prunes checkpoints.
-sweep_all() {
-  local line name seed ckpt step
-  while read -r line <&3; do
-    name=${line%_s*} seed=${line##*_s}
-    for ckpt in $(ls -d "$OUT/train_$line"/checkpoints/[0-9]* 2>/dev/null | sort -r); do
-      step=$(basename "$ckpt")
-      if [ "$name" = bsp10 ] && [ $((10#$step % 20000)) != 0 ]; then continue; fi
-      # shellcheck disable=SC2046
-      eval_cell "$(stem "$name" 0)_s${seed}_step$step" "$ckpt/pretrained_model" "$N_SWEEP" $(runtime_args "$name" 0)
-    done
-  done 3< <(job_list)
 }
 
 eval_matrix() {
@@ -172,11 +166,11 @@ eval_matrix() {
 }
 
 # worker <index> <gpu> <workers>: takes the next unclaimed job (the list is slowest first), trains it on its GPU,
-# evaluates its last checkpoint, and repeats; then waits for the other workers' trainings, evaluates every
-# <workers>-th final cell, then every <workers>-th sweep cell, and finally uploads its policies.
+# evaluates its last checkpoint and deletes the others, and repeats; then waits for the other workers'
+# trainings, evaluates every <workers>-th final cell, and uploads its policies.
 # EXTERNAL_TRAIN="<job> ..." names jobs trained by another process, which touches $OUT/.done_train_<job>.
 worker() {
-  local w=$1 gpu=$2 n=$3 line i mine=()
+  local w=$1 gpu=$2 n=$3 line mine=()
   export CUDA_VISIBLE_DEVICES=$gpu
   while read -r line <&3; do
     case " ${EXTERNAL_TRAIN:-} " in
@@ -189,6 +183,7 @@ worker() {
       mine+=("$line")
       run_stage "train_$line" train "${line%_s*}" "${line##*_s}"
       run_stage "final0_$line" final0 "${line%_s*}" "${line##*_s}"
+      run_stage "prune_$line" prune "$line"
     fi
   done 3< <(job_list)
   while read -r line <&3; do
@@ -196,12 +191,6 @@ worker() {
   done 3< <(job_list)
   EVAL_N=$n EVAL_W=$w EVAL_IDX=0
   run_stage "eval_w$w" eval_matrix
-  EVAL_IDX=0
-  run_stage "sweep_w$w" sweep_all
-  # Uploads delete all but the last checkpoint, so wait until every worker's sweep is done.
-  for ((i = 0; i < n; i++)); do
-    while [ ! -f "$OUT/.done_sweep_w$i" ]; do sleep 30; done
-  done
   if publishing "${HF_REPO:-}"; then
     for line in "${mine[@]}"; do publish "hub_train_$line" publish_train "$line"; done
   fi
@@ -229,7 +218,7 @@ run_all() {
 
 run_smoke() {
   OUT="$EXP_DIR/outputs/smoke" DATA="$EXP_DIR/outputs/smoke/data"
-  EPISODES=4 GEN_WORKERS=2 SEEDS=1 STEPS=200 BATCH=8 SAVE_FREQ=100 NUM_WORKERS=2 N_EVAL=2 N_SWEEP=2 EVAL_BATCH=2
+  EPISODES=4 GEN_WORKERS=2 SEEDS=1 STEPS=200 BATCH=8 SAVE_FREQ=100 NUM_WORKERS=2 N_EVAL=2 EVAL_BATCH=2
   PUBLISH=0
   run_all
 }
@@ -237,7 +226,7 @@ run_smoke() {
 run_full() {
   OUT="$EXP_DIR/outputs/full" DATA="$REPO/outputs/datasets/nexarm_stack_bowls"
   EPISODES=500 GEN_WORKERS=8 SEEDS=$FULL_SEEDS STEPS=$FULL_STEPS BATCH=$FULL_BATCH SAVE_FREQ=$FULL_SAVE_FREQ
-  NUM_WORKERS=$FULL_NUM_WORKERS N_EVAL=$FULL_N_EVAL N_SWEEP=$FULL_N_SWEEP EVAL_BATCH=$FULL_EVAL_BATCH PUBLISH=1
+  NUM_WORKERS=$FULL_NUM_WORKERS N_EVAL=$FULL_N_EVAL EVAL_BATCH=$FULL_EVAL_BATCH PUBLISH=1
   run_all
 }
 
