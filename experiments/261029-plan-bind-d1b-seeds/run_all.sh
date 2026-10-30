@@ -60,7 +60,13 @@ variant_args() {
 
 get_data() {
   local info="$DATA/meta/info.json"
-  if [ -f "$info" ]; then echo "reusing $DATA"; return; fi
+  if [ -f "$info" ]; then
+    local tasks
+    tasks=$(uv run python -c "import json, sys; print(json.load(open(sys.argv[1])).get(\"total_tasks\", 1))" "$info")
+    [ "$tasks" = 1 ] || die "$DATA has $tasks tasks (stacking orders); the policies need one. Set DATA to a single-order dataset"
+    echo "reusing $DATA"
+    return
+  fi
   [ ! -e "$DATA" ] || die "$DATA exists but is not a LeRobot dataset; remove it and rerun"
   if [ "$PUBLISH" = 1 ] && [ -n "${HF_DATASET_REPO:-}" ]; then
     uv run hf download "$HF_DATASET_REPO" --repo-type=dataset --local-dir "$DATA"
@@ -224,7 +230,8 @@ run_smoke() {
 }
 
 run_full() {
-  OUT="$EXP_DIR/outputs/full" DATA="$REPO/outputs/datasets/nexarm_stack_bowls"
+  # DATA: the single-order dataset (red, blue, black); a six-order dataset makes every policy fail.
+  OUT="$EXP_DIR/outputs/full" DATA="${DATA:-$REPO/outputs/datasets/nexarm_stack_bowls_red_blue_black_1k}"
   EPISODES=500 GEN_WORKERS=8 SEEDS=$FULL_SEEDS STEPS=$FULL_STEPS BATCH=$FULL_BATCH SAVE_FREQ=$FULL_SAVE_FREQ
   NUM_WORKERS=$FULL_NUM_WORKERS N_EVAL=$FULL_N_EVAL EVAL_BATCH=$FULL_EVAL_BATCH PUBLISH=1
   run_all
