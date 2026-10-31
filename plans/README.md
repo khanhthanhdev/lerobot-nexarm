@@ -4,10 +4,11 @@ One folder per plan, named `YYMMDD-HHMM-<slug>`, with a `plan.md` (outcome, deci
 
 ## Open work
 
-| Plan                                                                              | Status  | What is left                                                                                                                                                                               | Needs                   |
-| --------------------------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------- |
-| [NexArm CAD zero pose = real Home pose](261019-1440-nexarm-cad-home-pose/plan.md) | backlog | Measure the joint signs on the real follower (open problem 6), a follower-only recorder for sim fitting (7), regenerate sim datasets and calibrations (8), the Isaac USD and mobile assets | Robot session           |
-| [NexArm single-arm sim fidelity](261014-1423-nexarm-sim-fidelity/plan.md)         | backlog | All five phases: real-to-sim joint mapping, canonical asset tree, scene and object fixes, servo model, collision refit. Starts after the CAD plan, which fixes the zero pose it builds on  | Robot session, CAD plan |
+| Plan                                                                                      | Status  | What is left                                                                                                                                                                               | Needs                   |
+| ----------------------------------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------- |
+| [NexArm CAD zero pose = real Home pose](261019-1440-nexarm-cad-home-pose/plan.md)         | backlog | Measure the joint signs on the real follower (open problem 6), a follower-only recorder for sim fitting (7), regenerate sim datasets and calibrations (8), the Isaac USD and mobile assets | Robot session           |
+| [NexArm single-arm sim fidelity](261014-1423-nexarm-sim-fidelity/plan.md)                 | backlog | All five phases: real-to-sim joint mapping, canonical asset tree, scene and object fixes, servo model, collision refit. Starts after the CAD plan, which fixes the zero pose it builds on  | Robot session, CAD plan |
+| [Plan-Bind methodology fixes before D1b](261031-0052-plan-bind-methodology-fixes/plan.md) | active  | All five phases coded; left: the D1b smoke run with `onestep_pos`, a D1 checkpoint load and the plan-error runs on the server                                                              | GPU server              |
 
 Research runs that the reorganization made possible, tracked in their experiment folders rather than in a plan:
 
