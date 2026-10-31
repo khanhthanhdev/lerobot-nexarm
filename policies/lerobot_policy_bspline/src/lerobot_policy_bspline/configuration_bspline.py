@@ -49,6 +49,11 @@ class BsplineConfig(DiffusionConfig):
             up to the swap, exact C2 join), ``now`` (C2 join at the call frame only) or ``none`` (naive swap).
         planbind_position_limit: Bound on the normalized actions enforced on the control points; 0 is off.
         planbind_velocity_limit: Bound on the normalized action change per frame; 0 is off.
+        planbind_acceleration_limit: Bound on the normalized action change per frame squared; 0 is off.
+            At a position limit, the position and velocity bounds win and acceleration may exceed it.
+        planbind_onestep_input: `onestep` only. ``zeros`` feeds the UNet a constant sequence (D1's
+            control); ``learned`` feeds a trained ``(n_fine, action_dim)`` input initialised to a linear ramp,
+            so the input carries sequence position.
         planbind_call_every: Frames between network calls at evaluation, a multiple of
             `planbind_fine_spacing`; 0 calls once per fine span. A call never starts while one is pending.
         bspline_runtime: Evaluation only, `diffusion` mode: run the policy through the same runtime as
@@ -81,7 +86,9 @@ class BsplineConfig(DiffusionConfig):
     planbind_commit: str = "latency"
     planbind_position_limit: float = 0.0
     planbind_velocity_limit: float = 0.0
+    planbind_acceleration_limit: float = 0.0
     planbind_call_every: int = 0
+    planbind_onestep_input: str = "zeros"
     bspline_runtime: bool = False
 
     def __post_init__(self):
@@ -113,6 +120,15 @@ class BsplineConfig(DiffusionConfig):
         if self.bspline_mode not in ("diffusion", "onestep", "planbind"):
             raise ValueError(
                 f"`bspline_mode` must be 'diffusion', 'onestep' or 'planbind'. Got {self.bspline_mode!r}."
+            )
+        if self.planbind_onestep_input not in ("zeros", "learned"):
+            raise ValueError(
+                f"`planbind_onestep_input` must be 'zeros' or 'learned'. Got {self.planbind_onestep_input!r}."
+            )
+        if self.planbind_onestep_input == "learned" and self.bspline_mode != "onestep":
+            raise ValueError(
+                "`planbind_onestep_input='learned'` only applies to `bspline_mode='onestep'`. "
+                f"Got {self.bspline_mode!r}."
             )
         if self.bspline_mode != "diffusion" or self.bspline_runtime:
             self._validate_planbind()
@@ -147,6 +163,7 @@ class BsplineConfig(DiffusionConfig):
             "planbind_replan_threshold",
             "planbind_position_limit",
             "planbind_velocity_limit",
+            "planbind_acceleration_limit",
         ):
             if getattr(self, name) < 0:
                 raise ValueError(f"`{name}` must be >= 0. Got {getattr(self, name)}.")

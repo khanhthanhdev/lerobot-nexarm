@@ -5,6 +5,7 @@ from lerobot_policy_bspline.modeling_bspline import BsplineModel, BsplinePolicy
 from lerobot_policy_bspline.planbind import PlanBindModel
 from lerobot_policy_bspline.uniform_spline import (
     basis_matrix,
+    derivative_bounds,
     lift_matrix,
     n_ctrl_points,
     n_frozen,
@@ -117,6 +118,43 @@ def test_projection_bounds_position_and_velocity():
     assert project(ctrl, 3, spacing, 0.0, 0.0) is ctrl
 
 
+def _dense_derivatives(ctrl: torch.Tensor, spacing: float) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Values, speed and acceleration of the curve, by finite differences on dense samples."""
+    times = torch.linspace(0, (ctrl.shape[1] - 3) * spacing, 4001, dtype=torch.float64)
+    dt = times[1] - times[0]
+    values = curve(ctrl, times, spacing)
+    speed = values.diff(dim=1) / dt
+    return values, speed, speed.diff(dim=1) / dt
+
+
+def test_projection_bounds_acceleration():
+    torch.manual_seed(5)
+    spacing, vel, acc = 4.0, 0.05, 0.004
+    ctrl = 2 * torch.randn(4, 16, 3)
+    ctrl[:, :3] = 0.0  # feasible frozen prefix
+    out = project(ctrl, 3, spacing, 0.0, vel, acc)
+    torch.testing.assert_close(out[:, :3], ctrl[:, :3])
+    max_vel, max_acc = derivative_bounds(out, spacing)
+    assert (max_vel <= vel + 1e-6).all() and (max_acc <= acc + 1e-6).all()
+    _, speed, accel = _dense_derivatives(out, spacing)
+    assert speed.abs().max() <= vel + 1e-5
+    assert accel.abs().max() <= acc + 1e-4
+    assert project(ctrl, 3, spacing, 0.0, 0.0, 0.0) is ctrl
+
+
+def test_projection_at_the_position_wall_keeps_position_and_velocity():
+    spacing, pos, vel, acc = 4.0, 0.8, 0.05, 0.002
+    # Running at full speed towards the bound, too close to brake within the acceleration limit.
+    prefix = torch.tensor([0.4, 0.6, 0.78])
+    ctrl = torch.cat([prefix, torch.full((9,), 2.0)])[None, :, None]
+    out = project(ctrl, 3, spacing, pos, vel, acc)
+    max_vel, max_acc = derivative_bounds(out, spacing)
+    values, _, _ = _dense_derivatives(out, spacing)
+    assert values.abs().max() <= pos + 1e-6
+    assert max_vel.item() <= vel + 1e-6
+    assert max_acc.item() > acc, "expected the acceleration bound to give way at the position limit"
+
+
 def test_default_mode_is_unchanged():
     config = make_config(bspline_mode="diffusion")
     assert config.action_delta_indices == list(range(WINDOW))
@@ -141,6 +179,13 @@ def test_config_validation():
         make_config(planbind_call_every=6)
     with pytest.raises(ValueError, match="call period"):
         make_config(planbind_latency=20, planbind_call_every=12)
+    with pytest.raises(ValueError, match="planbind_onestep_input"):
+        make_config(bspline_mode="onestep", planbind_onestep_input="ramp")
+    for mode in ("planbind", "diffusion"):
+        with pytest.raises(ValueError, match="planbind_onestep_input"):
+            make_config(bspline_mode=mode, planbind_onestep_input="learned")
+    with pytest.raises(ValueError, match="planbind_acceleration_limit"):
+        make_config(planbind_acceleration_limit=-1.0)
 
 
 @pytest.mark.parametrize("mode", ["onestep", "planbind"])
@@ -276,3 +321,32 @@ def test_save_and_load_round_trip(tmp_path):
     obs = {OBS_STATE: batch[OBS_STATE], IMAGE_KEY: batch[IMAGE_KEY]}
     torch.testing.assert_close(policy.predict_action_chunk(dict(obs)), loaded.predict_action_chunk(dict(obs)))
     assert n_ctrl_points(WINDOW, 4) <= loaded.diffusion.n_fine
+
+
+def test_onestep_learned_input_trains_and_round_trips(tmp_path):
+    zeros_policy = BsplinePolicy(make_config(bspline_mode="onestep"))
+    assert zeros_policy.diffusion.onestep_input is None
+    assert not any("onestep_input" in k for k in zeros_policy.state_dict())
+
+    config = make_config(bspline_mode="onestep", planbind_onestep_input="learned")
+    policy = BsplinePolicy(config)
+    model = policy.diffusion
+    assert model.onestep_input.shape == (model.n_fine, ACTION_DIM)
+    torch.testing.assert_close(model.onestep_input[:, 0], torch.linspace(-1.0, 1.0, model.n_fine))
+    # Only the new input is added to the zeros model.
+    assert set(policy.state_dict()) - set(zeros_policy.state_dict()) == {"diffusion.onestep_input"}
+
+    batch = make_batch(config)
+    loss, _ = policy.forward(batch)
+    loss.backward()
+    assert model.onestep_input.grad is not None and model.onestep_input.grad.abs().sum() > 0
+    with torch.no_grad():
+        model.onestep_input.add_(0.1 * torch.randn_like(model.onestep_input))
+
+    policy.eval()
+    policy.save_pretrained(tmp_path)
+    loaded = BsplinePolicy.from_pretrained(tmp_path).eval()
+    assert loaded.config.planbind_onestep_input == "learned"
+    torch.testing.assert_close(loaded.diffusion.onestep_input, model.onestep_input)
+    obs = {OBS_STATE: batch[OBS_STATE], IMAGE_KEY: batch[IMAGE_KEY]}
+    torch.testing.assert_close(policy.predict_action_chunk(dict(obs)), loaded.predict_action_chunk(dict(obs)))

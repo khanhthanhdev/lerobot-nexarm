@@ -3,7 +3,9 @@
 Both modes regress control points with LeRobot's diffusion UNet used as a one-step network: the input
 sequence is the "sample" and the diffusion timestep embedding carries the call's role.
 
-- `onestep` (control): the UNet maps zeros to the fine control points of the next window.
+- `onestep` (control): the UNet maps an input without a plan to the fine control points of the next window:
+  zeros (`planbind_onestep_input=zeros`, D1's control) or a trained input initialised to a linear ramp along
+  the sequence (`learned`), which gives the UNet sequence position as the lifted plan gives it to Bind.
 - `planbind`: the same UNet first maps zeros to a coarse plan (timestep 0). The plan is lifted exactly to
   the fine grid and shifted to the current frame; the UNet then maps that lifted plan to a residual
   (timestep ``1 + plan age``). One shared UNet keeps the parameter count equal to `onestep`.
@@ -59,6 +61,10 @@ class PlanBindModel(DiffusionModel):
         self.fine_spacing = config.planbind_fine_spacing
         self.subdivision = config.planbind_subdivision
         self.n_coarse, self.n_fine = knot_grid(config)
+        self.onestep_input: torch.nn.Parameter | None = None
+        if config.bspline_mode == "onestep" and config.planbind_onestep_input == "learned":
+            ramp = torch.linspace(-1.0, 1.0, self.n_fine)[:, None].expand(-1, config.action_feature.shape[0])
+            self.onestep_input = torch.nn.Parameter(ramp.clone())
         frames = torch.arange(config.bspline_window, dtype=torch.float64)
         register_fine_grid(self, config)
         coarse_basis = basis_matrix(frames, self.n_coarse, self.fine_spacing * self.subdivision)
@@ -86,9 +92,13 @@ class PlanBindModel(DiffusionModel):
 
     def onestep(self, global_cond: Tensor) -> Tensor:
         """Fine control points ``(B, n_fine, D)`` of the next window, without a plan."""
-        zeros = global_cond.new_zeros(global_cond.shape[0], self.n_fine, self.config.action_feature.shape[0])
-        role = torch.zeros(global_cond.shape[0], dtype=torch.long, device=global_cond.device)
-        return self._run_unet(zeros, role, global_cond)
+        batch_size = global_cond.shape[0]
+        if self.onestep_input is not None:
+            x = self.onestep_input.expand(batch_size, -1, -1)
+        else:
+            x = global_cond.new_zeros(batch_size, self.n_fine, self.config.action_feature.shape[0])
+        role = torch.zeros(batch_size, dtype=torch.long, device=global_cond.device)
+        return self._run_unet(x, role, global_cond)
 
     def lifted_plan(self, coarse: Tensor, age_spans: Tensor) -> Tensor:
         """Coarse plans lifted to the fine grid and re-anchored ``age_spans`` fine spans later."""
@@ -232,7 +242,14 @@ class SplineRuntime:
                 spans = torch.full((chunk.shape[0],), (self.frame - self.cmd_anchor) // spacing)
                 running = shift_ctrl(self.cmd, spans)
                 chunk = torch.cat([running[:, :frozen], chunk[:, frozen:]], dim=1)
-            chunk = project(chunk, frozen, spacing, cfg.planbind_position_limit, cfg.planbind_velocity_limit)
+            chunk = project(
+                chunk,
+                frozen,
+                spacing,
+                cfg.planbind_position_limit,
+                cfg.planbind_velocity_limit,
+                cfg.planbind_acceleration_limit,
+            )
             if swap <= self.frame:
                 self.cmd, self.cmd_anchor = chunk, self.frame
             else:

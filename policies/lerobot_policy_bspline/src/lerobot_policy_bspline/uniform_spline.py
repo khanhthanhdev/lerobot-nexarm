@@ -93,19 +93,34 @@ def n_frozen(latency: int, spacing: int, commit: str) -> int:
 
 
 def project(
-    ctrl: Tensor, frozen: int, spacing: float, position_limit: float, velocity_limit: float
+    ctrl: Tensor,
+    frozen: int,
+    spacing: float,
+    position_limit: float,
+    velocity_limit: float,
+    acceleration_limit: float = 0.0,
 ) -> Tensor:
     """Clip the free control points so the curve respects the limits (0 disables a limit).
 
-    A B-spline lies in the convex hull of its control points and its derivative is a B-spline with
-    control points ``(c[i+1] - c[i]) / spacing``. So bounding the points and their differences bounds
-    position and velocity everywhere on the free part. Frozen points are left unchanged (they are assumed
-    feasible, as the output of an earlier projection).
+    A B-spline lies in the convex hull of its control points; its first derivative is a B-spline with
+    control points ``(c[i+1] - c[i]) / spacing`` and its second one a B-spline with control points
+    ``(c[i+1] - 2 c[i] + c[i-1]) / spacing**2``. So bounding the points and their first and second
+    differences bounds position, velocity and acceleration everywhere on the curve. Each free point is
+    clamped, in order, to the intersection of the position box, the velocity interval around the previous
+    point and the acceleration interval around its linear extrapolation. Frozen points are left unchanged
+    (they are assumed feasible, as the output of an earlier projection).
+
+    The velocity and acceleration intervals always meet, and so do the position box and the velocity
+    interval around a point inside the box; but all three can be disjoint when the curve runs into the
+    position limit faster than it can brake. Position and velocity then win: the point is clamped to their
+    intersection and the acceleration bound is exceeded there. The bounds hold exactly only away from the
+    position limit.
     """
-    if position_limit <= 0 and velocity_limit <= 0:
+    if position_limit <= 0 and velocity_limit <= 0 and acceleration_limit <= 0:
         return ctrl
     out = ctrl.clone()
     max_step = velocity_limit * spacing
+    max_bend = acceleration_limit * spacing**2
     for i in range(frozen, out.shape[1]):
         point = out[:, i]
         if i > 0 and velocity_limit > 0:
@@ -113,5 +128,30 @@ def project(
         if position_limit > 0:
             # Clipping towards the bound only shrinks the step from a feasible previous point.
             point = point.clamp(-position_limit, position_limit)
+        if i > 1 and acceleration_limit > 0:
+            centre = 2 * out[:, i - 1] - out[:, i - 2]
+            lo, hi = centre - max_bend, centre + max_bend
+            if velocity_limit > 0:
+                lo = torch.maximum(lo, out[:, i - 1] - max_step)
+                hi = torch.minimum(hi, out[:, i - 1] + max_step)
+            if position_limit > 0:
+                lo, hi = lo.clamp(min=-position_limit), hi.clamp(max=position_limit)
+            # `clamp` with lo > hi returns hi, so an empty intersection keeps the position-velocity point.
+            point = torch.where(lo <= hi, out[:, i].clamp(lo, hi), point)
         out[:, i] = point
     return out
+
+
+def derivative_bounds(ctrl: Tensor, spacing: float) -> tuple[Tensor, Tensor]:
+    """Per chunk, the largest absolute velocity and acceleration of the curve's control-point bounds.
+
+    Returns ``(B,)`` tensors: the max of ``|c[i+1] - c[i]| / spacing`` and of
+    ``|c[i+1] - 2 c[i] + c[i-1]| / spacing**2`` over points and channels, upper bounds of the curve's
+    speed and acceleration per channel.
+    """
+    first = ctrl.diff(dim=1)
+    second = first.diff(dim=1)
+    return (
+        first.abs().amax(dim=(1, 2)) / spacing,
+        second.abs().amax(dim=(1, 2)) / spacing**2,
+    )
