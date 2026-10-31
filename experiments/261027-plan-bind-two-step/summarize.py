@@ -4,7 +4,8 @@ usage: uv run python experiments/261027-plan-bind-two-step/summarize.py <eval di
 
 Each cell directory is named ``<policy>_L<latency frames>_<commit>[_<suffix>]`` and holds the
 ``eval_info.json`` of ``lerobot-nexarm-eval``. The second table pairs Plan-Bind with the one-step control
-at the same latency and commit mode (RQ1); episodes share seeds, so the difference is paired.
+at the same latency and commit mode (RQ1); episodes share seeds, so the difference is paired: the episodes
+solved by one policy only and the exact McNemar p on them.
 """
 
 from __future__ import annotations
@@ -13,6 +14,8 @@ import json
 import re
 import sys
 from pathlib import Path
+
+from episode_stats import episode_successes, format_p, paired_difference
 
 FPS = 30
 CELL = re.compile(r"^(?P<policy>[a-z0-9]+)_L(?P<latency>\d+)(?:_(?P<commit>[a-z]+))?(?:_(?P<suffix>.+))?$")
@@ -25,7 +28,7 @@ def load_cells(eval_dir: Path) -> list[dict]:
         match = CELL.match(info_path.parent.name)
         if not match:
             continue
-        overall = json.loads(info_path.read_text(encoding="utf-8"))["overall"]
+        info = json.loads(info_path.read_text(encoding="utf-8"))
         cells.append(
             {
                 "cell": info_path.parent.name,
@@ -33,7 +36,8 @@ def load_cells(eval_dir: Path) -> list[dict]:
                 "latency": int(match["latency"]),
                 "commit": match["commit"] or "-",
                 "suffix": match["suffix"] or "",
-                "overall": overall,
+                "overall": info["overall"],
+                "successes": episode_successes(info),
             }
         )
     return cells
@@ -98,13 +102,21 @@ def main() -> None:
     ]
     if pairs:
         print("\n## RQ1: Plan-Bind minus one-step control (same seeds)\n")
-        print("| Latency (ms) | Commit | One-step success | Plan-Bind success | Difference |")
-        print("|---|---|---|---|---|")
+        print(
+            "| Latency (ms) | Commit | One-step success | Plan-Bind success | Difference "
+            "| Only Plan-Bind / only one-step | McNemar p |"
+        )
+        print("|---|---|---|---|---|---|---|")
         for key, control in sorted(pairs, key=lambda p: (p[0][1], p[0][2])):
             ours = by_key[key]["overall"]["pc_success"]
             base = control["overall"]["pc_success"]
+            counts, p_value = "-", "-"
+            if by_key[key]["successes"] is not None and control["successes"] is not None:
+                result = paired_difference(by_key[key]["successes"], control["successes"])
+                counts, p_value = f"{result['only_a']} / {result['only_b']}", format_p(result["p"])
             print(
-                f"| {round(key[1] * 1000 / FPS)} | {key[2]} | {base:.1f} | {ours:.1f} | {ours - base:+.1f} |"
+                f"| {round(key[1] * 1000 / FPS)} | {key[2]} | {base:.1f} | {ours:.1f} | {ours - base:+.1f} "
+                f"| {counts} | {p_value} |"
             )
 
 

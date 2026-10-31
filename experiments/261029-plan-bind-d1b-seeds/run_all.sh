@@ -4,7 +4,9 @@
 # (../261027-plan-bind-two-step); only the statistics change.
 #   1. trains bsp10, onestep and planbind with SEEDS training seeds (1000, 1001, ...), plus two controls for
 #      the one-step baseline (seed 1000 only): onestep_k2 (fine knots every 2 frames, so it calls twice as
-#      often) and onestep_long (twice the steps);
+#      often) and onestep_long (twice the steps); and onestep_pos with SEEDS seeds, whose UNet input is a
+#      trained ramp instead of zeros, so it carries sequence position as Plan-Bind's lifted plan does: it
+#      separates the two-step structure from a position-bearing input (RQ1);
 #   2. after each training, evaluates its last checkpoint at latency 0 (the headline number);
 #   3. when all are trained, evaluates the last checkpoints: latency 0, 200 and 300 ms, latency commit, and
 #      naive swapping at 0 ms.
@@ -40,10 +42,13 @@ FULL_EVAL_BATCH=${EVAL_BATCH:-10}
 
 seeds() { local i; for ((i = 0; i < SEEDS; i++)); do echo $((1000 + i)); done; }
 
-# job_list (read through fd 3, so the commands in the loops cannot eat their stdin): "<variant>_s<seed>" lines, the slowest first so the GPUs finish together.
+# job_list (read through fd 3, so the commands in the loops cannot eat their stdin): "<variant>_s<seed>" lines,
+# the slowest first so the GPUs finish together, except onestep_pos, which comes early because its latency-0
+# cells decide how RQ1 is framed.
 job_list() {
   local seed p
   echo onestep_long_s1000
+  for seed in $(seeds); do echo "onestep_pos_s$seed"; done
   for p in bsp10 planbind onestep; do
     for seed in $(seeds); do echo "${p}_s$seed"; done
   done
@@ -55,15 +60,22 @@ base_config() { case $1 in onestep_*) echo onestep ;; *) echo "$1" ;; esac; }
 variant_args() {
   case $1 in
     onestep_k2) echo --policy.planbind_fine_spacing=2 ;;
+    onestep_pos) echo --policy.planbind_onestep_input=learned ;;
   esac
 }
 
+# check_data: D1b must train on D1's dataset: one stacking order and $EPISODES episodes.
+check_data() {
+  local counts tasks episodes
+  counts=$(uv run python -c "import json, sys; i = json.load(open(sys.argv[1])); print(i.get('total_tasks', 1), i['total_episodes'])" "$DATA/meta/info.json")
+  read -r tasks episodes <<< "$counts"
+  [ "$tasks" = 1 ] || die "$DATA has $tasks tasks (stacking orders); the policies need one. Set DATA to a single-order dataset"
+  [ "$episodes" = "$EPISODES" ] || die "$DATA has $episodes episodes, D1b expects $EPISODES (D1's dataset). Set DATA to D1's dataset"
+}
+
 get_data() {
-  local info="$DATA/meta/info.json"
-  if [ -f "$info" ]; then
-    local tasks
-    tasks=$(uv run python -c "import json, sys; print(json.load(open(sys.argv[1])).get(\"total_tasks\", 1))" "$info")
-    [ "$tasks" = 1 ] || die "$DATA has $tasks tasks (stacking orders); the policies need one. Set DATA to a single-order dataset"
+  if [ -f "$DATA/meta/info.json" ]; then
+    check_data
     echo "reusing $DATA"
     return
   fi
@@ -74,6 +86,7 @@ get_data() {
     uv run python examples/nexarm/generate_stack_bowls_dataset.py --repo-id local/nexarm_stack_bowls \
       --root "$DATA" --episodes "$EPISODES" --order "$STACK_ORDER" --gpus 0 --workers "$GEN_WORKERS"
   fi
+  check_data
 }
 
 # train <variant> <seed>: resumes from the last checkpoint.
@@ -230,8 +243,8 @@ run_smoke() {
 }
 
 run_full() {
-  # DATA: the single-order dataset (red, blue, black); a six-order dataset makes every policy fail.
-  OUT="$EXP_DIR/outputs/full" DATA="${DATA:-$REPO/outputs/datasets/nexarm_stack_bowls_red_blue_black_1k}"
+  # DATA: D1's single-order dataset (red, blue, black; 500 episodes); a six-order dataset makes every policy fail.
+  OUT="$EXP_DIR/outputs/full" DATA="${DATA:-$REPO/outputs/datasets/nexarm_stack_bowls_red_blue_black_500}"
   EPISODES=500 GEN_WORKERS=8 SEEDS=$FULL_SEEDS STEPS=$FULL_STEPS BATCH=$FULL_BATCH SAVE_FREQ=$FULL_SAVE_FREQ
   NUM_WORKERS=$FULL_NUM_WORKERS N_EVAL=$FULL_N_EVAL EVAL_BATCH=$FULL_EVAL_BATCH PUBLISH=1
   run_all

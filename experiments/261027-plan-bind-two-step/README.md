@@ -101,6 +101,9 @@ Reading it:
 - **Latency hardly hurts Plan-Bind** in this task (86 to 100 across 0 to 300 ms). Latency-aware commit showed no clear gain over naive swapping for either policy; the differences are mostly within noise.
 - **One-step improves with latency** (36–68 at 0 ms, 72–84 at 300 ms). A plausible cause is that a larger latency also lowers the update rate (calls do not overlap), so the control replans less often and jitters less. [D2](../261028-plan-bind-d2-latency/README.md) tests this, together with measured inference times.
 - **Limits.** One training seed per policy, one task and stacking order, and scripted demonstrations.
+- **Paired test (added 2026-10-31).** Every cell runs the same 50 episodes, so `summarize.py` now also prints the episodes solved by only one of the two policies and the exact McNemar p. Plan-Bind's lead is significant in all 8 cells (p ≤ 0.008; for example 29 against 1 episodes at 0 ms, naive). The table above is unchanged.
+- **The two identical 18/50 one-step cells are a coincidence.** `onestep_L0_none` and `onestep_L3_latency` agree on 26 of 50 episodes (12 succeed only in the first, 12 only in the second), and their videos differ, so both settings were applied.
+- **Open confound.** The one-step control maps an all-zeros sequence through a UNet with no positional encoding, while Bind receives the lifted plan, which carries sequence position. [D1b](../261029-plan-bind-d1b-seeds/README.md) adds `onestep_pos`, a one-step control with a position-bearing input, to separate the two.
 
 Measured times: dataset 67 min (10 workers); training 5.7 h (`bsp10`), 3.7 h (`onestep`) and 3.9 h (`planbind`); eval 18 cells in 2.8 h.
 

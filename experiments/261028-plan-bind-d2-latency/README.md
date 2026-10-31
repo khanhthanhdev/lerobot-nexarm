@@ -76,6 +76,26 @@ HF_REPO=<user>/plan-bind-d2 experiments/261028-plan-bind-d2-latency/run_all.sh  
 - `outputs/full/eval/<cell>/eval_info.json` — one directory per cell, as in D1, with up to 10 videos.
 - `outputs/full/results.md` — written by `summarize.py`: the timings, then one table per question with paired differences ("+a/-b" counts the episodes only one of the two cells succeeded in), then every cell with its stage rates.
 
+## Plan error
+
+Bind is trained on oracle plans (the coarse fit of the demonstration plus noise of std 0.02), never on the network's own plan, so the size of the real plan error, and of the residual the re-plan trigger compares with τ, is unmeasured. [`plan_error.py`](plan_error.py) measures both on D1's `planbind` checkpoint, at plan ages 0 to 32 frames, and reports the share of frames whose trigger exceeds τ = 0.3, 0.5 and 1.0. Run it on the training dataset and on 20 held-out layouts before choosing the thresholds above:
+
+```bash
+uv run hf download thanhkt/plan-bind-d1 --include "train_planbind/checkpoints/060000/*" --local-dir outputs/d1
+uv run hf download thanhkt/nexarm-stack-bowls-sim-red-blue-black-500 --repo-type dataset \
+  --local-dir outputs/datasets/nexarm_stack_bowls_red_blue_black_500
+uv run python examples/nexarm/generate_stack_bowls_dataset.py --repo-id local/nexarm_stack_bowls_eval_20 \
+  --root outputs/datasets/nexarm_stack_bowls_eval_20 --episodes 20 --order red,blue,black --split eval --gpus 0
+for split in red_blue_black_500 eval_20; do
+  uv run python experiments/261028-plan-bind-d2-latency/plan_error.py \
+    --policy outputs/d1/train_planbind/checkpoints/060000/pretrained_model \
+    --dataset-root outputs/datasets/nexarm_stack_bowls_$split --episodes 50 --frames-per-episode 10 \
+    --device cuda --out experiments/261028-plan-bind-d2-latency/outputs/plan_error_$split.json
+done
+```
+
+Results: pending.
+
 ## Results
 
 Pending.
