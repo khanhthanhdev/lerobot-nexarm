@@ -64,7 +64,9 @@ def main() -> None:
     load = partial(_load_episode, repo_id=args.repo_id, root=args.root, image_size=args.image_size)
     with h5py.File(out, "w") as f, mp.get_context("spawn").Pool(args.workers) as pool:
         data = f.create_group("data")
-        for ep, states, actions, images in tqdm(pool.imap(load, range(episodes)), total=episodes, desc="episodes"):
+        for ep, states, actions, images in tqdm(
+            pool.imap(load, range(episodes)), total=episodes, desc="episodes"
+        ):
             demo = data.create_group(f"demo_{ep}")
             demo.create_dataset("actions", data=actions)
             demo.create_dataset("obs/joint_pos", data=states)

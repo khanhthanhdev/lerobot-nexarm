@@ -27,7 +27,7 @@ if platform.system() == "Linux" and not os.environ.get("DISPLAY"):
     os.environ.setdefault("MUJOCO_GL", "egl")
 
 import cv2
-import dill
+import dill  # nosec B403  upstream diffusion_policy checkpoints are dill pickles
 import gymnasium as gym
 import hydra
 import numpy as np
@@ -43,7 +43,8 @@ def load_policy(ckpt: Path, bspline_repo: Path, device: torch.device, num_infere
     sys.path[:0] = [str(bspline_repo / "bspline_policy"), str(bspline_repo / "diffusion_policy")]
     OmegaConf.register_new_resolver("eval", eval, replace=True)
     with open(ckpt, "rb") as f:
-        payload = torch.load(f, pickle_module=dill, map_location="cpu")
+        # Only load checkpoints you trained or trust: a dill pickle can run code.
+        payload = torch.load(f, pickle_module=dill, map_location="cpu")  # nosec B614
     cfg = payload["cfg"]
     policy = hydra.utils.instantiate(cfg.policy)
     use_ema = bool(cfg.training.use_ema) and "ema_model" in payload["state_dicts"]
