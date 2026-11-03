@@ -29,9 +29,10 @@ CELL = re.compile(
     r"^(?P<variant>[a-z0-9]+(?:_[a-z0-9]+)*?)_L(?P<latency>\d+)(?:_(?P<commit>latency|now|none))?"
     r"(?:_every(?P<every>\d+))?_s(?P<seed>\d+)(?:_step(?P<step>\d+))?$"
 )
-VARIANTS = ("bsp10", "onestep", "onestep_pos", "onestep_k2", "onestep_long", "planbind")
-# One-step controls Plan-Bind is paired against in the RQ1 table.
-PAIRED_CONTROLS = ("onestep", "onestep_pos")
+VARIANTS = ("bsp10", "bsp10rt", "onestep", "onestep_pos", "onestep_k2", "onestep_long", "planbind")
+# Controls Plan-Bind is paired against in the RQ1 table. bsp10rt is bsp10 run through the latency runtime
+# (--policy.bspline_runtime=true); its cells carry a commit mode, unlike bsp10's own action queue.
+PAIRED_CONTROLS = ("onestep", "onestep_pos", "bsp10rt")
 # (latency in frames at 30 fps, commit mode, column label)
 COLUMNS = [
     (0, "latency", "0 ms, latency"),
@@ -57,7 +58,7 @@ def load_cells(eval_dir: Path) -> list[dict]:
             wins = round(info["overall"]["pc_success"] * n / 100)
         cells.append(
             {
-                "variant": match["variant"],
+                "variant": "bsp10rt" if match["variant"] == "bsp10" and match["commit"] else match["variant"],
                 "latency": int(match["latency"]),
                 "commit": match["commit"] or "-",
                 "every": int(match["every"] or 0),
@@ -154,7 +155,7 @@ def main() -> None:
         rows.append(row)
     table(["Policy", "Seeds", *[label for *_, label in COLUMNS]], rows)
 
-    print("## Plan-Bind minus one-step (same training seed, same eval episodes)\n")
+    print("## Plan-Bind minus a control (same training seed, same eval episodes)\n")
     print(
         "Per seed: the difference in percentage points, the episodes solved only by Plan-Bind / only by the "
         "control, and the exact McNemar p on them. The `mean` row averages the per-seed differences and counts "

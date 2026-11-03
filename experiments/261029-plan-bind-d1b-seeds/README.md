@@ -1,6 +1,6 @@
 # 261029-plan-bind-d1b-seeds
 
-**Status: not run yet.** D1 ([261027-plan-bind-two-step](../261027-plan-bind-two-step/README.md)) showed Plan-Bind ahead of the one-step control in all 8 cells, but with one training seed per policy, 50 episodes per cell and only the last checkpoint. D1b repeats it with the statistics needed to call the result.
+**Status: run (3 A5000 GPUs shared server, 2026-10-29 to 2026-11-03).** D1 ([261027-plan-bind-two-step](../261027-plan-bind-two-step/README.md)) showed Plan-Bind ahead of the one-step control in all 8 cells, but with one training seed per policy, 50 episodes per cell and only the last checkpoint. D1b repeats it with the statistics needed to call the result.
 
 ## Question
 
@@ -55,4 +55,41 @@ How the work is split: with `GPUS` set, each GPU worker takes the next unclaimed
 
 ## Results
 
-Not run yet.
+Stack bowls, one stacking order, 100 episodes per cell (seed 1000, the same episodes in every cell), last checkpoint of each training, 3 training seeds (1000 to 1002) unless noted. The full tables, with Wilson intervals, per-seed McNemar tests and every cell, are in `results.md` (regenerate with `summarize.py`).
+
+Success in percent, mean over seeds (`bsp10rt` is `bsp10` run through the same latency runtime as the one-step modes):
+
+| Policy | 0 ms | 0 ms, naive swap | 200 ms | 300 ms |
+| --- | --- | --- | --- | --- |
+| `planbind` | 96 | 92 | 98 | 98 |
+| `onestep` | 71 | 33 | 68 | 80 |
+| `bsp10rt` | 89 | - | 58 | 45 |
+| `bsp10` (own action queue) | 100 | - | - | - |
+
+One seed (1000): `onestep_long` (120k steps) 72, `onestep_k2` (calls twice as often) 43, `onestep_k2` at D1's call rate 44.
+
+Plan-Bind minus a control, mean of per-seed differences in points (ahead on 3 of 3 seeds in every row):
+
+| Control | 0 ms | 0 ms, naive | 200 ms | 300 ms |
+| --- | --- | --- | --- | --- |
+| `onestep` | +25 | +59 | +31 | +18 |
+| `bsp10rt` | +7 (p = 0.04, 0.02, 0.58) | - | +40 | +53 |
+
+Measured inference time of one call, batch 1, RTX A5000 and 4 CPU threads of a shared server (`bench_inference.py`, seed-1000 checkpoints); `frames` is the p95 rounded up at 30 fps:
+
+| Policy | GPU p50 / p95 (ms) | GPU frames | CPU p50 / p95 (ms) | CPU frames |
+| --- | --- | --- | --- | --- |
+| `bsp10` | 80.6 / 81.6 | 3 | 1305 / 1849 | 56 |
+| `onestep` | 18.6 / 24.8 | 1 | 213 / 242 | 8 |
+| `planbind` (plan + bind) | 26.3 / 31.5 | 1 | 246 / 277 | 9 |
+
+Reading it:
+
+- **RQ1 holds across seeds.** Plan-Bind beats the one-step control on every seed and setting, by 12 to 60 points. The one-step control is also unstable across training seeds (59 to 84 at 0 ms). Training it twice as long or calling it twice as often does not close the gap.
+- **Latency.** Plan-Bind stays at 92 to 99 across 0 to 300 ms. `bsp10rt` falls from 89 to 45, in line with its measured call time of 3 frames on the GPU. At 0 ms, `bsp10rt` is within 7 points of Plan-Bind, and `bsp10` with its own action queue reaches 100.
+- **Latency-aware commit** matters much more for one-step (71 against 33) than for Plan-Bind (96 against 92).
+- **One-step improves at 300 ms** (80 against 68 at 200 ms), as in D1. A longer latency also lowers the call rate here; [D2](../261028-plan-bind-d2-latency/README.md) separates the two.
+
+Limits: one stacking order and scripted demonstrations, simulation only. `onestep_k2` and `onestep_long` have one seed each. Only the last checkpoint was kept, so there is no training curve. Inference times come from a shared server and are indicative. The server's per-account limits (60 GB memory, 8 cores) froze concurrent evals, so the cells were run two at a time with batch size 5. The 4 trainings that first used the six-order dataset by mistake were discarded and rerun.
+
+Hub: checkpoints and eval cells are in `thanhkt/plan-bind-d1b`; the dataset is `thanhkt/nexarm_stack_bowls_red_blue_black_1k`.
