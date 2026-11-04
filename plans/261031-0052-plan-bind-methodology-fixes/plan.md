@@ -31,13 +31,13 @@ Experiments run elsewhere: unit tests, ruff and the summarizers run on this Wind
 
 ## Phases
 
-| #   | Phase                                                                                | Depends on | Status                              |
-| --- | ------------------------------------------------------------------------------------ | ---------- | ----------------------------------- |
-| 1   | [Position-bearing one-step control](./phase-01-position-bearing-one-step-control.md) | —          | Code done; server smoke run pending |
-| 2   | [Acceleration bound in `project`](./phase-02-acceleration-bound.md)                  | —          | Done                                |
-| 3   | [Paired statistics for D1b](./phase-03-paired-statistics.md)                         | 1          | Done                                |
-| 4   | [Plan-error measurement](./phase-04-plan-error-measurement.md)                       | —          | Script done; server run pending     |
-| 5   | [D1b guards and documentation](./phase-05-d1b-guards-and-documentation.md)           | 1, 3       | Done                                |
+| #   | Phase                                                                                | Depends on | Status                          |
+| --- | ------------------------------------------------------------------------------------ | ---------- | ------------------------------- |
+| 1   | [Position-bearing one-step control](./phase-01-position-bearing-one-step-control.md) | —          | Done; trained in D1b (3 seeds)  |
+| 2   | [Acceleration bound in `project`](./phase-02-acceleration-bound.md)                  | —          | Done                            |
+| 3   | [Paired statistics for D1b](./phase-03-paired-statistics.md)                         | 1          | Done                            |
+| 4   | [Plan-error measurement](./phase-04-plan-error-measurement.md)                       | —          | Script done; server run pending |
+| 5   | [D1b guards and documentation](./phase-05-d1b-guards-and-documentation.md)           | 1, 3       | Done                            |
 
 File ownership: phase 1 owns `experiments/261029-plan-bind-d1b-seeds/run_all.sh`; phase 5 edits it only after phase 1 is merged. Phase 3 owns `experiments/261029-plan-bind-d1b-seeds/summarize.py`, including the new variant name from phase 1. Phases 1 and 2 both touch `configuration_bspline.py` and `planbind.py` in disjoint places (one new field each); do them in order or in one branch.
 
