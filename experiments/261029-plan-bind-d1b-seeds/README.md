@@ -59,29 +59,29 @@ Stack bowls, one stacking order, 100 episodes per cell (seed 1000, the same epis
 
 Success in percent, mean over seeds (`bsp10rt` is `bsp10` run through the same latency runtime as the one-step modes):
 
-| Policy | 0 ms | 0 ms, naive swap | 200 ms | 300 ms |
-| --- | --- | --- | --- | --- |
-| `planbind` | 96 | 92 | 98 | 98 |
-| `onestep` | 71 | 33 | 68 | 80 |
-| `bsp10rt` | 89 | - | 58 | 45 |
-| `bsp10` (own action queue) | 100 | - | - | - |
+| Policy                     | 0 ms | 0 ms, naive swap | 200 ms | 300 ms |
+| -------------------------- | ---- | ---------------- | ------ | ------ |
+| `planbind`                 | 96   | 92               | 98     | 98     |
+| `onestep`                  | 71   | 33               | 68     | 80     |
+| `bsp10rt`                  | 89   | -                | 58     | 45     |
+| `bsp10` (own action queue) | 100  | -                | -      | -      |
 
 One seed (1000): `onestep_long` (120k steps) 72, `onestep_k2` (calls twice as often) 43, `onestep_k2` at D1's call rate 44.
 
 Plan-Bind minus a control, mean of per-seed differences in points (ahead on 3 of 3 seeds in every row):
 
-| Control | 0 ms | 0 ms, naive | 200 ms | 300 ms |
-| --- | --- | --- | --- | --- |
-| `onestep` | +25 | +59 | +31 | +18 |
-| `bsp10rt` | +7 (p = 0.04, 0.02, 0.58) | - | +40 | +53 |
+| Control   | 0 ms                      | 0 ms, naive | 200 ms | 300 ms |
+| --------- | ------------------------- | ----------- | ------ | ------ |
+| `onestep` | +25                       | +59         | +31    | +18    |
+| `bsp10rt` | +7 (p = 0.04, 0.02, 0.58) | -           | +40    | +53    |
 
 Measured inference time of one call, batch 1, RTX A5000 and 4 CPU threads of a shared server (`bench_inference.py`, seed-1000 checkpoints); `frames` is the p95 rounded up at 30 fps:
 
-| Policy | GPU p50 / p95 (ms) | GPU frames | CPU p50 / p95 (ms) | CPU frames |
-| --- | --- | --- | --- | --- |
-| `bsp10` | 80.6 / 81.6 | 3 | 1305 / 1849 | 56 |
-| `onestep` | 18.6 / 24.8 | 1 | 213 / 242 | 8 |
-| `planbind` (plan + bind) | 26.3 / 31.5 | 1 | 246 / 277 | 9 |
+| Policy                   | GPU p50 / p95 (ms) | GPU frames | CPU p50 / p95 (ms) | CPU frames |
+| ------------------------ | ------------------ | ---------- | ------------------ | ---------- |
+| `bsp10`                  | 80.6 / 81.6        | 3          | 1305 / 1849        | 56         |
+| `onestep`                | 18.6 / 24.8        | 1          | 213 / 242          | 8          |
+| `planbind` (plan + bind) | 26.3 / 31.5        | 1          | 246 / 277          | 9          |
 
 Reading it:
 

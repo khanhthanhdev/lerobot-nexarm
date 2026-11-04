@@ -107,6 +107,7 @@ Full tables (every cell with 95% intervals, stage rates) are in `results.md` of 
 - **Replan threshold:** 0.5 cost `planbind` 30 points at 200 ms; 1.0 changed nothing.
 - **`bsp10` through the spline runtime:** 80 at 0 ms (classic queue 100), 52 at 200 ms, 36 at 300 ms, 22 at 633 ms.
 - **Bottom bowl moved when the middle bowl is lifted (3 cm):** `planbind` falls from 92 to 74 at 0 ms and from 100 to 84 at 200 ms; `onestep` by 10 to 16 and `bsp10` by 4 to 18. No policy is robust to the shift; Plan-Bind stays ahead of the others in absolute terms at 200 ms.
+
 ## Not in this experiment
 
 - **Real arm.** The benchmark can time the policies on the robot's computer, but the evals are in simulation.
