@@ -82,16 +82,21 @@ def test_policy_camera_mismatch_names_the_flag():
         camera_config.check_policy_cameras(["front", "wrist"], ["front", "wrist", "top"], "policy")
 
 
-def test_rollout_reads_policy_image_inputs(monkeypatch, tmp_path):
+@pytest.mark.parametrize("policy_type", ["act", "bspline"])
+def test_rollout_reads_policy_image_inputs(monkeypatch, tmp_path, policy_type):
     import subprocess
     from pathlib import Path
 
     # Other test modules may set a headless MuJoCo backend that this host cannot load.
     monkeypatch.delenv("MUJOCO_GL", raising=False)
+    from lerobot_policy_bspline import BsplineConfig
+
     from lerobot.configs.types import FeatureType, PolicyFeature
     from lerobot.policies.act import ACTConfig
 
-    ACTConfig(
+    # bspline is a plugin type, registered only through register_third_party_plugins().
+    config_class = {"act": ACTConfig, "bspline": BsplineConfig}[policy_type]
+    config_class(
         input_features={
             "observation.state": PolicyFeature(type=FeatureType.STATE, shape=(6,)),
             "observation.images.front": PolicyFeature(type=FeatureType.VISUAL, shape=(3, 480, 640)),

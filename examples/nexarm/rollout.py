@@ -90,7 +90,9 @@ def policy_camera_names(policy_path: str) -> list[str]:
     """Camera names (``front``, ``wrist``, ``top``) the policy expects as image inputs."""
     import lerobot.policies  # noqa: F401  # registers the policy config types (act, smolvla, ...)
     from lerobot.configs import PreTrainedConfig
+    from lerobot.utils import register_third_party_plugins
 
+    register_third_party_plugins()  # plugin policy types (bspline, turbovla)
     config = PreTrainedConfig.from_pretrained(policy_path)
     return [key.removeprefix(IMAGE_PREFIX) for key in config.image_features]
 
