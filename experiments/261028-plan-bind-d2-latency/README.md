@@ -1,6 +1,6 @@
 # 261028-plan-bind-d2-latency
 
-**Status: ready to run, not run yet.** Follows [D1](../261027-plan-bind-two-step/README.md), where Plan-Bind beat the one-step control in all eight latency and commit cells. D2 reuses D1's checkpoints (step 60000 from the private Hub repo `thanhkt/plan-bind-d1`), so no training is needed unless `SEEDS` is above 1.
+**Status: run (marinelab, RTX 5050, 2026-10-28 to 2026-10-29).** Follows [D1](../261027-plan-bind-two-step/README.md), where Plan-Bind beat the one-step control in all eight latency and commit cells. D2 reuses D1's checkpoints (step 60000 from the private Hub repo `thanhkt/plan-bind-d1`), so no training is needed unless `SEEDS` is above 1.
 
 ## Questions
 
@@ -98,8 +98,15 @@ Results: pending.
 
 ## Results
 
-Pending.
+Full tables (every cell with 95% intervals, stage rates) are in `results.md` of the run, also in the Hub repo `thanhkt/plan-bind-d2`. 50 episodes per cell, one training seed (D1's checkpoints), so differences under about 15 points are within noise.
 
+- **Inference time per call (batch 1, RTX 5050):** `bsp10` 170 ms (6 frames at 30 fps), `onestep` 22 ms (1 frame), `planbind` 39 ms (2 frames; bind alone 22 ms). On 4 CPU threads: 590, 126 and 162 ms (19, 4 and 5 frames). Denoising is 164 of `bsp10`'s 170 ms; fp16 autocast was slower at batch 1.
+- **Each policy at its own measured latency (success %):** GPU `planbind` 94, `bsp10` 52, `onestep` 32. CPU `planbind` 100 (5 frames), `onestep` 32 (4), `bsp10` 22 (19).
+- **Update rate without latency:** `onestep` stays at 58 to 70 with a call every 4, 8 or 12 frames, so call rate alone does not explain its better scores at long latency in D1; the cause is not established. `planbind` is 92 to 100 at every rate.
+- **Commit modes:** latency-aware commit helps `onestep` at 0 ms (66 against 36 naive) and barely changes `planbind` (92 against 88).
+- **Replan threshold:** 0.5 cost `planbind` 30 points at 200 ms; 1.0 changed nothing.
+- **`bsp10` through the spline runtime:** 80 at 0 ms (classic queue 100), 52 at 200 ms, 36 at 300 ms, 22 at 633 ms.
+- **Bottom bowl moved when the middle bowl is lifted (3 cm):** `planbind` falls from 92 to 74 at 0 ms and from 100 to 84 at 200 ms; `onestep` by 10 to 16 and `bsp10` by 4 to 18. No policy is robust to the shift; Plan-Bind stays ahead of the others in absolute terms at 200 ms.
 ## Not in this experiment
 
 - **Real arm.** The benchmark can time the policies on the robot's computer, but the evals are in simulation.
