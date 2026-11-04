@@ -48,7 +48,6 @@ lib64/
 
 # PyInstaller
 *.manifest
-*.spec
 
 ### Compiled & Cached Files ###
 __pycache__/
@@ -150,9 +149,7 @@ target/
 dmypy.json
 
 ### HPC & Slurm ###
-nautilus/*.yaml
 *.key
-sbatch*.sh
 
 ### Miscellaneous ###
 # W&B
@@ -163,7 +160,6 @@ wandb/
 
 # Data folders
 data/
-pretrained/
 outputs/
 
 # Translations
@@ -201,3 +197,7 @@ sim/*
 sim/**/__pycache__/
 # Built by sim/isaac_lab/build_usd.py; rebuilt after each Fusion export.
 sim/isaac_lab/usd/
+
+# Local agent state and MuJoCo logs
+/.claude/
+MUJOCO_LOG.TXT

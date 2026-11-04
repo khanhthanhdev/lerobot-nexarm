@@ -84,7 +84,8 @@ To move to a newer LeRobot, follow "Upgrading LeRobot" in `CONTRIBUTING.md`.
 
 - **`packages/`** — NexArm plugins (table above); **`policies/`** — research policy plugins (TurboVLA adapter, B-spline Policy). Both are uv workspace members.
 - **`tests/`** — Pytest suite for the NexArm plugins, examples and scripts, organized by module; mocks in `tests/mocks/`. Policy tests sit in `policies/*/tests/`.
-- **`.github/workflows/`** — CI: `quality.yml` (pre-commit), `tests.yml` (NexArm and policy tests plus `make test-nexarm-ete`), `security.yml` (TruffleHog), `mobile_nexarm_sim.yml` (manual).
+- **`.github/workflows/`** — CI: `quality.yml` (pre-commit), `tests.yml` (NexArm and policy tests; `make test-nexarm-ete` runs locally only), `security.yml` (TruffleHog).
+- **`plans/`** — dated plans and research reports (`plans/reports/`), indexed by `plans/README.md`; **`media/readme/`** — images used by `README.md`. `CLAUDE.md` is a symlink to this file.
 - **`docs/`** — all user guides, indexed by `docs/README.md`: `getting-started/` (install, simulation, hardware), `guides/` (pipeline, data collection, training tips, TurboVLA, sim and server training, sim calibration, desktop app), `reference/` (architecture and conventions, Python API, troubleshooting), `hiwonder/` (the vendor tutorials) and `service/` (the engine's API snapshots). LeRobot's own docs are at <https://huggingface.co/docs/lerobot>.
 - **`examples/nexarm/`** — ready-to-run NexArm tutorials; **`tools/nexarm/`** — calibration, probes and dataset tools; **`experiments/`** — one folder per experiment; **`scripts/`** — protocol vectors, GPU bootstrap, multi-GPU and Slurm launchers.
 - **`sim/`, `firmware/`, `hardware/`** — sim assets and exporters, vendor firmware, hardware files.
