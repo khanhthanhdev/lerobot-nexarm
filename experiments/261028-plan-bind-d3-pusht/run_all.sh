@@ -158,7 +158,8 @@ worker() {
   done
   EVAL_N=$n EVAL_W=$w EVAL_IDX=0
   run_stage "eval_w$w" eval_matrix
-  wait $(jobs -p)  # not a bare wait: it would also wait for the log `tee` process substitutions
+  # Wait for the uploads only: a bare `wait` would also wait for the log tee process substitutions.
+  pending=$(jobs -p); [ -z "$pending" ] || wait $pending
 }
 
 run_all() {
@@ -173,7 +174,8 @@ run_all() {
   [ "$failed" = 0 ] || die "a GPU worker failed; rerun this script to resume"
   uv run python "$EXP_DIR/summarize.py" "$OUT/eval" > "$OUT/results.md"
   if publishing "${HF_REPO:-}"; then publish hub_eval publish_eval; fi
-  wait $(jobs -p)  # not a bare wait: it would also wait for the log `tee` process substitutions
+  # Wait for the uploads only: a bare `wait` would also wait for the log tee process substitutions.
+  pending=$(jobs -p); [ -z "$pending" ] || wait $pending
   say "results: $OUT/results.md"
   cat "$OUT/results.md"
 }
