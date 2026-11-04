@@ -75,9 +75,10 @@ eval_cell() {
   fi
   if [ -f "$dir/eval_info.json" ]; then echo "skip eval $cell (done)"; return; fi
   rm -rf "$dir"
+  # Sync envs: LeRobot's async workers (forkserver) do not import gym_pusht, so make_env fails with batch > 1.
   say "eval $cell"
   uv run lerobot-eval --policy.path="$path" --policy.device=cuda --env.type=pusht --seed="$EVAL_SEED" \
-    --eval.n_episodes="$episodes" --eval.batch_size="$EVAL_BATCH" --output_dir="$dir" "$@"
+    --eval.n_episodes="$episodes" --eval.batch_size="$EVAL_BATCH" --eval.use_async_envs=false --output_dir="$dir" "$@"
 }
 
 # The flags that run a policy at latency 0 the way the main comparison does.
