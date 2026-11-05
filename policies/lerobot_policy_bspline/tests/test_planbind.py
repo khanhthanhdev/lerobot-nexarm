@@ -370,3 +370,14 @@ def test_task_condition_depends_on_the_instruction(mode):
     assert torch.allclose(cond_a, policy._global_cond(obs))
     with pytest.raises(ValueError, match="task"):
         policy._global_cond({k: v for k, v in obs.items() if k != "task"})
+
+
+@pytest.mark.parametrize("mode", ["onestep", "diffusion"])
+def test_select_action_keeps_the_task_through_the_queues(mode):
+    """DiffusionPolicy rebuilds its batch from the queues; the instruction must survive that."""
+    policy = BsplinePolicy(make_config(bspline_mode=mode, task_condition="hash", n_action_steps=4))
+    policy.eval()
+    obs = {OBS_STATE: torch.randn(BATCH, STATE_DIM), IMAGE_KEY: torch.rand(BATCH, 3, 32, 32)}
+    for _ in range(3):
+        action = policy.select_action({**obs, "task": ["open the top drawer"] * BATCH})
+        assert action.shape == (BATCH, ACTION_DIM)

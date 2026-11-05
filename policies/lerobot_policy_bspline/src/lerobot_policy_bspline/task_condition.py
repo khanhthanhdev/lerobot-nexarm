@@ -36,6 +36,7 @@ class TaskConditionMixin:
     def __init__(self, config):
         """Build the diffusion modules; with a task condition, rebuild the UNet for the wider condition."""
         super().__init__(config)
+        self.current_tokens: Tensor | None = None
         if config.task_condition == "none":
             return
         cond_dim = config.robot_state_feature.shape[0]
@@ -53,7 +54,12 @@ class TaskConditionMixin:
         cond = super()._prepare_global_conditioning(batch)
         if self.config.task_condition == "none":
             return cond
-        tokens = batch[TASK_TOKENS].to(cond.device)
+        # DiffusionPolicy rebuilds the batch from its queues and drops extra keys, so the policy also parks
+        # the latest tokens on the model.
+        tokens = batch.get(TASK_TOKENS, self.current_tokens)
+        if tokens is None:
+            raise KeyError(TASK_TOKENS)
+        tokens = tokens.to(cond.device)
         mask = (tokens > 0).unsqueeze(-1).to(cond.dtype)
         pooled = (self.task_embed(tokens) * mask).sum(1) / mask.sum(1).clamp_min(1)
         return torch.cat([cond, pooled], dim=-1)

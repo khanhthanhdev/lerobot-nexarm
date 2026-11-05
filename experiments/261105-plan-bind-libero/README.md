@@ -15,7 +15,7 @@
 | Policies | `bsp10` (B-spline Policy, DDIM 10), `onestep`, `planbind`, with the 32-frame window, fine knots every 2 frames and coarse plan every 8, as in D3 (not tuned for LIBERO) |
 | Language | `task_condition=hash`: the instruction's words are hashed, embedded and mean-pooled into the UNet condition. LeRobot's diffusion policy has no language input, so it is not run |
 | Training | 60k steps, batch 32, 2 seeds (1000, 1001), last checkpoint only |
-| Eval | `lerobot-eval --env.type=libero` on `libero_spatial`, `libero_object`, `libero_goal`, `libero_10`, 5 episodes per task (50 per suite, 200 per cell), same seeds in every cell. Cells: main (latency 0), commit latency and none, latency 0 and 200 ms, `bsp10` also through the spline runtime |
+| Eval | `lerobot-eval --env.type=libero` on `libero_spatial`, `libero_object`, `libero_goal`, `libero_10`, 2 episodes per task (20 per suite, 80 per cell; the smoke run measured about 35 s per episode, so a cell takes about 50 minutes), same seeds in every cell. Cells: main (latency 0), commit latency and none, latency 0 and 200 ms, `bsp10` also through the spline runtime |
 
 Not yet done: the spline-fit check of LIBERO's jittery delta actions (the knot spacing is D3's), published baselines run in this harness, and a no-language check.
 

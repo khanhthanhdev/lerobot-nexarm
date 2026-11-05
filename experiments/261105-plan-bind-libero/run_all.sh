@@ -14,8 +14,8 @@
 #   experiments/261105-plan-bind-libero/run_all.sh smoke    # proves the pipeline (one suite, 200 steps)
 #   experiments/261105-plan-bind-libero/run_all.sh full     # the experiment
 # GPUS="0 1" spreads the trainings, then the eval cells, over those GPUs (one worker each; default one GPU).
-# env overrides: SEEDS=2 STEPS=60000 BATCH=32 SAVE_FREQ=20000 NUM_WORKERS=2 N_EVAL=5 (episodes per task, 10
-# tasks per suite, so 50 per suite) SUITES=libero_spatial,libero_object,libero_goal,libero_10
+# env overrides: SEEDS=2 STEPS=60000 BATCH=32 SAVE_FREQ=20000 NUM_WORKERS=2 N_EVAL=2 (episodes per task, 10
+# tasks per suite, so 20 per suite) SUITES=libero_spatial,libero_object,libero_goal,libero_10
 # HF_REPO=<user>/<repo> uploads each trained policy (then deletes its local checkpoints except the last),
 # the eval cells and results.md to that repo (full run only; needs `uv run hf auth login`).set -euo pipefail
 
@@ -30,7 +30,7 @@ EVAL_SEED=1000  # the same eval episodes in every cell, so cells compare episode
 POLICIES=(bsp10 onestep planbind)
 # Full-run settings, read now: the smoke run reuses these names in `all` mode.
 FULL_SEEDS=${SEEDS:-2} FULL_STEPS=${STEPS:-60000} FULL_BATCH=${BATCH:-32} FULL_SAVE_FREQ=${SAVE_FREQ:-20000}
-FULL_NUM_WORKERS=${NUM_WORKERS:-2} FULL_N_EVAL=${N_EVAL:-5}
+FULL_NUM_WORKERS=${NUM_WORKERS:-2} FULL_N_EVAL=${N_EVAL:-2}
 FULL_SUITES=${SUITES:-libero_spatial,libero_object,libero_goal,libero_10}
 
 seeds() { local i; for ((i = 0; i < SEEDS; i++)); do echo $((1000 + i)); done; }

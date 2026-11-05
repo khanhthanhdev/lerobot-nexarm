@@ -104,6 +104,7 @@ class BsplinePolicy(DiffusionPolicy):
         tokens = self._task_tokens(batch)
         if tokens is not None:
             batch[TASK_TOKENS] = tokens
+            self.diffusion.current_tokens = tokens
         return batch
 
     def _global_cond(self, batch: dict[str, Tensor]) -> Tensor:
