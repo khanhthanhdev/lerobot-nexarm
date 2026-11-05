@@ -1,0 +1,39 @@
+# Plan-Bind D4: B-spline Policy (DDIM, 10 steps) on LIBERO, language-conditioned. The fit tolerance is the
+# Push-T value (0.004 of the normalized action range), not tuned for LIBERO; it executes at most 8 actions
+# per call. run_all.sh passes the output dir, seed, steps,
+# batch size and workers on the command line; the values here are the defaults.
+dataset:
+  repo_id: lerobot/libero
+  revision: a1aaacb7f6cd6ee5fb43120f673cebb0cfea7dd4
+
+policy:
+  type: bspline
+  push_to_hub: false
+  device: cuda
+  # The instruction picks the task inside a scene, so every policy sees it (hashed words).
+  task_condition: hash
+  resize_shape: [128, 128]
+  crop_shape: [120, 120]
+  bspline_mode: diffusion
+  noise_scheduler_type: DDIM
+  num_inference_steps: 10
+  n_action_steps: 8
+  bspline_max_error: 0.004
+  bspline_fit_workers: 4
+  # The 10 fps grid of all three B-spline configs, also used when bsp10 runs through the spline runtime.
+  bspline_window: 32
+  planbind_fine_spacing: 2
+  planbind_subdivision: 4
+
+output_dir: experiments/261105-plan-bind-libero/outputs/full/train_bsp10_s1000
+job_name: 261105-plan-bind-d4-bsp10
+seed: 1000
+batch_size: 32
+steps: 60000
+save_freq: 20000
+log_freq: 100
+env_eval_freq: 0
+
+wandb:
+  enable: false
+  project: lerobot-nexarm
