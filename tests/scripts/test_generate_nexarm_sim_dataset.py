@@ -23,6 +23,8 @@ from examples.nexarm.generate_sim_dataset import (
 )
 from lerobot_robot_nexarm.motors.mujoco_mapping import JOINT_MAPPING_VERSION
 from lerobot_robot_nexarm.nexarm_sim import NexArmPickPlaceTask, NexArmSim, NexArmSimConfig
+from lerobot_robot_nexarm.nexarm_sim.mujoco_backend import SIM_DYNAMICS_MODEL
+from tests.opengl import require_opengl
 
 MODEL_PATH = Path(__file__).resolve().parents[2] / "sim" / "description" / "mjcf" / "scene.xml"
 
@@ -122,6 +124,7 @@ def test_quality_gate_rejects_bad_episodes() -> None:
 
 
 def test_generator_writes_dataset_report_and_episode_log(tmp_path: Path) -> None:
+    require_opengl()
     root = tmp_path / "dataset"
     code = generator_main(
         [
@@ -145,6 +148,7 @@ def test_generator_writes_dataset_report_and_episode_log(tmp_path: Path) -> None
     assert len(report["accepted_seeds"]) == 2
     assert report["validation"]["episodes"] == 2
     assert report["provenance"]["model_sha256"]
+    assert report["dynamics_model"] == SIM_DYNAMICS_MODEL
     rows = [json.loads(line) for line in (root / "generation_episodes.jsonl").read_text().splitlines()]
     assert sum(row["accepted"] for row in rows) == 2
     assert all(row["dr_params"] for row in rows)

@@ -23,6 +23,7 @@ from lerobot.datasets.lerobot_dataset import LeRobotDataset
 from lerobot.utils.constants import ACTION, OBS_STR
 from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES
 from lerobot_robot_nexarm.nexarm_sim.mujoco_backend import HOME_POSITIONS
+from tests.opengl import require_opengl
 
 
 def create_synthetic_nexarm_dataset(root_dir: Path, repo_id: str, num_frames: int = 20) -> LeRobotDataset:
@@ -94,6 +95,7 @@ def test_gradient_accumulation_config_validation():
 
 def test_nexarm_sim_gym_raw_position_contract(tmp_path: Path):
     """Verify that a policy trained on raw positions evaluates in Gym without unit mismatch (e.g. jumping to 4095)."""
+    require_opengl()
     from lerobot.envs.factory import make_env
     from lerobot_env_nexarm import NexArmEnv
 
@@ -133,6 +135,7 @@ def test_nexarm_sim_gym_raw_position_contract(tmp_path: Path):
 
 def test_nexarm_train_eval_integration(tmp_path: Path):
     """End-to-end integration test: dataset -> train ACT -> Gym eval."""
+    require_opengl()
     from lerobot.configs.default import DatasetConfig, EvalConfig
     from lerobot.configs.eval import EvalPipelineConfig
     from lerobot.configs.policies import PreTrainedConfig

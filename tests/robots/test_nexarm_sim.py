@@ -23,6 +23,7 @@ from lerobot_robot_nexarm.nexarm_sim import (
     NexArmSimConfig,
 )
 from lerobot_robot_nexarm.nexarm_sim.mujoco_backend import HOME_POSITIONS, RAW_RANGES, NexArmMujocoBackend
+from tests.opengl import require_opengl
 
 MODEL_PATH = Path(__file__).resolve().parents[2] / "sim" / "description" / "mjcf" / "scene.xml"
 
@@ -109,6 +110,7 @@ def test_sim_robot_reports_follower_type_and_returns_commanded_action() -> None:
 
 
 def test_backend_steps_and_renders(backend: NexArmMujocoBackend) -> None:
+    require_opengl()
     action = {f"{name}.pos": HOME_POSITIONS[name] for name in JOINT_NAMES}
     action["shoulder_pan.pos"] = 3072.0
     sent = backend.step(action)
@@ -125,24 +127,7 @@ def test_backend_steps_and_renders(backend: NexArmMujocoBackend) -> None:
 def test_gripper_collision_geometry_contacts_cube(backend: NexArmMujocoBackend) -> None:
     model = backend.model
     data = backend.data
-    action = {f"{name}.pos": HOME_POSITIONS[name] for name in JOINT_NAMES}
-    for _ in range(60):
-        backend.step(action)
-
-    jaw_center = _jaw_center(backend)
-    cube_joint_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, "cube_joint")
-    cube_qpos_address = model.jnt_qposadr[cube_joint_id]
-    data.qpos[cube_qpos_address : cube_qpos_address + 7] = [
-        *jaw_center,
-        1,
-        0,
-        0,
-        0,
-    ]
-    mujoco.mj_forward(model, data)
-
-    for _ in range(10):
-        backend.step(action)
+    _close_jaws_on_cube(backend)
 
     cube_contact_geoms: set[str] = set()
     for contact_index in range(data.ncon):
@@ -237,6 +222,7 @@ def test_robot_defaults_and_collision_masks_are_active(backend: NexArmMujocoBack
 
 
 def test_sim_robot_matches_physical_feature_contract() -> None:
+    require_opengl()
     robot = NexArmSim(
         NexArmSimConfig(
             id="test",
@@ -281,6 +267,23 @@ def _jaw_center(backend: NexArmMujocoBackend) -> tuple[float, float, float]:
         geom_id = mujoco.mj_name2id(backend.model, mujoco.mjtObj.mjOBJ_GEOM, name)
         positions.append(backend.data.geom_xpos[geom_id])
     return tuple(np.mean(positions, axis=0))
+
+
+def _close_jaws_on_cube(backend: NexArmMujocoBackend) -> None:
+    """Open the gripper at home, float the cube between the jaws (no gravity), then close the jaws on it.
+
+    The servo gripper needs about 0.5 s for a full stroke, and a cube teleported into closed stiff jaws is
+    pushed out, so the jaws must close on it.
+    """
+    backend.model.opt.gravity[:] = 0.0
+    action = {f"{name}.pos": HOME_POSITIONS[name] for name in JOINT_NAMES}
+    action["gripper.pos"] = GRIPPER_OPEN_POS
+    for _ in range(30):
+        backend.step(action)
+    _set_cube_position(backend, _jaw_center(backend))
+    action["gripper.pos"] = GRIPPER_CLOSED_POS
+    for _ in range(25):
+        backend.step(action)
 
 
 def test_pick_place_task_reset_is_seeded(backend: NexArmMujocoBackend) -> None:
@@ -354,12 +357,7 @@ def test_pick_place_task_rejects_outside_unreleased_drop_and_timeout(
 def test_pick_place_task_reports_two_jaw_grasp(backend: NexArmMujocoBackend) -> None:
     task = NexArmPickPlaceTask(backend)
     task.reset(seed=7)
-    action = {f"{name}.pos": HOME_POSITIONS[name] for name in JOINT_NAMES}
-    for _ in range(60):
-        backend.step(action)
-    _set_cube_position(backend, _jaw_center(backend))
-    for _ in range(10):
-        backend.step(action)
+    _close_jaws_on_cube(backend)
 
     assert task.status().is_grasped
 

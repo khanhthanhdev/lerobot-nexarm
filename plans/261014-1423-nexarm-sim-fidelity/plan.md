@@ -1,7 +1,7 @@
 ---
 title: "NexArm single-arm sim fidelity"
 description: "Make the single-arm MuJoCo twin match the real follower's servos, object masses and asset layout."
-status: backlog
+status: in-progress
 priority: P1
 effort: 14h
 branch: main
@@ -39,7 +39,8 @@ Sim datasets and policies then see the same kinematic timing as hardware.
 - Scope is the single arm first. Rebuilding the mobile bimanual sim from the fixed arm is a follow-up plan.
 - `sim/description/` becomes canonical. `sim/fusion_export/` stays raw Fusion exporter output that nothing loads
   at runtime.
-- Bowl mass is 55 g, as measured by the user.
+- Bowl mass is 60 g (user, 2026-11-04). This supersedes the 55 g first noted; the sim has used 60 g since
+  e8a582ad6, and `test_bowls_weigh_60_g_and_start_apart` checks it.
 
 ## Hardware facts used
 
@@ -67,23 +68,24 @@ Sim datasets and policies then see the same kinematic timing as hardware.
 
 ## Phases
 
-| #   | Phase                                                                         | Status                          | Effort | Depends on |
-| --- | ----------------------------------------------------------------------------- | ------------------------------- | ------ | ---------- |
-| 0   | [Real-to-sim joint mapping](phase-00-joint-mapping.md)                        | pending (needs a robot session) | 3h     | —          |
-| 1   | [Canonical asset tree](phase-01-canonical-asset-tree.md)                      | pending                         | 3h     | —          |
-| 2   | [Scene and object fixes](phase-02-scene-object-fixes.md)                      | pending                         | 2h     | 1          |
-| 3   | [Servo model](phase-03-servo-model.md)                                        | pending                         | 5h     | 1, 2       |
-| 4   | [Collision refit, URDF/Isaac sync, GL skip](phase-04-collision-refit-sync.md) | pending                         | 4h     | 3          |
+| #   | Phase                                                                         | Status                                      | Effort | Depends on |
+| --- | ----------------------------------------------------------------------------- | ------------------------------------------- | ------ | ---------- |
+| 0   | [Real-to-sim joint mapping](phase-00-joint-mapping.md)                        | pending (needs a robot session)             | 3h     | —          |
+| 1   | [Canonical asset tree](phase-01-canonical-asset-tree.md)                      | done (on `main` before session 3)           | 3h     | —          |
+| 2   | [Scene and object fixes](phase-02-scene-object-fixes.md)                      | done (`top` fy read on the device pending)  | 2h     | 1          |
+| 3   | [Servo model](phase-03-servo-model.md)                                        | done, except the replay RMS (needs phase 0) | 5h     | 1, 2       |
+| 4   | [Collision refit, URDF/Isaac sync, GL skip](phase-04-collision-refit-sync.md) | done, pending the user's viewer review      | 4h     | 3          |
 
 ## Acceptance criteria
 
 1. Exactly one robot MJCF exists (`sim/description/mjcf/nexarm.xml`). It is loaded by `NexArmSimConfig`, the
    gym env, `kinematics_dynamics.py`, the examples and the tests. No symlinks remain under `sim/`, and every scene
    compiles with any working directory.
-2. Each bowl body mass is 0.055 kg. Scene keyframes have no contact deeper than 1 mm, and the corrected `ready`
+2. Each bowl body mass is 0.060 kg. Scene keyframes have no contact deeper than 1 mm, and the corrected `ready`
    pose has no self-contact.
 3. Step test with the default config:
-   - each joint's sustained (200 ms) speed is within ±10% of its `max_speed_ticks_s` cap;
+   - the unloaded joints' (pan, roll) sustained (200 ms) speed is within ±10% of their `max_speed_ticks_s` cap,
+     and no joint exceeds its cap by more than 2% (the gravity-loaded joints run under it, as on the real arm);
    - a full gripper stroke takes 0.35–0.5 s (real: about 0.4 s at 30 Hz; rescale if the time-base check finds a
      slower loop);
    - droop at the IK grasp poses is under 2 mrad.
@@ -141,6 +143,59 @@ Questions asked: 4, plus 3 decisions made before planning: speed cap, scope, can
 - The fusion_export decision is consistent across plan.md (decisions, non-goals) and phase 1 (files, `.gitignore`).
 - The gripper force figure (116 N) matches between plan.md hardware facts and phase 3.
 - No unresolved contradictions.
+
+### Session 3 (2026-11-04): stiffness from real data, start phases 2–3
+
+Phase 1 was already done on `main` (no symlinks, one `bowl.stl`, every default under `sim/description/`,
+`tests/robots/test_nexarm_sim_assets.py`). The phase files still name the pre-plugin `src/lerobot/...` paths;
+the code now lives under `packages/` and `tools/nexarm/`. Baseline: `reports/servo-baseline.md`.
+
+| Topic         | Decision                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Propagated to |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
+| Joint gains   | Keep `kp=998.22` (stiff hold: the real arm's empty-gripper steady error is a median 0–2 ticks), but set `kv` per joint so the small-step time constant `(kv + damping) / kp` matches the real first-order fit (0.055–0.112 s; gripper 0.207 s). This replaces the SO-101 `kv=2.731`.                                                                                                                                                                                                                                                                                                            | phase 3       |
+| Goal          | Sim-to-real (train in sim, deploy on the real follower). The `front` camera stays at its current pose (user, 2026-11-04).                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | plan          |
+| Accel cap     | On by default, replacing "the acceleration ramp stays optional and off": 20k ticks/s² on the five arm joints, none on the gripper. Without it the stiff arm's jerk shakes the bowl out of the physical grasp (stack-bowls 0/20). The value was tuned on that grasp (10k–40k pass, 80k fails) and is consistent with the real demos' arm p99 of 12.6k–28.8k ticks/s², which cannot tell 10k from 40k at 30 fps. Evidence: `reports/servo-baseline.md`.                                                                                                                                           | phase 3       |
+| Bowl mass     | 60 g, not 55 g (user). The sim already used 60 g.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | plan, phase 2 |
+| Phase 2 scope | Done: the keyframes moved into `scene.xml` and `bowl_stack_scene.xml` with full qpos; the bowls already spawn at the task slots; `cam_mount` already has collision boxes. Not done: the `top` fovy, which needs a `pyrealsense2` read. Dropped: the floor `material="groundplane"`. It is a dark checker (rgb 0.1–0.4), and domain randomization sets the floor `geom_rgba` to 0.65–0.95, which multiplies the texture, so the floor would render near black and its colour randomization would mostly vanish. Match the real floor (colour or photo texture) instead, once a reference exists. | phase 2       |
+| Criterion 3   | **Amended (2026-11-05).** The user replied "Continue to done" to this proposal; taken as acceptance. The gravity-loaded joints (lift, elbow, wrist flex) reach 74–81% of the cap, because kv damps them, as in the real demos, where no arm joint saturates. Criterion 3 now asks ±10% only of the unloaded joints and "never above the cap ×1.02" of the rest, as the tests check. The gripper stroke (0.5 s) is accepted at the edge of 0.35–0.5 s.                                                                                                                                           | phase 3       |
+| Gripper force | Stays at the spec-derived 116 N; jaw pads use a direct contact stiffness (`solref="-230000 -150"`). With the accel cap both scripted tasks are 20/20.                                                                                                                                                                                                                                                                                                                                                                                                                                           | phase 3       |
+
+### Session 4 (2026-11-05): phase 4, `top` fovy, calibration
+
+| Topic            | Result                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Propagated to   |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
+| `top` camera     | User: it is a D435i. `fovy` 42.6° in both scenes from the nominal fy 615 px at 640×480; the device fy read and pose check are still to do on the robot PC.                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | phase 2, README |
+| Phase 4          | The refit and URDF/Isaac sync had already landed; measured coverage 91–100%, no self-contact in 40 scripted episodes. Added the OpenGL skip helper (CI fails instead) and the IK-pose self-contact test. Awaiting the user's viewer review.                                                                                                                                                                                                                                                                                                                                                                                  | phase 4         |
+| Calibration      | `calibrate_sim.py` now keeps `kp` fixed (`--fit-kp` opts in): a fitted kp hit the 4× bound and dropped scripted stack-bowls to 6/20 (4/20 with kp alone). Refit with `--exclude-episodes 1,3,12,19,69-92` (the replays that hit the floor or the back panel): delay 0, every arm-joint RMSE within 1 tick of the nominal model, so damping and friction are poorly identified by these demos (several scales sit at a bound). Both scripted tasks pass with it and domain randomization on (10/10 each). Output `outputs/calibration/nexarm_sim_calibration_hx_servo_v1.json`, copied to vishc-server-2 beside the old file. | phase 3         |
+| Phase 0 evidence | Posing the sim at real recorded states: episode 19 puts the gripper 39 mm into the back panel (it replays 280–480 ticks off), and episodes 1, 3 and 12 go 12–25 mm below the floor. Flipping the shoulder-pan sign removes the episode-19 hit only. Check the pan sign and the mount height on the robot before trusting replay fits.                                                                                                                                                                                                                                                                                        | phase 0         |
+
+#### kp choice (user asked for the best-fitting kp, 2026-11-05)
+
+`--fit-kp` (with `--exclude-episodes 1,3,12,19,69-92`) gives kp scales 1.41/2.83/3.67/4.0/2.83 (pan, lift, elbow, wrist flex, roll).
+Scaling them as `fitted ** alpha` (damping and friction from the same fit; the first 20 kept episodes are
+0–23 minus 1, 3, 12 and 19, and the holdout is 20–23; 20 seeds per task):
+
+| kp                              | Holdout RMSE mean (pan/lift/elbow/wflex/roll) | Pick-place | Stack-bowls |
+| ------------------------------- | --------------------------------------------- | ---------: | ----------: |
+| servo model (alpha 0)           | 17.4 (6.4/22.7/26.9/27.5/3.4)                 |      20/20 |       20/20 |
+| alpha 0.25                      | 13.2                                          |      20/20 |       18/20 |
+| alpha 0.5                       | 11.6 (6.9/15.2/15.5/15.0/5.5)                 |      20/20 |       12/20 |
+| alpha 0.75 / 1.0                | 12.2 / 13.6                                   |      20/20 |  4/20, 0/20 |
+| **alpha 0.5, elbow alpha 0.25** | **12.4 (6.9/14.3/20.1/15.2/5.5)**             |  **20/20** |   **20/20** |
+
+Only the elbow breaks the grasp on its own (16/20 with just its kp raised; the other four joints alone stay
+20/20), and lowering the acceleration cap does not recover it (13/20 at 15k, 15/20 at 10k). Chosen: the last
+row, kp scales 1.19/1.68/1.38/2.0/1.68. With domain randomization on (generator default) it gives pick-place
+20/20 and stack-bowls 19/20. Check videos (3 episodes per task, front | top | wrist):
+`outputs/videos/sim_{stack_bowls,pick_place}_kp_check.mp4`. The user reviewed both videos and found them fine
+(2026-11-05).
+
+Where the kp lives (the user asked for the best option): the calibration is tracked as
+`sim/calibration/nexarm_sim_calibration_hx_servo_v1.json`, and the MJCF keeps `kp=998.22`. What was approved is
+the whole calibration (kp with the fitted damping, friction and spreads), so shipping the file ships exactly
+what was tested. Baking kp into the MJCF would invalidate the kv derivation in the servo comment, would need a
+`dynamics_model` bump so that existing calibrations do not apply the scales twice, and would ship an untested
+combination of kp with the nominal damping.
 
 ### Session 2 (2026-10-14): real dataset
 

@@ -1,7 +1,7 @@
 ---
 phase: 2
 title: "Scene and object fixes"
-status: pending
+status: done
 priority: P1
 effort: "2h"
 dependencies: [1]
@@ -34,17 +34,21 @@ Scene objects have real masses, the scenes load collision-free, and keyframes wo
 
 ## Tasks & Steps
 
-- [ ] Fix the bowl masses. Assert that `body_mass` is 0.055 ± 1e-6 for each bowl.
-- [ ] Move the keyframes into the scenes, with `ready` = `(0, 0.5236, -1.0472, 0.5236, 0)` plus the gripper and object poses.
+- [x] Fix the bowl masses: 60 g per bowl, not 55 g (user, 2026-11-04); `test_bowls_weigh_60_g_and_start_apart`.
+- [x] Move the keyframes into the scenes, with `ready` = `(0, 0.5236, -1.0472, 0.5236, 0)` plus the gripper and object poses.
   - Check that the pose has no self-contact. If it does, search for a nearby collision-free pose and record it.
-- [ ] Add the `cam_mount` collision box and exclude.
+- [x] Add the `cam_mount` collision box and exclude (already in place).
   - Verify there is no contact at home.
   - Verify there is no new self-contact along the scripted pick and bowl IK trajectories, which phase 3 also uses.
-- [ ] Apply the floor material.
-- [ ] Add tests:
-  - [ ] Bowl mass.
-  - [ ] Every keyframe in every scene has no contact deeper than 1 mm.
-  - [ ] The raw bowl scene settles for 1 s with no bowl-bowl contact.
+- [x] Floor material: dropped. Domain randomization sets the floor `geom_rgba`, which would multiply the dark
+      checker texture to near black; match the real floor instead.
+- [x] `top` fovy: 42.6° in both scenes (2026-11-05), from the D435i nominal fy of 615 px through
+      `tools/nexarm/realsense_fovy.py`. The bowl scene had 43.65°, a framing zoom. Still to do on the robot PC: read
+      the device's fy and re-check the pose with `calibrate_camera_alignment.py --camera-name top`.
+- [x] Add tests:
+  - [x] Bowl mass.
+  - [x] Every keyframe in every scene has no contact deeper than 1 mm.
+  - [x] The raw bowl scene settles for 1 s with no bowl-bowl contact.
 
 ## Verification
 

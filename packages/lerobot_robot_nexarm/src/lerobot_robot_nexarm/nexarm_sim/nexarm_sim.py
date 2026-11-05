@@ -84,6 +84,8 @@ class NexArmSim(Robot):
             action_delay_steps=resolve_action_delay_steps(self.config.action_delay_steps, None),
             enable_domain_randomization=self.config.enable_domain_randomization,
             joint_mapping=load_joint_mapping(self.config.joint_mapping_path),
+            max_speed_ticks_s=self.config.max_speed_ticks_s,
+            max_accel_ticks_s2=self.config.max_accel_ticks_s2,
         )
         if self.config.calibration_path is not None:
             try:

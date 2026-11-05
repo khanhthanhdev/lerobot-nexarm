@@ -51,7 +51,7 @@
       <origin xyz="0 0 0.049" rpy="0 0 0"/>
       <axis xyz="0 0 -1"/>
       <limit lower="-2.35619" upper="2.35619" effort="5.0" velocity="3.14"/>
-      <dynamics damping="0.08" friction="0.04"/>
+      <dynamics damping="0.533" friction="0.052"/>
     </joint>
 
     <!-- Link 1 -->
@@ -83,7 +83,7 @@
       <origin xyz="0.0351 0 0.057445" rpy="0 0 0"/>
       <axis xyz="-1 0 0"/>
       <limit lower="-2.0944" upper="2.0944" effort="5.0" velocity="3.14"/>
-      <dynamics damping="0.15" friction="0.08"/>
+      <dynamics damping="1.156" friction="0.052"/>
     </joint>
 
     <!-- Link 2 -->
@@ -127,7 +127,7 @@
       <origin xyz="-0.05503 -0.036797 0.225029" rpy="0 0 0"/>
       <axis xyz="1 0 0"/>
       <limit lower="-2.35619" upper="2.35619" effort="5.0" velocity="3.14"/>
-      <dynamics damping="0.08" friction="0.04"/>
+      <dynamics damping="0.533" friction="0.052"/>
     </joint>
 
     <!-- Link 3 -->
@@ -159,7 +159,7 @@
       <origin xyz="-0.00032 -0.144999 -0.000188" rpy="0 0 0"/>
       <axis xyz="1 0 0"/>
       <limit lower="-1.74533" upper="1.74533" effort="5.0" velocity="3.14"/>
-      <dynamics damping="0.08" friction="0.04"/>
+      <dynamics damping="0.533" friction="0.052"/>
     </joint>
 
     <!-- Link 4 -->
@@ -191,7 +191,7 @@
       <origin xyz="0.02025 -0.047234 4.3e-05" rpy="0 0 0"/>
       <axis xyz="0 -1 0.000548"/>
       <limit lower="-3.14159" upper="3.14159" effort="5.0" velocity="3.14"/>
-      <dynamics damping="0.04" friction="0.02"/>
+      <dynamics damping="0.225" friction="0.052"/>
     </joint>
 
     <!-- Link 5 -->
@@ -285,7 +285,7 @@
       <axis xyz="-1 0 0"/>
       <limit lower="0" upper="0.0255" effort="5.0" velocity="3.14"/>
       <mimic joint="${prefix}right_jaw_slide_joint" multiplier="1" offset="0"/>
-      <dynamics damping="0.01" friction="0"/>
+      <dynamics damping="965" friction="2.56"/>
     </joint>
 
     <link name="${prefix}link_6_left_jaw">
@@ -316,7 +316,7 @@
       <origin xyz="0 -0.046232 3.8e-05" rpy="0 0 0"/>
       <axis xyz="1 0 0"/>
       <limit lower="0" upper="0.0255" effort="5.0" velocity="3.14"/>
-      <dynamics damping="0.01" friction="0"/>
+      <dynamics damping="965" friction="2.56"/>
     </joint>
 
     <link name="${prefix}link_6_right_jaw">

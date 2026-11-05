@@ -13,6 +13,11 @@ from lerobot_robot_nexarm.nexarm_sim.stack_bowls_task import COLORS, NexArmStack
 MODEL = Path(__file__).resolve().parents[2] / "sim/description/mjcf/bowl_stack_scene.xml"
 
 
+def _command_gripper(backend: NexArmMujocoBackend, raw: float) -> None:
+    """Command the gripper (the grasp assist reads the command, not the speed-limited setpoint)."""
+    backend.set_action({**backend.joint_positions(), "gripper.pos": raw})
+
+
 @pytest.fixture
 def task():
     backend = NexArmMujocoBackend(
@@ -45,9 +50,7 @@ def test_contact_assistance_requires_both_jaws_on_same_bowl(task):
     qadr = backend.model.jnt_qposadr[task._joint_ids["red"]]
     backend.data.qpos[qadr : qadr + 3] = site_pos + [0, 0, 0.09]
     mujoco.mj_forward(backend.model, backend.data)
-    backend.data.ctrl[backend._actuator_ids["gripper"]] = backend.raw_to_control(
-        "gripper", GRIPPER_CLOSED_POS
-    )
+    _command_gripper(backend, GRIPPER_CLOSED_POS)
     task.target_bowl = "red"
     backend.data.ncon = 0
     task._on_physics_step()
@@ -73,7 +76,7 @@ def test_contact_assistance_requires_both_jaws_on_same_bowl(task):
     assert task.held_bowl == "red"
     backend.data.ncon = 0
     assert not task._is_gripper_disengaged()
-    backend.data.ctrl[backend._actuator_ids["gripper"]] = backend.raw_to_control("gripper", GRIPPER_OPEN_POS)
+    _command_gripper(backend, GRIPPER_OPEN_POS)
     task._on_physics_step()
     assert task.held_bowl is None
     assert task.held_rel_pos is None
@@ -122,7 +125,7 @@ def test_held_bowl_turns_with_the_gripper(task):
         con = mujoco.MjContact()
         con.geom1, con.geom2, con.dist = jaw, red_geom, -0.001
         mujoco.mj_addContact(model, data, con)
-    data.ctrl[backend._actuator_ids["gripper"]] = backend.raw_to_control("gripper", GRIPPER_CLOSED_POS)
+    _command_gripper(backend, GRIPPER_CLOSED_POS)
     task.target_bowl = "red"
     task._on_physics_step()
     assert task.held_bowl == "red"
@@ -139,12 +142,57 @@ def test_held_bowl_turns_with_the_gripper(task):
     np.testing.assert_allclose(site.T @ bowl, relative, atol=1e-9)
 
 
+def test_released_bowl_regains_jaw_contacts_only_after_the_jaws_open(task):
+    """The servo gripper opens over several frames; the jaws must clear the bowl before its contacts return."""
+    backend = task.backend
+    model, data = backend.model, backend.data
+    jaw_geoms = task._jaw_only_geom_ids["red"]
+    gripper_qpos = model.jnt_qposadr[backend._joint_ids["gripper"]]
+    red_qpos = model.jnt_qposadr[task._joint_ids["red"]]
+    data.qpos[red_qpos : red_qpos + 3] = data.site_xpos[task._gripper_frame_site_id] + [0, 0, 0.09]
+    mujoco.mj_forward(model, data)
+
+    data.ncon = 0
+    red_geom = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, "bowl_red_wall_0")
+    for jaw in (task._left_jaw_geom_id, task._right_jaw_geom_id):
+        con = mujoco.MjContact()
+        con.geom1, con.geom2, con.dist = jaw, red_geom, -0.001
+        mujoco.mj_addContact(model, data, con)
+    _command_gripper(backend, GRIPPER_CLOSED_POS)
+    task.target_bowl = "red"
+    task._on_physics_step()
+    assert task.held_bowl == "red"
+    assert np.all(model.geom_contype[jaw_geoms] == 0)
+
+    # Commanded open, jaws still closed: released, but the contacts stay off.
+    data.qpos[gripper_qpos] = backend.raw_to_control("gripper", GRIPPER_CLOSED_POS)
+    _command_gripper(backend, GRIPPER_OPEN_POS)
+    task._on_physics_step()
+    assert task.held_bowl is None
+    assert np.all(model.geom_contype[jaw_geoms] == 0)
+
+    # The jaws have opened past the release threshold: the contacts return.
+    data.qpos[gripper_qpos] = backend.raw_to_control("gripper", GRIPPER_OPEN_POS)
+    task._on_physics_step()
+    assert np.all(model.geom_contype[jaw_geoms] == task._jaw_only_contype["red"])
+    assert task._jaws_clearing is None
+
+
+def test_reset_restores_contacts_of_a_bowl_still_clearing(task):
+    task._jaws_clearing = "red"
+    task._set_jaw_contacts("red", enabled=False)
+    task.reset(seed=3, settle_steps=0)
+    assert task._jaws_clearing is None
+    assert np.all(
+        task.backend.model.geom_contype[task._jaw_only_geom_ids["red"]] == task._jaw_only_contype["red"]
+    )
+
+
 def test_assist_release_threshold_is_configurable(task):
     """Real teleop releases often open only to about 1990, which the default threshold never sees."""
     backend = task.backend
-    gripper = backend._actuator_ids["gripper"]
     task.held_bowl, task.held_rel_pos = "red", np.zeros(3)
-    backend.data.ctrl[gripper] = backend.raw_to_control("gripper", 1990)
+    _command_gripper(backend, 1990)
     task._on_physics_step()
     assert task.held_bowl == "red"
 

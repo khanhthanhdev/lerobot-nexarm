@@ -4,11 +4,11 @@ This guide makes the MuJoCo twin behave like your physical arm, then generates s
 
 **What gets calibrated**
 
-| What                                                                                    | Tool                            | Result                          |
-| --------------------------------------------------------------------------------------- | ------------------------------- | ------------------------------- |
-| Action latency, per-joint gain (`kp`), damping and friction, and how much each can vary | `calibrate_sim.py`              | `SimCalibration` JSON           |
-| Camera pose and field of view                                                           | `calibrate_camera_alignment.py` | Edits you make to the scene XML |
-| Cube size, mass, table height                                                           | Measure by hand                 | Edits you make to the scene XML |
+| What                                                                                                  | Tool                            | Result                          |
+| ----------------------------------------------------------------------------------------------------- | ------------------------------- | ------------------------------- |
+| Action latency, per-joint damping and friction (and `kp` with `--fit-kp`), and how much each can vary | `calibrate_sim.py`              | `SimCalibration` JSON           |
+| Camera pose and field of view                                                                         | `calibrate_camera_alignment.py` | Edits you make to the scene XML |
+| Cube size, mass, table height                                                                         | Measure by hand                 | Edits you make to the scene XML |
 
 **What is not calibrated:** contact physics such as cube friction and slip. Keep real contact-rich demonstrations in your training mix, since simulation widens coverage but does not replace them.
 
@@ -104,7 +104,7 @@ MUJOCO_GL=egl uv run python tools/nexarm/calibrate_sim.py \
 The tool replays each episode's recorded `action` stream through the simulator, starting from the real first state, and compares the simulated joint positions with the real `observation.state`. It then fits:
 
 1. the action delay (searched over `--delay-range`, default 0–6 control steps),
-2. each joint's `kp`, damping and friction scales (limited to 0.25×–4×),
+2. each joint's damping and friction scales (limited to 0.25×–4×). `kp` stays at the servo model's value unless you pass `--fit-kp`: on the stack-bowls demos a fitted `kp` reached the 4× limit and dropped the scripted bowl grasp from 20/20 to 6/20,
 3. a spread for damping and friction, which becomes the domain-randomization range.
 
 By default 20% of the episodes are held out (`--holdout-frac`) and never used for fitting.
@@ -115,6 +115,7 @@ Useful options:
 | ----------------------------------- | ----------------------------------------------------- |
 | `--root <path>`                     | The dataset is in a local folder instead of the cache |
 | `--joints shoulder_lift,elbow_flex` | Fit only some joints                                  |
+| `--exclude-episodes 19,69-92`       | Skip episodes that do not replay                      |
 | `--delay-range 0 10`                | The latency may be longer than 6 steps                |
 | `--max-frames 900`                  | Use longer episodes                                   |
 | `--holdout-frac 0`                  | No holdout (use only for very few episodes)           |
@@ -145,13 +146,21 @@ If the fit is poor, the cause is almost always the data, not the tool: too few e
 
 ## Step 5. Use the calibration
 
+The repository ships one calibration, [`sim/calibration/nexarm_sim_calibration_hx_servo_v1.json`](../../sim/calibration/nexarm_sim_calibration_hx_servo_v1.json), fitted to `thanhkt/nexarm_stack_bowls` (episodes 0–23, skipping 1, 3, 12 and 19, whose replays hit the floor or the back panel). Use it unless you have fitted your own:
+
+- Its `kp` scales (pan 1.19, lift 1.68, elbow 1.38, wrist flex 2.0, roll 1.68) are the square root of a `--fit-kp` fit, and the elbow uses the fourth root. A higher elbow `kp` drops the scripted bowl grasp below 20/20.
+- They cut the holdout replay error from 17.4 to 12.4 raw units (mean over the arm joints) and keep both scripted tasks at 20/20. With domain randomization, the scores are pick-place 20/20 and stack-bowls 19/20.
+- The friction scales of wrist flex and roll sit at the 4× limit. These demos barely identify friction, so treat those two values as weak.
+
+The MJCF keeps the servo-model `kp`, so the scales apply only when you pass the file.
+
 Pass it to the generator:
 
 ```bash
 MUJOCO_GL=egl uv run python examples/nexarm/generate_sim_dataset.py \
     --repo-id local/nexarm_sim_pick_place \
     --root outputs/datasets/nexarm_sim_pick_place_cal \
-    --calibration outputs/calibration/nexarm_sim_calibration.json \
+    --calibration sim/calibration/nexarm_sim_calibration_hx_servo_v1.json \
     --episodes 200 --workers 4 --gpus 0,1,2,3
 ```
 
@@ -166,6 +175,8 @@ The same calibration is available in:
 - the robot class: `calibration_path` in `NexArmSimConfig`.
 
 Calibrations fitted before the servo-constant joint mapping (`rad = (raw - 2048) * 2π / 4096`) are stale and are refused on load (they carry no matching `joint_mapping`): re-run Step 3, then regenerate any sim data made with them.
+
+The fitted scales correct one sim servo model, so the file also records its `dynamics_model` (now `hx_servo_v1`, see "Servo model" in `sim/README.md`). A calibration without it, or fitted against another model, is refused on load: re-run Step 3. The setpoint speed and acceleration caps and the armature are fixed priors of the model; the calibration does not fit them.
 
 Use `--split eval` to generate a held-out evaluation set. Its seeds never overlap with the training seeds.
 

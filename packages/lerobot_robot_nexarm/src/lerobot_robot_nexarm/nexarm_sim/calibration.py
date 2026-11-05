@@ -24,7 +24,7 @@ from typing import Any
 from lerobot_robot_nexarm.motors.mujoco_mapping import JOINT_MAPPING_VERSION
 from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES
 
-from .mujoco_backend import NexArmMujocoBackend
+from .mujoco_backend import SIM_DYNAMICS_MODEL, NexArmMujocoBackend
 
 MIN_SPREAD = 0.10
 
@@ -67,6 +67,8 @@ class SimCalibration:
     fps: int | None = None
     fitted_joints: list[str] | None = None
     joint_mapping: str = JOINT_MAPPING_VERSION
+    # The sim servo model the scales were fitted against; they are corrections to it, so another model voids them.
+    dynamics_model: str = SIM_DYNAMICS_MODEL
 
     def __post_init__(self) -> None:
         if self.action_delay_steps < 0:
@@ -101,6 +103,13 @@ class SimCalibration:
                 f"but the sim uses {joint_mapping_version}. Re-run tools/nexarm/calibrate_sim.py with the same "
                 "--joint-mapping."
             )
+        dynamics_model = raw.get("dynamics_model")
+        if dynamics_model != SIM_DYNAMICS_MODEL:
+            raise ValueError(
+                f"Calibration {path} was fitted against the sim dynamics model "
+                f"{dynamics_model or 'that predates the servo model'} but the sim uses {SIM_DYNAMICS_MODEL}. "
+                "Re-run tools/nexarm/calibrate_sim.py to fit it against the current model."
+            )
         source = raw.get("source", {})
         fps = raw.get("fps") if raw.get("fps") is not None else source.get("fps")
         fitted_joints = (
@@ -113,6 +122,7 @@ class SimCalibration:
             fps=int(fps) if fps is not None else None,
             fitted_joints=list(fitted_joints) if fitted_joints is not None else None,
             joint_mapping=joint_mapping,
+            dynamics_model=dynamics_model,
         )
 
 

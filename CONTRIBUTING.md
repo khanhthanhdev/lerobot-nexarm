@@ -46,7 +46,7 @@ git lfs install
 git lfs pull
 ```
 
-Run the suite (hardware is mocked; the MuJoCo rendering tests need OpenGL/EGL):
+Run the suite (hardware is mocked). The MuJoCo rendering tests need OpenGL (`MUJOCO_GL=egl` on headless Linux) and are skipped when MuJoCo cannot open a context:
 
 ```bash
 uv run pytest tests policies -sv

@@ -16,6 +16,7 @@ from lerobot_robot_nexarm.nexarm_sim import (
     NexArmSimConfig,
     SimCalibration,
 )
+from lerobot_robot_nexarm.nexarm_sim.mujoco_backend import SIM_DYNAMICS_MODEL
 from tools.nexarm.calibrate_sim import Episode, Simulator, fit_calibration, rmse
 
 MODEL_PATH = Path(__file__).resolve().parents[2] / "sim" / "description" / "mjcf" / "scene.xml"
@@ -93,7 +94,7 @@ def test_fit_recovers_known_delay_and_gain() -> None:
     truth = SimCalibration(action_delay_steps=2, joints={"shoulder_lift": JointCalibration(kp_scale=0.5)})
     episodes = [_synthetic_episode(sim, truth, seed) for seed in range(2)]
 
-    fitted = fit_calibration(sim, episodes, ["shoulder_lift"], range(0, 5))
+    fitted = fit_calibration(sim, episodes, ["shoulder_lift"], range(0, 5), fit_kp=True)
 
     assert fitted.action_delay_steps == 2
     assert 0.4 <= fitted.joints["shoulder_lift"].kp_scale <= 0.6
@@ -101,6 +102,20 @@ def test_fit_recovers_known_delay_and_gain() -> None:
     before = rmse(sim, episodes, SimCalibration())[column]
     after = rmse(sim, episodes, fitted)[column]
     assert after < 0.2 * before
+
+
+def test_fit_keeps_the_servo_model_kp_by_default() -> None:
+    sim = Simulator(MODEL_PATH, fps=30)
+    truth = SimCalibration(
+        action_delay_steps=1, joints={"shoulder_lift": JointCalibration(damping_scale=2.0)}
+    )
+    episodes = [_synthetic_episode(sim, truth, seed) for seed in range(2)]
+
+    fitted = fit_calibration(sim, episodes, ["shoulder_lift"], range(0, 3))
+
+    assert fitted.joints["shoulder_lift"].kp_scale == 1.0
+    column = JOINT_NAMES.index("shoulder_lift")
+    assert rmse(sim, episodes, fitted)[column] < rmse(sim, episodes, SimCalibration())[column]
 
 
 def _sim(path: Path | None = None, **overrides) -> NexArmSim:
@@ -173,6 +188,7 @@ def test_older_calibration_files_read_fps_and_fitted_joints_from_source(tmp_path
                 "joints": {name: {} for name in JOINT_NAMES},
                 "source": {"fps": 30, "fitted_joints": ["shoulder_pan", "elbow_flex"]},
                 "joint_mapping": JOINT_MAPPING_VERSION,
+                "dynamics_model": SIM_DYNAMICS_MODEL,
             }
         ),
         encoding="utf-8",
@@ -193,10 +209,27 @@ def test_calibration_fitted_with_another_joint_mapping_is_refused(tmp_path: Path
         SimCalibration.load(path)
 
 
-def test_saved_calibration_records_the_joint_mapping(tmp_path: Path) -> None:
+def test_saved_calibration_records_the_joint_mapping_and_dynamics_model(tmp_path: Path) -> None:
     path = tmp_path / "calibration.json"
     SimCalibration().save(path)
-    assert json.loads(path.read_text(encoding="utf-8"))["joint_mapping"] == JOINT_MAPPING_VERSION
+    saved = json.loads(path.read_text(encoding="utf-8"))
+    assert saved["joint_mapping"] == JOINT_MAPPING_VERSION
+    assert saved["dynamics_model"] == SIM_DYNAMICS_MODEL
+
+
+@pytest.mark.parametrize("dynamics_model", [None, "pd_v0"])
+def test_calibration_fitted_against_another_dynamics_model_is_refused(tmp_path: Path, dynamics_model) -> None:
+    payload = {
+        "action_delay_steps": 1,
+        "joints": {name: {} for name in JOINT_NAMES},
+        "joint_mapping": JOINT_MAPPING_VERSION,
+    }
+    if dynamics_model is not None:
+        payload["dynamics_model"] = dynamics_model
+    path = tmp_path / "calibration.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(ValueError, match="calibrate_sim.py"):
+        SimCalibration.load(path)
 
 
 def test_calibration_fitted_with_a_probe_mapping_needs_that_mapping(tmp_path: Path) -> None:

@@ -291,12 +291,14 @@ class NexArmMotorsBus:
         time.sleep(0.1)
 
     def write_motion_params(self, acc: int, speed: int = 0) -> None:
-        """Set LeRobot-mode servo acceleration and speed limit (CMD 56).
+        """Send LeRobot-mode servo acceleration and speed (CMD 56).
 
-        acc:   0-254, acceleration applied to every CMD 97 write.
-               0 = max acceleration (no ramp), 50 is a smooth default.
-        speed: 0-3400 raw units/s. 0 = no speed limit (servo runs at max).
-               Stored in AT32 as arm.lerobot_speed and applied each CMD 97.
+        acc:   0-254, stored by the firmware as arm.move_acc.
+        speed: 0-3400 raw units/s.
+
+        CMD 97 position writes do not use either value: they reach the servos as raw sync writes with zero
+        acceleration and speed. Real demos recorded at ``motion_speed=2000`` move wrist flex at about
+        3050 ticks/s, so this call does not cap teleoperation speed.
         """
         acc = max(0, min(254, int(acc)))
         speed = max(0, min(3400, int(speed)))

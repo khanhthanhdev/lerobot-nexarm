@@ -1,0 +1,105 @@
+{
+  "action_delay_steps": 0,
+  "joints": {
+    "shoulder_pan": {
+      "kp_scale": 1.189207115002721,
+      "damping_scale": 2.0,
+      "frictionloss_scale": 1.189207115002721,
+      "damping_spread": 0.5,
+      "frictionloss_spread": 0.5
+    },
+    "shoulder_lift": {
+      "kp_scale": 1.6817928305074292,
+      "damping_scale": 0.7071067811865476,
+      "frictionloss_scale": 0.5,
+      "damping_spread": 0.5,
+      "frictionloss_spread": 0.5
+    },
+    "elbow_flex": {
+      "kp_scale": 1.38,
+      "damping_scale": 0.3535533905932738,
+      "frictionloss_scale": 0.7071067811865476,
+      "damping_spread": 0.43367699129738957,
+      "frictionloss_spread": 0.49933662257632055
+    },
+    "wrist_flex": {
+      "kp_scale": 2.0,
+      "damping_scale": 2.0,
+      "frictionloss_scale": 4.0,
+      "damping_spread": 0.28206915014761513,
+      "frictionloss_spread": 0.4217636860654401
+    },
+    "wrist_roll": {
+      "kp_scale": 1.681792830507429,
+      "damping_scale": 0.6484197773255048,
+      "frictionloss_scale": 4.0,
+      "damping_spread": 0.5,
+      "frictionloss_spread": 0.5
+    },
+    "gripper": {
+      "kp_scale": 1.0,
+      "damping_scale": 1.0,
+      "frictionloss_scale": 1.0,
+      "damping_spread": 0.25,
+      "frictionloss_spread": 0.25
+    }
+  },
+  "source": {
+    "repo_id": "thanhkt/nexarm_stack_bowls",
+    "fit_episodes": 16,
+    "holdout_episodes": 4,
+    "fps": 30,
+    "fitted_joints": [
+      "shoulder_pan",
+      "shoulder_lift",
+      "elbow_flex",
+      "wrist_flex",
+      "wrist_roll"
+    ],
+    "rmse_raw_units": {
+      "fit_before": [
+        6.92,
+        30.67,
+        92.41,
+        48.88,
+        12.35,
+        51.16
+      ],
+      "holdout_before": [
+        5.94,
+        23.49,
+        25.49,
+        23.92,
+        3.41,
+        47.94
+      ],
+      "fit_after": [
+        5.99,
+        21.42,
+        79.97,
+        32.94,
+        11.92,
+        50.87
+      ],
+      "holdout_after": [
+        6.94,
+        14.31,
+        20.13,
+        15.22,
+        5.5,
+        47.36
+      ]
+    },
+    "kp_selection": "kp scales = (--fit-kp fit on the first 20 episodes of 0-23 minus 1,3,12,19) ** 0.5, elbow ** 0.25; best real-replay holdout RMSE that keeps scripted pick-place and stack-bowls 20/20 (2026-11-05)"
+  },
+  "fps": 30,
+  "fitted_joints": [
+    "shoulder_pan",
+    "shoulder_lift",
+    "elbow_flex",
+    "wrist_flex",
+    "wrist_roll"
+  ],
+  "joint_mapping": "servo_4096_v2",
+  "dynamics_model": "hx_servo_v1"
+}

@@ -192,6 +192,9 @@ sim/*
 !sim/description/**
 !sim/assets/
 !sim/assets/**
+# Sim calibrations fitted to the real follower (tools/nexarm/calibrate_sim.py).
+!sim/calibration/
+!sim/calibration/**
 !sim/mobile_nexarm/
 !sim/mobile_nexarm/**
 sim/**/__pycache__/

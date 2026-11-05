@@ -4,10 +4,12 @@
 
 Replays the recorded real ``action`` stream of each episode through the simulator, starting from the real
 initial pose, and compares the simulated joint trajectory with the real ``observation.state``. It fits
-the action delay and per-joint ``kp`` / damping / frictionloss scales (and their spread, used as the
-domain-randomization range) and writes a ``SimCalibration`` JSON that ``generate_sim_dataset.py``,
+the action delay and per-joint damping / frictionloss scales (and their spread, used as the
+domain-randomization range; ``--fit-kp`` also fits a ``kp`` scale) and writes a ``SimCalibration`` JSON that ``generate_sim_dataset.py``,
 ``generate_stack_bowls_dataset.py`` and ``NexArmSimConfig.calibration_path`` accept. The file records the
-fitted ``fps`` (loaders refuse another run fps) and ``fitted_joints``.
+fitted ``fps`` (loaders refuse another run fps), ``fitted_joints`` and the sim ``dynamics_model`` it was fitted
+against (loaders refuse a file fitted against another servo model). Armature, kp (unless ``--fit-kp``), the setpoint
+speed cap and the acceleration cap are fixed priors of the servo model.
 
 For the cleanest fit, record a few object-free episodes that sweep each joint through its range
 (e.g. with teleoperate/record). Contact-rich frames (a grasped cube) bias the gripper fit, so the gripper is
@@ -33,7 +35,10 @@ from lerobot_robot_nexarm.nexarm_sim import SimCalibration
 from lerobot_robot_nexarm.nexarm_sim.calibration import MIN_SPREAD
 from lerobot_robot_nexarm.nexarm_sim.mujoco_backend import NexArmMujocoBackend, resolve_model_path
 
-PARAMS = ("kp_scale", "damping_scale", "frictionloss_scale")
+# kp is a fixed prior of the servo model (stiff hold, kv from the real time constants); fitting it trades
+# against latency and contact on the real demos and breaks the scripted bowl grasp, so it is opt-in (--fit-kp).
+PARAMS = ("damping_scale", "frictionloss_scale")
+PARAMS_WITH_KP = ("kp_scale", *PARAMS)
 MAX_SPREAD = 0.5
 SCALE_RANGE = (0.25, 4.0)  # fitted multipliers never leave 2 octaves around the model
 # (log2 half-range, log2 step) per sweep: coarse global search, then local refinement.
@@ -127,15 +132,19 @@ def fit_delay(
 
 
 def fit_dynamics(
-    sim: Simulator, episodes: Sequence[Episode], calibration: SimCalibration, joints: Sequence[str]
+    sim: Simulator,
+    episodes: Sequence[Episode],
+    calibration: SimCalibration,
+    joints: Sequence[str],
+    params: Sequence[str] = PARAMS,
 ) -> None:
-    """Per-joint coordinate descent over kp / damping / frictionloss scales on a log grid."""
+    """Per-joint coordinate descent over the ``params`` scales (damping / frictionloss, optionally kp)."""
     for half_range, step in SWEEPS:
         exponents = np.arange(-half_range, half_range + 1e-9, step)
         for name in joints:
             column = JOINT_NAMES.index(name)
             joint = calibration.joints[name]
-            for param in PARAMS:
+            for param in params:
                 center = getattr(joint, param) if half_range < 2.0 else 1.0
                 best_value, best_cost = getattr(joint, param), float("inf")
                 for exponent in exponents:
@@ -176,13 +185,14 @@ def fit_calibration(
     fit_episodes: Sequence[Episode],
     joints: Sequence[str],
     delays: range,
+    fit_kp: bool = False,
 ) -> SimCalibration:
     calibration = SimCalibration()
     # Latency is shared by all joints, while gain trades off against it per joint: estimate it from every
     # arm joint so an incorrectly modeled joint cannot masquerade as extra delay.
     arm = JOINT_NAMES[:-1]
     fit_delay(sim, fit_episodes, calibration, delays, arm)
-    fit_dynamics(sim, fit_episodes, calibration, joints)
+    fit_dynamics(sim, fit_episodes, calibration, joints, PARAMS_WITH_KP if fit_kp else PARAMS)
     fit_delay(sim, fit_episodes, calibration, delays, arm)
     fit_spread(sim, fit_episodes, calibration, joints)
     return calibration
@@ -262,6 +272,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default=",".join(JOINT_NAMES[:-1]),
         help="Comma-separated joints to fit (gripper is contact-dominated; add it only for free-air data)",
     )
+    parser.add_argument(
+        "--fit-kp",
+        action="store_true",
+        help="Also fit a kp scale per joint (kp is a fixed servo-model prior by default)",
+    )
     parser.add_argument("--delay-range", type=int, nargs=2, default=(0, 6), metavar=("MIN", "MAX"))
     parser.add_argument("--holdout-frac", type=float, default=0.2)
     parser.add_argument("--out", type=Path, default=Path("outputs/calibration/nexarm_sim_calibration.json"))
@@ -304,7 +319,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         columns["holdout_before"] = rmse(sim, holdout, before)
 
     calibration = fit_calibration(
-        sim, fit_episodes, args.joints, range(args.delay_range[0], args.delay_range[1] + 1)
+        sim,
+        fit_episodes,
+        args.joints,
+        range(args.delay_range[0], args.delay_range[1] + 1),
+        fit_kp=args.fit_kp,
     )
     columns["fit_after"] = rmse(sim, fit_episodes, calibration)
     if holdout:

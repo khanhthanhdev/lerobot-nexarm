@@ -1,7 +1,7 @@
 ---
 phase: 4
 title: "Collision refit, URDF/Isaac sync, GL skip"
-status: pending
+status: done, pending the user's viewer review
 priority: P2
 effort: "4h"
 dependencies: [3]
@@ -14,7 +14,25 @@ dependencies: [3]
 Collision primitives cover the link meshes, and the URDF and Isaac configs carry the same dynamics as the MJCF.
 Tests that need OpenGL skip cleanly when it is missing.
 
-## Context
+## Status (2026-11-05)
+
+The refit and the sync already landed with the CAD Home pose and Isaac twin commits (`47f4c5721`, `e8a582ad6`):
+`apply_fusion_extract.py` fits oriented boxes that enclose every mesh vertex, and `build_isaac_assets.py` writes
+the URDF boxes and joint damping/friction and the Isaac drive gains (stiffness `kp`, damping `kv` + joint damping,
+effort, armature) from the MJCF. Measured on the current MJCF:
+
+| Check                                                      | Result                                        |
+| ---------------------------------------------------------- | --------------------------------------------- |
+| Mesh vertices inside the link's collision boxes (0 mm)     | 91.4% `base_link`, 95.4–100% every other link |
+| Random joint poses in self-contact (2000 samples)          | 25% (41% measured at planning time)           |
+| Self-contact along 20+20 scripted episodes (16 751 frames) | none; pick-place and stack-bowls 20/20        |
+
+Added here: `tests/opengl.py` (`require_opengl`, a cached `mujoco.Renderer` probe; CI sets
+`NEXARM_REQUIRE_OPENGL=1` so it fails instead of skipping), applied to the 10 render tests, and a test that the
+IK grasp-approach poses have no self-contact. The URDF/Isaac velocity limit stays at 5.51 rad/s, and the Isaac
+twin still has no setpoint speed or acceleration limiter.
+
+## Context (at planning time)
 
 - The `link_2` capsule (r 32 mm) is undersized: 5% of its mesh vertices lie 66 mm or more from its axis.
 - Self-contacts appear in 41% of random poses, but none at the IK grasp poses.

@@ -71,6 +71,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       MUJOCO_GL: egl
+      # The render tests skip without OpenGL; CI has EGL, so make them fail instead of skipping.
+      NEXARM_REQUIRE_OPENGL: "1"
       HF_HOME: /mnt/cache/.cache/huggingface
       HF_LEROBOT_HOME: /mnt/cache/.cache/huggingface/lerobot
     steps:

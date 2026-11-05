@@ -2,24 +2,60 @@
   <compiler angle="radian" meshdir="../../assets/meshes/visual" autolimits="true" />
   <option timestep="0.002" integrator="implicitfast" gravity="0 0 -9.81" cone="elliptic" impratio="10" />
 
+  <!-- Servo model (Hiwonder HX bus servos, 0.2 s/60 deg = 5.24 rad/s no-load):
+       - joint damping = stall torque / no-load speed, so a saturated joint tops out at the servo's no-load speed;
+       - armature 0.028 and frictionloss 0.052 are the STS3215 values identified in MuJoCo Menagerie's SO-101
+         (same 30 kg.cm class), used as priors;
+       - kp 998.22 (SO-101) holds against gravity like the real arm (median steady error 0-2 ticks);
+       - kv per actuator sets the small-step time constant (kv + damping) / kp to the first-order fit of the real
+         follower (7 full-length episodes of thanhkt/nexarm_stack_bowls), so it is not a class default.
+       The backend additionally caps how fast the setpoint moves (max_speed_ticks_s). -->
   <default>
     <default class="nexarm">
       <joint damping="0.08" frictionloss="0.04" armature="0.004" />
-      <position kp="100" kv="0.2" />
+      <position kp="998.22" />
+      <!-- HX-65HM, 6.37 N.m stall: 6.37 / 5.51 rad/s -->
+      <default class="hx65hm">
+        <joint damping="1.156" frictionloss="0.052" armature="0.028" />
+        <position forcerange="-6.37 6.37" />
+      </default>
+      <!-- HX-30HM, 2.94 N.m stall: 2.94 / 5.51 rad/s -->
+      <default class="hx30hm">
+        <joint damping="0.533" frictionloss="0.052" armature="0.028" />
+        <position forcerange="-2.94 2.94" />
+      </default>
+      <!-- HX-12H, 1.18 N.m stall: 1.18 / 5.24 rad/s -->
+      <default class="hx12h">
+        <joint damping="0.225" frictionloss="0.052" armature="0.028" />
+        <position forcerange="-1.18 1.18" />
+      </default>
     </default>
+    <!-- Gripper: the HX-12H drives both jaws through a pinion of radius r = 0.0255 m / (1638 ticks x 2 pi / 4096)
+         = 10.149 mm, so rotary values become linear ones: force = tau / r, kp = kp_rot / r^2, armature =
+         arm_rot / r^2, frictionloss = fl_rot / r. Damping comes from the real gripper's saturated speed, 129
+         ticks/frame = 3870 ticks/s (0.0602 m/s): 116.3 N / 0.0602 m/s = 1930 N.s/m. Each jaw carries half of the
+         armature, damping and frictionloss; the equality below makes them move as one.
+         Deviations from the priors, fitted to the real full stroke of about 0.4 s: the armature is a quarter of
+         the SO-101 value (rotary 0.007, 68 kg in total; the full 272 kg alone stretches the stroke to 0.6 s), and
+         the small-step time constant is 0.05 s, not the 0.207 s first-order fit, which mostly sees the gripper
+         squeezing a bowl. -->
     <default class="gripper">
-      <joint damping="0.01" frictionloss="0" armature="0" />
+      <joint damping="965" frictionloss="2.56" armature="34" />
     </default>
     <default class="gripper_actuator">
-      <position kp="1000" kv="5" />
+      <!-- kv = 0.05 s x kp - 1930 -->
+      <position kp="9.6915e6" kv="4.8265e5" forcerange="-116.3 116.3" />
     </default>
     <default class="visual">
       <geom type="mesh" contype="0" conaffinity="0" group="2" />
     </default>
     <default class="collision">
       <geom contype="1" conaffinity="3" group="3" rgba="0 0 0 0" friction="1.1 0.01 0.001" />
+      <!-- Jaw pads use a direct contact stiffness (negative solref: N/m, N.s/m). The default time-constant form
+           is scaled by the light object's mass, so the 116 N grip sank 5 mm into a 20 g cube and squeezed it
+           out. 2.3e5 N/m leaves about 0.5 mm at full grip force. -->
       <default class="finger_collision">
-        <geom type="box" contype="8" conaffinity="11" group="3" friction="1.5 0.005 0.0001" condim="4" solimp="0.9 0.95 0.001" solref="0.01 1" />
+        <geom type="box" contype="8" conaffinity="11" group="3" friction="1.5 0.005 0.0001" condim="4" solimp="0.9 0.95 0.001" solref="-230000 -150" />
       </default>
     </default>
     <default class="site">
@@ -56,29 +92,29 @@
         <inertial mass="0.307643" pos="0.53937928 0.0645093434 0.0187781864" fullinertia="5.498090e-04 5.570952e-04 7.322669e-04 1.626228e-07 -6.868540e-09 7.496669e-06" />
         <geom name="base_link_collision_0" class="collision" type="box" pos="0.539369 0.063973 0.03" size="0.055675 0.055675 0.035003" />
         <body name="link_1" pos="0 0 0" quat="1 0 0 0">
-          <joint name="joint_1_base_to_link_1" pos="0.539369023 0.063972763 0.049" type="hinge" axis="0 0 -1" limited="true" range="-2.35619449019 2.35619449019" />
+          <joint name="joint_1_base_to_link_1" class="hx30hm" pos="0.539369023 0.063972763 0.049" type="hinge" axis="0 0 -1" limited="true" range="-2.35619449019 2.35619449019" />
           <geom name="link_1_visual" class="visual" mesh="link_1" material="dark_bracket" />
           <inertial mass="0.28384" pos="0.539393115 0.0635159462 0.0717804084" fullinertia="2.032788e-04 2.487346e-04 2.474501e-04 6.009257e-07 2.280297e-07 1.981360e-06" />
           <geom name="link_1_collision_0" class="collision" type="box" pos="0.539369 0.063973 0.080028" size="0.047488 0.04749 0.036528" />
           <body name="link_2" pos="0 0 0" quat="1 0 0 0">
-            <joint name="joint_2_link_1_to_link_2" pos="0.574469023 0.063972763 0.106445071" type="hinge" axis="-1 0 0" limited="true" range="-2.09439510239 2.09439510239" armature="0.008" damping="0.15" frictionloss="0.08" />
+            <joint name="joint_2_link_1_to_link_2" class="hx65hm" pos="0.574469023 0.063972763 0.106445071" type="hinge" axis="-1 0 0" limited="true" range="-2.09439510239 2.09439510239" />
             <geom name="link_2_visual" class="visual" mesh="link_2" material="black_metal" />
             <inertial mass="0.192568" pos="0.539369024 0.0630835759 0.221105065" fullinertia="8.608103e-04 8.918344e-04 5.946522e-05 -2.307043e-13 3.712060e-12 -1.917386e-05" />
             <geom name="link_2_collision_0" class="collision" type="box" pos="0.539369 0.063973 0.129598" size="0.03928 0.033153 0.012362" quat="0.707107 0.707107 0 0" />
             <geom name="link_2_collision_1" class="collision" type="box" pos="0.539369 0.063973 0.218489" size="0.051136 0.015049 0.009799" quat="-0.5 0.5 0.5 0.5" />
             <geom name="link_2_collision_2" class="collision" type="box" pos="0.539308 0.053231 0.313562" size="0.041343 0.022373 0.029139" quat="0.657056 -0.265533 -0.264351 -0.654131" />
             <body name="link_3" pos="0 0 0" quat="1 0 0 0">
-              <joint name="joint_3_link_2_to_link_3" pos="0.519439024 0.02717557 0.331474057" type="hinge" axis="1 0 0" limited="true" range="-2.35619449019 2.35619449019" />
+              <joint name="joint_3_link_2_to_link_3" class="hx30hm" pos="0.519439024 0.02717557 0.331474057" type="hinge" axis="1 0 0" limited="true" range="-2.35619449019 2.35619449019" />
               <geom name="link_3_visual" class="visual" mesh="link_3" material="dark_bracket" />
               <inertial mass="0.196103" pos="0.538277011 -0.0429517469 0.331485295" fullinertia="5.809189e-04 2.711611e-05 5.866832e-04 6.642977e-07 -5.446095e-08 8.987228e-07" />
               <geom name="link_3_collision_0" class="collision" type="box" pos="0.53998 -0.045223 0.331519" size="0.082621 0.021509 0.017403" quat="0.705774 -0.043399 -0.043399 0.705774" />
               <body name="link_4" pos="0 0 0" quat="1 0 0 0">
-                <joint name="joint_4_link_3_to_link_4" pos="0.519118833 -0.11782302 0.331286782" type="hinge" axis="1 0 0" limited="true" range="-1.74532925199 1.74532925199" />
+                <joint name="joint_4_link_3_to_link_4" class="hx30hm" pos="0.519118833 -0.11782302 0.331286782" type="hinge" axis="1 0 0" limited="true" range="-1.74532925199 1.74532925199" />
                 <geom name="link_4_visual" class="visual" mesh="link_4" material="black_metal" />
                 <inertial mass="0.0554609" pos="0.539233497 -0.145016313 0.32597125" fullinertia="1.863340e-05 1.670002e-05 2.290469e-05 -1.262205e-07 4.816249e-09 1.604208e-06" />
                 <geom name="link_4_collision_0" class="collision" type="box" pos="0.539371 -0.136348 0.327948" size="0.022254 0.028619 0.022741" />
                 <body name="link_5" pos="0 0 0" quat="1 0 0 0">
-                  <joint name="joint_5_link_4_to_link_5" pos="0.539368638 -0.165057357 0.331329346" type="hinge" axis="0 -1 0.000548" limited="true" range="-3.14159265359 3.14159265359" armature="0.001" damping="0.04" frictionloss="0.02" />
+                  <joint name="joint_5_link_4_to_link_5" class="hx12h" pos="0.539368638 -0.165057357 0.331329346" type="hinge" axis="0 -1 0.000548" limited="true" range="-3.14159265359 3.14159265359" />
                   <geom name="link_5_visual" class="visual" mesh="link_5" material="dark_bracket" />
                   <inertial mass="0.0449343" pos="0.539311323 -0.184502484 0.326118212" fullinertia="9.635606e-06 9.110348e-06 9.762553e-06 -4.247220e-09 3.251408e-08 6.083407e-07" />
                   <geom name="link_5_collision_0" class="collision" type="box" pos="0.539383 -0.18233 0.323015" size="0.025153 0.020268 0.017796" />
@@ -143,12 +179,14 @@
   </equality>
 
   <actuator>
-    <position name="joint_1_base_to_link_1_control" class="nexarm" joint="joint_1_base_to_link_1" kp="40" kv="2.0" forcerange="-2.94 2.94" ctrllimited="true" ctrlrange="-2.35619449019 2.35619449019" />
-    <position name="joint_2_link_1_to_link_2_control" class="nexarm" joint="joint_2_link_1_to_link_2" kp="80" kv="4.0" forcerange="-6.37 6.37" ctrllimited="true" ctrlrange="-2.09439510239 2.09439510239" />
-    <position name="joint_3_link_2_to_link_3_control" class="nexarm" joint="joint_3_link_2_to_link_3" kp="40" kv="2.0" forcerange="-2.94 2.94" ctrllimited="true" ctrlrange="-2.35619449019 2.35619449019" />
-    <position name="joint_4_link_3_to_link_4_control" class="nexarm" joint="joint_4_link_3_to_link_4" kp="35" kv="1.5" forcerange="-2.94 2.94" ctrllimited="true" ctrlrange="-1.74532925199 1.74532925199" />
-    <position name="joint_5_link_4_to_link_5_control" class="nexarm" joint="joint_5_link_4_to_link_5" kp="20" kv="0.8" forcerange="-1.18 1.18" ctrllimited="true" ctrlrange="-3.14159265359 3.14159265359" />
-    <position name="gripper_control" class="gripper_actuator" joint="right_jaw_slide_joint" kp="3000" kv="30.0" forcerange="-50.0 50.0" ctrllimited="true" ctrlrange="0 0.0255" />
+    <!-- kv = tau x kp - joint damping, tau = -1 / (30 ln(1 - alpha)) from the real first-order fit:
+         shoulder_pan 0.0549 s, shoulder_lift 0.1117 s, elbow_flex 0.1063 s, wrist_flex 0.0941 s, wrist_roll 0.0218 s. -->
+    <position name="joint_1_base_to_link_1_control" class="hx30hm" joint="joint_1_base_to_link_1" kv="54.31" ctrllimited="true" ctrlrange="-2.35619449019 2.35619449019" />
+    <position name="joint_2_link_1_to_link_2_control" class="hx65hm" joint="joint_2_link_1_to_link_2" kv="110.35" ctrllimited="true" ctrlrange="-2.09439510239 2.09439510239" />
+    <position name="joint_3_link_2_to_link_3_control" class="hx30hm" joint="joint_3_link_2_to_link_3" kv="105.59" ctrllimited="true" ctrlrange="-2.35619449019 2.35619449019" />
+    <position name="joint_4_link_3_to_link_4_control" class="hx30hm" joint="joint_4_link_3_to_link_4" kv="93.35" ctrllimited="true" ctrlrange="-1.74532925199 1.74532925199" />
+    <position name="joint_5_link_4_to_link_5_control" class="hx12h" joint="joint_5_link_4_to_link_5" kv="21.50" ctrllimited="true" ctrlrange="-3.14159265359 3.14159265359" />
+    <position name="gripper_control" class="gripper_actuator" joint="right_jaw_slide_joint" ctrllimited="true" ctrlrange="0 0.0255" />
   </actuator>
 
   <sensor>
@@ -181,9 +219,5 @@
     <actuatorfrc name="gripper_force" actuator="gripper_control" />
   </sensor>
 
-  <keyframe>
-    <key name="home" qpos="0 0 0 0 0 0 0 0" ctrl="0 0 0 0 0 0" />
-    <key name="ready" qpos="0 -0.0154 0.3197 1.0655 0 0 0 0" ctrl="0 -0.0154 0.3197 1.0655 0 0" />
-    <key name="open" qpos="0 0 0 0 0 0 0.0255 0.0255" ctrl="0 0 0 0 0 0.0255" />
-  </keyframe>
+  <!-- Keyframes live in the scenes: a key must list the full qpos, objects included, or MuJoCo zero-pads it. -->
 </mujoco>

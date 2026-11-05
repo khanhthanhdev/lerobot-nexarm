@@ -142,6 +142,8 @@ class NexArmStackBowlsTask:
         self.held_rel_pos: np.ndarray | None = None
         self.held_rel_mat: np.ndarray | None = None
         self.target_bowl: str | None = None
+        # A released bowl whose jaw contacts stay off until the jaws have opened clear of it.
+        self._jaws_clearing: str | None = None
         self.backend.step_callback = self._on_physics_step
 
         self.current_order: tuple[str, str, str] = PERMUTATIONS[0]
@@ -229,6 +231,7 @@ class NexArmStackBowlsTask:
         self.held_bowl = None
         self.held_rel_pos = None
         self.held_rel_mat = None
+        self._jaws_clearing = None
         for color in COLORS:
             self._set_jaw_contacts(color, enabled=True)
         self.target_bowl = None
@@ -243,10 +246,8 @@ class NexArmStackBowlsTask:
         carry a grasped bowl rigidly. Contact mode requires both jaws to touch the same bowl; proximity
         mode preserves the legacy behavior for comparison, not grasp validation.
         """
-        gripper_ctrl = self.backend.control_to_raw(
-            "gripper",
-            float(self.backend.data.ctrl[self.backend._actuator_ids["gripper"]]),
-        )
+        # The command, not the speed-limited setpoint in data.ctrl: a close command engages the assist at once.
+        gripper_ctrl = self.backend.commanded_position("gripper")
         site_id = self._gripper_frame_site_id
         site_pos = self.backend.data.site_xpos[site_id].copy()
         site_mat = self.backend.data.site_xmat[site_id].reshape(3, 3).copy()
@@ -293,10 +294,20 @@ class NexArmStackBowlsTask:
                 self.backend.data.qvel[dofadr : dofadr + 6] = 0
         elif gripper_ctrl < self.assist_release_pos:  # commanded towards open
             if self.held_bowl is not None:
-                self._set_jaw_contacts(self.held_bowl, enabled=True)
+                # The jaws still overlap the carried bowl's wall, and the servo gripper takes a few frames to
+                # open; restoring the contacts now would kick the bowl, so wait until the jaws have opened.
+                self._jaws_clearing = self.held_bowl
                 self.held_bowl = None
                 self.held_rel_pos = None
                 self.held_rel_mat = None
+        if self._jaws_clearing is not None and self._measured_gripper_position() < self.assist_release_pos:
+            self._set_jaw_contacts(self._jaws_clearing, enabled=True)
+            self._jaws_clearing = None
+
+    def _measured_gripper_position(self) -> float:
+        """Raw gripper position of the jaws themselves (not the command or the setpoint)."""
+        qpos_adr = int(self.backend.model.jnt_qposadr[self.backend._joint_ids["gripper"]])
+        return self.backend.control_to_raw("gripper", float(self.backend.data.qpos[qpos_adr]))
 
     def _track_physical_grasp(self, gripper_ctrl: float, site_pos: np.ndarray, site_mat: np.ndarray) -> None:
         """A bowl is held while the gripper is commanded closed and a jaw still touches it.

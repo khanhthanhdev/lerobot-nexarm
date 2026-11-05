@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import logging
 import os
 import platform
 import shutil
@@ -22,6 +23,7 @@ from lerobot_robot_nexarm.nexarm_sim.calibration import (
     check_calibration_fps,
     resolve_action_delay_steps,
 )
+from lerobot_robot_nexarm.nexarm_sim.mujoco_backend import SIM_DYNAMICS_MODEL
 
 if TYPE_CHECKING:
     from lerobot.datasets.lerobot_dataset import LeRobotDataset
@@ -302,6 +304,7 @@ def base_report(
         "model_sha256": sha256_file(model_path),
         "repo_id": args.repo_id,
         "joint_mapping": args.joint_mapping_version,
+        "dynamics_model": SIM_DYNAMICS_MODEL,
         "split": args.split,
         "fps": args.fps,
         "camera_width": args.camera_width,
@@ -470,6 +473,14 @@ def check_dataset_root(
             f"{root} was generated with joint mapping {report.get('joint_mapping') or 'servo-range scaling'}; "
             f"this run uses {joint_mapping_version}. Appending would mix two angle conventions, so regenerate it "
             "or pass the same --joint-mapping"
+        )
+    if report.get("dynamics_model") != SIM_DYNAMICS_MODEL:
+        logging.warning(
+            "%s was generated with sim dynamics %s; this run uses %s. The appended episodes move with different "
+            "servo timing than the existing ones.",
+            root,
+            report.get("dynamics_model") or "that predate the servo model",
+            SIM_DYNAMICS_MODEL,
         )
 
 

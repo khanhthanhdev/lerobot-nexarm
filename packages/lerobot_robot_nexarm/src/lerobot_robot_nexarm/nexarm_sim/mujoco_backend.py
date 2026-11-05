@@ -15,7 +15,7 @@
 from __future__ import annotations
 
 from collections import deque
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -32,16 +32,35 @@ from lerobot_robot_nexarm.motors.mujoco_mapping import (
     joint_position_to_raw,
     raw_to_joint_position,
 )
-from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES
+from lerobot_robot_nexarm.motors.nexarm import GRIPPER_CLOSED_POS, GRIPPER_OPEN_POS, JOINT_NAMES
 
 __all__ = [
     "HOME_POSITIONS",
     "MUJOCO_JOINTS",
     "RAW_RANGES",
+    "SERVO_MAX_ACCEL_TICKS_S2",
+    "SERVO_MAX_SPEED_TICKS_S",
+    "SIM_DYNAMICS_MODEL",
     "DomainRandomizationRanges",
     "NexArmMujocoBackend",
     "resolve_model_path",
 ]
+
+# Names the servo model (MJCF servo classes plus the setpoint speed and acceleration caps). Calibrations and sim dataset reports
+# record it, so data and fits made under other dynamics are detected.
+SIM_DYNAMICS_MODEL = "hx_servo_v1"
+
+# Fastest the servo setpoint may move, in raw ticks per second, in JOINT_NAMES order. Arm joints use the HX servo
+# spec (0.2 s/60 deg = 3413 ticks/s): lag-aligned real demos never saturate them. The real gripper saturates at
+# 129 ticks/frame at 30 fps (3870 ticks/s).
+SERVO_MAX_SPEED_TICKS_S: tuple[float, ...] = (3413.0, 3413.0, 3413.0, 3413.0, 3413.0, 3870.0)
+
+# Fastest the servo setpoint speed may change, in raw ticks per second squared, in JOINT_NAMES order (None: no
+# cap). Without it the stiff arm follows an instant speed change, and that jerk shakes a bowl out of a friction
+# grasp. The value is tuned on that grasp (10k-40k work, 80k does not); it is consistent with the real demos'
+# 99th-percentile arm accelerations of 12.6k-28.8k ticks/s^2, which 30 fps data cannot pin down further. The
+# gripper is left uncapped so its stroke keeps the real duration.
+SERVO_MAX_ACCEL_TICKS_S2: tuple[float | None, ...] = (20000.0, 20000.0, 20000.0, 20000.0, 20000.0, None)
 
 
 def resolve_model_path(model_path: Path | str) -> Path:
@@ -105,6 +124,8 @@ class NexArmMujocoBackend:
         enable_domain_randomization: bool = False,
         init_qpos_noise_rad: float = 0.0,
         joint_mapping: JointMapping = IDENTITY_MAPPING,
+        max_speed_ticks_s: Sequence[float] = SERVO_MAX_SPEED_TICKS_S,
+        max_accel_ticks_s2: Sequence[float | None] | None = SERVO_MAX_ACCEL_TICKS_S2,
     ) -> None:
         self.model_path = resolve_model_path(model_path)
         # Real-to-sim sign and zero offset per arm joint (tools/nexarm/probe_joint_mapping.py).
@@ -177,6 +198,43 @@ class NexArmMujocoBackend:
         control_period = 1.0 / fps
         self.steps_per_action = max(1, round(control_period / self.model.opt.timestep))
         self.model.opt.timestep = control_period / self.steps_per_action
+
+        # Servo setpoint: set_action only sets the target; every physics substep moves the setpoint toward it at
+        # no more than the joint's speed cap (and acceleration cap, when set) and writes it to the actuator.
+        speeds = np.asarray(max_speed_ticks_s, dtype=np.float64)
+        if speeds.shape != (len(JOINT_NAMES),) or not np.all(np.isfinite(speeds)) or np.any(speeds <= 0):
+            raise ValueError(
+                f"max_speed_ticks_s needs {len(JOINT_NAMES)} positive values, got {max_speed_ticks_s}"
+            )
+        accels = [None] * len(JOINT_NAMES) if max_accel_ticks_s2 is None else list(max_accel_ticks_s2)
+        if len(accels) != len(JOINT_NAMES) or any(
+            accel is not None and not (np.isfinite(accel) and accel > 0) for accel in accels
+        ):
+            raise ValueError(
+                f"max_accel_ticks_s2 needs {len(JOINT_NAMES)} positive values or None, got {max_accel_ticks_s2}"
+            )
+        self.max_speed_ticks_s = tuple(float(speed) for speed in speeds)
+        self.max_accel_ticks_s2 = tuple(None if accel is None else float(accel) for accel in accels)
+        # The raw-to-joint mapping is affine per joint, so the limiter runs in control units.
+        control_per_tick = np.array(
+            [
+                abs(float(np.diff(self.model.jnt_range[self._joint_ids["gripper"]])[0]))
+                / (GRIPPER_CLOSED_POS - GRIPPER_OPEN_POS)
+                if feature_name == "gripper"
+                else 2.0 * np.pi / 4096.0
+                for feature_name in JOINT_NAMES
+            ]
+        )
+        self._servo_actuators = np.array([self._actuator_ids[name] for name in JOINT_NAMES])
+        self._servo_max_velocity = speeds * control_per_tick
+        self._servo_accel_capped = np.array([accel is not None for accel in self.max_accel_ticks_s2])
+        self._servo_max_accel = (
+            np.array([0.0 if accel is None else accel for accel in self.max_accel_ticks_s2])
+            * control_per_tick
+        )
+        self._servo_target = np.zeros(len(JOINT_NAMES))
+        self._servo_setpoint = np.zeros(len(JOINT_NAMES))
+        self._servo_velocity = np.zeros(len(JOINT_NAMES))
 
     def raw_to_control(self, feature_name: str, raw_position: float) -> float:
         joint_range = self.model.jnt_range[self._joint_ids[feature_name]]
@@ -371,18 +429,47 @@ class NexArmMujocoBackend:
             self.data.ctrl[self._actuator_ids[feature_name]] = control
             self.data.qpos[self.model.jnt_qposadr[self._joint_ids[feature_name]]] = control
             pose[f"{feature_name}.pos"] = raw
+        self._servo_target[:] = self.data.ctrl[self._servo_actuators]
+        self._servo_setpoint[:] = self._servo_target
+        self._servo_velocity[:] = 0.0
         self._action_queue.clear()
         for _ in range(self.action_delay_steps):
             self._action_queue.append(dict(pose))
         mujoco.mj_forward(self.model, self.data)
 
     def set_action(self, action: Mapping[str, float]) -> dict[str, float]:
+        """Set the servo target; ``step`` moves the actuator setpoint toward it at the servo's speed."""
         sent = self.clamp_action(action)
-        for feature_name in JOINT_NAMES:
-            self.data.ctrl[self._actuator_ids[feature_name]] = self.raw_to_control(
-                feature_name, sent[f"{feature_name}.pos"]
-            )
+        for index, feature_name in enumerate(JOINT_NAMES):
+            self._servo_target[index] = self.raw_to_control(feature_name, sent[f"{feature_name}.pos"])
         return sent
+
+    def commanded_position(self, feature_name: str) -> float:
+        """Raw position the servo is currently commanded to (after any action delay), not the ramped setpoint."""
+        return self.control_to_raw(feature_name, float(self._servo_target[JOINT_NAMES.index(feature_name)]))
+
+    def _advance_servo_setpoint(self, dt: float) -> None:
+        error = self._servo_target - self._servo_setpoint
+        # Uncapped joints: a speed clip.
+        step = np.clip(error, -self._servo_max_velocity * dt, self._servo_max_velocity * dt)
+        capped = self._servo_accel_capped
+        if capped.any():
+            # Accel-capped joints: a trapezoidal profile, the fastest speed that can still stop at the target,
+            # ramped by the cap.
+            distance = np.abs(error[capped])
+            accel = self._servo_max_accel[capped]
+            desired = np.sign(error[capped]) * np.minimum(
+                np.minimum(self._servo_max_velocity[capped], distance / dt), np.sqrt(2.0 * accel * distance)
+            )
+            velocity = self._servo_velocity[capped]
+            velocity = np.clip(desired, velocity - accel * dt, velocity + accel * dt)
+            capped_step = velocity * dt
+            overshoot = np.abs(capped_step) > distance
+            capped_step[overshoot] = error[capped][overshoot]
+            step[capped] = capped_step
+        self._servo_velocity[:] = step / dt
+        self._servo_setpoint += step
+        self.data.ctrl[self._servo_actuators] = self._servo_setpoint
 
     def step(self, action: Mapping[str, float] | None = None) -> dict[str, float] | None:
         """Advance one control period; returns the action applied this tick (delayed when latency is set)."""
@@ -394,7 +481,9 @@ class NexArmMujocoBackend:
                 sent = self.set_action(action)
         else:
             sent = None
+        dt = float(self.model.opt.timestep)
         for _ in range(self.steps_per_action):
+            self._advance_servo_setpoint(dt)
             if self.step_callback is not None:
                 self.step_callback()
             mujoco.mj_step(self.model, self.data)

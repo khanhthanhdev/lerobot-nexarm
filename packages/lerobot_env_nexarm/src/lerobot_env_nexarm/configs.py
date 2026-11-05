@@ -30,6 +30,10 @@ class NexArmEnv(EnvConfig):
     action_delay_steps: int | None = None
     # Uniform noise (rad) on the five arm joints around home at every reset; 0 starts exactly at home.
     init_qpos_noise_rad: float = 0.0
+    # Servo setpoint caps per joint (raw ticks/s and ticks/s^2, six values; a null acceleration entry leaves
+    # that joint uncapped). None keeps the sim defaults (SERVO_MAX_SPEED_TICKS_S, SERVO_MAX_ACCEL_TICKS_S2).
+    max_speed_ticks_s: tuple[float, ...] | None = None
+    max_accel_ticks_s2: tuple[float | None, ...] | None = None
     # Stack-bowls grasp assist: raw gripper commands above engage may attach a bowl, below release drop it.
     # None keeps the env defaults (2400 and 2300; 2300 lets go at real operators' partial openings).
     assist_engage_pos: float | None = None
@@ -114,7 +118,14 @@ class NexArmEnv(EnvConfig):
         }
         if self.episode_length is not None:
             kwargs["max_episode_steps"] = self.episode_length
-        for key in ("assist_engage_pos", "assist_release_pos", "grasp_mode", "stack_order"):
+        for key in (
+            "max_speed_ticks_s",
+            "max_accel_ticks_s2",
+            "assist_engage_pos",
+            "assist_release_pos",
+            "grasp_mode",
+            "stack_order",
+        ):
             if getattr(self, key) is not None:
                 kwargs[key] = getattr(self, key)
         if self.bowl_shift_m:

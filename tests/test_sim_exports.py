@@ -4,6 +4,10 @@ import sys
 from pathlib import Path
 
 import mujoco
+import numpy as np
+import pytest
+
+from tests.opengl import require_opengl
 
 SIM_DIR = Path(__file__).parent.parent / "sim"
 DESCRIPTION_DIR = SIM_DIR / "description"
@@ -143,6 +147,7 @@ def test_urdf_loads_in_rerun_tree():
 def test_description_scene_camera_rendering():
     import numpy as np
 
+    require_opengl()
     scene_path = DESCRIPTION_DIR / "mjcf" / "scene.xml"
     model = mujoco.MjModel.from_xml_path(str(scene_path))
     data = mujoco.MjData(model)
@@ -270,7 +275,7 @@ def test_apply_fusion_extract_merges_without_touching_tuning(tmp_path):
     applier.apply_extract(path, sim)
 
     robot_xml = (sim / "description" / "mjcf" / "nexarm.xml").read_text(encoding="utf-8")
-    assert 'kp="80" kv="4.0" forcerange="-6.37 6.37"' in robot_xml  # hand tuning survives
+    assert 'class="hx65hm" joint="joint_2_link_1_to_link_2" kv="110.35"' in robot_xml  # hand tuning survives
     for scene in ("scene.xml", "bowl_stack_scene.xml"):
         model = mujoco.MjModel.from_xml_path(str(sim / "description" / "mjcf" / scene))
         data = mujoco.MjData(model)
@@ -395,13 +400,37 @@ def test_link_collisions_cover_the_link_meshes():
         assert _collision_coverage(model, name) >= 0.95, name
 
 
-def test_robot_keyframes_have_no_contacts_in_the_workcell():
+@pytest.mark.parametrize("scene", ["scene.xml", "bowl_stack_scene.xml"])
+def test_scene_keyframes_are_full_and_free_of_deep_contacts(scene):
+    model = mujoco.MjModel.from_xml_path(str(MJCF_DIR / scene))
+    data = mujoco.MjData(model)
+    keys = {mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_KEY, key) for key in range(model.nkey)}
+    assert keys == {"home", "ready", "open"}
+    for key in range(model.nkey):
+        # Object poses must be listed: a zero-padded free joint has a zero quaternion and sits at the origin.
+        assert np.allclose(model.key_qpos[key][8:], model.qpos0[8:]), mujoco.mj_id2name(
+            model, mujoco.mjtObj.mjOBJ_KEY, key
+        )
+        mujoco.mj_resetDataKeyframe(model, data, key)
+        mujoco.mj_forward(model, data)
+        contacts = [
+            (
+                mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_GEOM, c.geom1),
+                mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_GEOM, c.geom2),
+                round(float(c.dist), 4),
+            )
+            for c in data.contact[: data.ncon]
+            if c.dist < -0.001
+        ]
+        assert not contacts, (mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_KEY, key), contacts)
+
+
+def test_robot_keyframes_have_no_robot_contacts_in_the_workcell():
     model = mujoco.MjModel.from_xml_path(str(MJCF_DIR / "scene.xml"))
     data = mujoco.MjData(model)
     cube = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "cube")
     for key in range(model.nkey):
-        mujoco.mj_resetData(model, data)
-        data.qpos[:8] = model.key_qpos[key][:8]
+        mujoco.mj_resetDataKeyframe(model, data, key)
         mujoco.mj_forward(model, data)
         contacts = [
             (
@@ -414,6 +443,71 @@ def test_robot_keyframes_have_no_contacts_in_the_workcell():
         assert not contacts, (mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_KEY, key), contacts)
 
 
+def _robot_bodies(model) -> set[int]:
+    mount = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "nexarm_mount")
+    bodies = set()
+    for body in range(model.nbody):
+        parent = body
+        while parent > 0 and parent != mount:
+            parent = model.body_parentid[parent]
+        if parent == mount:
+            bodies.add(body)
+    return bodies
+
+
+def test_ik_grasp_approach_poses_have_no_self_contact():
+    from lerobot_robot_nexarm.nexarm_sim import NexArmPickPlaceTask
+    from lerobot_robot_nexarm.nexarm_sim.mujoco_backend import NexArmMujocoBackend
+
+    backend = NexArmMujocoBackend(
+        model_path=MJCF_DIR / "scene.xml", fps=30, camera_width=64, camera_height=48, camera_names=()
+    )
+    try:
+        model, data = backend.model, backend.data
+        robot = _robot_bodies(model)
+        task = NexArmPickPlaceTask(backend)
+        for seed in range(5):
+            task.reset(seed=seed, settle_steps=25)
+            for height in (0.10, 0.03):
+                target = backend.body_position("cube") + np.array([0.0, 0.0, height])
+                solution = backend.solve_ik(target, seed=seed)
+                assert solution is not None, (seed, height)
+                command = dict(backend.joint_positions())
+                command.update({f"{name}.pos": value for name, value in solution.items()})
+                for _ in range(backend.fps):
+                    backend.step(command)
+                self_contacts = [
+                    (
+                        mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_GEOM, c.geom1),
+                        mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_GEOM, c.geom2),
+                    )
+                    for c in data.contact[: data.ncon]
+                    if model.geom_bodyid[c.geom1] in robot and model.geom_bodyid[c.geom2] in robot
+                ]
+                assert not self_contacts, (seed, height, self_contacts)
+    finally:
+        backend.close()
+
+
+def test_opengl_skip_helper_skips_when_the_renderer_cannot_start(monkeypatch):
+    from tests import opengl
+
+    def no_context(*args, **kwargs):
+        raise mujoco.FatalError("no OpenGL context")
+
+    monkeypatch.setattr(opengl.mujoco, "Renderer", no_context)
+    monkeypatch.delenv("NEXARM_REQUIRE_OPENGL", raising=False)
+    opengl.opengl_error.cache_clear()
+    try:
+        with pytest.raises(pytest.skip.Exception, match="no OpenGL context"):
+            opengl.require_opengl()
+        monkeypatch.setenv("NEXARM_REQUIRE_OPENGL", "1")
+        with pytest.raises(pytest.fail.Exception, match="no OpenGL context"):
+            opengl.require_opengl()
+    finally:
+        opengl.opengl_error.cache_clear()
+
+
 def test_bowls_weigh_60_g_and_start_apart():
     model = mujoco.MjModel.from_xml_path(str(MJCF_DIR / "bowl_stack_scene.xml"))
     data = mujoco.MjData(model)
@@ -423,9 +517,12 @@ def test_bowls_weigh_60_g_and_start_apart():
     }
     for body in bowls:
         assert abs(model.body_mass[body] - 0.060) < 1e-4  # 33 proxies x 1.818 g
-    touching = [
-        c
-        for c in data.contact[: data.ncon]
-        if {model.geom_bodyid[c.geom1], model.geom_bodyid[c.geom2]} <= bowls
-    ]
-    assert not touching
+    # The raw scene settles for 1 s without any bowl touching another.
+    for _ in range(round(1.0 / model.opt.timestep)):
+        touching = [
+            c
+            for c in data.contact[: data.ncon]
+            if {model.geom_bodyid[c.geom1], model.geom_bodyid[c.geom2]} <= bowls
+        ]
+        assert not touching, data.time
+        mujoco.mj_step(model, data)

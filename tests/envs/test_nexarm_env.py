@@ -24,6 +24,7 @@ from gymnasium.utils.env_checker import check_env
 import lerobot_env_nexarm.nexarm  # noqa: F401
 from lerobot.envs.factory import make_env
 from lerobot_env_nexarm import NexArmEnv
+from tests.opengl import require_opengl
 
 
 def test_nexarm_env_registration():
@@ -38,6 +39,8 @@ def test_nexarm_env_registration():
 
 @pytest.mark.parametrize("obs_type", ["state", "pixels_agent_pos"])
 def test_nexarm_env_gym_checker(obs_type):
+    if obs_type != "state":
+        require_opengl()
     env = gym.make("NexArmPickPlace-v0", obs_type=obs_type)
     unwrapped = env.unwrapped
     if obs_type != "state":
@@ -50,6 +53,8 @@ def test_nexarm_env_gym_checker(obs_type):
 
 @pytest.mark.parametrize("obs_type", ["pixels_agent_pos", "pixels", "state"])
 def test_nexarm_env_obs_types(obs_type):
+    if obs_type != "state":
+        require_opengl()
     env = gym.make(
         "NexArmPickPlace-v0",
         obs_type=obs_type,
@@ -138,6 +143,7 @@ def test_nexarm_env_seeded_reproducibility():
 
 
 def test_nexarm_env_render_rgb():
+    require_opengl()
     env = gym.make(
         "NexArmPickPlace-v0",
         render_mode="rgb_array",

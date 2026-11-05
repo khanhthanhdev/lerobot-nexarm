@@ -9,7 +9,8 @@ Example:
         --episodes 50 --position-jitter-m 0.02
 
 Calibrated to a real arm (see calibrate_sim.py), sharded over 2 GPUs, held-out eval split:
-    uv run python examples/nexarm/generate_stack_bowls_dataset.py --calibration outputs/calibration/nexarm.json \
+    uv run python examples/nexarm/generate_stack_bowls_dataset.py \
+        --calibration sim/calibration/nexarm_sim_calibration_hx_servo_v1.json \
         --episodes 200 --gpus 0,1 --split eval
 
 Domain randomization (visual, dynamics and every bowl's friction/mass/color) is on by default; --no-dr
@@ -76,10 +77,14 @@ JAW_CLEARANCE_M = 0.005
 # bowls out of reach and fails more often.
 GRASP_PITCH_DEG = 80.0
 JAW_CENTER_OFFSET = np.array([0.0, 0.033, 0.0])  # Jaw collision pad center in gripper_frame
-# The arm sags about 1.4 cm below its IK target at the rim. The descent aims that much higher and then re-aims
-# on the measured jaw height, so the jaws never dip below the rim, where an open jaw can hook a neighbor bowl.
-RIM_DESCENT_SAG_M = 0.014
+# The servo-model arm holds its IK target to under 2 mrad (like the real follower), so the descent aims at the
+# rim itself and then re-aims on the measured jaw height. The jaws must not dip below the rim, where an open jaw
+# can hook a neighbor bowl.
+RIM_DESCENT_SAG_M = 0.0
 RIM_DESCENT_ATTEMPTS = 4
+# Frames held after a grasp or release command. The gripper, like the real one, needs about 0.5 s (15 frames)
+# for a full stroke, and the command ramp covers only part of it.
+GRIPPER_SETTLE_STEPS = 12
 RIM_DESCENT_TOLERANCE_M = 0.003
 # Like a teleoperator, the expert moves in straight segments: up to a transit height, across, then down. In
 # transit, the carried bowl's bottom (or the open jaws' tips) clears the highest rim of every other bowl by this
@@ -545,7 +550,14 @@ def _pick_and_place(
 
     # Grasp rim (pinch fingers to straddle rim wall)
     _interpolate_stage(
-        robot, task, sol, OPEN_GRIPPER, CLOSED_GRIPPER, steps=10, settle_steps=2, record_frame=record_frame
+        robot,
+        task,
+        sol,
+        OPEN_GRIPPER,
+        CLOSED_GRIPPER,
+        steps=10,
+        settle_steps=GRIPPER_SETTLE_STEPS,
+        record_frame=record_frame,
     )
     if task.held_bowl is None:
         return "grasp_missed"
@@ -595,7 +607,14 @@ def _pick_and_place(
 
     # Release
     _interpolate_stage(
-        robot, task, sol, CLOSED_GRIPPER, OPEN_GRIPPER, steps=15, settle_steps=3, record_frame=record_frame
+        robot,
+        task,
+        sol,
+        CLOSED_GRIPPER,
+        OPEN_GRIPPER,
+        steps=15,
+        settle_steps=GRIPPER_SETTLE_STEPS,
+        record_frame=record_frame,
     )
 
     # Open jaws straight back up out of the stack.

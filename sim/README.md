@@ -66,6 +66,37 @@ registers, or the Hiwonder follower control loop. It preserves the external
 LeRobot action contract so datasets and policies can address the real and
 simulated followers with the same feature names.
 
+### Servo model (`hx_servo_v1`)
+
+The sim stands in for the servos with a model fitted to the HX specs and the real demos
+(`thanhkt/nexarm_stack_bowls`). Its name, `SIM_DYNAMICS_MODEL` in `mujoco_backend.py`, is recorded in sim
+calibrations and dataset reports.
+
+- **Joints** (`nexarm.xml` classes `hx65hm`, `hx30hm`, `hx12h`): damping is stall torque ÷ no-load speed, and
+  armature and frictionloss are the STS3215 priors from MuJoCo Menagerie's SO-101. `forcerange` is the stall
+  torque.
+- **Actuators:** `kp=998.22`, a stiff hold like the real arm's 0–2 tick steady error. `kv` per joint sets
+  `(kv + damping) / kp` to the real first-order time constant (0.055–0.112 s).
+- **Gripper:** the HX-12H converts through its 10.15 mm pinion to 116 N. Its damping comes from the real
+  saturated speed (3870 ticks/s), and the jaw pads use a direct contact stiffness.
+- **Setpoint:** `set_action` sets a target, and each physics substep moves the actuator setpoint toward it.
+  - Speed: at most `max_speed_ticks_s` (3413 ticks/s for the arm, the HX spec; 3870 for the gripper).
+  - Acceleration: at most `max_accel_ticks_s2` (20k ticks/s² on the arm, none on the gripper). Without the
+    cap, the stiff arm's jerk shakes a bowl out of the friction grasp.
+
+  Both caps are `NexArmSimConfig` and `--env.*` options. The acceleration cap was tuned on the physical bowl
+  grasp (10k–40k ticks/s² work, 80k does not); it is consistent with the real demos, whose 30 fps data cannot
+  pin it down further.
+
+The Isaac Lab twin (`sim/isaac_lab/`) mirrors the joint and drive values, but it has no setpoint speed or
+acceleration limiter yet, so its arm moves faster than this model.
+
+Measured with the default config: arm joints reach 2500–3200 ticks/s, a full gripper stroke takes 0.5 s, and
+the arm holds grasp poses within about 1 mrad. Before `hx_servo_v1` the arm was a soft PD with no speed limit:
+joints ran at 4500–8200 ticks/s, the gripper closed in one frame, and the arm sagged about 13 mrad. Sim
+datasets, policies and calibrations made before it saw those faster dynamics. Calibrations are refused, and
+appending to an older dataset warns. Numbers and method: `plans/261014-1423-nexarm-sim-fidelity/reports/servo-baseline.md`.
+
 When a physical leader is used, its side of the pipeline does use the Hiwonder
 firmware:
 
@@ -600,7 +631,10 @@ not sit where the real webcam does.
 
 Each camera's `fovy` lives in the scene files and is kept by the merge. `front`
 uses 37.6 degrees: the C270's 55-degree diagonal (720p) gives 48.8 degrees
-horizontal, and a 640 x 480 stream of the 4:3 sensor keeps that width.
+horizontal, and a 640 x 480 stream of the 4:3 sensor keeps that width. `top`
+(RealSense D435i colour stream at 640 x 480) uses 42.6 degrees, from the nominal
+`fy` of 615 px. Read the camera's own `fy` with `tools/nexarm/realsense_fovy.py`
+on the robot PC and use the `fovy` it prints.
 
 The merge also refits the arm-link collision boxes from the exported meshes
 (`COLLISION_BOXES` in `apply_fusion_extract.py`): one box for `base_link`,
@@ -668,9 +702,8 @@ use record or rollout without launching `examples/nexarm/simulate.py`.
    match the simulation for all six joints (especially `shoulder_lift`).
    `calibrate_sim.py` already fits latency and per-joint gain, damping and
    friction from real recordings (see `docs/guides/sim-calibration.md`).
-2. Identify HX-30HM torque, velocity limit (the follower's `motion_speed` cap
-   is not modelled), deadband and backlash instead of relying on generic
-   position gains.
+2. Identify servo deadband and backlash. The servo model above covers torque, speed, acceleration and
+   stiffness; `motion_speed` caps nothing on the real arm, so it is not modelled.
 3. Add sensor noise and physical friction measurements; control delay, camera
    alignment and visual/dynamics/object randomization already exist.
 4. Implement a Gymnasium environment with deterministic reset, cube

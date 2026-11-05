@@ -17,7 +17,7 @@
     <light pos="0 0 3" dir="0 0 -1" directional="true" />
     <geom name="floor" type="plane" size="1 1 0.05" rgba="0.8 0.8 0.8 1" friction="1 0.005 0.0001" contype="2" conaffinity="2" />
     <camera name="front" mode="fixed" pos="-0.032 -0.868756 0.816789" xyaxes="1 0 0 0 0.709822 0.704381" fovy="37.6" />
-    <camera name="top" mode="fixed" pos="-0.0458 -0.349378 0.76965" xyaxes="0 -1 0 1 0 0" fovy="55" />
+    <camera name="top" mode="fixed" pos="-0.0458 -0.349378 0.76965" xyaxes="0 -1 0 1 0 0" fovy="42.6" />
     <body name="cube" pos="-0.000369022999 -0.243972762847 0.01">
       <freejoint name="cube_joint" />
       <geom name="cube_collision" type="box" size="0.01 0.01 0.01" mass="0.02" rgba="0.85 0.15 0.1 1" friction="1.2 0.01 0.001" contype="2" conaffinity="3" />
@@ -26,4 +26,11 @@
       <geom name="target_zone_visual" type="cylinder" size="0.05 0.002" rgba="0.1 0.8 0.2 0.45" contype="0" conaffinity="0" />
     </body>
   </worldbody>
+
+  <!-- Robot pose (8 joints), then the cube at its spawn pose. -->
+  <keyframe>
+    <key name="home" qpos="0 0 0 0 0 0 0 0 -0.000369023 -0.243973 0.01 1 0 0 0" ctrl="0 0 0 0 0 0" />
+    <key name="ready" qpos="0 -0.0154 0.3197 1.0655 0 0 0 0 -0.000369023 -0.243973 0.01 1 0 0 0" ctrl="0 -0.0154 0.3197 1.0655 0 0" />
+    <key name="open" qpos="0 0 0 0 0 0 0.0255 0.0255 -0.000369023 -0.243973 0.01 1 0 0 0" ctrl="0 0 0 0 0 0.0255" />
+  </keyframe>
 </mujoco>

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, Literal
 
@@ -32,6 +33,8 @@ from lerobot_robot_nexarm.nexarm_sim.calibration import (
 )
 from lerobot_robot_nexarm.nexarm_sim.mujoco_backend import (
     RAW_RANGES,
+    SERVO_MAX_ACCEL_TICKS_S2,
+    SERVO_MAX_SPEED_TICKS_S,
     NexArmMujocoBackend,
     resolve_model_path,
 )
@@ -99,6 +102,8 @@ class _NexArmMujocoEnv(gym.Env):
         action_delay_steps: int | None = None,
         init_qpos_noise_rad: float = 0.0,
         joint_mapping_path: Path | str | None = None,
+        max_speed_ticks_s: Sequence[float] = SERVO_MAX_SPEED_TICKS_S,
+        max_accel_ticks_s2: Sequence[float | None] | None = SERVO_MAX_ACCEL_TICKS_S2,
     ) -> None:
         super().__init__()
         self.obs_type = obs_type
@@ -127,6 +132,8 @@ class _NexArmMujocoEnv(gym.Env):
             enable_domain_randomization=enable_domain_randomization,
             init_qpos_noise_rad=init_qpos_noise_rad,
             joint_mapping=load_joint_mapping(joint_mapping_path),
+            max_speed_ticks_s=max_speed_ticks_s,
+            max_accel_ticks_s2=max_accel_ticks_s2,
         )
         if calibration_path is not None:
             try:

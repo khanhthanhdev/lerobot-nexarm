@@ -14,7 +14,8 @@ Example:
         --episodes 20
 
 Calibrated to a real arm (see calibrate_sim.py), sharded over 4 GPUs, held-out eval split:
-    uv run python examples/nexarm/generate_sim_dataset.py --calibration outputs/calibration/nexarm.json \
+    uv run python examples/nexarm/generate_sim_dataset.py \
+        --calibration sim/calibration/nexarm_sim_calibration_hx_servo_v1.json \
         --episodes 200 --workers 4 --gpus 0,1,2,3 --split eval
 """
 
@@ -299,7 +300,9 @@ def generate_episode(
 
     # Account for gripper_frame site offset relative to the jaw collision
     # boxes to ensure vertical overlap with the 20 mm cube.
-    cube_grasp = cube + np.array([variation.grasp_xy[0], variation.grasp_xy[1], -0.020 + variation.grasp_z])
+    # The servo-model arm holds its IK target (sag under 2 mrad, like the real follower), so this puts the jaw
+    # centres about 6.5 mm above the cube centre with the jaw tips just clear of the floor.
+    cube_grasp = cube + np.array([variation.grasp_xy[0], variation.grasp_xy[1], -0.028 + variation.grasp_z])
     target_release = target + np.array([variation.release_xy[0], variation.release_xy[1], -0.018])
     base_stages = (
         (cube_grasp + [0.0, 0.0, 0.12 + variation.approach_dz], OPEN_GRIPPER, 16),
