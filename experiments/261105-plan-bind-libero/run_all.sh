@@ -197,6 +197,25 @@ say "preflight"
 preflight 60 "the venv, the LIBERO videos and checkpoints (all but the last are deleted after an upload)"
 say "setup"
 setup
+# A private LIBERO config that points at the installed package: ~/.libero may hold another checkout's paths,
+# and a missing config makes LIBERO stop at an interactive question.
+export LIBERO_CONFIG_PATH="$REPO/.libero_config"
+mkdir -p "$LIBERO_CONFIG_PATH"
+uv run python - <<'PY'
+import importlib.util
+import os
+
+root = importlib.util.find_spec("libero.libero").submodule_search_locations[0]
+paths = {
+    "benchmark_root": root,
+    "bddl_files": f"{root}/bddl_files",
+    "init_states": f"{root}/init_files",
+    "datasets": f"{root}/../datasets",
+    "assets": f"{root}/assets",
+}
+with open(os.path.join(os.environ["LIBERO_CONFIG_PATH"], "config.yaml"), "w") as f:
+    f.writelines(f"{k}: {v}\n" for k, v in paths.items())
+PY
 case "$MODE" in
   smoke) run_smoke ;;
   full) run_full ;;
