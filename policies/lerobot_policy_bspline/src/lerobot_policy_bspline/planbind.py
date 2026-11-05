@@ -29,6 +29,7 @@ from lerobot.policies.diffusion.modeling_diffusion import DiffusionModel
 from lerobot.utils.constants import ACTION
 
 from .configuration_bspline import BsplineConfig
+from .task_condition import TaskConditionMixin
 from .uniform_spline import basis_matrix, lift_matrix, n_ctrl_points, n_frozen, project, shift_ctrl
 
 
@@ -52,7 +53,7 @@ def register_fine_grid(module: torch.nn.Module, config: BsplineConfig) -> Tensor
     return fine_basis
 
 
-class PlanBindModel(DiffusionModel):
+class PlanBindModel(TaskConditionMixin, DiffusionModel):
     """Observation encoders and UNet of the diffusion model, trained as one-step spline regressors."""
 
     def __init__(self, config: BsplineConfig):

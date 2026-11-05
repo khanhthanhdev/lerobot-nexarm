@@ -26,6 +26,7 @@ from lerobot.utils.import_utils import require_package
 from .bspline import decode_param_batch, encode_action_batch
 from .configuration_bspline import BsplineConfig
 from .planbind import PlanBindModel, SplineRuntime, register_fine_grid
+from .task_condition import TASK_TOKENS, TaskConditionMixin, tokenize_tasks
 
 
 def _model_config(config: BsplineConfig) -> BsplineConfig:
@@ -41,7 +42,7 @@ def _model_config(config: BsplineConfig) -> BsplineConfig:
     return model_config
 
 
-class BsplineModel(DiffusionModel):
+class BsplineModel(TaskConditionMixin, DiffusionModel):
     """Diffusion model that returns the full denoised parameter chunk (no `n_action_steps` slice)."""
 
     def generate_actions(self, batch: dict[str, Tensor], noise: Tensor | None = None) -> Tensor:
@@ -80,12 +81,34 @@ class BsplinePolicy(DiffusionPolicy):
     def reset(self):
         """Clear the observation and action queues and the spline runtime state."""
         super().reset()
+        self._current_tokens: Tensor | None = None
         if getattr(self, "runtime", None) is not None:
             self.runtime.reset()
 
+    def _task_tokens(self, batch: dict[str, Tensor]) -> Tensor | None:
+        """Hashed instruction ids of the batch's ``task`` texts, or None without a task condition."""
+        if self.config.task_condition == "none":
+            return None
+        tasks = batch.get("task")
+        if tasks is None and self._current_tokens is not None:
+            return self._current_tokens  # select_action: its queues drop the text
+        if tasks is None:
+            raise ValueError("`task_condition` is set, but the batch has no `task` instruction text.")
+        if isinstance(tasks, str):
+            tasks = [tasks]
+        return tokenize_tasks(list(tasks), self.config.task_hash_buckets, self.config.task_max_tokens)
+
+    def _with_tokens(self, batch: dict[str, Tensor]) -> dict[str, Tensor]:
+        """A copy of `batch` that carries the task tokens."""
+        batch = dict(batch)
+        tokens = self._task_tokens(batch)
+        if tokens is not None:
+            batch[TASK_TOKENS] = tokens
+        return batch
+
     def _global_cond(self, batch: dict[str, Tensor]) -> Tensor:
         """Observation features of a dataloader-style batch (one or `n_obs_steps` frames per key)."""
-        batch = dict(batch)
+        batch = self._with_tokens(batch)
         if self.config.image_features:
             for key in self.config.image_features:
                 if batch[key].ndim == 4:
@@ -139,7 +162,7 @@ class BsplinePolicy(DiffusionPolicy):
     @torch.no_grad()
     def predict_action_params(self, batch: dict[str, Tensor], *, noise: Tensor | None = None) -> Tensor:
         """Denoised B-spline parameter chunk ``(B, horizon, 1 + action_dim)``."""
-        return super().predict_action_chunk(batch, noise=noise)
+        return super().predict_action_chunk(self._with_tokens(batch), noise=noise)
 
     @torch.no_grad()
     def predict_action_chunk(self, batch: dict[str, Tensor], *, noise: Tensor | None = None) -> Tensor:
@@ -165,6 +188,7 @@ class BsplinePolicy(DiffusionPolicy):
     @torch.no_grad()
     def select_action(self, batch: dict[str, Tensor], *, noise: Tensor | None = None) -> Tensor:
         """Next action; `onestep` and `planbind` run through `SplineRuntime` (latency, commit, projection)."""
+        self._current_tokens = self._task_tokens(batch)
         if self.runtime is None:
             return super().select_action(batch, noise=noise)
         batch = dict(batch)
@@ -175,6 +199,8 @@ class BsplinePolicy(DiffusionPolicy):
 
         def global_cond() -> Tensor:
             stacked = {k: torch.stack(list(self._queues[k]), dim=1) for k in batch if k in self._queues}
+            if self._current_tokens is not None:
+                stacked[TASK_TOKENS] = self._current_tokens
             return self.diffusion._prepare_global_conditioning(stacked)
 
         return self.runtime.step(global_cond)
@@ -184,9 +210,9 @@ class BsplinePolicy(DiffusionPolicy):
 
         `onestep` and `planbind` regress the raw action window directly (`PlanBindModel.compute_loss`).
         """
+        batch = self._with_tokens(batch)
         if self.config.bspline_mode != "diffusion":
             return DiffusionPolicy.forward(self, batch)
-        batch = dict(batch)
         params = self.encode_actions(batch[ACTION], batch.get("action_is_pad"))
         batch[ACTION] = params
         batch["action_is_pad"] = torch.zeros(params.shape[:2], dtype=torch.bool, device=params.device)

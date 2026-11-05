@@ -350,3 +350,23 @@ def test_onestep_learned_input_trains_and_round_trips(tmp_path):
     torch.testing.assert_close(loaded.diffusion.onestep_input, model.onestep_input)
     obs = {OBS_STATE: batch[OBS_STATE], IMAGE_KEY: batch[IMAGE_KEY]}
     torch.testing.assert_close(policy.predict_action_chunk(dict(obs)), loaded.predict_action_chunk(dict(obs)))
+
+
+@pytest.mark.parametrize("mode", ["onestep", "planbind", "diffusion"])
+def test_task_condition_depends_on_the_instruction(mode):
+    config = make_config(bspline_mode=mode, task_condition="hash")
+    policy = BsplinePolicy(config)
+    batch = make_batch(config)
+    batch["task"] = ["put the bowl on the plate"] * BATCH
+    loss, _ = policy.forward(batch)
+    loss.backward()
+    assert policy.diffusion.task_embed.weight.grad.abs().sum() > 0
+    with torch.no_grad():
+        policy.diffusion.task_embed.weight.normal_()  # the embedding starts untrained
+    obs = {k: v for k, v in batch.items() if k not in (ACTION, "action_is_pad")}
+    cond_a = policy._global_cond(obs)
+    cond_b = policy._global_cond({**obs, "task": ["open the top drawer"] * BATCH})
+    assert not torch.allclose(cond_a, cond_b)
+    assert torch.allclose(cond_a, policy._global_cond(obs))
+    with pytest.raises(ValueError, match="task"):
+        policy._global_cond({k: v for k, v in obs.items() if k != "task"})

@@ -56,6 +56,8 @@ class BsplineConfig(DiffusionConfig):
             so the input carries sequence position.
         planbind_call_every: Frames between network calls at evaluation, a multiple of
             `planbind_fine_spacing`; 0 calls once per fine span. A call never starts while one is pending.
+        task_condition: ``none`` (default) or ``hash``: condition on the batch's ``task`` instruction text,
+            hashed word by word into `task_hash_buckets` ids (at most `task_max_tokens` words).
         bspline_runtime: Evaluation only, `diffusion` mode: run the policy through the same runtime as
             `onestep` and `planbind` (latency, commit, call rate), refitting each denoised spline to the fine
             knot grid. Off keeps B-spline Policy's own action queue.
@@ -89,6 +91,9 @@ class BsplineConfig(DiffusionConfig):
     planbind_acceleration_limit: float = 0.0
     planbind_call_every: int = 0
     planbind_onestep_input: str = "zeros"
+    task_condition: str = "none"
+    task_hash_buckets: int = 4096
+    task_max_tokens: int = 24
     bspline_runtime: bool = False
 
     def __post_init__(self):
@@ -117,6 +122,10 @@ class BsplineConfig(DiffusionConfig):
                 "`do_mask_loss_for_padding` is not supported: padded frames are dropped before the "
                 "spline fit, so there is no per-row padding mask."
             )
+        if self.task_condition not in ("none", "hash"):
+            raise ValueError(f"`task_condition` must be 'none' or 'hash'. Got {self.task_condition!r}.")
+        if self.task_hash_buckets < 2 or self.task_max_tokens < 1:
+            raise ValueError("`task_hash_buckets` must be >= 2 and `task_max_tokens` >= 1.")
         if self.bspline_mode not in ("diffusion", "onestep", "planbind"):
             raise ValueError(
                 f"`bspline_mode` must be 'diffusion', 'onestep' or 'planbind'. Got {self.bspline_mode!r}."
