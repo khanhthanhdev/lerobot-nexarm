@@ -63,12 +63,12 @@ HF_REPO=<user>/plan-bind-d3 experiments/261028-plan-bind-d3-pusht/run_all.sh   #
 
 Push-T (`lerobot/pusht`, 206 human demonstrations), 100k steps at batch 64, 2 training seeds (1000, 1001), 200 evaluation episodes per cell (seed 1000, same episodes in every cell), last checkpoint. Score is the mean over episodes of the best target coverage, in percent (the paper's metric); `results.md` of the run (Hub: `thanhkt/plan-bind-d3`) has every cell. Eval used synchronous envs, because LeRobot's async workers do not import `gym_pusht`.
 
-| Policy | Score (seeds) | Coverage >= 0.9 | Env success | Paper score |
-| --- | --- | --- | --- | --- |
-| `diffusion` | 83.5 (86, 81) | 73% | 38% | 72 |
-| `onestep` | 72.6 (71, 74) | 61% | 35% | - |
-| `bsp10` | 66.4 (68, 64) | 56% | 35% | 75 |
-| `planbind` | 53.2 (55, 51) | 39% | 20% | - |
+| Policy      | Score (seeds) | Coverage >= 0.9 | Env success | Paper score |
+| ----------- | ------------- | --------------- | ----------- | ----------- |
+| `diffusion` | 83.5 (86, 81) | 73%             | 38%         | 72          |
+| `onestep`   | 72.6 (71, 74) | 61%             | 35%         | -           |
+| `bsp10`     | 66.4 (68, 64) | 56%             | 35%         | 75          |
+| `planbind`  | 53.2 (55, 51) | 39%             | 20%         | -           |
 
 Score by latency with latency-aware commit (`bsp10` through the spline runtime): `bsp10` 63 / 62 / 63, `onestep` 73 / 71 / 72, `planbind` 53 / 50 / 50 at 0 / 100 / 200 ms.
 
@@ -82,6 +82,7 @@ Reading it:
 - **Paper numbers:** our `diffusion` (83.5) is above the paper's 72 and our `bsp10` (66) below its 75. The paper averages its best three checkpoints in its own codebase, so the gaps are not a like-for-like comparison.
 
 Limits: 2 seeds, one training recipe per policy, no tuning for Push-T.
+
 ## Not in this experiment
 
 - **The paper's speed-up test.** It used a 200 Hz Push-T variant with 100 newly collected demonstrations, which are not public.
