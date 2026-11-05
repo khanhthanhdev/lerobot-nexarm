@@ -5,12 +5,23 @@ import sys
 import time
 from collections.abc import Callable
 
-from lerobot.utils.keyboard_input import TerminalKeyListener, create_key_listener
+from lerobot.utils.keyboard_input import TerminalKeyListener, create_key_listener, pynput_can_capture
 
 # Ignore a second press this soon after the last one, so key repeat cannot skip a phase.
 KEY_DEBOUNCE_S = 0.5
 # The stdin key reader needs termios, which Windows lacks.
 HAS_TERMIOS = importlib.util.find_spec("termios") is not None
+
+# Mouse buttons mapped onto the keys above. pynput names the side buttons x1/x2 on Windows and
+# button8/button9 on X11 (back/forward in a browser).
+MOUSE_BUTTON_KEYS = {
+    "left": "enter",
+    "right": "left",
+    "x2": "right",
+    "button9": "right",
+    "x1": "esc",
+    "button8": "esc",
+}
 
 _DIGITS = (
     (" ███ ", "█   █", "█   █", "█   █", " ███ "),
@@ -26,7 +37,7 @@ _DIGITS = (
 )
 
 
-def show_recording_status(count: int, status: str, location: str = "") -> None:
+def show_recording_status(count: int, status: str, location: str = "", mouse_control: bool = False) -> None:
     if sys.stdout.isatty():
         print("\033[2J\033[H", end="")
     print("EPISODES RECORDED\n")
@@ -36,17 +47,21 @@ def show_recording_status(count: int, status: str, location: str = "") -> None:
     print(f"\n{status}\n")
     if status not in ("SAVING...", "MERGING DATA...", "FINISHED"):
         print("Enter / →: start or stop    ←: discard current episode    Esc / q: finish")
+        if mouse_control:
+            print("Mouse: left or forward: start or stop    right: discard    back: finish")
     if location:
         print(f"\nDataset: {location}")
     sys.stdout.flush()
 
 
-def init_manual_keyboard_listener():
+def init_manual_keyboard_listener(mouse_control: bool = False):
     """Keyboard listener for ``run_manual_session``: returns ``(listener, events)`` like LeRobot's.
 
     Enter or Right/n ends the current phase, Left/r discards the episode being recorded and Esc/q
     finishes. Keys are silent, ignored while ``events["controls_enabled"]`` is false (during saving)
     and debounced. A terminal reads keys from stdin when it can; otherwise LeRobot picks the backend.
+    With ``mouse_control`` a global mouse listener also drives the same handler (see ``MOUSE_BUTTON_KEYS``);
+    stopping the returned listener stops it too. Clicks anywhere on the desktop count while it runs.
     """
     events = {
         "exit_early": False,
@@ -78,9 +93,43 @@ def init_manual_keyboard_listener():
     if sys.stdin.isatty() and HAS_TERMIOS:
         listener = TerminalKeyListener(on_key)
         listener.start()
-        return listener, events
-    controls = "Enter/Right/n: start or stop, Left/r: discard, Esc/q: finish"
-    return create_key_listener(on_key, controls_help=controls), events
+    else:
+        controls = "Enter/Right/n: start or stop, Left/r: discard, Esc/q: finish"
+        listener = create_key_listener(on_key, controls_help=controls)
+    if mouse_control:
+        listener = _with_mouse(listener, on_key)
+    return listener, events
+
+
+class _KeyAndMouseListener:
+    """Stops the key listener and the mouse listener together."""
+
+    def __init__(self, key_listener, mouse_listener):
+        self._key_listener = key_listener
+        self._mouse_listener = mouse_listener
+
+    def stop(self) -> None:
+        self._mouse_listener.stop()
+        if self._key_listener is not None:
+            self._key_listener.stop()
+
+
+def _with_mouse(key_listener, on_key: Callable[[str], None]):
+    if not pynput_can_capture():
+        raise RuntimeError(
+            "--mouse_control needs pynput and an X11 desktop session: run `uv sync --extra hardware` and, "
+            'on Ubuntu, choose "Ubuntu on Xorg" at the login screen (Wayland blocks global mouse clicks).'
+        )
+    from pynput import mouse
+
+    def on_click(_x, _y, button, pressed) -> None:
+        key = MOUSE_BUTTON_KEYS.get(getattr(button, "name", ""))
+        if pressed and key:
+            on_key(key)
+
+    mouse_listener = mouse.Listener(on_click=on_click)
+    mouse_listener.start()
+    return _KeyAndMouseListener(key_listener, mouse_listener)
 
 
 def run_manual_session(

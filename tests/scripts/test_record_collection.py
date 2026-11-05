@@ -95,7 +95,7 @@ def test_manual_control_records_and_merges(monkeypatch, tmp_path, merge_into_roo
         "controls_enabled": False,
     }
 
-    def fake_listener():
+    def fake_listener(_mouse_control):
         # One press starts the episode, the second ends it.
         _press_enter_when_enabled(events, 2)
         return _StoppedListener(), events

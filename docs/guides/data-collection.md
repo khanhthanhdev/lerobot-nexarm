@@ -36,6 +36,8 @@ The terminal shows a large **saved episode count** and the current phase:
 - **← / r:** discard the current recording and reset before trying again.
 - **Esc / q:** finish; a nonempty current recording is saved. Quitting at READY or during reset adds no episode.
 
+**Mouse control:** add `--mouse` (`./scripts/nexarm/collect.sh --mouse`, or `--mouse_control=true` for `record_collection.py`; needs `uv sync --extra hardware` for `pynput`, and an X11 session: on Ubuntu pick "Ubuntu on Xorg" at the login screen, because Wayland blocks global mouse clicks) to also use the mouse: **left** or **forward** = start/stop (same as Enter), **right** = discard the current episode, **back** = finish and save. The listener is global, so clicks in any window count while recording runs; keep the cursor in the terminal.
+
 Recording and reset have no timeout. Keys are ignored while saving (except quit), so wait for the reset screen before pressing again. Keep the terminal focused. Routine logs go to `outputs/collection/<timestamp>/recording.log`; setup/recording failures are printed.
 
 Defaults collect 50 bowl-stacking episodes into a timestamped local session (`thanhkt/nexarm_stack_bowls_<YYYYMMDD_HHMMSS>`). When you press **Esc / q** or reach the episode limit, the session automatically merges into the **local** root dataset `thanhkt/nexarm_stack_bowls_top` (front, wrist and top cameras):

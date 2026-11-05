@@ -166,3 +166,58 @@ def test_manual_session_writes_real_dataset(monkeypatch, tmp_path):
         assert phases == [dataset, None, dataset]
     finally:
         dataset.finalize()
+
+
+def test_mouse_buttons_drive_the_same_controls(monkeypatch):
+    import sys
+    import types
+    from types import SimpleNamespace
+
+    handlers = {}
+
+    class FakeMouseListener:
+        def __init__(self, on_click):
+            handlers["click"] = on_click
+            self.stopped = False
+
+        def start(self):
+            pass
+
+        def stop(self):
+            self.stopped = True
+
+    pynput = types.ModuleType("pynput")
+    pynput.mouse = types.SimpleNamespace(Listener=FakeMouseListener)
+    monkeypatch.setitem(sys.modules, "pynput", pynput)
+    monkeypatch.setattr(session, "pynput_can_capture", lambda: True)
+    monkeypatch.setattr(session.sys.stdin, "isatty", lambda: True)
+    monkeypatch.setattr(session, "HAS_TERMIOS", True)
+    monkeypatch.setattr(session.TerminalKeyListener, "start", lambda _: None)
+    monkeypatch.setattr(session.TerminalKeyListener, "stop", lambda _: None)
+    listener, events = session.init_manual_keyboard_listener(mouse_control=True)
+    click = handlers["click"]
+    button = lambda name: SimpleNamespace(name=name)  # noqa: E731
+
+    events["controls_enabled"] = True
+    events["allow_rerecord"] = True
+    click(0, 0, button("middle"), True)  # unmapped
+    click(0, 0, button("left"), False)  # release ignored
+    assert not events["exit_early"]
+    click(0, 0, button("x2"), True)  # forward = start or stop
+    assert events["exit_early"] and not events["rerecord_episode"]
+
+    events["exit_early"] = False
+    session.time.sleep(session.KEY_DEBOUNCE_S)
+    click(0, 0, button("right"), True)  # right = discard
+    assert events["rerecord_episode"]
+
+    click(0, 0, button("x1"), True)  # back = finish
+    assert events["stop_recording"]
+    listener.stop()
+    assert listener._mouse_listener.stopped
+
+
+def test_mouse_control_explains_why_it_cannot_start(monkeypatch):
+    monkeypatch.setattr(session, "pynput_can_capture", lambda: False)
+    with pytest.raises(RuntimeError, match="Xorg"):
+        session.init_manual_keyboard_listener(mouse_control=True)

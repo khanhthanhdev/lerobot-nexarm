@@ -57,6 +57,11 @@ def parse_args(argv=None):
         "--resume", action="store_true", help="Use the exact existing --repo-id, including its timestamp"
     )
     parser.add_argument("--root", type=Path, help="Optional dataset directory")
+    parser.add_argument(
+        "--mouse",
+        action="store_true",
+        help="Also control recording with the mouse: left/forward start or stop, right discards, back finishes",
+    )
     args = parser.parse_args(argv)
     if min(args.num_episodes, args.fps, args.width, args.height) <= 0:
         parser.error("Episode count, fps, width, and height must be positive")
@@ -339,6 +344,8 @@ def main():
         f"--recording_log={log_path}",
         f"--resume={'true' if args.resume else 'false'}",
     ]
+    if args.mouse:
+        command.append("--mouse_control=true")
     if args.root:
         command.append(f"--dataset.root={args.root.resolve()}")
     if not args.no_merge:

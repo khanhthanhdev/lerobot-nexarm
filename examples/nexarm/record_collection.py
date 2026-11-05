@@ -11,6 +11,8 @@ This wraps ``lerobot-record`` (:func:`lerobot.scripts.lerobot_record.record`). I
   created by the first session. The session itself is not pushed to the Hub.
 - ``--manual_control=true`` / ``--recording_log``: wait for Enter/Right, record until pressed again,
   reset without a timer, and show a small terminal dashboard while routine logs go to the log file.
+- ``--mouse_control=true``: with manual control, also use the mouse buttons (left/forward start or stop,
+  right discards, back finishes).
 - ``--rerun_save_path``: also save the Rerun stream to a local ``.rrd`` file (needs
   ``--display_data=true``).
 
@@ -64,6 +66,9 @@ class CollectionRecordConfig(RecordConfig):
     rerun_save_path: str | None = None
     # Wait for Enter/Right, record until pressed again, and reset without a timer.
     manual_control: bool = False
+    # With --manual_control: also use the mouse (left/forward = start or stop, right = discard,
+    # back = finish). Global: clicks anywhere on the desktop count while recording.
+    mouse_control: bool = False
     # Write routine logs here while showing the manual collection dashboard.
     recording_log: str = "outputs/collection/recording.log"
     # Merge finished sessions into this local root dataset, preserving prior episodes. Compatibility
@@ -218,7 +223,7 @@ def _record_manual(cfg: CollectionRecordConfig, processors: Processors) -> LeRob
             teleop.connect()
         robot.connect()
 
-        listener, events = init_manual_keyboard_listener()
+        listener, events = init_manual_keyboard_listener(cfg.mouse_control)
         if listener is None:
             raise RuntimeError("Manual collection requires an interactive terminal for Enter/Right controls.")
 
@@ -240,7 +245,13 @@ def _record_manual(cfg: CollectionRecordConfig, processors: Processors) -> LeRob
             )
 
         with VideoEncodingManager(dataset):
-            run_manual_session(dataset, events, cfg.dataset.num_episodes, run_phase)
+            run_manual_session(
+                dataset,
+                events,
+                cfg.dataset.num_episodes,
+                run_phase,
+                show=functools.partial(show_recording_status, mouse_control=cfg.mouse_control),
+            )
     finally:
         log_say("Stop recording", cfg.play_sounds, blocking=True)
         if dataset:
