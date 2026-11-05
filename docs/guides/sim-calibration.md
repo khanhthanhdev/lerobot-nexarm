@@ -12,6 +12,21 @@ This guide makes the MuJoCo twin behave like your physical arm, then generates s
 
 **What is not calibrated:** contact physics such as cube friction and slip. Keep real contact-rich demonstrations in your training mix, since simulation widens coverage but does not replace them.
 
+**Order and time.** Do the steps in this order. Each step depends on the ones before it: a wrong joint mapping makes every dynamics fit wrong, and wrong dynamics make camera checks on a moving arm misleading.
+
+| #   | Step                                                                         | Where           | Time      | Done when                                                |
+| --- | ---------------------------------------------------------------------------- | --------------- | --------- | -------------------------------------------------------- |
+| 0   | [Settings, zero, joint mapping](#step-0-before-you-start)                    | Robot PC        | 30 min    | Wrist overlays line up on a recorded episode             |
+| 1   | [Record calibration episodes](#step-1-record-system-identification-episodes) | Robot PC        | 30–45 min | 20 free-motion episodes recorded                         |
+| 2   | [Check the recording](#step-2-check-the-recording)                           | Any PC          | 5 min     | Audit shows no lag outliers, or you noted them           |
+| 3–4 | [Fit and read the result](#step-3-fit-the-simulation)                        | PC with OpenGL  | 15–30 min | Holdout RMSE drops, few scales at a limit                |
+| 5–6 | [Use and verify the calibration](#step-5-use-the-calibration)                | PC with OpenGL  | 30 min    | Scripted tasks still pass, videos look like the real arm |
+| 7   | [Align the cameras](#step-7-align-the-cameras)                               | Robot PC        | 30–60 min | Overlays line up for front, top and wrist                |
+| 8   | [Match the scene](#step-8-match-the-scene)                                   | Robot PC        | 20 min    | Measured sizes and heights are in the scene XML          |
+| 9   | [Train and evaluate on the real arm](#step-9-train-and-iterate)              | GPU server, arm | days      | Real success rate measured on a fixed protocol           |
+
+The sim's world frame, used for every position below: the origin is on the floor under the base's pan axis, `-y` points toward the work area (the robot's front), `+x` is the robot's left, and `+z` is up. Distances are in metres.
+
 ## Step 0. Before you start
 
 - Zero positions are set in the servos (follower: desktop Servo Advanced page; leader: Synchronizer page) and checked with `tools/nexarm/calibrate_arms.py`, which reports leader/follower deltas at the Home pose and keeps the calibration files identity (`lerobot-calibrate` writes the same identity files). Teleoperation works.
@@ -31,6 +46,22 @@ This guide makes the MuJoCo twin behave like your physical arm, then generates s
 
      The wrist-camera overlays should line up. Fitting dynamics with a wrong mapping gives meaningless numbers.
 
+  In more detail:
+  - **Before the probe.** Power the follower, connect it by USB, and quit the Hiwonder desktop app. Clear the space around the arm. The probe leaves torque off, so hold the arm while you pose it.
+  - **During the probe.** It asks you to pose the arm straight up (every link vertical, gripper pointing at the ceiling), then to turn each joint by about a quarter turn. After each turn it asks which way the gripper or link moved: `f` (front, toward the work area), `b` (back), `l` (the robot's left) or `r` (its right).
+  - **Reading the output.** It prints one line per joint, such as `shoulder_pan sign +1 offset +0.40 deg`, and writes `outputs/nexarm/joint_mapping_probe.json`.
+    - Every sign `+1` and every offset within a few degrees means the identity mapping is right, and you can skip the rest of this item.
+    - A sign of `-1` means the sim turns that joint the wrong way.
+    - An offset above about 5° means the servo's zero differs from the CAD pose.
+    - A `WARNING` about the base pan being a quarter turn off, or about an offset outside the joint range, means you should repeat the probe more carefully before trusting it.
+  - **Checking the result.** Run `overlay_recorded_frames.py` twice on the same episode: once without `--mapping` and once with it. Open the PNG images in `outputs/nexarm/overlay/`. Each shows real, sim and a 50% blend side by side. In the blend, the gripper jaws and the table edge should coincide. Use episodes that move a lot. On `thanhkt/nexarm_stack_bowls`, episode 19 is a good test: without a correct mapping its replay puts the gripper about 39 mm into the panel behind the arm.
+  - **Applying a non-identity mapping.** Pass the file everywhere the sim reads real joint values:
+    - `--joint-mapping outputs/nexarm/joint_mapping_probe.json` to `calibrate_sim.py`, `generate_sim_dataset.py` and `generate_stack_bowls_dataset.py`;
+    - `--env.joint_mapping_path` to the gym environment;
+    - `joint_mapping_path` in `NexArmSimConfig`.
+
+    Calibrations and datasets record the mapping version and refuse to mix with another, so refit (Step 3) and regenerate after you apply it. Copy the file to `sim/calibration/` so it is versioned with the calibration fitted on top of it.
+
 - Decide the follower settings now and keep them. `motion_speed` and `motion_acc` in `examples/nexarm/record.yaml` change how the arm responds, so a calibration only holds for the values used when you recorded. Re-run the calibration if you change them.
 
 ## Step 1. Record system-identification episodes
@@ -42,7 +73,7 @@ Record 15–25 episodes with the same follower, leader, fps (30) and settings yo
 ```bash
 uv run python examples/nexarm/record.py \
     --leader-port /dev/ttyUSB0 --follower-port /dev/ttyUSB1 \
-    --repo-id <user>/nexarm_sysid --num-episodes 20
+    --repo-id <user>/nexarm_sysid --num-episodes 20 --episode-time 20
 ```
 
 The recorder appends a timestamp to the repo id and prints the final `Dataset repo_id:` (e.g. `<user>/nexarm_sysid_20261011_093000`) and `Dataset root:`. Use that printed id as `<sysid_repo_id>` below.
@@ -53,6 +84,20 @@ Per episode, move the leader arm like this:
 2. Add a few episodes that move all joints together, as in a normal task.
 3. Keep the gripper open and still. The gripper is not fitted by default.
 4. Do not touch objects or the table.
+
+A 20-episode plan that covers every joint (about 20 s each, so add `--episode-time 20`):
+
+| Episodes | Move                                                                                         |
+| -------- | -------------------------------------------------------------------------------------------- |
+| 1–2      | Shoulder pan only: slow sweep left to right, then fast back and forth                        |
+| 3–4      | Shoulder lift only, with the elbow bent so the arm stays clear of the table                  |
+| 5–6      | Elbow only, through most of its range                                                        |
+| 7–8      | Wrist flex only                                                                              |
+| 9–10     | Wrist roll only                                                                              |
+| 11–14    | One joint per episode again, now with short fast reversals (small moves back and forth)      |
+| 15–20    | All joints together, as when reaching to the bowls and lifting, at your normal and fast pace |
+
+Before each episode, start from the same rest pose. Between episodes, check that the cable has not wrapped around the wrist.
 
 Tips:
 
@@ -144,6 +189,19 @@ The gripper RMSE is large because it is not fitted. This is expected.
 
 If the fit is poor, the cause is almost always the data, not the tool: too few episodes, too little motion, or a different `motion_speed` than the one you use normally.
 
+### Optional: choose `kp`
+
+The default fit keeps the servo model's `kp`. To let the real data set it:
+
+1. Fit with `--fit-kp` into a separate file.
+2. Make candidates between the servo model and the fit. Scale each joint's fitted `kp_scale` by an exponent from 0 to 1, for example 0.25, 0.5 and 0.75, and keep everything else from the `--fit-kp` file.
+3. For each candidate, record two numbers:
+   - the holdout RMSE (the `holdout_after` mean over the five arm joints);
+   - the scripted success over 20 seeds of each task (Step 6, check 1).
+4. Keep the candidate with the lowest holdout RMSE that still scores 20/20 on both tasks. If one joint alone breaks a task, give that joint a smaller exponent.
+
+On `thanhkt/nexarm_stack_bowls`, the full `--fit-kp` result scored 0/20 on stack-bowls, and the halfway point had the lowest RMSE. The shipped file is the halfway point with a smaller exponent for the elbow (see Step 5).
+
 ## Step 5. Use the calibration
 
 The repository ships one calibration, [`sim/calibration/nexarm_sim_calibration_hx_servo_v1.json`](../../sim/calibration/nexarm_sim_calibration_hx_servo_v1.json), fitted to `thanhkt/nexarm_stack_bowls` (episodes 0–23, skipping 1, 3, 12 and 19, whose replays hit the floor or the back panel). Use it unless you have fitted your own:
@@ -184,9 +242,25 @@ Use `--split eval` to generate a held-out evaluation set. Its seeds never overla
 
 Do these checks before training:
 
-1. **Replay check.** Re-run Step 3 on a _different_ real dataset with `--holdout-frac 0` and the same model. The RMSE should stay close to the holdout value from Step 4. Then compare it to `SimCalibration()` (no calibration) to see the gain.
-2. **Distribution check.** Compare the real and the simulated datasets for episode length, the range of each joint, and per-step action changes. `generation_report.json` gives the simulated numbers. Large gaps mean the scripted motion differs from how your operator moves. Adjust `--action-noise` or the trajectory variation in `generate_sim_dataset.py`.
-3. **Look at frames.** Export a real and a simulated episode with `export_episode_video.py` and compare the views side by side.
+1. **Scripted success check.** A calibration that makes the sim arm track the real one better can still break the scripted grasps that generate the data. Run 20 seeds of each task with no retries, first with domain randomization off and then with it on (drop `--no-dr`):
+
+   ```bash
+   CAL=sim/calibration/nexarm_sim_calibration_<name>.json
+   for task in generate_sim_dataset generate_stack_bowls_dataset; do
+     MUJOCO_GL=egl uv run python examples/nexarm/$task.py --calibration $CAL \
+         --repo-id local/check_$task --root outputs/datasets/check_$task \
+         --episodes 20 --max-attempts 20 --no-video --no-dr
+     uv run python -c "import json; r=json.load(open('outputs/datasets/check_$task/generation_report.json')); print('$task', len(r['accepted_seeds']), '/', r['attempts'])"
+   done
+   ```
+
+   Expect 20/20 for both without domain randomization, and at least 19/20 with it. The shipped calibration scores 20/20 and 20/20, then 20/20 pick-place and 19/20 stack-bowls with domain randomization. Delete the check folders before rerunning.
+
+   To watch the episodes, run again without `--no-video` and with `--episodes 3`, then export them with `tools/nexarm/export_episode_video.py`. Look at whether the arm moves faster or more sharply than the real one, and whether objects slip in the gripper.
+
+2. **Replay check.** Re-run Step 3 on a _different_ real dataset with `--holdout-frac 0` and the same model. The RMSE should stay close to the holdout value from Step 4. Then compare it to `SimCalibration()` (no calibration) to see the gain.
+3. **Distribution check.** Compare the real and the simulated datasets for episode length, the range of each joint, and per-step action changes. `generation_report.json` gives the simulated numbers. Large gaps mean the scripted motion differs from how your operator moves. Adjust `--action-noise` or the trajectory variation in `generate_sim_dataset.py`.
+4. **Look at frames.** Export a real and a simulated episode with `export_episode_video.py` and compare the views side by side.
 
 ## Step 7. Align the cameras
 
@@ -198,6 +272,34 @@ uv run python tools/nexarm/calibrate_camera_alignment.py --cam-index 0 --camera-
 
 The tool overlays the simulated view on the live camera. Keys: `m` switches mode, `+` and `-` change the blend, `s` saves a snapshot, `q` quits. Compare the table edge, the base of the arm and the target zone. If they do not line up, edit the camera `pos`, `quat`/`xyaxes` or `fovy` in the scene XML (`sim/description/mjcf/`) until they do, then repeat with `--camera-name wrist` and `--camera-name top`. For the RealSense `top` camera, `uv run python tools/nexarm/realsense_fovy.py` reads the colour intrinsics and prints the matching `fovy`. For `top`, pass the RealSense RGB V4L2 node as `--cam-index` (e.g. `/dev/video4`); the sim top camera looks straight down from 0.75 m. Check that the resolution and fps match your real cameras.
 
+Step by step for each camera. Fix the field of view first; a pose error cannot be tuned away while the field of view is wrong.
+
+1. **Field of view.**
+   - **`top` (D435i):** run `uv run python tools/nexarm/realsense_fovy.py --width 640 --height 480` and set the printed `fovy` on the `top` camera.
+   - **`front` (webcam):** calibrate it with a printed checkerboard (OpenCV `calibrateCamera`, or any camera-calibration app) to get `fy` at 640×480, then set `fovy = 2 * atan(240 / fy)` in degrees.
+   - **`wrist`:** its `fovy` is in `sim/description/mjcf/nexarm.xml`.
+2. **Measure the real camera position** with a tape, in the world frame above, to the lens centre:
+   - `x`, left or right of the base's pan axis;
+   - `y`, forward of it (negative toward the work area);
+   - `z`, above the table.
+
+   Current sim values:
+
+   | Camera  | Position (x, y, z) in m                        | Points                                 |
+   | ------- | ---------------------------------------------- | -------------------------------------- |
+   | `front` | -0.03, -0.87, 0.82 (pick-place) / 0.72 (bowls) | Back at the arm, tilted down about 45° |
+   | `top`   | -0.05, -0.35, 0.77                             | Straight down                          |
+   | `wrist` | On the gripper; edit it in `nexarm.xml`        | Along the jaws                         |
+
+3. **Set the measured `pos`** in both `scene.xml` and `bowl_stack_scene.xml`, unless the camera really is in a different place for the two tasks. Today the `front` camera height differs between them by 0.1 m, so check which one is right.
+4. **Fine-tune the orientation in the overlay.** Run the alignment tool, look at where the table edge and the arm base land, edit `xyaxes`, and restart the tool. `xyaxes` holds the camera's right direction and its up direction, both in world coordinates.
+   - Tilt (the image is too high or too low): change the second vector, for example `0 0.71 0.70` (about 45° down) toward `0 0.77 0.64` (about 50° down, looking further down).
+   - Pan (the image is shifted left or right): rotate both vectors about `z`.
+   - Size (the scene looks too big or too small): this is `fovy` or the distance, not the orientation. Go back to steps 1–2.
+5. **Save a snapshot** with `s` once the table edge, the base and the target zone line up within a few pixels. Keep it with the commit that changes the XML.
+
+After any change to the scene cameras, rerun the scripted success check (Step 6). Regenerate sim data before training, because the existing data was rendered from the old view.
+
 ## Step 8. Match the scene
 
 Measure these on your real setup and update the scene XML if they differ:
@@ -205,6 +307,19 @@ Measure these on your real setup and update the scene XML if they differ:
 - cube size and mass (the simulated cube is 20 mm and 20 g),
 - table height and the target zone size,
 - background and table color.
+
+What to measure and where it lives in the sim:
+
+| Measure on the real setup                              | Sim value                                                           | Where to change it                                                                |
+| ------------------------------------------------------ | ------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Height of the shoulder-lift axis above the table       | 0.139 m                                                             | `nexarm_mount` `pos` z in `sim/description/mjcf/nexarm.xml` (moves the whole arm) |
+| Anything behind or beside the arm (wall, panel, clamp) | Check in the viewer: `uv run python examples/nexarm/simulate.py`    | Add or move a box geom in the scene XML                                           |
+| Cube: edge length and mass                             | 20 mm, 20 g                                                         | `cube_collision` in `scene.xml`                                                   |
+| Target zone: centre and radius                         | (-0.09, -0.24), radius 0.05 m                                       | `target_zone` in `scene.xml`                                                      |
+| Bowls: mass, rim diameter, height, start positions     | 60 g each; red (-0.11, -0.27), blue (0, -0.18), black (0.11, -0.27) | `bowl_stack_scene.xml`; keep the spawn slots in `stack_bowls_task.py` in step     |
+| Table and background colour, lighting                  | Grey floor; domain randomization varies colour                      | Floor `rgba` in the scene XML; `DomainRandomizationRanges`                        |
+
+Measure heights from the table surface, which is the sim floor (`z = 0`). If the real arm stands on a plate or clamp, measure from that, then add its height to the mount `z`. A mount error of 1–2 cm is enough to make replays touch the table, as episodes 1, 3 and 12 of `thanhkt/nexarm_stack_bowls` do (12–25 mm below it).
 
 Then adjust the visual randomization range in `DomainRandomizationRanges` (`packages/lerobot_robot_nexarm/src/lerobot_robot_nexarm/nexarm_sim/mujoco_backend.py`) so it covers the lighting and color you actually see.
 
