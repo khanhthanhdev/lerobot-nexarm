@@ -1,6 +1,6 @@
 # 261028-plan-bind-d3-pusht
 
-**Status: ready to run, not run yet.** The stack-bowls experiments ([D1](../261027-plan-bind-two-step/README.md), [D2](../261028-plan-bind-d2-latency/README.md)) use one simulated task with scripted demonstrations, which are close to unimodal. D3 moves Plan-Bind to Push-T, the simulation benchmark of the [B-spline Policy paper](https://arxiv.org/abs/2607.09648), where the 206 demonstrations (`lerobot/pusht`) are human and multimodal.
+**Status: run (3 then 2 A5000 GPUs of a shared server, 2026-11-04).** The stack-bowls experiments ([D1](../261027-plan-bind-two-step/README.md), [D2](../261028-plan-bind-d2-latency/README.md)) use one simulated task with scripted demonstrations, which are close to unimodal. D3 moves Plan-Bind to Push-T, the simulation benchmark of the [B-spline Policy paper](https://arxiv.org/abs/2607.09648), where the 206 demonstrations (`lerobot/pusht`) are human and multimodal.
 
 ## Questions
 
@@ -61,8 +61,27 @@ HF_REPO=<user>/plan-bind-d3 experiments/261028-plan-bind-d3-pusht/run_all.sh   #
 
 ## Results
 
-Pending.
+Push-T (`lerobot/pusht`, 206 human demonstrations), 100k steps at batch 64, 2 training seeds (1000, 1001), 200 evaluation episodes per cell (seed 1000, same episodes in every cell), last checkpoint. Score is the mean over episodes of the best target coverage, in percent (the paper's metric); `results.md` of the run (Hub: `thanhkt/plan-bind-d3`) has every cell. Eval used synchronous envs, because LeRobot's async workers do not import `gym_pusht`.
 
+| Policy | Score (seeds) | Coverage >= 0.9 | Env success | Paper score |
+| --- | --- | --- | --- | --- |
+| `diffusion` | 83.5 (86, 81) | 73% | 38% | 72 |
+| `onestep` | 72.6 (71, 74) | 61% | 35% | - |
+| `bsp10` | 66.4 (68, 64) | 56% | 35% | 75 |
+| `planbind` | 53.2 (55, 51) | 39% | 20% | - |
+
+Score by latency with latency-aware commit (`bsp10` through the spline runtime): `bsp10` 63 / 62 / 63, `onestep` 73 / 71 / 72, `planbind` 53 / 50 / 50 at 0 / 100 / 200 ms.
+
+Call rate and commit at latency 0: `onestep` with naive swapping scores 38 with a call every 2 frames and 79 every 8; `planbind` scores 61 and 53. Latency-aware commit gives `onestep` 73 and 72, `planbind` 53 and 49.
+
+Reading it:
+
+- **Plan-Bind does not win here.** It is the weakest policy, about 19 points below `onestep` and 13 below `bsp10`, on both seeds. Its checkpoint curve is flat or falling (seed 1001: 53, 51, 53, 48 from 25k to 100k), so longer training does not help. The stack-bowls lead of D1 and D1b does not carry over to human, multimodal data.
+- **Untested explanation:** regressing a coarse plan and then a residual may average the demonstration modes. The `planbind` config (32-frame window, fine knots every 2 frames, plan every 8, maximum plan age 16) was set without tuning for Push-T.
+- **Latency hardly matters** for any policy at these 10 fps latencies; call rate and commit mode move `onestep` much more.
+- **Paper numbers:** our `diffusion` (83.5) is above the paper's 72 and our `bsp10` (66) below its 75. The paper averages its best three checkpoints in its own codebase, so the gaps are not a like-for-like comparison.
+
+Limits: 2 seeds, one training recipe per policy, no tuning for Push-T.
 ## Not in this experiment
 
 - **The paper's speed-up test.** It used a 200 Hz Push-T variant with 100 newly collected demonstrations, which are not public.
