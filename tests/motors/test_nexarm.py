@@ -182,6 +182,20 @@ def test_control_commands(method: str, value: bool | None, command: int, expecte
     assert send.call_args.kwargs == {"expect_reply": False}
 
 
+def test_torque_release_frames_match_the_vendor_desktop_app() -> None:
+    """Byte-for-byte the frames the vendor desktop app sends for "All off" and per-servo torque off."""
+    bus = NexArmMotorsBus("/dev/null")
+    with patch.object(bus, "_send") as send, patch("lerobot_robot_nexarm.motors.nexarm.time.sleep"):
+        bus.release_torque_all()
+        bus.release_torque_each()
+
+    frames = [c.args[0] for c in send.call_args_list]
+    assert frames[0] == bytes.fromhex("FF FF FF 03 3D 00 C0")
+    assert frames[4] == bytes.fromhex("FF FF 04 04 03 28 00 CC")
+    assert [f[2] for f in frames[1:]] == [1, 2, 3, 4, 5, 6]
+    assert all(c.kwargs == {"expect_reply": False} for c in send.call_args_list)
+
+
 def test_write_motion_params_clamps_and_encodes() -> None:
     bus = NexArmMotorsBus("/dev/null")
     with patch.object(bus, "_send") as send:

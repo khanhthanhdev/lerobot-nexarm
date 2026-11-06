@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import mujoco
@@ -179,23 +180,23 @@ def test_solve_mapping_rejects_sideways_tilts_and_tiny_moves(sim_arm):
 
 def test_run_probe_reads_each_pose():
     bus = RateLimitedBus([2048] * 6, rate=0)
-    answers = iter(["", "", "", "f"] + ["", ""] + ["", "f", ""] * 3 + ["", ""])
+    answers = iter(["", "f"] + ["", ""] + ["", "f", ""] * 3 + ["", ""])
     upright, moved, directions, camera_side = probe.run_probe(bus, ask=lambda _: next(answers))
     assert upright == [2048.0] * 6 and camera_side == "front"
-    assert bus.torque is False
     assert set(moved) == set(probe.ARM_JOINTS) and set(directions) == set(probe.FLEX_JOINTS)
 
 
-def test_release_arm_resends_torque_off_until_confirmed():
-    bus = RateLimitedBus([2048] * 6, rate=0)
+def test_release_arm_tries_the_desktop_app_methods_in_turn():
     calls = []
-    bus.set_torque = calls.append
+    bus = SimpleNamespace(
+        release_torque_all=lambda: calls.append("all"), release_torque_each=lambda: calls.append("each")
+    )
     answers = iter(["", "n", "y"])
-    probe.release_arm(bus, ask=lambda _: next(answers))
-    assert calls == [False, False]
+    assert "per-servo" in probe.release_arm(bus, ask=lambda _: next(answers))
+    assert calls == ["all", "each"]
 
-    answers = iter(["", "n", "n", "n"])
-    with pytest.raises(RuntimeError, match="power-cycle"):
+    answers = iter(["", "n", "n"])
+    with pytest.raises(RuntimeError, match="Power-cycle"):
         probe.release_arm(bus, ask=lambda _: next(answers))
 
 

@@ -35,8 +35,15 @@ PC ──USB (CH340, 1 Mbps)── ESP32 UART0 ──┐
 ## 2. ESP32 bridge mode (CMD 68)
 
 - Entering bridge mode swaps the USB callback for `bridge_usb_callback` and the
-  AT32 callback for `bridge_at32_callback`. Leaving it reboots the ESP32
-  (`ESP.restart()` at `system_task_handle.cpp:2953`).
+  AT32 callback for `bridge_at32_callback`. `register_success_callback`
+  replaces the callback, so CMD 68 `[0]` sent in bridge mode goes to the AT32
+  through `bridge_usb_callback`'s default branch and never reaches the
+  `ESP.restart()` at `system_task_handle.cpp:2953`. Only a power cycle or the
+  board button (`system_loop_handler`) ends bridge mode.
+- In bridge mode the ESP32's own torque command (CMD 61) and raw servo frames
+  cannot be sent, so torque-off depends on the AT32's CMD 98. The vendor
+  desktop app turns torque off in normal mode instead, with CMD 61 or
+  per-servo writes of register 40.
 - In bridge mode, **every** PC command is forwarded to the AT32 with ID 0xFF,
   not only 96/97/98 (default branch at `:126-129`). So CMD 56, 59, 60, 71..80
   and 104 all reach the AT32 while the robot is in LeRobot use.

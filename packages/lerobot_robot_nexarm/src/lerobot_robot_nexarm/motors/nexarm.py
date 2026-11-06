@@ -48,8 +48,11 @@ CMD_READ_POS = 96
 CMD_WRITE_POS = 97
 CMD_TORQUE = 98
 CMD_SET_MOTION_PARAMS = 56  # sets arm.move_acc only; NOT used by CMD_LR_WRITE_POS
+CMD_SET_TORQUE_ALL = 61  # normal mode only: the ESP32 broadcasts a torque-enable write to every servo
 
 # HX-30HM register layout (used by reg_write path, cmd=3)
+SERVO_CMD_WRITE = 3
+REG_TORQUE_ENABLE = 40
 REG_ACC = 41  # acceleration (1 byte)
 REG_GOAL_POS = 42  # goal position (2 bytes LE)
 REG_GOAL_SPEED = 46  # goal speed    (2 bytes LE)
@@ -277,6 +280,24 @@ class NexArmMotorsBus:
         frame = build_frame(SYSTEM_ID, CMD_TORQUE, bytes([1 if enable else 0]))
         self._send(frame, expect_reply=False)
         time.sleep(0.02)
+
+    def release_torque_all(self) -> None:
+        """Turn all servos' torque off with system CMD 61, as the vendor desktop app's "All off" does.
+
+        Normal mode only: in bridge mode the ESP32 hands every frame to the AT32 instead.
+        """
+        self._send(build_frame(SYSTEM_ID, CMD_SET_TORQUE_ALL, b"\x00"), expect_reply=False)
+        time.sleep(0.02)
+
+    def release_torque_each(self, gap_s: float = 0.06) -> None:
+        """Write torque-enable 0 to servos 1..6 one by one, as the vendor desktop app's calibration page does.
+
+        Normal mode only, like :meth:`release_torque_all`.
+        """
+        for servo_id in range(1, JOINT_COUNT + 1):
+            frame = build_frame(servo_id, SERVO_CMD_WRITE, bytes([REG_TORQUE_ENABLE, 0]))
+            self._send(frame, expect_reply=False)
+            time.sleep(gap_s)
 
     def enter_lerobot_mode(self) -> None:
         """Enter LeRobot bridge mode on slave ESP32 (CMD 68)."""

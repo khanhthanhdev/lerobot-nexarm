@@ -10,8 +10,9 @@ raw value:
 
     qpos = sign * (raw - 2048) * 2*pi / 4096 + offset_rad
 
-The follower stays un-energised so you can pose it by hand, as in ``calibrate_arms.py``. Support the arm while
-you move it. Directions are named from the robot's point of view:
+The probe turns the follower's motors off first, the way the vendor desktop app does, so you can pose it by
+hand. Power-cycle the follower beforehand if a LeRobot program used it since it was switched on. Support the
+arm while you move it. Directions are named from the robot's point of view:
 
 - front: toward the work area;
 - back: away from it;
@@ -31,21 +32,16 @@ from pathlib import Path
 import mujoco
 import numpy as np
 
+from lerobot_robot_nexarm.motors import NexArmMotorsBus
 from lerobot_robot_nexarm.motors.mujoco_mapping import MUJOCO_JOINTS
 from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES, POSITION_CENTER, TICKS_PER_REVOLUTION
 from lerobot_robot_nexarm.nexarm_sim.mujoco_backend import resolve_model_path
-
-try:  # imported as a package module (tests) or run as a script
-    from tools.nexarm.servo_step_test import follower_bus
-except ModuleNotFoundError:
-    from servo_step_test import follower_bus  # type: ignore[no-redef]
 
 ARM_JOINTS = JOINT_NAMES[:-1]
 FLEX_JOINTS = ("shoulder_lift", "elbow_flex", "wrist_flex")
 # The sim robot faces -y, so its left is +x.
 DIRECTIONS = {"front": (0.0, -1.0), "back": (0.0, 1.0), "left": (1.0, 0.0), "right": (-1.0, 0.0)}
 QUARTER_TURN_TICKS = TICKS_PER_REVOLUTION / 4
-RELEASE_ATTEMPTS = 3
 JAW_CENTER_OFFSET = np.array([0.0, 0.033, 0.0])  # jaw pad centre in gripper_frame, as in the bowl generator
 
 PROMPTS = {
@@ -222,26 +218,33 @@ def ask_direction(question: str, ask: Callable[[str], str]) -> str:
         print("Answer f, b, l or r.")
 
 
-def release_arm(bus, ask: Callable[[str], str] = input) -> None:
-    """Turn the follower's motors off, resending until the user confirms the arm moves by hand."""
-    ask("Support the arm with one hand: its motors turn off when you press Enter.")
-    for _ in range(RELEASE_ATTEMPTS):
-        # Read first: the reply proves the bridge is live, and the controller stops its own motion loop on
-        # the first position read, so nothing re-drives the servos after the torque-off.
-        bus.read_positions()
-        bus.set_torque(False)
-        if ask("Does the arm move freely by hand? [Y/n]: ").strip().lower()[:1] != "n":
-            return
-        print("Sending torque-off again.")
+def release_arm(bus, ask: Callable[[str], str] = input) -> str:
+    """Turn the follower's motors off the way the vendor desktop app does; returns the method that worked.
+
+    Must run before the bus enters LeRobot bridge mode: in bridge mode the ESP32 hands every frame to the
+    AT32, whose own torque command does not free the arm.
+    """
+    ask(
+        "Power-cycle the follower first if a LeRobot program used it since it was switched on (bridge mode "
+        "only ends on a restart), and close the vendor desktop app. Support the arm with one hand: its "
+        "motors turn off when you press Enter."
+    )
+    for label, release in (
+        ("the all-servo torque-off (CMD 61)", bus.release_torque_all),
+        ("per-servo torque-off writes", bus.release_torque_each),
+    ):
+        release()
+        if ask(f"Sent {label}. Does the arm move freely by hand? [Y/n]: ").strip().lower()[:1] != "n":
+            print(f"Released by {label}.")
+            return label
     raise RuntimeError(
-        "The follower kept its motors on. Close any other program on its serial port, power-cycle the "
-        "follower, and run the probe again."
+        "The follower kept its motors on. Power-cycle it, close any other program on its serial port, and "
+        "run the probe again."
     )
 
 
 def run_probe(bus, ask: Callable[[str], str] = input) -> tuple[list[float], dict, dict, str]:
     """Interactive readings: upright, then a quarter turn per joint, returning to upright in between."""
-    release_arm(bus, ask)
     ask(PROMPTS["upright"] + " Press Enter.")
     upright = read_average(bus)
     camera_side = ask_direction("When upright, which side of the gripper is the wrist camera on?", ask)
@@ -269,8 +272,14 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
     sim = SimArm(resolve_model_path(args.model))
-    with follower_bus(args.port, args.baudrate) as bus:
+    bus = NexArmMotorsBus(port=args.port, baudrate=args.baudrate)
+    bus.connect()
+    try:
+        release_arm(bus)
+        bus.enter_lerobot_mode()  # for the CMD 96 position reads; it ends only when the follower restarts
         upright, moved, directions, camera_side = run_probe(bus)
+    finally:
+        bus.disconnect()
     result = solve_mapping(sim, upright, moved, directions, camera_side)
     result["readings"] = {"upright": upright, "moved": moved, "flex_directions": directions}
 

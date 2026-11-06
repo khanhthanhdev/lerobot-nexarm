@@ -32,7 +32,7 @@ The sim's world frame, used for every position below: the origin is on the floor
 - Zero positions are set in the servos (follower: desktop Servo Advanced page; leader: Synchronizer page) and checked with `tools/nexarm/calibrate_arms.py`, which reports leader/follower deltas at the Home pose and keeps the calibration files identity (`lerobot-calibrate` writes the same identity files). Teleoperation works.
 - You can generate simulation data (see `pipeline.md`, section 1a) and `MUJOCO_GL=egl` works on your machine.
 - Check that the sim joint mapping matches your arm. The sim maps raw 2048 onto the exported CAD pose, which is the follower's Home pose (an L: upper-arm tube vertical, forearm and closed gripper horizontal). Servo signs and zero errors still vary per arm, and until they are measured the sim can pose real joint values slightly differently from the real arm.
-  1. Measure the per-joint sign and zero offset by posing the un-energised follower by hand. The probe uses a straight-up pose as its reference and reads where it is, so it works whatever shape Home has. Close any app that holds the follower's serial port (such as the Hiwonder desktop app) first:
+  1. Measure the per-joint sign and zero offset by posing the un-energised follower by hand. The probe uses a straight-up pose as its reference and reads where it is, so it works whatever shape Home has. Power-cycle the follower and close any app that holds its serial port (such as the Hiwonder desktop app) first:
 
      ```bash
      uv run python tools/nexarm/probe_joint_mapping.py --port /dev/ttyUSB1
@@ -47,7 +47,8 @@ The sim's world frame, used for every position below: the origin is on the floor
      The wrist-camera overlays should line up. Fitting dynamics with a wrong mapping gives meaningless numbers.
 
   In more detail:
-  - **Before the probe.** Power the follower, connect it by USB, and quit the Hiwonder desktop app. Clear the space around the arm. The probe leaves torque off, so hold the arm while you pose it.
+  - **Before the probe.** Power-cycle the follower, connect it by USB, and quit the Hiwonder desktop app. Clear the space around the arm. The power-cycle matters: any LeRobot program (`lerobot-record`, a rollout, an earlier probe) leaves the follower in bridge mode, which only a restart ends, and in bridge mode the probe cannot turn the motors off.
+  - **Turning the motors off.** The probe first sends the desktop app's "All off" command and asks whether the arm moves freely. If you answer `n`, it sends per-servo torque-off writes and asks again. Hold the arm before you press Enter: it drops as soon as the motors turn off.
   - **During the probe.** It asks you to pose the arm straight up (every link vertical, gripper pointing at the ceiling), then to turn each joint by about a quarter turn. After each turn it asks which way the gripper or link moved: `f` (front, toward the work area), `b` (back), `l` (the robot's left) or `r` (its right).
   - **Reading the output.** It prints one line per joint, such as `shoulder_pan sign +1 offset +0.40 deg`, and writes `outputs/nexarm/joint_mapping_probe.json`.
     - Every sign `+1` and every offset within a few degrees means the identity mapping is right, and you can skip the rest of this item.
