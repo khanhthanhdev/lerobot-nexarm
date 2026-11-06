@@ -45,6 +45,7 @@ FLEX_JOINTS = ("shoulder_lift", "elbow_flex", "wrist_flex")
 # The sim robot faces -y, so its left is +x.
 DIRECTIONS = {"front": (0.0, -1.0), "back": (0.0, 1.0), "left": (1.0, 0.0), "right": (-1.0, 0.0)}
 QUARTER_TURN_TICKS = TICKS_PER_REVOLUTION / 4
+RELEASE_ATTEMPTS = 3
 JAW_CENTER_OFFSET = np.array([0.0, 0.033, 0.0])  # jaw pad centre in gripper_frame, as in the bowl generator
 
 PROMPTS = {
@@ -221,10 +222,26 @@ def ask_direction(question: str, ask: Callable[[str], str]) -> str:
         print("Answer f, b, l or r.")
 
 
+def release_arm(bus, ask: Callable[[str], str] = input) -> None:
+    """Turn the follower's motors off, resending until the user confirms the arm moves by hand."""
+    ask("Support the arm with one hand: its motors turn off when you press Enter.")
+    for _ in range(RELEASE_ATTEMPTS):
+        # Read first: the reply proves the bridge is live, and the controller stops its own motion loop on
+        # the first position read, so nothing re-drives the servos after the torque-off.
+        bus.read_positions()
+        bus.set_torque(False)
+        if ask("Does the arm move freely by hand? [Y/n]: ").strip().lower()[:1] != "n":
+            return
+        print("Sending torque-off again.")
+    raise RuntimeError(
+        "The follower kept its motors on. Close any other program on its serial port, power-cycle the "
+        "follower, and run the probe again."
+    )
+
+
 def run_probe(bus, ask: Callable[[str], str] = input) -> tuple[list[float], dict, dict, str]:
     """Interactive readings: upright, then a quarter turn per joint, returning to upright in between."""
-    ask("Support the arm with one hand: its motors turn off when you press Enter.")
-    bus.set_torque(False)
+    release_arm(bus, ask)
     ask(PROMPTS["upright"] + " Press Enter.")
     upright = read_average(bus)
     camera_side = ask_direction("When upright, which side of the gripper is the wrist camera on?", ask)
