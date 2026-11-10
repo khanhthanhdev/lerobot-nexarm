@@ -136,6 +136,40 @@ def test_invalid_servo_caps_are_rejected(kwargs) -> None:
         )
 
 
+def test_domain_randomization_holds_a_servo_offset_and_reset_domain_restores_the_model() -> None:
+    backend = NexArmMujocoBackend(
+        model_path=SCENE,
+        fps=30,
+        camera_width=64,
+        camera_height=48,
+        camera_names=(),
+        enable_domain_randomization=True,
+    )
+    try:
+        nominal_gain = backend.model.actuator_gainprm.copy()
+        nominal_bias = backend.model.actuator_biasprm.copy()
+        backend.reset(rng=np.random.default_rng(0))
+        assert not np.allclose(backend.model.actuator_biasprm, nominal_bias)
+        command = backend.joint_positions()
+        for _ in range(backend.fps):
+            backend.step(command)
+        observed = backend.observed_joint_positions()
+        joints = backend.last_domain_params["joints"]
+        for name in JOINT_NAMES[:-1]:
+            assert observed[f"{name}.pos"] == round(observed[f"{name}.pos"])
+            offset = joints[name]["offset_ticks"]
+            assert abs(offset) <= backend.dr_ranges.servo_offset_ticks
+            assert observed[f"{name}.pos"] - command[f"{name}.pos"] == pytest.approx(offset, abs=2.5)
+        assert max(abs(joints[name]["offset_ticks"]) for name in JOINT_NAMES[:-1]) > 3.0
+
+        backend.reset_domain()
+        np.testing.assert_array_equal(backend.model.actuator_gainprm, nominal_gain)
+        np.testing.assert_array_equal(backend.model.actuator_biasprm, nominal_bias)
+        assert not backend._servo_offset.any()
+    finally:
+        backend.close()
+
+
 def test_accel_cap_can_be_turned_off() -> None:
     backend = NexArmMujocoBackend(
         model_path=SCENE, fps=30, camera_width=64, camera_height=48, camera_names=(), max_accel_ticks_s2=None

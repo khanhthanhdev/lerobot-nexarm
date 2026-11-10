@@ -108,7 +108,7 @@ class NexArmSim(Robot):
 
     @check_if_not_connected
     def get_observation(self) -> RobotObservation:
-        observation: RobotObservation = self.backend.joint_positions()
+        observation: RobotObservation = self.backend.observed_joint_positions()
         for camera_name in self.config.camera_names:
             observation[camera_name] = self.backend.render(camera_name)
         return observation

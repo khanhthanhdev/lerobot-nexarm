@@ -275,7 +275,7 @@ def test_apply_fusion_extract_merges_without_touching_tuning(tmp_path):
     applier.apply_extract(path, sim)
 
     robot_xml = (sim / "description" / "mjcf" / "nexarm.xml").read_text(encoding="utf-8")
-    assert 'class="hx65hm" joint="joint_2_link_1_to_link_2" kv="110.35"' in robot_xml  # hand tuning survives
+    assert 'class="hx65hm" joint="joint_2_link_1_to_link_2" kv="59.61"' in robot_xml  # hand tuning survives
     for scene in ("scene.xml", "bowl_stack_scene.xml"):
         model = mujoco.MjModel.from_xml_path(str(sim / "description" / "mjcf" / scene))
         data = mujoco.MjData(model)

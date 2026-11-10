@@ -15,7 +15,7 @@ Example:
 
 Calibrated to a real arm (see calibrate_sim.py), sharded over 4 GPUs, held-out eval split:
     uv run python examples/nexarm/generate_sim_dataset.py \
-        --calibration sim/calibration/nexarm_sim_calibration_hx_servo_v1.json \
+        --calibration sim/calibration/nexarm_sim_calibration_<name>.json \
         --episodes 200 --workers 4 --gpus 0,1,2,3 --split eval
 """
 

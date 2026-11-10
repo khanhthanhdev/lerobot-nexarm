@@ -145,6 +145,13 @@ class _NexArmMujocoEnv(gym.Env):
             except BaseException:
                 self.backend.close()
                 raise
+        # Domain randomization also draws the action delay per episode, within one step of the run's delay
+        # like the dataset generators, unless the delay is set explicitly.
+        self._action_delay_range = (
+            (max(0, self.backend.action_delay_steps - 1), self.backend.action_delay_steps + 1)
+            if enable_domain_randomization and action_delay_steps is None
+            else None
+        )
         try:
             self.sim_task = self._make_task()
         except BaseException:
@@ -275,7 +282,7 @@ class _NexArmMujocoEnv(gym.Env):
 
     def _get_agent_pos(self) -> np.ndarray:
         """Returns joint positions (raw [0, 4095] or normalized [-1.0, 1.0])."""
-        raw_positions = self.backend.joint_positions()
+        raw_positions = self.backend.observed_joint_positions()
         if self.control_mode == "raw":
             return np.array([raw_positions[f"{name}.pos"] for name in JOINT_NAMES], dtype=np.float32)
 
@@ -338,6 +345,11 @@ class _NexArmMujocoEnv(gym.Env):
     ) -> tuple[dict[str, np.ndarray], dict[str, Any]]:
         super().reset(seed=seed)
         int_seed = int(seed) if seed is not None else int(self.np_random.integers(0, 2**31 - 1))
+        if self._action_delay_range is not None:
+            low, high = self._action_delay_range
+            self.backend.action_delay_steps = int(
+                np.random.default_rng([int_seed, 3]).integers(low, high + 1)
+            )
         status = self._reset_task(int_seed)
         self._step_count = 0
         info = self._info(status)

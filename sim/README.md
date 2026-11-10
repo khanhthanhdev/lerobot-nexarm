@@ -66,7 +66,7 @@ registers, or the Hiwonder follower control loop. It preserves the external
 LeRobot action contract so datasets and policies can address the real and
 simulated followers with the same feature names.
 
-### Servo model (`hx_servo_v1`)
+### Servo model (`hx_servo_v2`)
 
 The sim stands in for the servos with a model fitted to the HX specs and the real demos
 (`thanhkt/nexarm_stack_bowls`). Its name, `SIM_DYNAMICS_MODEL` in `mujoco_backend.py`, is recorded in sim
@@ -76,25 +76,35 @@ calibrations and dataset reports.
   armature and frictionloss are the STS3215 priors from MuJoCo Menagerie's SO-101. `forcerange` is the stall
   torque.
 - **Actuators:** `kp=998.22`, a stiff hold like the real arm's 0–2 tick steady error. `kv` per joint sets
-  `(kv + damping) / kp` to the real first-order time constant (0.055–0.112 s).
+  `(kv + damping) / kp` to the time constant that best replays the real demos (0.028–0.061 s). Scaling `kp`
+  or damping (`scale_joint_dynamics`, calibrations, domain randomization) recomputes `kv`, so the time
+  constant changes only when it is scaled itself.
 - **Gripper:** the HX-12H converts through its 10.15 mm pinion to 116 N. Its damping comes from the real
   saturated speed (3870 ticks/s), and the jaw pads use a direct contact stiffness.
 - **Setpoint:** `set_action` sets a target, and each physics substep moves the actuator setpoint toward it.
   - Speed: at most `max_speed_ticks_s` (3413 ticks/s for the arm, the HX spec; 3870 for the gripper).
-  - Acceleration: at most `max_accel_ticks_s2` (20k ticks/s² on the arm, none on the gripper). Without the
-    cap, the stiff arm's jerk shakes a bowl out of the friction grasp.
+  - Acceleration: at most `max_accel_ticks_s2` (40k ticks/s² on the arm, none on the gripper). Without the
+    cap, the stiff arm's jerk shakes the cube out of the scripted grasp (pick-place 0/20).
 
-  Both caps are `NexArmSimConfig` and `--env.*` options. The acceleration cap was tuned on the physical bowl
-  grasp (10k–40k ticks/s² work, 80k does not); it is consistent with the real demos, whose 30 fps data cannot
-  pin it down further.
+  Both caps are `NexArmSimConfig` and `--env.*` options. The acceleration cap is the lowest value that no
+  longer distorts the replay of the real demos: at 20k the fitted time constants shrink to make up for it
+  (holdout arm RMSE 13.0 raw units), while 40k and no cap both reach 11.8.
+
+- **Observations:** `NexArmSim` and the gym envs report joint positions in whole raw ticks, like the real
+  servos. With domain randomization on, each arm servo also rests up to 6 ticks off its command for the
+  episode (`DomainRandomizationRanges.servo_offset_ticks`; the real follower rests 2–9 ticks off, median per
+  joint), and the gym envs draw the action delay per episode within one step of the configured one, as the
+  dataset generators do.
 
 The Isaac Lab twin (`sim/isaac_lab/`) mirrors the joint and drive values, but it has no setpoint speed or
 acceleration limiter yet, so its arm moves faster than this model.
 
 Measured with the default config: arm joints reach 2500–3200 ticks/s, a full gripper stroke takes 0.5 s, and
-the arm holds grasp poses within about 1 mrad. Before `hx_servo_v1` the arm was a soft PD with no speed limit:
+the arm holds grasp poses within about 1 mrad. `hx_servo_v2` replaced `hx_servo_v1` (time constants
+0.055–0.112 s from a first-order fit that ignored the setpoint caps, and a 20k acceleration cap), which lagged
+the real arm. Before `hx_servo_v1` the arm was a soft PD with no speed limit:
 joints ran at 4500–8200 ticks/s, the gripper closed in one frame, and the arm sagged about 13 mrad. Sim
-datasets, policies and calibrations made before it saw those faster dynamics. Calibrations are refused, and
+datasets, policies and calibrations made under another model saw different dynamics. Calibrations are refused, and
 appending to an older dataset warns. Numbers and method: `plans/261014-1423-nexarm-sim-fidelity/reports/servo-baseline.md`.
 
 When a physical leader is used, its side of the pipeline does use the Hiwonder

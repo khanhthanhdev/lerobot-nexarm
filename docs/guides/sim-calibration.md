@@ -150,8 +150,10 @@ MUJOCO_GL=egl uv run python tools/nexarm/calibrate_sim.py \
 The tool replays each episode's recorded `action` stream through the simulator, starting from the real first state, and compares the simulated joint positions with the real `observation.state`. It then fits:
 
 1. the action delay (searched over `--delay-range`, default 0–6 control steps),
-2. each joint's damping and friction scales (limited to 0.25×–4×). `kp` stays at the servo model's value unless you pass `--fit-kp`: on the stack-bowls demos a fitted `kp` reached the 4× limit and dropped the scripted bowl grasp from 20/20 to 6/20,
-3. a spread for damping and friction, which becomes the domain-randomization range.
+2. each joint's time-constant scale (limited to 0.25×–4×): how fast the servo follows a small step, `(kv + damping) / kp`. This is the one dynamics parameter that task demos identify,
+3. a spread for it, which becomes the domain-randomization range.
+
+`kp`, damping and friction stay at the servo model's values. With the time constant held, `kp` only sets the holding stiffness and damping the saturated top speed, and on the stack-bowls demos halving or doubling `kp` changes the replay error by 0.1 raw units. `--fit-kp` and `--fit-friction` fit them anyway; use those only with free-air sweeps that saturate the joints, and check the scripted tasks afterwards (Step 6).
 
 By default 20% of the episodes are held out (`--holdout-frac`) and never used for fitting.
 
@@ -183,7 +185,7 @@ The units are raw servo units, where one degree is about 11.4. Check each of the
 | `holdout_after` is lower than `holdout_before` for the arm joints | Yes, clearly                    | The fit does not generalize. Record more varied episodes (Step 1)                                                   |
 | `holdout_after` is close to `fit_after`                           | Within about 2×                 | The fit overfits. Use more episodes or `--holdout-frac 0.3`                                                         |
 | `action_delay_steps`                                              | Strictly inside `--delay-range` | A value at either edge of the range means the search range may be wrong. Widen it                                   |
-| Scales                                                            | Mostly between 0.5× and 2×      | Many scales at 0.25× or 4× mean the data is too weak to identify them. Treat the result as unreliable and re-record |
+| Time-constant scales                                              | Mostly between 0.5× and 2×      | Many scales at 0.25× or 4× mean the data is too weak to identify them. Treat the result as unreliable and re-record |
 | Spread                                                            | 0.10–0.50                       | Values pinned at 0.10 or 0.50 mean there is little information. The clamp is protecting you                         |
 
 The gripper RMSE is large because it is not fitted. This is expected.
@@ -192,34 +194,26 @@ If the fit is poor, the cause is almost always the data, not the tool: too few e
 
 ### Optional: choose `kp`
 
-The default fit keeps the servo model's `kp`. To let the real data set it:
+The default fit keeps the servo model's `kp`. A `kp` scale no longer changes the response time (the tool recomputes `kv` to hold the time constant), so it only matters for how stiffly the arm holds against loads. To let the real data set it, you need recordings where the arm is pushed or carries a known load:
 
 1. Fit with `--fit-kp` into a separate file.
-2. Make candidates between the servo model and the fit. Scale each joint's fitted `kp_scale` by an exponent from 0 to 1, for example 0.25, 0.5 and 0.75, and keep everything else from the `--fit-kp` file.
-3. For each candidate, record two numbers:
-   - the holdout RMSE (the `holdout_after` mean over the five arm joints);
-   - the scripted success over 20 seeds of each task (Step 6, check 1).
-4. Keep the candidate with the lowest holdout RMSE that still scores 20/20 on both tasks. If one joint alone breaks a task, give that joint a smaller exponent.
-
-On `thanhkt/nexarm_stack_bowls`, the full `--fit-kp` result scored 0/20 on stack-bowls, and the halfway point had the lowest RMSE. The shipped file is the halfway point with a smaller exponent for the elbow (see Step 5).
+2. Compare the holdout RMSE (the `holdout_after` mean over the five arm joints) with the default fit. Keep the `kp` scales only if they lower it clearly.
+3. Check the scripted success over 20 seeds of each task (Step 6, check 1). It must stay at 20/20 on both.
 
 ## Step 5. Use the calibration
 
-The repository ships one calibration, [`sim/calibration/nexarm_sim_calibration_hx_servo_v1.json`](../../sim/calibration/nexarm_sim_calibration_hx_servo_v1.json), fitted to `thanhkt/nexarm_stack_bowls` (episodes 0–23, skipping 1, 3, 12 and 19, whose replays hit the floor or the back panel). Use it unless you have fitted your own:
+The repository ships no calibration file. The servo model in the MJCF (`hx_servo_v2`) already carries the time constants fitted to `thanhkt/nexarm_stack_bowls`, so the sim is usable without one:
 
-- Its `kp` scales (pan 1.19, lift 1.68, elbow 1.38, wrist flex 2.0, roll 1.68) are the square root of a `--fit-kp` fit, and the elbow uses the fourth root. A higher elbow `kp` drops the scripted bowl grasp below 20/20.
-- They cut the holdout replay error from 17.4 to 12.4 raw units (mean over the arm joints) and keep both scripted tasks at 20/20. With domain randomization, the scores are pick-place 20/20 and stack-bowls 19/20.
-- The friction scales of wrist flex and roll sit at the 4× limit. These demos barely identify friction, so treat those two values as weak.
+- Without a calibration file, the model replays held-out `thanhkt/nexarm_stack_bowls` episodes with about 11 raw units of error (mean over the arm joints), and both scripted tasks score 20/20 with and without domain randomization.
+- A refit on the same dataset moved the time constants by 0.84–1.30× and changed the holdout error by less than 1 raw unit, which is inside the noise of these demos. That is why no fitted file is shipped.
 
-The MJCF keeps the servo-model `kp`, so the scales apply only when you pass the file.
-
-Pass it to the generator:
+Fit your own file (Step 3) when you have free-air recordings of your follower, and pass it to the generator:
 
 ```bash
 MUJOCO_GL=egl uv run python examples/nexarm/generate_sim_dataset.py \
     --repo-id local/nexarm_sim_pick_place \
     --root outputs/datasets/nexarm_sim_pick_place_cal \
-    --calibration sim/calibration/nexarm_sim_calibration_hx_servo_v1.json \
+    --calibration sim/calibration/nexarm_sim_calibration_<name>.json \
     --episodes 200 --workers 4 --gpus 0,1,2,3
 ```
 
@@ -235,7 +229,7 @@ The same calibration is available in:
 
 Calibrations fitted before the servo-constant joint mapping (`rad = (raw - 2048) * 2π / 4096`) are stale and are refused on load (they carry no matching `joint_mapping`): re-run Step 3, then regenerate any sim data made with them.
 
-The fitted scales correct one sim servo model, so the file also records its `dynamics_model` (now `hx_servo_v1`, see "Servo model" in `sim/README.md`). A calibration without it, or fitted against another model, is refused on load: re-run Step 3. The setpoint speed and acceleration caps and the armature are fixed priors of the model; the calibration does not fit them.
+The fitted scales correct one sim servo model, so the file also records its `dynamics_model` (now `hx_servo_v2`, see "Servo model" in `sim/README.md`). A calibration without it, or fitted against another model (including `hx_servo_v1`), is refused on load: re-run Step 3, then regenerate any sim data made with it. The setpoint speed and acceleration caps and the armature are fixed priors of the model; the calibration does not fit them.
 
 Use `--split eval` to generate a held-out evaluation set. Its seeds never overlap with the training seeds.
 
@@ -255,7 +249,7 @@ Do these checks before training:
    done
    ```
 
-   Expect 20/20 for both without domain randomization, and at least 19/20 with it. The shipped calibration scores 20/20 and 20/20, then 20/20 pick-place and 19/20 stack-bowls with domain randomization. Delete the check folders before rerunning.
+   Expect 20/20 for both without domain randomization, and at least 19/20 with it. The servo model without a calibration scores 20/20 on both tasks, with and without domain randomization. Delete the check folders before rerunning.
 
    To watch the episodes, run again without `--no-video` and with `--episodes 3`, then export them with `tools/nexarm/export_episode_video.py`. Look at whether the arm moves faster or more sharply than the real one, and whether objects slip in the gripper.
 
@@ -272,6 +266,8 @@ uv run python tools/nexarm/calibrate_camera_alignment.py --cam-index 0 --camera-
 ```
 
 The tool overlays the simulated view on the live camera. Keys: `m` switches mode, `+` and `-` change the blend, `s` saves a snapshot, `q` quits. Compare the table edge, the base of the arm and the target zone. If they do not line up, edit the camera `pos`, `quat`/`xyaxes` or `fovy` in the scene XML (`sim/description/mjcf/`) until they do, then repeat with `--camera-name wrist` and `--camera-name top`. For the RealSense `top` camera, `uv run python tools/nexarm/realsense_fovy.py` reads the colour intrinsics and prints the matching `fovy`. For `top`, pass the RealSense RGB V4L2 node as `--cam-index` (e.g. `/dev/video4`); the sim top camera looks straight down from 0.75 m. Check that the resolution and fps match your real cameras.
+
+Known open point: the `front` camera sits at z = 0.817 m in `scene.xml` and 0.717 m in `bowl_stack_scene.xml`. Only one can match your rig, so measure the real height and correct the other file.
 
 Step by step for each camera. Fix the field of view first; a pose error cannot be tuned away while the field of view is wrong.
 

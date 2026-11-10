@@ -258,6 +258,12 @@ def test_nexarm_env_applies_calibration_latency_and_domain_randomization(tmp_pat
     try:
         backend = env.unwrapped.backend
         assert backend.action_delay_steps == 2
+        # Domain randomization draws the delay per episode, within one step of the calibrated one.
+        delays = set()
+        for seed in range(12):
+            env.reset(seed=seed)
+            delays.add(backend.action_delay_steps)
+        assert delays == {1, 2, 3}
         env.reset(seed=3)
         assert "cube" in backend.last_domain_params["objects"]
         home_pan = backend.data.ctrl[backend._actuator_ids["shoulder_pan"]]

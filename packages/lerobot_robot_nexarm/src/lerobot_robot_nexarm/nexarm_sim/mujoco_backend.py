@@ -48,7 +48,7 @@ __all__ = [
 
 # Names the servo model (MJCF servo classes plus the setpoint speed and acceleration caps). Calibrations and sim dataset reports
 # record it, so data and fits made under other dynamics are detected.
-SIM_DYNAMICS_MODEL = "hx_servo_v1"
+SIM_DYNAMICS_MODEL = "hx_servo_v2"
 
 # Fastest the servo setpoint may move, in raw ticks per second, in JOINT_NAMES order. Arm joints use the HX servo
 # spec (0.2 s/60 deg = 3413 ticks/s): lag-aligned real demos never saturate them. The real gripper saturates at
@@ -57,10 +57,11 @@ SERVO_MAX_SPEED_TICKS_S: tuple[float, ...] = (3413.0, 3413.0, 3413.0, 3413.0, 34
 
 # Fastest the servo setpoint speed may change, in raw ticks per second squared, in JOINT_NAMES order (None: no
 # cap). Without it the stiff arm follows an instant speed change, and that jerk shakes a bowl out of a friction
-# grasp. The value is tuned on that grasp (10k-40k work, 80k does not); it is consistent with the real demos'
-# 99th-percentile arm accelerations of 12.6k-28.8k ticks/s^2, which 30 fps data cannot pin down further. The
-# gripper is left uncapped so its stroke keeps the real duration.
-SERVO_MAX_ACCEL_TICKS_S2: tuple[float | None, ...] = (20000.0, 20000.0, 20000.0, 20000.0, 20000.0, None)
+# grasp (scripted pick-place fails without a cap). Replays of the real demos fit better the higher the cap is
+# (holdout arm RMSE 13.0 ticks at 20k, 11.8 at 40k and with none), and at 20k the fitted time constants shrink
+# to make up for it, so the value is the lowest one that no longer distorts the replay. The gripper is left
+# uncapped so its stroke keeps the real duration.
+SERVO_MAX_ACCEL_TICKS_S2: tuple[float | None, ...] = (40000.0, 40000.0, 40000.0, 40000.0, 40000.0, None)
 
 
 def resolve_model_path(model_path: Path | str) -> Path:
@@ -108,6 +109,14 @@ class DomainRandomizationRanges:
     joint_friction_scale: dict[str, tuple[float, float]] = field(
         default_factory=lambda: dict.fromkeys(JOINT_NAMES, (0.75, 1.30))
     )
+    # Scales the servo's small-step response time, the parameter the real replays identify best.
+    joint_time_constant_scale: dict[str, tuple[float, float]] = field(
+        default_factory=lambda: dict.fromkeys(JOINT_NAMES, (0.8, 1.25))
+    )
+    # Each arm servo holds a constant offset of up to this many raw ticks from its command for the episode. The
+    # real follower rests that far off (median 2-9 ticks per joint, 95th percentile up to 20), so a policy must
+    # not expect the state to equal the action at rest.
+    servo_offset_ticks: float = 6.0
 
 
 class NexArmMujocoBackend:
@@ -189,6 +198,18 @@ class NexArmMujocoBackend:
         self._nominal_light_diffuse = self.model.light_diffuse.copy()
         self._nominal_dof_damping = self.model.dof_damping.copy()
         self._nominal_dof_frictionloss = self.model.dof_frictionloss.copy()
+        self._nominal_actuator_gainprm = self.model.actuator_gainprm.copy()
+        self._nominal_actuator_biasprm = self.model.actuator_biasprm.copy()
+        # Degrees of freedom each servo drives: its own joint plus any joint tied to it by an equality (the
+        # second gripper jaw), so their damping counts toward the servo's time constant.
+        self._servo_dofs: dict[str, list[int]] = {}
+        for feature_name, joint_id in self._joint_ids.items():
+            joints = {joint_id}
+            for eq_id in np.flatnonzero(self.model.eq_type == mujoco.mjtEq.mjEQ_JOINT):
+                pair = {int(self.model.eq_obj1id[eq_id]), int(self.model.eq_obj2id[eq_id])}
+                if joint_id in pair:
+                    joints |= pair
+            self._servo_dofs[feature_name] = [int(self.model.jnt_dofadr[j]) for j in sorted(joints)]
         self._nominal_geom_friction = self.model.geom_friction.copy()
         self._nominal_geom_rgba = self.model.geom_rgba.copy()
         self._nominal_body_mass = self.model.body_mass.copy()
@@ -235,6 +256,8 @@ class NexArmMujocoBackend:
         self._servo_target = np.zeros(len(JOINT_NAMES))
         self._servo_setpoint = np.zeros(len(JOINT_NAMES))
         self._servo_velocity = np.zeros(len(JOINT_NAMES))
+        self._servo_control_per_tick = control_per_tick
+        self._servo_offset = np.zeros(len(JOINT_NAMES))
 
     def raw_to_control(self, feature_name: str, raw_position: float) -> float:
         joint_range = self.model.jnt_range[self._joint_ids[feature_name]]
@@ -343,17 +366,59 @@ class NexArmMujocoBackend:
             }
         params["objects"] = objects
 
-        # 4. Joint dynamics (damping & frictionloss)
+        # 4. Servo dynamics (damping, frictionloss and response time constant)
         joints: dict[str, dict[str, float]] = {}
-        for feature_name, joint_id in self._joint_ids.items():
-            dof_adr = int(self.model.jnt_dofadr[joint_id])
+        for feature_name in self._joint_ids:
             damping_scale = float(rng.uniform(*ranges.joint_damping_scale[feature_name]))
             friction_scale = float(rng.uniform(*ranges.joint_friction_scale[feature_name]))
-            self.model.dof_damping[dof_adr] = self._nominal_dof_damping[dof_adr] * damping_scale
-            self.model.dof_frictionloss[dof_adr] = self._nominal_dof_frictionloss[dof_adr] * friction_scale
-            joints[feature_name] = {"damping_scale": damping_scale, "frictionloss_scale": friction_scale}
+            time_constant_scale = float(rng.uniform(*ranges.joint_time_constant_scale[feature_name]))
+            self.scale_joint_dynamics(
+                feature_name,
+                damping=damping_scale,
+                frictionloss=friction_scale,
+                time_constant=time_constant_scale,
+            )
+            joints[feature_name] = {
+                "damping_scale": damping_scale,
+                "frictionloss_scale": friction_scale,
+                "time_constant_scale": time_constant_scale,
+            }
+        offsets = rng.uniform(
+            -ranges.servo_offset_ticks, ranges.servo_offset_ticks, size=len(JOINT_NAMES) - 1
+        )
+        self._servo_offset[:-1] = offsets * self._servo_control_per_tick[:-1]
+        for feature_name, offset in zip(JOINT_NAMES[:-1], offsets, strict=True):
+            joints[feature_name]["offset_ticks"] = float(offset)
         params["joints"] = joints
         return params
+
+    def scale_joint_dynamics(
+        self,
+        feature_name: str,
+        *,
+        kp: float = 1.0,
+        damping: float = 1.0,
+        frictionloss: float = 1.0,
+        time_constant: float = 1.0,
+    ) -> None:
+        """Set one servo's dynamics to multiples of the nominal model.
+
+        ``kv`` is recomputed so the small-step time constant ``(kv + damping) / kp`` is the nominal one times
+        ``time_constant``: ``kp`` then only sets the holding stiffness and ``damping`` the saturated top speed.
+        """
+        dofs = self._servo_dofs[feature_name]
+        actuator_id = self._actuator_ids[feature_name]
+        nominal_kp = float(self._nominal_actuator_gainprm[actuator_id, 0])
+        nominal_kv = -float(self._nominal_actuator_biasprm[actuator_id, 2])
+        nominal_damping = float(self._nominal_dof_damping[dofs].sum())
+        tau = (nominal_kv + nominal_damping) / nominal_kp * time_constant
+        self.model.dof_damping[dofs] = self._nominal_dof_damping[dofs] * damping
+        self.model.dof_frictionloss[dofs] = self._nominal_dof_frictionloss[dofs] * frictionloss
+        self.model.actuator_gainprm[actuator_id, 0] = nominal_kp * kp
+        self.model.actuator_biasprm[actuator_id, 1] = -nominal_kp * kp
+        self.model.actuator_biasprm[actuator_id, 2] = -max(
+            0.0, tau * nominal_kp * kp - nominal_damping * damping
+        )
 
     def _object_body_ids(self, names: tuple[str, ...] | None) -> dict[str, int]:
         """Task objects to randomize: the named bodies, or every body that owns a free joint."""
@@ -377,6 +442,8 @@ class NexArmMujocoBackend:
         """Adopt the current dynamics as the nominal values that domain randomization perturbs."""
         self._nominal_dof_damping = self.model.dof_damping.copy()
         self._nominal_dof_frictionloss = self.model.dof_frictionloss.copy()
+        self._nominal_actuator_gainprm = self.model.actuator_gainprm.copy()
+        self._nominal_actuator_biasprm = self.model.actuator_biasprm.copy()
         self._nominal_geom_friction = self.model.geom_friction.copy()
         self._nominal_body_mass = self.model.body_mass.copy()
         self._nominal_body_inertia = self.model.body_inertia.copy()
@@ -391,10 +458,13 @@ class NexArmMujocoBackend:
         self.model.light_diffuse[:] = self._nominal_light_diffuse
         self.model.dof_damping[:] = self._nominal_dof_damping
         self.model.dof_frictionloss[:] = self._nominal_dof_frictionloss
+        self.model.actuator_gainprm[:] = self._nominal_actuator_gainprm
+        self.model.actuator_biasprm[:] = self._nominal_actuator_biasprm
         self.model.geom_friction[:] = self._nominal_geom_friction
         self.model.geom_rgba[:] = self._nominal_geom_rgba
         self.model.body_mass[:] = self._nominal_body_mass
         self.model.body_inertia[:] = self._nominal_body_inertia
+        self._servo_offset[:] = 0.0
 
     def reset(self, settle_steps: int = 0, rng: np.random.Generator | None = None) -> None:
         if self.enable_domain_randomization:
@@ -431,6 +501,7 @@ class NexArmMujocoBackend:
             pose[f"{feature_name}.pos"] = raw
         self._servo_target[:] = self.data.ctrl[self._servo_actuators]
         self._servo_setpoint[:] = self._servo_target
+        self.data.ctrl[self._servo_actuators] = self._servo_setpoint + self._servo_offset
         self._servo_velocity[:] = 0.0
         self._action_queue.clear()
         for _ in range(self.action_delay_steps):
@@ -469,7 +540,7 @@ class NexArmMujocoBackend:
             step[capped] = capped_step
         self._servo_velocity[:] = step / dt
         self._servo_setpoint += step
-        self.data.ctrl[self._servo_actuators] = self._servo_setpoint
+        self.data.ctrl[self._servo_actuators] = self._servo_setpoint + self._servo_offset
 
     def step(self, action: Mapping[str, float] | None = None) -> dict[str, float] | None:
         """Advance one control period; returns the action applied this tick (delayed when latency is set)."""
@@ -496,6 +567,10 @@ class NexArmMujocoBackend:
             qpos = float(self.data.qpos[self.model.jnt_qposadr[joint_id]])
             positions[f"{feature_name}.pos"] = self.control_to_raw(feature_name, qpos)
         return positions
+
+    def observed_joint_positions(self) -> dict[str, float]:
+        """Joint positions as the real follower reports them: whole raw servo ticks."""
+        return {key: float(round(value)) for key, value in self.joint_positions().items()}
 
     def solve_ik(
         self,

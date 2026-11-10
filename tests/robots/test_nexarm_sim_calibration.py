@@ -45,7 +45,11 @@ def test_calibration_validation() -> None:
 def test_apply_calibration_scales_model_and_recenters_dr(tmp_path: Path) -> None:
     calibration = SimCalibration(
         action_delay_steps=2,
-        joints={"shoulder_lift": JointCalibration(kp_scale=2.0, damping_scale=1.5, damping_spread=0.1)},
+        joints={
+            "shoulder_lift": JointCalibration(
+                kp_scale=2.0, damping_scale=1.5, time_constant_scale=0.5, damping_spread=0.1
+            )
+        },
     )
     path = tmp_path / "calibration.json"
     calibration.save(path)
@@ -66,6 +70,16 @@ def test_apply_calibration_scales_model_and_recenters_dr(tmp_path: Path) -> None
         assert tuned.backend.model.actuator_gainprm[actuator, 0] == pytest.approx(
             2.0 * plain.backend.model.actuator_gainprm[actuator, 0]
         )
+
+        def time_constant(sim: NexArmSim) -> float:
+            model = sim.backend.model
+            return float(
+                (model.dof_damping[dof] - model.actuator_biasprm[actuator, 2])
+                / model.actuator_gainprm[actuator, 0]
+            )
+
+        # Only the time-constant scale changes the response time; kp and damping scales leave it alone.
+        assert time_constant(tuned) == pytest.approx(0.5 * time_constant(plain))
         assert tuned.backend.action_delay_steps == 2
         assert tuned.backend._nominal_dof_damping[dof] == pytest.approx(tuned.backend.model.dof_damping[dof])
         assert tuned.backend.dr_ranges.joint_damping_scale["shoulder_lift"] == pytest.approx((0.9, 1.1))
@@ -104,16 +118,19 @@ def test_fit_recovers_known_delay_and_gain() -> None:
     assert after < 0.2 * before
 
 
-def test_fit_keeps_the_servo_model_kp_by_default() -> None:
+def test_fit_recovers_the_time_constant_and_keeps_the_other_priors_by_default() -> None:
     sim = Simulator(MODEL_PATH, fps=30)
     truth = SimCalibration(
-        action_delay_steps=1, joints={"shoulder_lift": JointCalibration(damping_scale=2.0)}
+        action_delay_steps=1, joints={"shoulder_lift": JointCalibration(time_constant_scale=2.0)}
     )
     episodes = [_synthetic_episode(sim, truth, seed) for seed in range(2)]
 
     fitted = fit_calibration(sim, episodes, ["shoulder_lift"], range(0, 3))
 
-    assert fitted.joints["shoulder_lift"].kp_scale == 1.0
+    joint = fitted.joints["shoulder_lift"]
+    assert fitted.action_delay_steps == 1
+    assert 1.6 <= joint.time_constant_scale <= 2.5
+    assert (joint.kp_scale, joint.damping_scale, joint.frictionloss_scale) == (1.0, 1.0, 1.0)
     column = JOINT_NAMES.index("shoulder_lift")
     assert rmse(sim, episodes, fitted)[column] < rmse(sim, episodes, SimCalibration())[column]
 

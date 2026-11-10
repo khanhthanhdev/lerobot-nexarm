@@ -7,9 +7,10 @@
        - armature 0.028 and frictionloss 0.052 are the STS3215 values identified in MuJoCo Menagerie's SO-101
          (same 30 kg.cm class), used as priors;
        - kp 998.22 (SO-101) holds against gravity like the real arm (median steady error 0-2 ticks);
-       - kv per actuator sets the small-step time constant (kv + damping) / kp to the first-order fit of the real
-         follower (7 full-length episodes of thanhkt/nexarm_stack_bowls), so it is not a class default.
-       The backend additionally caps how fast the setpoint moves (max_speed_ticks_s). -->
+       - kv per actuator sets the small-step time constant (kv + damping) / kp to the replay fit of the real
+         follower (contact-free episodes of thanhkt/nexarm_stack_bowls), so it is not a class default.
+       The backend additionally caps how fast the setpoint moves and accelerates (max_speed_ticks_s,
+       max_accel_ticks_s2); the time constants are fitted with those caps on. -->
   <default>
     <default class="nexarm">
       <joint damping="0.08" frictionloss="0.04" armature="0.004" />
@@ -179,13 +180,14 @@
   </equality>
 
   <actuator>
-    <!-- kv = tau x kp - joint damping, tau = -1 / (30 ln(1 - alpha)) from the real first-order fit:
-         shoulder_pan 0.0549 s, shoulder_lift 0.1117 s, elbow_flex 0.1063 s, wrist_flex 0.0941 s, wrist_roll 0.0218 s. -->
+    <!-- kv = tau x kp - joint damping. tau is fitted by replaying the real actions of the contact-free episodes of
+         thanhkt/nexarm_stack_bowls through this model with its setpoint caps (tools/nexarm/calibrate_sim.py):
+         shoulder_pan 0.0549 s, shoulder_lift 0.0609 s, elbow_flex 0.0410 s, wrist_flex 0.0432 s, wrist_roll 0.0282 s. -->
     <position name="joint_1_base_to_link_1_control" class="hx30hm" joint="joint_1_base_to_link_1" kv="54.31" ctrllimited="true" ctrlrange="-2.35619449019 2.35619449019" />
-    <position name="joint_2_link_1_to_link_2_control" class="hx65hm" joint="joint_2_link_1_to_link_2" kv="110.35" ctrllimited="true" ctrlrange="-2.09439510239 2.09439510239" />
-    <position name="joint_3_link_2_to_link_3_control" class="hx30hm" joint="joint_3_link_2_to_link_3" kv="105.59" ctrllimited="true" ctrlrange="-2.35619449019 2.35619449019" />
-    <position name="joint_4_link_3_to_link_4_control" class="hx30hm" joint="joint_4_link_3_to_link_4" kv="93.35" ctrllimited="true" ctrlrange="-1.74532925199 1.74532925199" />
-    <position name="joint_5_link_4_to_link_5_control" class="hx12h" joint="joint_5_link_4_to_link_5" kv="21.50" ctrllimited="true" ctrlrange="-3.14159265359 3.14159265359" />
+    <position name="joint_2_link_1_to_link_2_control" class="hx65hm" joint="joint_2_link_1_to_link_2" kv="59.61" ctrllimited="true" ctrlrange="-2.09439510239 2.09439510239" />
+    <position name="joint_3_link_2_to_link_3_control" class="hx30hm" joint="joint_3_link_2_to_link_3" kv="40.43" ctrllimited="true" ctrlrange="-2.35619449019 2.35619449019" />
+    <position name="joint_4_link_3_to_link_4_control" class="hx30hm" joint="joint_4_link_3_to_link_4" kv="42.56" ctrllimited="true" ctrlrange="-1.74532925199 1.74532925199" />
+    <position name="joint_5_link_4_to_link_5_control" class="hx12h" joint="joint_5_link_4_to_link_5" kv="27.95" ctrllimited="true" ctrlrange="-3.14159265359 3.14159265359" />
     <position name="gripper_control" class="gripper_actuator" joint="right_jaw_slide_joint" ctrllimited="true" ctrlrange="0 0.0255" />
   </actuator>
 

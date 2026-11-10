@@ -10,7 +10,7 @@ Example:
 
 Calibrated to a real arm (see calibrate_sim.py), sharded over 2 GPUs, held-out eval split:
     uv run python examples/nexarm/generate_stack_bowls_dataset.py \
-        --calibration sim/calibration/nexarm_sim_calibration_hx_servo_v1.json \
+        --calibration sim/calibration/nexarm_sim_calibration_<name>.json \
         --episodes 200 --gpus 0,1 --split eval
 
 Domain randomization (visual, dynamics and every bowl's friction/mass/color) is on by default; --no-dr

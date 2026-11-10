@@ -33,20 +33,25 @@ MIN_SPREAD = 0.10
 class JointCalibration:
     """Multiplicative corrections to the model's joint dynamics.
 
-    ``*_spread`` is the fractional half-range used for domain randomization around the calibrated value.
+    ``time_constant_scale`` scales the servo's small-step response time ``(kv + damping) / kp``; ``kp_scale``
+    and ``damping_scale`` leave it unchanged (``kv`` follows), so they set the holding stiffness and the
+    saturated top speed. ``*_spread`` is the fractional half-range used for domain randomization around the
+    calibrated value.
     """
 
     kp_scale: float = 1.0
     damping_scale: float = 1.0
     frictionloss_scale: float = 1.0
+    time_constant_scale: float = 1.0
     damping_spread: float = 0.25
     frictionloss_spread: float = 0.25
+    time_constant_spread: float = 0.25
 
     def __post_init__(self) -> None:
-        for name in ("kp_scale", "damping_scale", "frictionloss_scale"):
+        for name in ("kp_scale", "damping_scale", "frictionloss_scale", "time_constant_scale"):
             if getattr(self, name) <= 0:
                 raise ValueError(f"{name} must be positive")
-        for name in ("damping_spread", "frictionloss_spread"):
+        for name in ("damping_spread", "frictionloss_spread", "time_constant_spread"):
             if not 0 <= getattr(self, name) < 1:
                 raise ValueError(f"{name} must be in [0, 1)")
 
@@ -157,18 +162,21 @@ def apply_calibration(
     """
 
     check_calibration_fps(calibration, backend.fps)
-    model = backend.model
     fitted = set(calibration.fitted_joint_names())
     for name, joint in calibration.joints.items():
-        joint_id = backend._joint_ids[name]
-        dof = int(model.jnt_dofadr[joint_id])
-        model.dof_damping[dof] *= joint.damping_scale
-        model.dof_frictionloss[dof] *= joint.frictionloss_scale
-        actuator_id = backend._actuator_ids[name]
-        model.actuator_gainprm[actuator_id, 0] *= joint.kp_scale
-        model.actuator_biasprm[actuator_id, 1] *= joint.kp_scale
+        backend.scale_joint_dynamics(
+            name,
+            kp=joint.kp_scale,
+            damping=joint.damping_scale,
+            frictionloss=joint.frictionloss_scale,
+            time_constant=joint.time_constant_scale,
+        )
         if name not in fitted:
             continue
+        backend.dr_ranges.joint_time_constant_scale[name] = (
+            1.0 - joint.time_constant_spread,
+            1.0 + joint.time_constant_spread,
+        )
         backend.dr_ranges.joint_damping_scale[name] = (
             1.0 - joint.damping_spread,
             1.0 + joint.damping_spread,
