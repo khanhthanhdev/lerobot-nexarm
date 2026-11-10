@@ -2,7 +2,7 @@
 #include <Wire.h>
 #include "Robot_Arm.h"
 #include "usb_ctrl.h"
-#include "Espnow_ctrl.h"
+#include "EspNow_Ctrl.h"
 
 // Protocol v2 constants
 #define CMD_SET_MODE             0x01

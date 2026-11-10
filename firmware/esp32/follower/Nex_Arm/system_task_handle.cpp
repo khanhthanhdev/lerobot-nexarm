@@ -62,6 +62,7 @@ static float arm_kin[9] = {
 };
 
 static bool lerobotBridgeMode = false;
+static volatile bool bridgeRadioStopPending = false;
 static int16_t cached_servo_pos[6] = {0};
 static bool cached_pos_valid = false;
 
@@ -95,6 +96,8 @@ void bridge_at32_callback(PacketTypeDef* pkt) {
 
 }
 
+static void exit_lerobot_bridge_mode();
+
 void bridge_usb_callback(PacketTypeDef* pkt) {
     if (!lerobotBridgeMode) return;
 
@@ -102,6 +105,17 @@ void bridge_usb_callback(PacketTypeDef* pkt) {
     uint8_t *args = pkt->elements.args;
     uint8_t data_len = pkt->elements.length - 2;
     uint8_t len;
+
+    /* CMD 68 belongs to the ESP32, not the AT32: answer a repeated enter and leave bridge mode on exit. */
+    if (cmd == CMD_LEROBOT_MODE && data_len >= 1) {
+        if (args[0] == 1) {
+            uint8_t resp = 1;
+            send_local_response(CMD_LEROBOT_MODE, &resp, 1);
+        } else {
+            exit_lerobot_bridge_mode();
+        }
+        return;
+    }
 
     while (servo_uart_busy) { delayMicroseconds(100); }
     servo_uart_busy = true;
@@ -134,6 +148,13 @@ void bridge_usb_callback(PacketTypeDef* pkt) {
 }
 
 void enter_lerobot_bridge_mode() {
+    /* The leader keeps broadcasting its joints over ESP-NOW every 4 ms, also in LeRobot mode.
+     * With sync on (BOOT button), OnDataRecv would keep writing them to the servos and override
+     * every CMD 97 from the PC, so USB must be the only source of servo commands in bridge mode. */
+    /* The radio itself is stopped from system_loop_handler: this function also runs from the ESP-NOW and
+     * BLE callbacks, and esp_now_deinit must not be called inside an ESP-NOW receive callback. */
+    espnow_ctrl.enable_sync(false);
+    bridgeRadioStopPending = true;
 
     serial_port.protocol.register_success_callback(bridge_usb_callback);
 
@@ -152,6 +173,18 @@ const char* AP_PASS = "hiwonder";
 ESP_EVENT_DEFINE_BASE(SYS_STATUS_EVENTS);
 ESP_EVENT_DEFINE_BASE(SYS_TIMING_EVENTS);
 void func_ctrl_callback(PacketTypeDef* self);
+
+/* Back to the boot state (Wi-Fi AP, no ESP-NOW sync) without a reboot, so torque stays as the PC left it. */
+static void exit_lerobot_bridge_mode() {
+    lerobotBridgeMode = false;
+    bridgeRadioStopPending = false;
+    serial_port.protocol.register_success_callback(func_ctrl_callback);
+    at32_protocol.register_success_callback(at32_packet_callback);
+
+    espnow_ctrl.startAP(AP_SSID, AP_PASS);
+    espnow_ctrl.register_ops_callback(func_ctrl_callback);
+    current_system_mode = MODE_WIFI_AP_RUNNING;
+}
 
 static void apply_chassis_config_to_runtime() {
     arm.board.mecanum.configure(chassis_wheel_diameter,
@@ -2154,10 +2187,11 @@ void func_ctrl_callback(PacketTypeDef* self)
     uint8_t len;
     uint16_t bat_level;
 
-    if (!lerobotBridgeMode) {
-        Serial.printf("[CB] id=0x%02X cmd=%d len=%d\n",
-                      self->elements.id, self->elements.cmd, self->elements.length);
-    }
+    /* In bridge mode USB frames go to bridge_usb_callback; drop BLE commands so they cannot move the arm. */
+    if (lerobotBridgeMode) return;
+
+    Serial.printf("[CB] id=0x%02X cmd=%d len=%d\n",
+                  self->elements.id, self->elements.cmd, self->elements.length);
 
     if(self->elements.id == 0xFF && self->elements.cmd == CMD_ACTION_GROUP_DOWNLOAD) {
         is_downloading = true;
@@ -3344,6 +3378,10 @@ void system_loop_handler()
         serial_port.rec_handler();
 
         if (lerobotBridgeMode) {
+            if (bridgeRadioStopPending) {
+                bridgeRadioStopPending = false;
+                espnow_ctrl.stop();
+            }
 
             while(servo.uart->available()) {
                 uint8_t c = servo.uart->read();

@@ -16,6 +16,10 @@ Run `uv run lerobot-find-port`. Plug in only one arm at a time if you are unsure
 2. Confirm the follower ESP32 firmware supports CMD 68 (LeRobot bridge mode).
 3. Try power-cycling the follower arm (ensure 12V power supply is plugged in).
 
+## Follower follows the leader by itself and ignores the PC
+
+The leader ESP32 broadcasts its joints over ESP-NOW every 4 ms, also in LeRobot mode. A follower switched to ESP-NOW sync with its BOOT button applies those packets in the background, so they overwrite every CMD 97 write from LeRobot and the arm only tracks the leader. Firmware built from `firmware/esp32/follower/Nex_Arm` turns ESP-NOW off when it enters LeRobot bridge mode (CMD 68). With the vendor image, power-cycle the follower and do not press its BOOT button before you run LeRobot. To build and flash the sketches, see [`firmware/README.md`](../../firmware/README.md#build-and-flash).
+
 ## `Permission denied: '/nexarm_stack_bowls_YYYYMMDD_HHMMSS'`
 
 **Cause**: `${HF_USER}` was empty, so the dataset repo ID expanded to `/nexarm_stack_bowls` and the recorder tried to create it at the filesystem root.
@@ -31,11 +35,15 @@ Then keep `--dataset.repo_id="${HF_USER}/nexarm_stack_bowls"` in your normal com
 
 ## `TimeoutError: No position reply from NexArm`
 
-The leader firmware may emit debug lines over Serial that interrupt protocol frames. The driver automatically retries up to 3 times. For a permanent fix, comment out `Serial.printf` lines in `Nex_Arm.ino` when `lerobotMode == true` and reflash.
+The leader firmware may emit debug lines over Serial that interrupt protocol frames. The driver automatically retries up to 3 times. The leader sketch in `firmware/esp32/leader/Nex_Arm` stops these prints in LeRobot mode; reflash it for a permanent fix.
 
 ## Checksum errors
 
-The leader firmware has a known checksum bug. The driver automatically accepts both correct and vendor checksums for maximum compatibility.
+The vendor leader firmware checksums its replies over the request's length, so the position bytes of a CMD 96 reply are not covered. The driver accepts both that checksum and the correct one; the leader sketch in `firmware/esp32/leader/Nex_Arm` sends the correct one.
+
+## Leader ignores some commands from the PC
+
+The vendor leader firmware restarts its frame parser on every USB read, so a command whose bytes arrive in two reads is dropped without a reply. The leader sketch in `firmware/esp32/leader/Nex_Arm` keeps the parser state between reads; flash it as described in [`firmware/README.md`](../../firmware/README.md#build-and-flash).
 
 ## Camera not found or busy
 

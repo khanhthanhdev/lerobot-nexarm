@@ -6,8 +6,8 @@
 
 #define FIRMWARE_VERSION_MAJOR       1
 #define FIRMWARE_VERSION_MINOR       0
-#define FIRMWARE_VERSION_PATCH       0
-#define FIRMWARE_VERSION_STR         "1.0.0"
+#define FIRMWARE_VERSION_PATCH       2
+#define FIRMWARE_VERSION_STR         "1.0.2"
 #define TIMER_PERIOD                10
 
 enum TimingEvent{

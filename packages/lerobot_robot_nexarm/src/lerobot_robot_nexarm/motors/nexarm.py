@@ -21,7 +21,7 @@ The master ESP32 directly controls HX-30HM servos (leader arm).
 The slave ESP32 forwards commands through an AT32F421 co-processor (follower arm).
 
 Supported commands:
-    CMD 68  — Enter/exit LeRobot bridge mode (slave only)
+    CMD 68  — Enter/exit LeRobot mode (follower: USB-to-AT32 bridge; leader: no debug text on USB)
     CMD 96  — Read 6 servo positions (reply: 12 bytes, 6 × int16 LE)
     CMD 97  — Write 6 servo positions (12 bytes, sync-write, no reply)
     CMD 98  — Enable/disable torque on all 6 servos
@@ -104,9 +104,9 @@ def build_frame(device_id: int, cmd: int, args: bytes = b"") -> bytes:
 def parse_frame(data: bytes) -> tuple[int, int, bytes] | None:
     """Parse a CommProtocol frame. Returns (id, cmd, args) or None.
 
-    Accepts both the correct full-range checksum and the buggy short checksum
-    from the master firmware (tx_packet_complete uses rx_packet.elements.length
-    instead of tx_packet.elements.length).
+    Accepts both the correct full-range checksum and the short checksum of the
+    vendor leader firmware, whose tx_packet_complete used rx_packet.elements.length
+    instead of tx_packet.elements.length; the leader sketch in firmware/ sends the full one.
     """
     if len(data) < 6 or data[0] != 0xFF or data[1] != 0xFF:
         return None
@@ -300,13 +300,13 @@ class NexArmMotorsBus:
             time.sleep(gap_s)
 
     def enter_lerobot_mode(self) -> None:
-        """Enter LeRobot bridge mode on slave ESP32 (CMD 68)."""
+        """Enter LeRobot mode (CMD 68): the follower bridges USB to the AT32, the leader stops its debug text."""
         frame = build_frame(SYSTEM_ID, CMD_LEROBOT_MODE, bytes([1]))
         self._send(frame, expect_reply=False)
         time.sleep(0.1)
 
     def exit_lerobot_mode(self) -> None:
-        """Exit LeRobot bridge mode on slave ESP32 (CMD 68)."""
+        """Exit LeRobot mode (CMD 68). The vendor follower firmware ignores this in bridge mode and needs a restart."""
         frame = build_frame(SYSTEM_ID, CMD_LEROBOT_MODE, bytes([0]))
         self._send(frame, expect_reply=False)
         time.sleep(0.1)

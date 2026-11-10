@@ -48,6 +48,11 @@ def test_leader_connect_configures_torque_off(leader) -> None:
     assert teleop.is_connected
     bus.connect.assert_called_once()
     bus.set_torque.assert_called_once_with(False)
+    # LeRobot mode keeps the leader's debug text out of the position replies
+    bus.enter_lerobot_mode.assert_called_once()
+
+    teleop.disconnect()
+    bus.exit_lerobot_mode.assert_called_once()
 
 
 def test_leader_connection_state_guards(leader) -> None:

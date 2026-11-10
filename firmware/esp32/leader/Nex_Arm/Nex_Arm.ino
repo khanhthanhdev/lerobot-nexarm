@@ -270,14 +270,15 @@ void loop() {
 
                  if (status.error_bits.bit_rx == 0 && status.error_bits.bit_tx == 0 && pos != 0) {
                      last_valid_pos[i] = pos;
-                 } else if (currentMillis - lastDebugTime > 1000) {
+                 } else if (!lerobotMode && currentMillis - lastDebugTime > 1000) {
                      Serial.printf("[WARN] ID%d read fail rx=%d tx=%d pos=%d\n",
                                    i+1, status.error_bits.bit_rx, status.error_bits.bit_tx, pos);
                  }
                  delayMicroseconds(200);
              }
 
-             if (currentMillis - lastDebugTime > 1000) {
+             // Debug text shares USB with the CMD 96 replies, so keep it off in LeRobot mode.
+             if (!lerobotMode && currentMillis - lastDebugTime > 1000) {
                  Serial.printf("[POS] %d %d %d %d %d %d\n",
                      last_valid_pos[0], last_valid_pos[1], last_valid_pos[2],
                      last_valid_pos[3], last_valid_pos[4], last_valid_pos[5]);

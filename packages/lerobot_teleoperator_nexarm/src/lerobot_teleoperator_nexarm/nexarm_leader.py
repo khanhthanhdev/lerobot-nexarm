@@ -21,6 +21,7 @@ in torque-off mode so the operator can freely drag the arm.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 from typing import Any
 
@@ -94,6 +95,9 @@ class NexArmLeader(Teleoperator):
         logger.info(f"Calibration saved to {self.calibration_fpath}")
 
     def configure(self) -> None:
+        # CMD 68 on the leader only silences its once-a-second [POS] debug text, which otherwise lands in
+        # the CMD 96 replies; torque and the ESP-NOW broadcast are unchanged.
+        self.bus.enter_lerobot_mode()
         self.bus.set_torque(False)
 
     @check_if_not_connected
@@ -135,5 +139,7 @@ class NexArmLeader(Teleoperator):
 
     @check_if_not_connected
     def disconnect(self) -> None:
+        with contextlib.suppress(Exception):
+            self.bus.exit_lerobot_mode()
         self.bus.disconnect()
         logger.info(f"{self} disconnected.")
