@@ -112,7 +112,7 @@ Useful flags (both generators):
 | `--no-dr`               | Turn off domain randomization (lighting, materials, camera jitter, dynamics, object friction and mass). Keep it on for training data. |
 | `--split eval`          | Write a held-out set. Eval seeds start at 1,000,000 and never overlap the training seeds.                                             |
 | `--resume`              | Add episodes to an existing `--root`. Refused if the existing data used another joint mapping.                                        |
-| `--calibration PATH`    | Apply a fitted sim calibration ([Sim calibration](sim-calibration.md)), including its action delay.                                   |
+| `--calibration PATH`    | Apply a fitted sim calibration ([Calibration](calibration.md)), including its action delay.                                           |
 | `--joint-mapping PATH`  | Use a joint mapping measured on your follower with `probe_joint_mapping.py`.                                                          |
 | `--no-video`            | Store PNG frames instead of video (larger on disk, faster to decode).                                                                 |
 
@@ -327,13 +327,10 @@ rate, then on the real arm.
 
 ## 6. Before running on the real arm
 
-- Measure the follower's joint directions once with `tools/nexarm/probe_joint_mapping.py` (see
-  [Sim calibration](sim-calibration.md)). If it reports a sign or offset that is not the identity,
-  regenerate the sim data with `--joint-mapping outputs/nexarm/joint_mapping_probe.json`; otherwise sim-trained
-  policies move those joints the wrong way.
-- Run the real arm with exactly the cameras the policy was trained on; `rollout.py` refuses a
-  mismatch.
-- Keep a hand near the power switch the first time a new checkpoint moves the arm.
+Follow [Calibration, Part 3](calibration.md#part-3-sim-to-real): it checks the joint mapping, cameras, scene and
+follower settings before the first run, gives the rollout command, and maps each kind of real failure back to
+the calibration step that fixes it. Without a measured joint mapping, sim-trained policies can move some joints
+the wrong way.
 
 ## Troubleshooting
 

@@ -51,10 +51,12 @@ For data generation, recording, training and tests, install the full profile in 
 
 | I want to…                                  | Read                                                                                                                                |
 | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| See every command on one page               | [Running NexArm](docs/running.md)                                                                                                   |
 | Install the repository                      | [Install](docs/getting-started/install.md)                                                                                          |
 | Try the simulation                          | [Simulation quickstart](docs/getting-started/simulation.md)                                                                         |
 | Connect and teleoperate the arms            | [Hardware quickstart](docs/getting-started/hardware.md)                                                                             |
 | Record, train and roll out a policy         | [Pipeline](docs/guides/pipeline.md) and [Training tips](docs/guides/training-tips.md)                                               |
+| Run a trained policy on the arm             | [Rollout](docs/guides/rollout.md)                                                                                                   |
 | Train TurboVLA, on several GPUs or a server | [TurboVLA](docs/guides/turbovla.md), [Sim training](docs/guides/sim-training.md), [Server training](docs/guides/server-training.md) |
 | Understand the code                         | [Architecture and conventions](docs/reference/architecture.md)                                                                      |
 | Fix a problem                               | [Troubleshooting](docs/reference/troubleshooting.md)                                                                                |

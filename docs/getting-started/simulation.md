@@ -98,7 +98,7 @@ MUJOCO_GL=egl uv run python examples/nexarm/generate_sim_dataset.py \
     --action-delay-steps 2
 ```
 
-The 3-bowl stacking generator `generate_stack_bowls_dataset.py` takes the same flags. All generation flags, resuming and stale datasets are covered in [the pipeline guide, section 1a](../guides/pipeline.md#1a-simulation-scripted-demonstrations); generating on several GPUs in [Sim training](../guides/sim-training.md).
+The 3-bowl stacking generator `generate_stack_bowls_dataset.py` takes the same flags. For data meant for the real arm, fit the simulation to your arm first and pass `--calibration`: see [Calibration](../guides/calibration.md). All generation flags, resuming and stale datasets are covered in [the pipeline guide, section 1a](../guides/pipeline.md#1a-simulation-scripted-demonstrations); generating on several GPUs in [Sim training](../guides/sim-training.md).
 
 ## Rerun 3D showcase
 

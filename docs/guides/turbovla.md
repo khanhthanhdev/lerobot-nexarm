@@ -140,7 +140,7 @@ uv run lerobot-rollout \
     --task="Stack the bowls with red on bottom, blue in middle, and black on top."
 ```
 
-Give the policy exactly the cameras it was trained on; a 2-view checkpoint needs the `top` entry removed. Keep `--task` identical to the training prompt.
+Give the policy exactly the cameras it was trained on; a 2-view checkpoint needs the `top` entry removed. Keep `--task` identical to the training prompt. The shorter `rollout.py` command, recording rollouts as evaluation datasets and troubleshooting are in [Rolling out a trained policy](rollout.md).
 
 ### Checkpoints from the former `train_turbovla.py`
 

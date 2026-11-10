@@ -1,6 +1,6 @@
 # Troubleshooting
 
-General problems with the arms, cameras and recording loop. Guide-specific problems are listed in each guide: [data collection](../guides/data-collection.md#5-troubleshooting), [sim training](../guides/sim-training.md#troubleshooting), [sim calibration](../guides/sim-calibration.md#troubleshooting) and [`sim/README.md`](../../sim/README.md#13-troubleshooting). Weak policies are covered in [Training tips](../guides/training-tips.md#18-troubleshooting-signal).
+General problems with the arms, cameras and recording loop. Guide-specific problems are listed in each guide: [data collection](../guides/data-collection.md#5-troubleshooting), [sim training](../guides/sim-training.md#troubleshooting), [calibration](../guides/calibration.md#troubleshooting) and [`sim/README.md`](../../sim/README.md#13-troubleshooting). Weak policies are covered in [Training tips](../guides/training-tips.md#18-troubleshooting-signal).
 
 ## `Permission denied: '/dev/ttyUSB*'`
 

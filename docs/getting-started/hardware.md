@@ -139,6 +139,6 @@ uv run python tools/nexarm/calibrate_camera_alignment.py \
     --cam-index 0
 ```
 
-Keys, the top camera and how to edit the scene are in [Sim calibration, Step 7](../guides/sim-calibration.md#step-7-align-the-cameras).
+Keys, the top camera and how to edit the scene are in [Calibration, Step 7](../guides/calibration.md#step-7-align-the-cameras).
 
-Next: [record a dataset and train a policy](../guides/pipeline.md), or use the [stack-bowls collection rig](../guides/data-collection.md).
+All of these commands, with collection, training and rollout, are on one page in [Running NexArm](../running.md). Next: [record a dataset and train a policy](../guides/pipeline.md), or use the [stack-bowls collection rig](../guides/data-collection.md).

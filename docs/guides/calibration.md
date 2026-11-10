@@ -1,71 +1,153 @@
-# Calibrating the NexArm simulation to your real arm
+# Calibration: real to sim to real
 
-This guide makes the MuJoCo twin behave like your physical arm, then generates simulation data from it. Follow the steps in order and run every command from the repository root with `uv run`.
+Every calibration of the NexArm is on this page: the real arms, the MuJoCo twin fitted to them, and running a policy trained in simulation back on the real arm. Other pages link here instead of repeating it. Follow the steps in order and run every command from the repository root with `uv run`.
+
+The loop has three parts:
+
+1. **Real arm** (Step 0): zero the servos, check that leader and follower agree, and fix the follower settings. Every later number depends on these.
+2. **Real to sim** (Steps 1–8): make the simulation move, look and measure like your arm: joint mapping, latency and servo dynamics, cameras, scene.
+3. **Sim to real** (Steps 9–10): generate data with the calibration, train on real and sim data, run the policy on the real arm, and go back to the step its failures point to.
 
 **What gets calibrated**
 
-| What                                                                                                  | Tool                            | Result                          |
-| ----------------------------------------------------------------------------------------------------- | ------------------------------- | ------------------------------- |
-| Action latency, per-joint damping and friction (and `kp` with `--fit-kp`), and how much each can vary | `calibrate_sim.py`              | `SimCalibration` JSON           |
-| Camera pose and field of view                                                                         | `calibrate_camera_alignment.py` | Edits you make to the scene XML |
-| Cube size, mass, table height                                                                         | Measure by hand                 | Edits you make to the scene XML |
+| What                                                                                    | Tool                                                   | Result                          |
+| --------------------------------------------------------------------------------------- | ------------------------------------------------------ | ------------------------------- |
+| Servo zero positions; leader/follower agreement at Home                                 | Vendor desktop app, `calibrate_arms.py`                | Zeros stored in the servos      |
+| Per-joint sign and zero offset between the real servos and the sim joints               | `probe_joint_mapping.py`, `overlay_recorded_frames.py` | Joint mapping JSON              |
+| Action latency and per-joint servo time constant (and `kp` with `--fit-kp`), and spread | `calibrate_sim.py`                                     | `SimCalibration` JSON           |
+| Camera pose and field of view                                                           | `calibrate_camera_alignment.py`, `realsense_fovy.py`   | Edits you make to the scene XML |
+| Arm mount height, cube and bowl sizes and masses, table and target zone                 | Measure by hand                                        | Edits you make to the scene XML |
 
 **What is not calibrated:** contact physics such as cube friction and slip. Keep real contact-rich demonstrations in your training mix, since simulation widens coverage but does not replace them.
 
-**Order and time.** Do the steps in this order. Each step depends on the ones before it: a wrong joint mapping makes every dynamics fit wrong, and wrong dynamics make camera checks on a moving arm misleading.
+## All calibration commands
 
-| #   | Step                                                                         | Where           | Time      | Done when                                                |
-| --- | ---------------------------------------------------------------------------- | --------------- | --------- | -------------------------------------------------------- |
-| 0   | [Settings, zero, joint mapping](#step-0-before-you-start)                    | Robot PC        | 30 min    | Wrist overlays line up on a recorded episode             |
-| 1   | [Record calibration episodes](#step-1-record-system-identification-episodes) | Robot PC        | 30–45 min | 20 free-motion episodes recorded                         |
-| 2   | [Check the recording](#step-2-check-the-recording)                           | Any PC          | 5 min     | Audit shows no lag outliers, or you noted them           |
-| 3–4 | [Fit and read the result](#step-3-fit-the-simulation)                        | PC with OpenGL  | 15–30 min | Holdout RMSE drops, few scales at a limit                |
-| 5–6 | [Use and verify the calibration](#step-5-use-the-calibration)                | PC with OpenGL  | 30 min    | Scripted tasks still pass, videos look like the real arm |
-| 7   | [Align the cameras](#step-7-align-the-cameras)                               | Robot PC        | 30–60 min | Overlays line up for front, top and wrist                |
-| 8   | [Match the scene](#step-8-match-the-scene)                                   | Robot PC        | 20 min    | Measured sizes and heights are in the scene XML          |
-| 9   | [Train and evaluate on the real arm](#step-9-train-and-iterate)              | GPU server, arm | days      | Real success rate measured on a fixed protocol           |
+The short version, in order. Each line links to the step that explains it and how to read its output.
+
+```bash
+# Step 0: real arms at the vendor Home pose (needs --extra service)
+uv run python tools/nexarm/calibrate_arms.py --leader-port /dev/ttyUSB0 --follower-port /dev/ttyUSB1
+
+# Step 0: joint mapping (follower power-cycled, desktop app closed), then check it on a recorded episode
+uv run python tools/nexarm/probe_joint_mapping.py --port /dev/ttyUSB1
+MUJOCO_GL=egl uv run python tools/nexarm/overlay_recorded_frames.py --repo-id <real_repo_id> --episode 0 \
+    --mapping outputs/nexarm/joint_mapping_probe.json
+
+# Step 1: record 20 free-motion episodes
+uv run python examples/nexarm/record.py --leader-port /dev/ttyUSB0 --follower-port /dev/ttyUSB1 \
+    --repo-id <user>/nexarm_sysid --num-episodes 20 --episode-time 20
+
+# Step 2: audit the recording; optionally time the servos directly
+uv run python tools/nexarm/audit_real_dataset.py --repo-id <sysid_repo_id> --episode-time-s 20
+uv run python tools/nexarm/servo_step_test.py --port /dev/ttyUSB1 --joint elbow_flex
+
+# Step 3: fit latency and dynamics
+MUJOCO_GL=egl uv run python tools/nexarm/calibrate_sim.py --repo-id <sysid_repo_id> \
+    --joint-mapping outputs/nexarm/joint_mapping_probe.json \
+    --out outputs/calibration/nexarm_sim_calibration.json
+
+# Step 5: generate calibrated sim data
+MUJOCO_GL=egl uv run python examples/nexarm/generate_stack_bowls_dataset.py \
+    --repo-id local/nexarm_stack_bowls_cal --root outputs/datasets/nexarm_stack_bowls_cal --episodes 200 \
+    --calibration outputs/calibration/nexarm_sim_calibration.json \
+    --joint-mapping outputs/nexarm/joint_mapping_probe.json
+
+# Step 7: cameras (field of view first, then pose in the live overlay)
+uv run python tools/nexarm/realsense_fovy.py --width 640 --height 480
+uv run python tools/nexarm/calibrate_camera_alignment.py --camera-name front --cam-index 0
+uv run python tools/nexarm/calibrate_camera_alignment.py --camera-name wrist --cam-index 1
+uv run python tools/nexarm/calibrate_camera_alignment.py --camera-name top --cam-index /dev/video4
+
+# Step 10: run the sim-trained policy on the real arm
+uv run python examples/nexarm/rollout.py --follower-port /dev/ttyUSB1 --front-cam 0 --wrist-cam 1 \
+    --policy-path <checkpoint> --task "<training prompt>"
+```
+
+Leave out `--joint-mapping` when the probe reports the identity mapping (every sign `+1`, every offset within a few degrees).
+
+## Calibration files and where they are used
+
+| File                                              | Made by                  | Pass it to                                                                                                                                                                                           | Refused when                                                 |
+| ------------------------------------------------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `outputs/nexarm/joint_mapping_probe.json`         | `probe_joint_mapping.py` | `--joint-mapping` (`calibrate_sim.py`, both generators); `--env.joint_mapping_path` (gym env, `lerobot-eval`); `--robot.joint_mapping_path` / `joint_mapping_path` (`nexarm_sim`, `NexArmSimConfig`) | Data or calibrations were made under another mapping version |
+| `outputs/calibration/nexarm_sim_calibration.json` | `calibrate_sim.py`       | `--calibration` (both generators, `lerobot-nexarm-sim-benchmark`); `--env.calibration_path` (gym env); `calibration_path` (`NexArmSimConfig`)                                                        | Another fps, joint mapping or servo model (`dynamics_model`) |
+| Scene XML in `sim/description/mjcf/`              | You, from Steps 7–8      | Used by every sim tool; regenerate sim data after a change                                                                                                                                           | —                                                            |
+
+Copy a mapping and a calibration you keep to `sim/calibration/` and commit them together, since the calibration is fitted on top of the mapping. The repository ships neither: the default mapping is the identity, and the servo model `hx_servo_v2` already carries time constants fitted to `thanhkt/nexarm_stack_bowls` (Step 5). Explicit flags beat the calibration file, which beats the defaults: `--action-delay-steps` overrides the calibrated delay.
+
+## Order and time
+
+Do the steps in this order. Each step depends on the ones before it: a wrong joint mapping makes every dynamics fit wrong, and wrong dynamics make camera checks on a moving arm misleading.
+
+| #   | Step                                                                         | Where          | Time      | Done when                                                |
+| --- | ---------------------------------------------------------------------------- | -------------- | --------- | -------------------------------------------------------- |
+| 0   | [Real arm: zero, settings, joint mapping](#step-0-before-you-start)          | Robot PC       | 30 min    | Wrist overlays line up on a recorded episode             |
+| 1   | [Record calibration episodes](#step-1-record-system-identification-episodes) | Robot PC       | 30–45 min | 20 free-motion episodes recorded                         |
+| 2   | [Check the recording](#step-2-check-the-recording)                           | Any PC         | 5 min     | Audit shows no lag outliers, or you noted them           |
+| 3–4 | [Fit and read the result](#step-3-fit-the-simulation)                        | PC with OpenGL | 15–30 min | Holdout RMSE drops, few scales at a limit                |
+| 5–6 | [Use and verify the calibration](#step-5-use-the-calibration)                | PC with OpenGL | 30 min    | Scripted tasks still pass, videos look like the real arm |
+| 7   | [Align the cameras](#step-7-align-the-cameras)                               | Robot PC       | 30–60 min | Overlays line up for front, top and wrist                |
+| 8   | [Match the scene](#step-8-match-the-scene)                                   | Robot PC       | 20 min    | Measured sizes and heights are in the scene XML          |
+| 9   | [Train on real and sim data](#step-9-train-on-real-and-sim-data)             | GPU server     | hours     | Checkpoint passes in simulation                          |
+| 10  | [Run on the real arm and iterate](#step-10-run-on-the-real-arm-and-iterate)  | Robot PC       | days      | Real success rate measured on a fixed protocol           |
 
 The sim's world frame, used for every position below: the origin is on the floor under the base's pan axis, `-y` points toward the work area (the robot's front), `+x` is the robot's left, and `+z` is up. Distances are in metres.
 
-## Step 0. Before you start
+## Part 1. Real arm
 
-- Zero positions are set in the servos (follower: desktop Servo Advanced page; leader: Synchronizer page) and checked with `tools/nexarm/calibrate_arms.py`, which reports leader/follower deltas at the Home pose and keeps the calibration files identity (`lerobot-calibrate` writes the same identity files). Teleoperation works.
-- You can generate simulation data (see `pipeline.md`, section 1a) and `MUJOCO_GL=egl` works on your machine.
-- Check that the sim joint mapping matches your arm. The sim maps raw 2048 onto the exported CAD pose, which is the follower's Home pose (an L: upper-arm tube vertical, forearm and closed gripper horizontal). Servo signs and zero errors still vary per arm, and until they are measured the sim can pose real joint values slightly differently from the real arm.
-  1. Measure the per-joint sign and zero offset by posing the un-energised follower by hand. The probe uses a straight-up pose as its reference and reads where it is, so it works whatever shape Home has. Power-cycle the follower and close any app that holds its serial port (such as the Hiwonder desktop app) first:
+### Step 0. Before you start
 
-     ```bash
-     uv run python tools/nexarm/probe_joint_mapping.py --port /dev/ttyUSB1
-     ```
+**Zero the arms.** Zero positions live in the servos, not in software. Set them with the vendor desktop app (follower: Servo Advanced page; leader: Synchronizer page). Then place both arms by hand at the vendor Home pose (every joint at raw 2048: upper arm vertical, forearm and closed gripper horizontal) and check them:
 
-  2. Confirm the result on a recorded episode. This needs OpenGL; use `MUJOCO_GL=egl` on headless Linux.
+```bash
+uv run python tools/nexarm/calibrate_arms.py --leader-port /dev/ttyUSB0 --follower-port /dev/ttyUSB1
+```
 
-     ```bash
-     uv run python tools/nexarm/overlay_recorded_frames.py --repo-id <real_repo_id> --episode 0 --mapping outputs/nexarm/joint_mapping_probe.json
-     ```
+It prints both arms' raw readings and the leader-to-follower delta per joint, flags joints beyond `--tolerance` ticks, and writes identity calibration files, backing up any older software offsets. `lerobot-calibrate` writes the same identity files. Fix any offset it reports in the desktop app, not in software, and check that [teleoperation](../getting-started/hardware.md#leader-follower-teleoperation) tracks all six joints. The script needs `--extra service` in your `uv sync` line.
 
-     The wrist-camera overlays should line up. Fitting dynamics with a wrong mapping gives meaningless numbers.
+**Fix the follower settings.** `motion_speed` and `motion_acc` in `examples/nexarm/record.yaml` change how the arm responds, so a calibration only holds for the values used when you recorded. Decide them now, use them for every recording and rollout, and re-run the calibration if you change them.
 
-  In more detail:
-  - **Before the probe.** Power-cycle the follower, connect it by USB, and quit the Hiwonder desktop app. Clear the space around the arm. The power-cycle matters: any LeRobot program (`lerobot-record`, a rollout, an earlier probe) leaves the follower in bridge mode, which only a restart ends, and in bridge mode the probe cannot turn the motors off.
-  - **Turning the motors off.** The probe first sends the desktop app's "All off" command and asks whether the arm moves freely. If you answer `n`, it sends per-servo torque-off writes and asks again. Hold the arm before you press Enter: it drops as soon as the motors turn off.
-  - **During the probe.** It asks you to pose the arm straight up (every link vertical, gripper pointing at the ceiling), then to turn each joint by about a quarter turn. After each turn it asks which way the gripper or link moved: `f` (front, toward the work area), `b` (back), `l` (the robot's left) or `r` (its right).
-  - **Reading the output.** It prints one line per joint, such as `shoulder_pan sign +1 offset +0.40 deg`, and writes `outputs/nexarm/joint_mapping_probe.json`.
-    - Every sign `+1` and every offset within a few degrees means the identity mapping is right, and you can skip the rest of this item.
-    - A sign of `-1` means the sim turns that joint the wrong way.
-    - An offset above about 5° means the servo's zero differs from the CAD pose.
-    - A `WARNING` about the base pan being a quarter turn off, or about an offset outside the joint range, means you should repeat the probe more carefully before trusting it.
-  - **Checking the result.** Run `overlay_recorded_frames.py` twice on the same episode: once without `--mapping` and once with it. Open the PNG images in `outputs/nexarm/overlay/`. Each shows real, sim and a 50% blend side by side. In the blend, the gripper jaws and the table edge should coincide. Use episodes that move a lot. On `thanhkt/nexarm_stack_bowls`, episode 19 is a good test: without a correct mapping its replay puts the gripper about 39 mm into the panel behind the arm.
-  - **Applying a non-identity mapping.** Pass the file everywhere the sim reads real joint values:
-    - `--joint-mapping outputs/nexarm/joint_mapping_probe.json` to `calibrate_sim.py`, `generate_sim_dataset.py` and `generate_stack_bowls_dataset.py`;
-    - `--env.joint_mapping_path` to the gym environment;
-    - `joint_mapping_path` in `NexArmSimConfig`.
+**Check the simulation runs.** You can generate simulation data ([pipeline, section 1a](pipeline.md#1a-simulation-scripted-demonstrations)) and `MUJOCO_GL=egl` works on your machine.
 
-    Calibrations and datasets record the mapping version and refuse to mix with another, so refit (Step 3) and regenerate after you apply it. Copy the file to `sim/calibration/` so it is versioned with the calibration fitted on top of it.
+**Measure the joint mapping.** Check that the sim joint mapping matches your arm. The sim maps raw 2048 onto the exported CAD pose, which is the follower's Home pose (an L: upper-arm tube vertical, forearm and closed gripper horizontal). Servo signs and zero errors still vary per arm, and until they are measured the sim can pose real joint values slightly differently from the real arm.
 
-- Decide the follower settings now and keep them. `motion_speed` and `motion_acc` in `examples/nexarm/record.yaml` change how the arm responds, so a calibration only holds for the values used when you recorded. Re-run the calibration if you change them.
+1. Measure the per-joint sign and zero offset by posing the un-energised follower by hand. The probe uses a straight-up pose as its reference and reads where it is, so it works whatever shape Home has. Power-cycle the follower and close any app that holds its serial port (such as the Hiwonder desktop app) first:
 
-## Step 1. Record system-identification episodes
+   ```bash
+   uv run python tools/nexarm/probe_joint_mapping.py --port /dev/ttyUSB1
+   ```
+
+2. Confirm the result on a recorded episode. This needs OpenGL; use `MUJOCO_GL=egl` on headless Linux.
+
+   ```bash
+   uv run python tools/nexarm/overlay_recorded_frames.py --repo-id <real_repo_id> --episode 0 --mapping outputs/nexarm/joint_mapping_probe.json
+   ```
+
+   The wrist-camera overlays should line up. Fitting dynamics with a wrong mapping gives meaningless numbers.
+
+In more detail:
+
+- **Before the probe.** Power-cycle the follower, connect it by USB, and quit the Hiwonder desktop app. Clear the space around the arm. The power-cycle matters: any LeRobot program (`lerobot-record`, a rollout, an earlier probe) leaves the follower in bridge mode, which only a restart ends, and in bridge mode the probe cannot turn the motors off.
+- **Turning the motors off.** The probe first sends the desktop app's "All off" command and asks whether the arm moves freely. If you answer `n`, it sends per-servo torque-off writes and asks again. Hold the arm before you press Enter: it drops as soon as the motors turn off.
+- **During the probe.** It asks you to pose the arm straight up (every link vertical, gripper pointing at the ceiling), then to turn each joint by about a quarter turn. After each turn it asks which way the gripper or link moved: `f` (front, toward the work area), `b` (back), `l` (the robot's left) or `r` (its right).
+- **Reading the output.** It prints one line per joint, such as `shoulder_pan sign +1 offset +0.40 deg`, and writes `outputs/nexarm/joint_mapping_probe.json`.
+  - Every sign `+1` and every offset within a few degrees means the identity mapping is right, and you can skip the rest of this item.
+  - A sign of `-1` means the sim turns that joint the wrong way.
+  - An offset above about 5° means the servo's zero differs from the CAD pose.
+  - A `WARNING` about the base pan being a quarter turn off, or about an offset outside the joint range, means you should repeat the probe more carefully before trusting it.
+- **Checking the result.** Run `overlay_recorded_frames.py` twice on the same episode: once without `--mapping` and once with it. Open the PNG images in `outputs/nexarm/overlay/`. Each shows real, sim and a 50% blend side by side. In the blend, the gripper jaws and the table edge should coincide. Use episodes that move a lot. On `thanhkt/nexarm_stack_bowls`, episode 19 is a good test: without a correct mapping its replay puts the gripper about 39 mm into the panel behind the arm.
+- **Applying a non-identity mapping.** Pass the file everywhere the sim reads real joint values:
+  - `--joint-mapping outputs/nexarm/joint_mapping_probe.json` to `calibrate_sim.py`, `generate_sim_dataset.py` and `generate_stack_bowls_dataset.py`;
+  - `--env.joint_mapping_path` to the gym environment;
+  - `joint_mapping_path` in `NexArmSimConfig`.
+
+  Calibrations and datasets record the mapping version and refuse to mix with another, so refit (Step 3) and regenerate after you apply it. Copy the file to `sim/calibration/` so it is versioned with the calibration fitted on top of it.
+
+- **If a joint still moves the wrong way in the sim.** Correct the mapping as above; do not change the CAD joint axis to hide a mismatch between the controller and the sim. The mapping formula and the CAD zero are described in [`sim/README.md`](../../sim/README.md).
+
+## Part 2. Real to sim
+
+### Step 1. Record system-identification episodes
 
 The fit needs episodes where the arm moves freely and moves a lot. A recording of a pick-and-place task works poorly, because contact with the cube biases the fit and several joints barely move.
 
@@ -106,7 +188,7 @@ Tips:
 - Include some small, fast reversals. They are the movements that reveal latency.
 - Record a different set of episodes if you later want an independent check.
 
-## Step 2. Check the recording
+### Step 2. Check the recording
 
 ```bash
 uv run python - <<'EOF'
@@ -138,7 +220,7 @@ Confirm that:
 - the action names are the six `*.pos` joints,
 - there are at least 10 episodes with 20 or more frames each.
 
-## Step 3. Fit the simulation
+### Step 3. Fit the simulation
 
 ```bash
 MUJOCO_GL=egl uv run python tools/nexarm/calibrate_sim.py \
@@ -168,7 +250,7 @@ Useful options:
 | `--max-frames 900`                  | Use longer episodes                                   |
 | `--holdout-frac 0`                  | No holdout (use only for very few episodes)           |
 
-## Step 4. Read the result
+### Step 4. Read the result
 
 The tool prints a table like this:
 
@@ -192,7 +274,7 @@ The gripper RMSE is large because it is not fitted. This is expected.
 
 If the fit is poor, the cause is almost always the data, not the tool: too few episodes, too little motion, or a different `motion_speed` than the one you use normally.
 
-### Optional: choose `kp`
+#### Optional: choose `kp`
 
 The default fit keeps the servo model's `kp`. A `kp` scale no longer changes the response time (the tool recomputes `kv` to hold the time constant), so it only matters for how stiffly the arm holds against loads. To let the real data set it, you need recordings where the arm is pushed or carries a known load:
 
@@ -200,7 +282,7 @@ The default fit keeps the servo model's `kp`. A `kp` scale no longer changes the
 2. Compare the holdout RMSE (the `holdout_after` mean over the five arm joints) with the default fit. Keep the `kp` scales only if they lower it clearly.
 3. Check the scripted success over 20 seeds of each task (Step 6, check 1). It must stay at 20/20 on both.
 
-## Step 5. Use the calibration
+### Step 5. Use the calibration
 
 The repository ships no calibration file. The servo model in the MJCF (`hx_servo_v2`) already carries the time constants fitted to `thanhkt/nexarm_stack_bowls`, so the sim is usable without one:
 
@@ -233,7 +315,7 @@ The fitted scales correct one sim servo model, so the file also records its `dyn
 
 Use `--split eval` to generate a held-out evaluation set. Its seeds never overlap with the training seeds.
 
-## Step 6. Verify the calibrated data
+### Step 6. Verify the calibrated data
 
 Do these checks before training:
 
@@ -257,7 +339,7 @@ Do these checks before training:
 3. **Distribution check.** Compare the real and the simulated datasets for episode length, the range of each joint, and per-step action changes. `generation_report.json` gives the simulated numbers. Large gaps mean the scripted motion differs from how your operator moves. Adjust `--action-noise` or the trajectory variation in `generate_sim_dataset.py`.
 4. **Look at frames.** Export a real and a simulated episode with `export_episode_video.py` and compare the views side by side.
 
-## Step 7. Align the cameras
+### Step 7. Align the cameras
 
 Policies see images, so wrong camera geometry causes a bigger sim-to-real gap than the dynamics.
 
@@ -297,7 +379,7 @@ Step by step for each camera. Fix the field of view first; a pose error cannot b
 
 After any change to the scene cameras, rerun the scripted success check (Step 6). Regenerate sim data before training, because the existing data was rendered from the old view.
 
-## Step 8. Match the scene
+### Step 8. Match the scene
 
 Measure these on your real setup and update the scene XML if they differ:
 
@@ -320,9 +402,12 @@ Measure heights from the table surface, which is the sim floor (`z = 0`). If the
 
 Then adjust the visual randomization range in `DomainRandomizationRanges` (`packages/lerobot_robot_nexarm/src/lerobot_robot_nexarm/nexarm_sim/mujoco_backend.py`) so it covers the lighting and color you actually see.
 
-## Step 9. Train and iterate
+## Part 3. Sim to real
 
-1. Train with real and simulated data mixed. `lerobot-train` takes one dataset, so merge the real and sim datasets first (they share `robot_type="nexarm_follower"`; they also need the same cameras and fps), and set the mix through the episode counts; start with real data at about 25–50% of the episodes:
+### Step 9. Train on real and sim data
+
+1. Generate the training data with the calibration, the joint mapping (if not the identity) and domain randomization on (Step 5). Start with 200–300 episodes per task; more randomized episodes help sim-to-real more than more training steps. Generating on several GPUs: [Sim training](sim-training.md).
+2. Train with real and simulated data mixed. `lerobot-train` takes one dataset, so merge the real and sim datasets first (they share `robot_type="nexarm_follower"`; they also need the same cameras and fps), and set the mix through the episode counts; start with real data at about 25–50% of the episodes:
 
    ```bash
    uv run lerobot-edit-dataset \
@@ -335,20 +420,65 @@ Then adjust the visual randomization range in `DomainRandomizationRanges` (`pack
 
    Then train on it as in [the pipeline guide, section 2](pipeline.md#2-training).
 
-2. Evaluate on **real held-out trials**, not on simulated ones.
-3. Look at how the real rollouts fail: late or early motion points to delay or gains (repeat Steps 1–5), missed grasps point to the scene or contact (Step 8).
-4. Regenerate and retrain.
+3. Check the checkpoint in the calibrated simulation before it touches the arm. Pass the same calibration and mapping to the env:
+
+   ```bash
+   MUJOCO_GL=egl uv run lerobot-eval --policy.path=<checkpoint> \
+       --env.type=nexarm --env.task=NexArmStackBowls-v0 --eval.n_episodes=20 \
+       --env.calibration_path=outputs/calibration/nexarm_sim_calibration.json \
+       --env.joint_mapping_path=outputs/nexarm/joint_mapping_probe.json \
+       --output_dir=outputs/eval/sim_check
+   ```
+
+   A checkpoint that fails here will not succeed on the real arm. Simulated success rate does not predict the real one, only rules out a broken checkpoint.
+
+### Step 10. Run on the real arm and iterate
+
+Before the first run:
+
+- The follower uses the same `motion_speed` and `motion_acc` as when you recorded the calibration episodes (Step 0).
+- The real cameras are where the sim cameras are: run `calibrate_camera_alignment.py` for each camera (Step 7) and check that the overlay still lines up. A bumped camera is the most common sim-to-real failure.
+- The real scene matches the sim (Step 8): bowl or cube positions inside the trained spawn area, the same lighting as far as possible.
+- The policy gets exactly the cameras it was trained on; `rollout.py` refuses a mismatch. Use `--no-top-cam` for a 2-camera checkpoint.
+- Keep a hand near the power switch the first time a new checkpoint moves the arm.
+
+Run it with the training prompt:
+
+```bash
+uv run python examples/nexarm/rollout.py --follower-port /dev/ttyUSB1 --front-cam 0 --wrist-cam 1 \
+    --policy-path <checkpoint> \
+    --task "Stack the bowls with red on bottom, blue in middle, and black on top."
+```
+
+To keep each trial as a dataset for later analysis, add `--strategy sentry --repo-id <user>/eval_nexarm`; every rollout option is in [Rolling out a trained policy](rollout.md).
+
+Evaluate on **real held-out trials** with a fixed protocol: the same number of trials (at least 10–20), the same set of start layouts written down in advance, and the same success criterion for every checkpoint. Then read how the trials fail and go back to the step that owns it:
+
+| How the real rollouts fail                                   | Likely cause                     | Go back to                                                            |
+| ------------------------------------------------------------ | -------------------------------- | --------------------------------------------------------------------- |
+| A joint moves the wrong way or to a consistently wrong angle | Joint mapping                    | [Step 0](#step-0-before-you-start), then regenerate                   |
+| Motion starts late, overshoots or oscillates                 | Latency or servo dynamics        | [Steps 1–5](#step-1-record-system-identification-episodes)            |
+| The gripper reaches a consistent offset from the object      | Camera pose or field of view     | [Step 7](#step-7-align-the-cameras)                                   |
+| Hits the table, misses heights, or collides with the rig     | Mount height or scene geometry   | [Step 8](#step-8-match-the-scene)                                     |
+| Reaches well, but grasps slip or fail                        | Contact physics (not calibrated) | More real demonstrations in the mix (Step 9)                          |
+| Works in some lighting or backgrounds and not others         | Visual gap                       | Widen `DomainRandomizationRanges` ([Step 8](#step-8-match-the-scene)) |
+
+Fix one cause at a time, regenerate the sim data, retrain, and rerun the same protocol so the success rates compare.
 
 ## Troubleshooting
 
-| Symptom                                      | Likely cause and fix                                                                                   |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `No usable episodes found`                   | Episodes have fewer than 20 frames, or the repo id or `--root` is wrong                                |
-| Delay fits to 0 and RMSE stays high          | The real data has little fast motion. Add fast reversals (Step 1)                                      |
-| Delay fits to the maximum                    | Raise `--delay-range`, and check that the dataset fps equals the control rate                          |
-| Scales hit 0.25× or 4×                       | Too little excitation for that joint. Record more sweeps of it                                         |
-| Good fit, but real rollouts still fail       | The gap is probably visual or contact related. Do Steps 7 and 8 and keep real contact data in training |
-| Results change after changing `motion_speed` | Expected. Record new episodes with the new setting and re-fit                                          |
+| Symptom                                                 | Likely cause and fix                                                                                   |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `No usable episodes found`                              | Episodes have fewer than 20 frames, or the repo id or `--root` is wrong                                |
+| Delay fits to 0 and RMSE stays high                     | The real data has little fast motion. Add fast reversals (Step 1)                                      |
+| Delay fits to the maximum                               | Raise `--delay-range`, and check that the dataset fps equals the control rate                          |
+| Scales hit 0.25× or 4×                                  | Too little excitation for that joint. Record more sweeps of it                                         |
+| Good fit, but real rollouts still fail                  | The gap is probably visual or contact related. Do Steps 7 and 8 and keep real contact data in training |
+| Results change after changing `motion_speed`            | Expected. Record new episodes with the new setting and re-fit                                          |
+| A sim joint moves opposite to the real one              | Stop sim-to-real testing and measure the joint mapping (Step 0)                                        |
+| A calibration or dataset is refused on load             | It was made under another fps, joint mapping or servo model. Re-run Step 3 and regenerate the data     |
+| `calibrate_arms.py`: `No module named 'nexarm_service'` | Add `--extra service` to your `uv sync` line                                                           |
+| `probe_joint_mapping.py` cannot turn the motors off     | The follower is still in bridge mode from a LeRobot program. Power-cycle it and close the desktop app  |
 
 ## Limits of this calibration
 

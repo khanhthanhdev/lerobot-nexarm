@@ -2,6 +2,8 @@
 
 Everything you need to use and develop the Hiwonder NexArm on LeRobot. Pick the path that matches what you want to do; every page is listed in the [map](#map-of-the-documentation) below.
 
+**Just want the commands?** [Running NexArm](running.md) has every command on one page, in order: install, find the ports, find the cameras, settings, teleoperate, collect data, inspect and upload, train, roll out, calibrate.
+
 ## Paths by role
 
 ### I want to try it without hardware
@@ -15,7 +17,8 @@ Everything you need to use and develop the Hiwonder NexArm on LeRobot. Pick the 
 1. [Install](getting-started/install.md)
 2. [Hardware quickstart](getting-started/hardware.md): wiring, ports, cameras, teleoperation
 3. [Pipeline](guides/pipeline.md): record, replay, train, roll out
-4. [Training tips](guides/training-tips.md): how to collect good data, which policy, how long to train, what success rate to expect
+4. [Rollout](guides/rollout.md): run the trained policy on the arm, record evaluation runs, measure the success rate
+5. [Training tips](guides/training-tips.md): how to collect good data, which policy, how long to train, what success rate to expect
 
 ### I collect data on the stack-bowls rig
 
@@ -27,9 +30,13 @@ Everything you need to use and develop the Hiwonder NexArm on LeRobot. Pick the 
 - [TurboVLA](guides/turbovla.md): install, local development of the `turbovla` package, training, checkpoint conversion
 - [Sim training](guides/sim-training.md): generate simulation datasets and train on several GPUs
 - [Server training](guides/server-training.md): TurboVLA on a remote GPU server or a Slurm cluster
-- [Sim calibration](guides/sim-calibration.md): fit the simulation to your real arm before sim-to-real
+- [Calibration](guides/calibration.md): every calibration in one place, real arm → sim → real arm: servo zeros, joint mapping, latency and dynamics, cameras, scene, and running sim-trained policies on the arm
 - [`experiments/`](../experiments/README.md): one folder per experiment, with its configs and results
 - Policy plugins: [`lerobot_policy_turbovla`](../policies/lerobot_policy_turbovla/README.md), [`lerobot_policy_bspline`](../policies/lerobot_policy_bspline/README.md), [`lerobot_policy_dem`](../policies/lerobot_policy_dem/README.md)
+
+### I want a policy trained in simulation to work on the real arm
+
+[Calibration: real to sim to real](guides/calibration.md): zero the arms, measure the joint mapping, fit latency and servo dynamics, align the cameras and the scene, then generate data, train, run on the arm and trace each failure back to a step.
 
 ### I use the desktop app
 
@@ -46,16 +53,18 @@ Everything you need to use and develop the Hiwonder NexArm on LeRobot. Pick the 
 
 | Section            | Page                                                                          | What it covers                                                           |
 | ------------------ | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Commands           | [Running NexArm](running.md)                                                  | Every command on one page: ports, cameras, settings, collection, train   |
 | Getting started    | [Install](getting-started/install.md)                                         | uv, dependency profiles, Git LFS, Hugging Face login, serial permissions |
 |                    | [Simulation](getting-started/simulation.md)                                   | MuJoCo viewer, keyboard teleop, gym environments, dataset generation     |
 |                    | [Hardware](getting-started/hardware.md)                                       | Wiring, ports, cameras, teleoperation, vision grasp, camera alignment    |
 | Guides             | [Pipeline](guides/pipeline.md)                                                | Record, inspect, train, roll out, benchmark                              |
 |                    | [Data collection](guides/data-collection.md)                                  | The stack-bowls collection rig                                           |
+|                    | [Rollout](guides/rollout.md)                                                  | Run policies on the arm and in sim, strategies, DAgger, success rate     |
 |                    | [Training tips](guides/training-tips.md)                                      | Data quality, policy choice, training length, evaluation                 |
 |                    | [TurboVLA](guides/turbovla.md)                                                | TurboVLA install, training, rollout, checkpoint conversion               |
 |                    | [Sim training](guides/sim-training.md)                                        | Multi-GPU dataset generation and training                                |
 |                    | [Server training](guides/server-training.md)                                  | Remote GPU server and Slurm                                              |
-|                    | [Sim calibration](guides/sim-calibration.md)                                  | System identification and camera alignment for sim-to-real               |
+|                    | [Calibration](guides/calibration.md)                                          | Real to sim to real: arm zeros, joint mapping, dynamics, cameras, deploy |
 |                    | [Desktop app](guides/desktop-app.md)                                          | The `lerobot-nexarm-service` engine                                      |
 | Reference          | [Architecture](reference/architecture.md)                                     | LeRobot basics, plugins, code layout, protocol, conventions              |
 |                    | [Python API](reference/python-api.md)                                         | Kinematics and dynamics, motor bus, idle torque timeout                  |

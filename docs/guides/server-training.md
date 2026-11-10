@@ -230,7 +230,7 @@ uv run lerobot-rollout \
     --task="Stack the bowls with red on bottom, blue in middle, and black on top."
 ```
 
-Give the policy exactly the cameras it was trained on; for a 2-view checkpoint, remove the `top` entry. Keep `--task` identical to the training prompt. See [the TurboVLA guide](turbovla.md#4-rollout--evaluation) for checkpoints from the former script.
+Give the policy exactly the cameras it was trained on; for a 2-view checkpoint, remove the `top` entry. Keep `--task` identical to the training prompt. See [the TurboVLA guide](turbovla.md#4-rollout--evaluation) for checkpoints from the former script, and [Rolling out a trained policy](rollout.md) for every rollout option.
 
 ---
 

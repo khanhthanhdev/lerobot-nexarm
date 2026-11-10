@@ -30,7 +30,7 @@ MUJOCO_GL=egl uv run python examples/nexarm/generate_stack_bowls_dataset.py \
 - Cameras default to `front,wrist,top` (`--cameras front,wrist` for a 2-camera dataset). Only successful episodes are kept.
 - Domain randomization (visual, dynamics, and every bowl's friction and mass; bowl colours stay fixed because the prompt names them) is on by default; `--no-dr` disables it.
 - Episodes cycle through the six stacking orders by seed, and the layout is independent of the order, so only the prompt tells a policy which bowl goes where: a policy that ignores it succeeds at most one time in six. `--order red,blue,black` (bottom,middle,top) records one order with one prompt instead; evaluate such a policy with `--env.stack_order=red,blue,black`, or the env keeps cycling the six orders.
-- `--gpus 0,1` takes comma-separated GPU ids for EGL rendering; `--workers` defaults to one per id. `--split eval` writes a held-out set (seeds start at 1000000). `--calibration PATH` and `--action-delay-steps N` apply a sim calibration (see [Sim calibration](sim-calibration.md)). Other flags: `--seed-start`, `--max-attempts`, `--no-video`.
+- `--gpus 0,1` takes comma-separated GPU ids for EGL rendering; `--workers` defaults to one per id. `--split eval` writes a held-out set (seeds start at 1000000). `--calibration PATH` and `--action-delay-steps N` apply a sim calibration (see [Calibration](calibration.md)). Other flags: `--seed-start`, `--max-attempts`, `--no-video`.
 - A fresh run on an existing `--root` is an error. `--resume` appends to it (also with `--workers`/`--gpus`), continuing after the last logged seed; it requires `generation_episodes.jsonl` and a `generation_report.json` whose `joint_mapping` matches the current mapping, and refuses to resume otherwise.
 - Datasets generated before the servo-constant joint mapping (`rad = (raw - 2048) * 2π / 4096`) are stale and are refused by `--resume` (their report has no `joint_mapping`): regenerate them.
 - Sim datasets record `robot_type="nexarm_follower"`, the same as real datasets. Provenance is in `<root>/generation_report.json` and `<root>/generation_episodes.jsonl`.
@@ -200,50 +200,18 @@ Use `lerobot-train` with a dataset that contains the cameras you intend to use a
 
 ## 3. Rollout
 
-### TurboVLA
-
-TurboVLA checkpoints are LeRobot policies, so they run like the policies below. Use the EMA weights in `pretrained_model_ema`:
+Run the trained checkpoint on the follower (only the follower is needed):
 
 ```bash
-# Simulation (the stack-bowls prompt follows the sampled bowl order; videos go to --output_dir)
-MUJOCO_GL=egl uv run lerobot-eval \
-    --policy.path=outputs/train/nexarm_turbovla/checkpoints/last/pretrained_model_ema \
-    --env.type=nexarm --env.task=NexArmStackBowls-v0 --eval.n_episodes=20 \
-    --output_dir=outputs/eval/nexarm_turbovla
-
-# Real robot (front, wrist and auto-detected top camera)
-uv run python examples/nexarm/rollout.py --follower-port /dev/ttyUSB1 \
-    --policy-path outputs/train/nexarm_turbovla/checkpoints/last/pretrained_model_ema \
-    --front-cam 0 --wrist-cam 1 \
-    --task "Stack the bowls with red on bottom, blue in middle, and black on top."
+uv run python examples/nexarm/rollout.py --follower-port /dev/ttyUSB1 --front-cam 0 --wrist-cam 1 \
+    --policy-path outputs/train/nexarm_act/checkpoints/last/pretrained_model
 ```
 
-Keep the task identical to the training prompt. A 2-view checkpoint needs `--no-top-cam`; a camera mismatch exits with an error. `lerobot-rollout --strategy.type=base --policy.path=... --robot.type=nexarm_follower ...` works as well ([the TurboVLA guide, section 4](turbovla.md#4-rollout--evaluation)). Checkpoints from the former `train_turbovla.py` need a one-time conversion first, described in the same section. Ctrl+C stops the rollout.
-
-### LeRobot policies (ACT, pi0, SmolVLA, ...)
-
-```bash
-# Using rollout script
-uv run python examples/nexarm/rollout.py --follower-port /dev/ttyUSB1 \
-    --policy-path <checkpoint dir or Hub id> --front-cam 0 --wrist-cam 1
-
-# Using lerobot-rollout CLI
-uv run lerobot-rollout \
-    --robot.type=nexarm_follower \
-    --robot.port=/dev/ttyUSB1 \
-    --robot.cameras='{"front":{"type":"opencv","index_or_path":0,"width":640,"height":480,"fps":30},"wrist":{"type":"opencv","index_or_path":1,"width":640,"height":480,"fps":30},"top":{"type":"intelrealsense","serial_number_or_name":"<REALSENSE_SERIAL>","width":640,"height":480,"fps":30}}' \
-    --policy.path=outputs/train/nexarm_act/checkpoints/last/pretrained_model \
-    --strategy.type=base \
-    --display_data=true
-```
-
-Add `--no-top-cam` for 2-camera checkpoints (or remove the `top` entry from `--robot.cameras`). `--strategy` selects `base`, `sentry`, `highlight` or `dagger` (the last three need `--repo-id`). To save the rollout as an evaluation dataset, use `--strategy sentry --repo-id <user>/eval_nexarm` (`rollout.py`) or `--strategy.type=sentry --dataset.repo_id=<user>/eval_nexarm --dataset.single_task="<task>"` (`lerobot-rollout`). `examples/nexarm/inference.yaml` is a ready config with the `top` camera enabled; delete its `top` block for 2-camera checkpoints.
-
-Keep the arm clear of obstacles and a hand near power the first time you run a new checkpoint.
+Give the policy exactly the cameras it was trained on (`--no-top-cam` for 2-camera checkpoints; a mismatch exits at startup), pass `--task` with the training prompt for TurboVLA and other language-conditioned policies, and use TurboVLA's `pretrained_model_ema` folder. `Ctrl+C` stops. Recording rollouts as evaluation datasets (`sentry`, `highlight`, `episodic`, `dagger`), `lerobot-rollout` and `inference.yaml`, simulated rollouts with `lerobot-eval`, measuring the real success rate and troubleshooting are in [Rolling out a trained policy](rollout.md).
 
 ## 4. Benchmark
 
-`lerobot-nexarm-sim-benchmark` evaluates LeRobot-format checkpoints on the single-arm **pick-and-place** task (red cube into the green zone) on identical seeds and reports success rate and latency. It does not benchmark stack-bowls policies; evaluate those with `lerobot-eval --env.type=nexarm --env.task=NexArmStackBowls-v0` (section 3) or a `sentry` rollout. `lerobot-eval` reports `pc_success`. For how far the failed episodes got, run `lerobot-nexarm-eval` with the same flags: it adds `pc_<stage>` (`pc_picked_middle`, `pc_nested_middle`, ...) to the log and to `eval_info.json`, and each episode's stage flags to its task's metrics. It logs seeded episodes only, so keep `--seed` set (1000 by default).
+`lerobot-nexarm-sim-benchmark` evaluates LeRobot-format checkpoints on the single-arm **pick-and-place** task (red cube into the green zone) on identical seeds and reports success rate and latency. It does not benchmark stack-bowls policies; evaluate those with `lerobot-eval --env.type=nexarm --env.task=NexArmStackBowls-v0` ([Rollout, Run it in simulation](rollout.md#run-it-in-simulation)) or a `sentry` rollout. `lerobot-eval` reports `pc_success`. For how far the failed episodes got, run `lerobot-nexarm-eval` with the same flags: it adds `pc_<stage>` (`pc_picked_middle`, `pc_nested_middle`, ...) to the log and to `eval_info.json`, and each episode's stage flags to its task's metrics. It logs seeded episodes only, so keep `--seed` set (1000 by default).
 
 ```bash
 MUJOCO_GL=egl uv run lerobot-nexarm-sim-benchmark \

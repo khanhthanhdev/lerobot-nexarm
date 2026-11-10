@@ -205,7 +205,7 @@ uv run python examples/nexarm/rollout.py \
   --task "<same task description used during training>" --duration 120
 ```
 
-Cameras default to front, wrist and the RealSense top; add `--no-top-cam` for a 2-camera policy.
+Cameras default to front, wrist and the RealSense top; add `--no-top-cam` for a 2-camera policy. A trial protocol, local-only evaluation datasets and the other strategies are in [Rolling out a trained policy](rollout.md#measure-the-success-rate-on-the-real-arm).
 
 Report success rate across episodes. Compare to a teleoperated baseline and to an earlier checkpoint to catch regressions.
 

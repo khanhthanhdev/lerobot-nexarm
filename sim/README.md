@@ -220,22 +220,13 @@ and gripper horizontal, pointing forward, with the jaws closed (mapping version
 `servo_4096_v2`; `v1` data used an earlier CAD zero with the arm bent differently
 and must be regenerated). The servo signs and small zero errors still differ per
 arm, so before sim-to-real work, measure each joint's sign and zero offset on the
-real follower (un-energised, posed by hand straight up, then a quarter turn per
-joint; the readings need not be `2048`):
-
-```bash
-uv run python tools/nexarm/probe_joint_mapping.py --port /dev/ttyUSB1
-```
-
-It writes `outputs/nexarm/joint_mapping_probe.json`, which changes the arm
-mapping to `qpos = sign * (raw - 2048) * 2*pi / 4096 + offset_rad`. Pass it with
-`--joint-mapping` to `generate_sim_dataset.py`, `generate_stack_bowls_dataset.py`
-and `calibrate_sim.py`, `--robot.joint_mapping_path` to `nexarm_sim`, or
-`--env.joint_mapping_path` to the `nexarm` env. Each mapping gets its own
-version, so calibrations and datasets made under a different mapping are
-refused instead of mixed. No measured mapping is committed yet; until one is,
-compare real and simulated zero positions, endpoints, and direction for every
-joint before deployment.
+real follower with `tools/nexarm/probe_joint_mapping.py`, as described in
+[Calibration, Step 0](../docs/guides/calibration.md#step-0-before-you-start).
+Its JSON changes the arm mapping to
+`qpos = sign * (raw - 2048) * 2*pi / 4096 + offset_rad`; the same page lists
+every flag that takes it. Each mapping gets its own version, so calibrations and
+datasets made under a different mapping are refused instead of mixed. No
+measured mapping is committed yet.
 
 ## 1. Install
 
@@ -638,7 +629,8 @@ uses 37.6 degrees: the C270's 55-degree diagonal (720p) gives 48.8 degrees
 horizontal, and a 640 x 480 stream of the 4:3 sensor keeps that width. `top`
 (RealSense D435i colour stream at 640 x 480) uses 42.6 degrees, from the nominal
 `fy` of 615 px. Read the camera's own `fy` with `tools/nexarm/realsense_fovy.py`
-on the robot PC and use the `fovy` it prints.
+on the robot PC and use the `fovy` it prints. Aligning each camera with the real
+one is in [Calibration, Step 7](../docs/guides/calibration.md#step-7-align-the-cameras).
 
 The merge also refits the arm-link collision boxes from the exported meshes
 (`COLLISION_BOXES` in `apply_fusion_extract.py`): one box for `base_link`,
@@ -692,9 +684,9 @@ camera list.
 power, USB permissions, and that no second process has opened the port.
 
 **A physical joint moves in the opposite direction:** Stop sim-to-real testing
-and measure the real follower mapping. Correct the per-joint direction/zero
-mapping in the simulation backend instead of changing the CAD axis only to
-hide a controller mismatch.
+and measure the real follower mapping ([Calibration, Step 0](../docs/guides/calibration.md#step-0-before-you-start)).
+Correct the per-joint direction/zero mapping instead of changing the CAD axis
+only to hide a controller mismatch.
 
 **Running without a desktop:** The interactive viewer needs a display. For
 offscreen LeRobot camera rendering on a Linux server, set `MUJOCO_GL=egl` and
@@ -705,7 +697,7 @@ use record or rollout without launching `examples/nexarm/simulate.py`.
 1. Confirm on hardware that the physical follower's raw zero and direction
    match the simulation for all six joints (especially `shoulder_lift`).
    `calibrate_sim.py` already fits latency and per-joint gain, damping and
-   friction from real recordings (see `docs/guides/sim-calibration.md`).
+   friction from real recordings (see `docs/guides/calibration.md`).
 2. Identify servo deadband and backlash. The servo model above covers torque, speed, acceleration and
    stiffness; `motion_speed` caps nothing on the real arm, so it is not modelled.
 3. Add sensor noise and physical friction measurements; control delay, camera
