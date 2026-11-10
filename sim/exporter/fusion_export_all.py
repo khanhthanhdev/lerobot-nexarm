@@ -86,12 +86,6 @@ def _to_arm(point, world_to_arm):
     return _mm(p)
 
 
-def _rotate(vector, matrix):
-    v = vector.copy()
-    v.transformBy(matrix)
-    return [v.x, v.y, v.z]
-
-
 def _rotation(matrix):
     return [[matrix.getCell(i, j) for j in range(3)] for i in range(3)]
 

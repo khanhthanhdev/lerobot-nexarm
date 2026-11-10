@@ -12,10 +12,8 @@ import shutil
 import tarfile
 import tempfile
 import uuid
-from collections.abc import Iterator
 from pathlib import Path
 
-CHUNK = 1024 * 1024
 # A LeRobot dataset with video can be tens of GB; the cap only stops a runaway or hostile stream.
 DEFAULT_MAX_BYTES = 200 * 1024**3
 
@@ -31,12 +29,6 @@ def pack(directory: Path, scratch: Path) -> Path:
     with tarfile.open(target, "w:gz") as tar:
         tar.add(directory, arcname=".")
     return target
-
-
-def read_chunks(path: Path) -> Iterator[bytes]:
-    with open(path, "rb") as f:
-        while chunk := f.read(CHUNK):
-            yield chunk
 
 
 def _check_member(member: tarfile.TarInfo) -> None:

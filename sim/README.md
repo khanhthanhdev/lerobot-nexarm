@@ -568,12 +568,6 @@ environment (`--env.type=nexarm`) exposes the benchmark's calibration, delay and
 randomization options as `--env.calibration_path`, `--env.action_delay_steps`
 and `--env.enable_domain_randomization`.
 
-The same entry point is available as:
-
-```bash
-MUJOCO_GL=egl uv run python tools/nexarm/benchmark_sim.py --policy act=PATH
-```
-
 ## 11. Re-export from Fusion 360
 
 The Fusion design is the source of truth for geometry, mass and the workcell. The

@@ -14,9 +14,8 @@ Two session kinds share one wire protocol (JSON over a WebSocket, joints only):
   actions, shows the station's joints, and measures the round trip.
 
 The station never trusts the stream: every action is validated, clamped to the soft limits and
-rate-limited relative to its own last command. Transport is a direct WebSocket (see
-plans/reports/spike-261014-0950-remote-teleop-transport.md); the protocol is kept apart from the sockets so
-another transport can carry it.
+rate-limited relative to its own last command. Transport is a direct WebSocket; the protocol is kept apart
+from the sockets so another transport can carry it.
 """
 
 import contextlib

@@ -74,11 +74,6 @@ class SceneSpec:
         raw = np.clip(raw, m["raw_low"], m["raw_high"])
         return np.clip(m["scale"] * raw + m["offset"], m["target_low"], m["target_high"])
 
-    def target_to_raw(self, target: np.ndarray) -> np.ndarray:
-        m = self.action_map
-        target = np.clip(target, m["target_low"], m["target_high"])
-        return np.clip((target - m["offset"]) / m["scale"], m["raw_low"], m["raw_high"])
-
     def home_joint_positions(self) -> dict[str, float]:
         """Every robot joint at the follower's home pose (undriven joints at 0)."""
         targets = self.raw_to_target(self.action_map["home_raw"])

@@ -74,7 +74,6 @@ nosetests.xml
 coverage.xml
 *.cover
 *.py,cover
-!tests/artifacts
 
 ### Logs & Temporary Files ###
 logs/
@@ -183,7 +182,6 @@ sim/*
 # sim/fusion_export/ is Fusion export staging (meshes + fusion_extract.json), merged into sim/description/.
 !sim/run_export.py
 !sim/test_sim_models.py
-!sim/visualize_rerun.py
 !sim/exporter/
 !sim/exporter/**
 !sim/isaac_lab/

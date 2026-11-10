@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any, Protocol
 
@@ -27,14 +27,6 @@ class SkillBackend(Protocol):
         self, joints: npt.NDArray[np.float64], gripper_raw: float, steps: int
     ) -> dict[str, Any]: ...
     def evaluate(self) -> dict[str, Any]: ...
-
-
-@dataclass
-class Trace:
-    stage: str
-    attempt: int
-    target_xyz: list[float]
-    result: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass

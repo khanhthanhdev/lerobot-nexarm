@@ -15,8 +15,9 @@ Each folder's README holds the status, the commands and the results; update this
 | [261027-bspline-stack-bowls-single-order](261027-bspline-stack-bowls-single-order/README.md) | B-spline Policy as the non-language baseline for the DEM run            | Results table empty                                          |
 | [261027-plan-bind-two-step](261027-plan-bind-two-step/README.md)                             | Plan-Bind D1: does it beat the one-step control under latency?          | Run once: ahead in all 8 cells                               |
 | [261028-plan-bind-d2-latency](261028-plan-bind-d2-latency/README.md)                         | Plan-Bind D2: measured inference latency and update rate                | Run                                                          |
-| [261028-plan-bind-d3-pusht](261028-plan-bind-d3-pusht/README.md)                             | Plan-Bind D3: does the lead hold on Push-T's human demonstrations?      | Ready, not run                                               |
+| [261028-plan-bind-d3-pusht](261028-plan-bind-d3-pusht/README.md)                             | Plan-Bind D3: does the lead hold on Push-T's human demonstrations?      | Run: the stack-bowls lead does not carry over                |
 | [261029-plan-bind-d1b-seeds](261029-plan-bind-d1b-seeds/README.md)                           | Plan-Bind D1b: D1 repeated with 3 seeds and a position-bearing control  | Run                                                          |
+| [261105-plan-bind-libero](261105-plan-bind-libero/README.md)                                 | Plan-Bind D4: the same comparison on the four LIBERO suites             | Running (smoke run first)                                    |
 
 ## Convention
 

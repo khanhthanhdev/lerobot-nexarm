@@ -41,7 +41,6 @@ except ImportError:
 ROOT_DIR = Path(__file__).resolve().parent.parent
 SIM_DIR = ROOT_DIR / "sim"
 DESC_DIR = SIM_DIR / "description"
-ASSETS_DIR = SIM_DIR / "assets" / "meshes" / "visual"
 
 
 @dataclass

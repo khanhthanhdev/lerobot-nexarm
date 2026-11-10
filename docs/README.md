@@ -40,7 +40,7 @@ Everything you need to use and develop the Hiwonder NexArm on LeRobot. Pick the 
 1. [`CONTRIBUTING.md`](../CONTRIBUTING.md): setup, tests, pre-commit, upgrading LeRobot, pull requests
 2. [Architecture and conventions](reference/architecture.md)
 3. [`AGENTS.md`](../AGENTS.md): the instructions AI coding agents follow in this repository
-4. [`plans/`](../plans/README.md): open work and past plans
+4. [`plans/`](../plans/README.md): open work
 
 ## Map of the documentation
 

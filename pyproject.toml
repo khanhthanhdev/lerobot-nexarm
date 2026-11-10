@@ -100,13 +100,7 @@ torchcodec = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux' and (pl
 [tool.ruff]
 target-version = "py312"
 line-length = 110
-exclude = [
-    "firmware",
-    "tests/artifacts/**/*.safetensors",
-    "*_pb2.py",
-    "*_pb2_grpc.py",
-    "TurboVLA",
-]
+exclude = ["firmware"]
 [tool.ruff.lint]
 # E, W: pycodestyle errors and warnings
 # F: PyFlakes
@@ -206,7 +200,6 @@ files = [
     "packages/nexarm_service/src",
     "scripts",
 ]
-exclude = ['_pb2(_grpc)?\.py$']
 exclude_gitignore = true
 warn_redundant_casts = true
 extra_checks = true
