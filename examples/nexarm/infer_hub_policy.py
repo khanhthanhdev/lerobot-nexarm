@@ -2,13 +2,15 @@
 
 # Run a NexArm policy that is already on the Hugging Face Hub: TurboVLA, B-spline Policy or Plan-Bind.
 #
-# The script downloads only the chosen checkpoint, converts the TurboVLA checkpoint (saved by the former
-# train_turbovla.py) into a LeRobot policy folder once, then runs it in the MuJoCo stack-bowls env
+# The script downloads only the chosen checkpoint into a plain folder, outputs/models/stack_bowls/<preset>,
+# the first time (the TurboVLA checkpoint of the former train_turbovla.py is converted into a LeRobot policy
+# there), then runs it from that folder in the MuJoCo stack-bowls env
 # (`--target sim`, lerobot-nexarm-eval: success rate and per-stage rates) or on the real follower
 # (`--target real`, examples/nexarm/rollout.py). Every flag the script does not know is passed on to
 # that command, for example `--eval.n_episodes=50` in sim or `--follower-port COM19 --no-top-cam` on the arm.
 #
 # Usage:
+#   uv run python examples/nexarm/infer_hub_policy.py planbind --download-only   # fetch weights, run later
 #   MUJOCO_GL=egl uv run python examples/nexarm/infer_hub_policy.py planbind
 #   uv run python examples/nexarm/infer_hub_policy.py bspline --target real --follower-port /dev/ttyUSB1
 #   uv run python examples/nexarm/infer_hub_policy.py turbovla --target real \
@@ -21,6 +23,8 @@
 # running them on the real arm, see docs/guides/calibration.md.
 
 import argparse
+import re
+import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -30,7 +34,7 @@ from huggingface_hub import HfApi, snapshot_download
 
 STACK_BOWLS_TASK = "NexArmStackBowls-v0"
 POLICY_CONFIG = "pretrained_model/config.json"
-CONVERTED_ROOT = Path("outputs/hub_policies")
+MODELS_DIR = Path("outputs/models/stack_bowls")
 
 
 @dataclass(frozen=True)
@@ -78,6 +82,15 @@ def parse_args(argv: list[str] | None = None) -> tuple[argparse.Namespace, list[
     )
     parser.add_argument("--n-episodes", type=int, default=20, help="Sim only: episodes to evaluate")
     parser.add_argument("--output-dir", type=Path, help="Sim only (default: outputs/eval/hub_<policy>)")
+    parser.add_argument(
+        "--models-dir",
+        type=Path,
+        default=MODELS_DIR,
+        help=f"Where the policy folders are kept, one per model (default: {MODELS_DIR})",
+    )
+    parser.add_argument(
+        "--download-only", action="store_true", help="Download (and convert) the model, then exit"
+    )
     parser.add_argument("--list", action="store_true", help="List the policy folders in the repo and exit")
     return parser.parse_known_args(argv)
 
@@ -101,27 +114,37 @@ def list_policies(repo_id: str, revision: str | None) -> list[str]:
     return folders + sorted(f for f in files if f.endswith("_pytorch_model.pt"))
 
 
-def download_policy(preset: Preset, revision: str | None) -> Path:
-    """A local LeRobot policy folder for the preset, downloading only its files."""
+def model_name(args: argparse.Namespace, preset: Preset) -> str:
+    """Folder name under --models-dir: the preset name, or a name for the repo and checkpoint chosen."""
+    if args.repo_id is None and args.subfolder is None and args.checkpoint_file is None:
+        return args.policy
+    source = f"{preset.repo_id}/{preset.subfolder or preset.turbovla_checkpoint or 'root'}"
+    return f"{args.policy}--" + re.sub(r"[^\w.-]+", "_", source).strip("_")
+
+
+def download_policy(preset: Preset, revision: str | None, folder: Path) -> Path:
+    """Make `folder` a LeRobot policy folder for the preset, downloading only its files the first time."""
+    if (folder / "config.json").is_file():
+        return folder
+    # Files land in .hub/<name> first; a second run resumes an interrupted download from there.
+    staging = folder.parent / ".hub" / folder.name
     if preset.turbovla_checkpoint:
-        return convert_turbovla(preset, revision)
+        return convert_turbovla(preset, revision, staging, folder)
     pattern = f"{preset.subfolder}/*" if preset.subfolder else "*"
-    root = snapshot_download(preset.repo_id, revision=revision, allow_patterns=[pattern])
-    folder = Path(root) / preset.subfolder
-    if not (folder / "config.json").is_file():
+    snapshot_download(preset.repo_id, revision=revision, allow_patterns=[pattern], local_dir=staging)
+    source = staging / preset.subfolder
+    if not (source / "config.json").is_file():
         raise SystemExit(
             f"No policy at {preset.repo_id}/{preset.subfolder or '(root)'}. "
             f"Run with --list to see the folders it has."
         )
+    shutil.move(source, folder)
     return folder
 
 
-def convert_turbovla(preset: Preset, revision: str | None) -> Path:
-    """Download a former train_turbovla.py checkpoint and convert it once into a LeRobot policy folder."""
+def convert_turbovla(preset: Preset, revision: str | None, staging: Path, folder: Path) -> Path:
+    """Download a former train_turbovla.py checkpoint and convert it into a LeRobot policy folder."""
     checkpoint = preset.turbovla_checkpoint or ""
-    output_dir = CONVERTED_ROOT / preset.repo_id.replace("/", "--") / Path(checkpoint).stem
-    if (output_dir / "config.json").is_file():
-        return output_dir
     try:
         from lerobot_policy_turbovla.convert_checkpoint import convert_checkpoint
     except ImportError as error:
@@ -129,14 +152,15 @@ def convert_turbovla(preset: Preset, revision: str | None) -> Path:
             f"TurboVLA is not installed ({error}); add --extra turbovla to your uv sync line."
         ) from error
     # The converter reads the horizon, cameras and statistics saved next to the weights.
-    root = snapshot_download(
+    snapshot_download(
         preset.repo_id,
         revision=revision,
         allow_patterns=[checkpoint, "config.json", "stats_*.json", "stats.json"],
+        local_dir=staging,
     )
-    print(f"Converting {preset.repo_id}/{checkpoint} into {output_dir} (once)...")
+    print(f"Converting {preset.repo_id}/{checkpoint} into {folder}...")
     # The DINOv3 and BERT backbones are fetched from the Hub the first time.
-    return convert_checkpoint(Path(root) / checkpoint, output_dir, local_files_only=False)
+    return convert_checkpoint(staging / checkpoint, folder, local_files_only=False)
 
 
 def command(args: argparse.Namespace, preset: Preset, policy_path: Path, extra: list[str]) -> list[str]:
@@ -179,7 +203,10 @@ def main() -> None:
     ):
         # In sim the env supplies the prompt; on the arm TurboVLA needs the one it was trained with.
         raise SystemExit('TurboVLA on the real arm needs its training prompt: add --task "<prompt>".')
-    policy_path = download_policy(preset, args.revision)
+    policy_path = download_policy(preset, args.revision, args.models_dir / model_name(args, preset))
+    if args.download_only:
+        print(f"Policy ready: {policy_path}")
+        return
     cmd = command(args, preset, policy_path, extra)
     print("Running:", subprocess.list2cmdline(cmd))
     subprocess.run(cmd, check=True)

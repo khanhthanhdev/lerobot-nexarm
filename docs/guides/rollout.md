@@ -53,7 +53,7 @@ uv run python examples/nexarm/rollout.py --follower-port /dev/ttyUSB1 --front-ca
 
 ### Models already on the Hub: TurboVLA, B-spline Policy, Plan-Bind
 
-[`examples/nexarm/infer_hub_policy.py`](../../examples/nexarm/infer_hub_policy.py) runs the published stack-bowls models by name. It downloads only the chosen checkpoint, converts the TurboVLA checkpoint into a LeRobot policy once (under `outputs/hub_policies/`), then runs it in the MuJoCo stack-bowls env (default) or on the arm:
+[`examples/nexarm/infer_hub_policy.py`](../../examples/nexarm/infer_hub_policy.py) runs the published stack-bowls models by name. The first time, it downloads only the chosen checkpoint into a plain folder, `outputs/models/stack_bowls/<preset>` (`--models-dir` moves it, `--download-only` stops there), converting the TurboVLA checkpoint into a LeRobot policy; then it runs the model from that folder in the MuJoCo stack-bowls env (default) or on the arm. On the collection rig, follow [Rolling out the stack-bowls models](stack-bowls-rollout.md) step by step:
 
 | Preset     | Hub repo                                          | Model                                                                                                                         | Trained on                                                                        |
 | ---------- | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |

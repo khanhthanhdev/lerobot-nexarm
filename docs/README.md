@@ -60,6 +60,7 @@ Everything you need to use and develop the Hiwonder NexArm on LeRobot. Pick the 
 | Guides             | [Pipeline](guides/pipeline.md)                                                | Record, inspect, train, roll out, benchmark                              |
 |                    | [Data collection](guides/data-collection.md)                                  | The stack-bowls collection rig                                           |
 |                    | [Rollout](guides/rollout.md)                                                  | Run policies on the arm and in sim, strategies, DAgger, success rate     |
+|                    | [Stack-bowls rollout](guides/stack-bowls-rollout.md)                          | Download the published models and run them on the rig, step by step      |
 |                    | [Training tips](guides/training-tips.md)                                      | Data quality, policy choice, training length, evaluation                 |
 |                    | [TurboVLA](guides/turbovla.md)                                                | TurboVLA install, training, rollout, checkpoint conversion               |
 |                    | [Sim training](guides/sim-training.md)                                        | Multi-GPU dataset generation and training                                |

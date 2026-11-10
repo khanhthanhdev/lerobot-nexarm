@@ -197,7 +197,7 @@ MUJOCO_GL=egl uv run lerobot-eval --policy.path=<checkpoint> \
     --env.type=nexarm --env.task=NexArmStackBowls-v0 --eval.n_episodes=20
 ```
 
-The published TurboVLA, B-spline and Plan-Bind models run by name, in sim or with `--target real` on the arm: `uv run python examples/nexarm/infer_hub_policy.py planbind` ([Rollout, Models already on the Hub](guides/rollout.md#models-already-on-the-hub-turbovla-b-spline-policy-plan-bind)).
+The published TurboVLA, B-spline and Plan-Bind stack-bowls models run by name: `./scripts/nexarm/rollout_stack_bowls.sh planbind` on the rig ([Stack-bowls rollout](guides/stack-bowls-rollout.md)).
 
 Give the policy exactly the cameras it was trained on (`--no-top-cam` for 2-camera checkpoints) and the same task prompt. Keep a hand near the power the first time you run a new checkpoint. Record rollouts as evaluation datasets with `--strategy sentry --repo-id "${HF_USER}/eval_<name>"`. Strategies, `lerobot-rollout` options, DAgger, measuring the success rate and troubleshooting: [Rolling out a trained policy](guides/rollout.md).
 
