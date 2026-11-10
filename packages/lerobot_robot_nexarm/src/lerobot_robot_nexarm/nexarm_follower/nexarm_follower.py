@@ -119,9 +119,21 @@ class NexArmFollower(Robot):
         self.bus.set_torque(True)
         self._last_action_time = time.time()
         self._is_idle_relaxed = False
+        # After this setup the AT32 answers the first CMD 96 or so with garbage (e.g. shoulder_pan 2 or 828)
+        # in about a quarter of connects, and it became frame 0 of the first episode. Read until two
+        # consecutive readings agree, so the first observation is real and has a previous value to check against.
+        prev = self.bus.read_positions()
+        for _ in range(5):
+            positions = self.bus.read_positions()
+            if max(abs(a - b) for a, b in zip(positions, prev, strict=True)) <= self._MAX_SETTLE_DELTA:
+                break
+            prev = positions
+        self._prev_positions = positions
 
     # Velocity watchdog: warn when a joint jumps more than this per tick.
     _MAX_POS_DELTA = 300
+    # Two settle reads at connect agree when no joint differs by more than this.
+    _MAX_SETTLE_DELTA = 20
 
     # Positions suspiciously close to 0 or 4095 are treated as corrupt reads.
     # The firmware occasionally returns these on a dropped/corrupted packet.

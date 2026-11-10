@@ -92,10 +92,10 @@ def test_observation_reuses_previous_values_for_corrupt_reads(follower) -> None:
     robot, bus = follower
     bus.read_positions.side_effect = [
         [100, 200, 300, 400, 500, 600],
+        [100, 200, 300, 400, 500, 600],
         [0, 4095, 301, 401, 501, 601],
     ]
     connect(robot)
-    robot.get_observation()
 
     observation = robot.get_observation()
 
@@ -104,9 +104,28 @@ def test_observation_reuses_previous_values_for_corrupt_reads(follower) -> None:
     assert observation["elbow_flex.pos"] == 301.0
 
 
+def test_connect_discards_garbage_reads_before_the_first_observation(follower) -> None:
+    # The AT32 sometimes answers the first CMD 96 after connect with garbage; it must not become frame 0.
+    robot, bus = follower
+    real = [2856, 1591, 1630, 2212, 1740, 2784]
+    bus.read_positions.side_effect = [
+        [2, 0, 4095, 4095, 544, 4095],
+        [828, 1591, 1630, 2212, 1740, 2784],
+        real,
+        real,
+        real,
+    ]
+    connect(robot)
+
+    observation = robot.get_observation()
+
+    assert [observation[f"{name}.pos"] for name in JOINT_NAMES] == real
+
+
 def test_send_action_clamps_rounds_and_returns_command(follower) -> None:
     robot, bus = follower
     connect(robot)
+    bus.read_positions.reset_mock()
     values = [-100.0, 5000.0, 2048.7, 400.0, 500.0, 600.0]
     action = {f"{name}.pos": value for name, value in zip(JOINT_NAMES, values, strict=True)}
 
