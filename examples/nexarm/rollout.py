@@ -16,6 +16,13 @@
 #       --follower-port COM19 --no-top-cam \
 #       --policy-path YOUR_HF_USERNAME/nexarm_act
 #
+# Usage — DAgger: the policy drives the follower, you correct it with the leader arm
+# (space pauses/resumes, tab starts/ends a correction, enter uploads):
+#   python examples/nexarm/rollout.py \
+#       --leader-port /dev/ttyUSB0 --follower-port /dev/ttyUSB1 \
+#       --policy-path outputs/train/nexarm_act/checkpoints/last/pretrained_model \
+#       --strategy dagger --repo-id YOUR_HF_USERNAME/nexarm_dagger --task "Pick up the cube"
+#
 # Alternatively, use the CLI directly:
 #   lerobot-rollout \
 #       --strategy.type=base \
@@ -45,6 +52,11 @@ IMAGE_PREFIX = "observation.images."
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description="Run NexArm inference")
     parser.add_argument("--follower-port", default="/dev/ttyUSB1")
+    parser.add_argument(
+        "--leader-port",
+        default="/dev/ttyUSB0",
+        help="Leader arm serial port, used by --strategy dagger for human corrections",
+    )
     parser.add_argument("--policy-path", required=True, help="Local checkpoint dir or HF Hub repo id")
     parser.add_argument("--fps", type=int, default=30, help="Control loop and camera frame rate")
     add_camera_args(parser)
@@ -97,11 +109,9 @@ def policy_camera_names(policy_path: str) -> list[str]:
     return [key.removeprefix(IMAGE_PREFIX) for key in config.image_features]
 
 
-def main():
-    args = parse_args()
-    check_policy_cameras(camera_names(args), policy_camera_names(args.policy_path), args.policy_path)
+def rollout_command(args: argparse.Namespace) -> list[str]:
+    """The ``lerobot-nexarm-rollout`` command for the parsed arguments."""
     cameras_json = json.dumps(build_camera_dicts(args, args.fps))
-
     cmd = [
         sys.executable,
         "-m",
@@ -116,6 +126,9 @@ def main():
         "--display_data=true",
     ]
 
+    if args.strategy == "dagger":
+        # DAgger hands control to the leader for corrections, so LeRobot needs the teleoperator.
+        cmd += ["--teleop.type=nexarm_leader", f"--teleop.port={args.leader_port}"]
     if args.task:
         cmd.append(f"--task={args.task}")
     if args.duration > 0:
@@ -124,8 +137,13 @@ def main():
         cmd.append(f"--dataset.repo_id={args.repo_id}")
     if args.rerun_save_path:
         cmd.append(f"--rerun_save_path={args.rerun_save_path}")
+    return cmd
 
-    subprocess.run(cmd, check=True)
+
+def main():
+    args = parse_args()
+    check_policy_cameras(camera_names(args), policy_camera_names(args.policy_path), args.policy_path)
+    subprocess.run(rollout_command(args), check=True)
 
 
 if __name__ == "__main__":

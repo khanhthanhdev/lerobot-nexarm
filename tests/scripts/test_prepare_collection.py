@@ -122,3 +122,44 @@ def test_rollout_reads_policy_image_inputs(monkeypatch, tmp_path, policy_type):
     args = rollout.parse_args(["--policy-path", "owner/policy"])
     assert args.follower_port == "/dev/ttyUSB1"
     assert camera_config.camera_names(args) == ["front", "wrist", "top"]
+
+
+@pytest.mark.parametrize("strategy", ["base", "dagger"])
+def test_rollout_command_is_a_valid_lerobot_rollout_config(monkeypatch, tmp_path, strategy):
+    from lerobot.cameras.opencv import OpenCVCameraConfig  # noqa: F401  # registers the "opencv" camera type
+    from lerobot.configs import parser
+    from lerobot.configs.types import FeatureType, PolicyFeature
+    from lerobot.policies.act import ACTConfig
+    from lerobot.rollout.configs import RolloutConfig
+    from lerobot.utils import register_third_party_plugins
+
+    register_third_party_plugins()
+    ACTConfig(
+        input_features={
+            "observation.state": PolicyFeature(type=FeatureType.STATE, shape=(6,)),
+            "observation.images.front": PolicyFeature(type=FeatureType.VISUAL, shape=(3, 480, 640)),
+            "observation.images.wrist": PolicyFeature(type=FeatureType.VISUAL, shape=(3, 480, 640)),
+        },
+        output_features={"action": PolicyFeature(type=FeatureType.ACTION, shape=(6,))},
+        device="cpu",
+    ).save_pretrained(tmp_path)
+    dataset_args = ["--repo-id", "local/nexarm_dagger"] if strategy == "dagger" else []
+    args = rollout.parse_args(
+        ["--policy-path", str(tmp_path), "--no-top-cam", "--leader-port", "COM18", "--follower-port", "COM19"]
+        + ["--strategy", strategy, "--task", "Pick up the cube", *dataset_args]
+    )
+
+    @parser.wrap()
+    def load(cfg: RolloutConfig) -> RolloutConfig:
+        return cfg
+
+    # The command runs `python -m <module> <flags>`; LeRobot's parser reads the flags from sys.argv.
+    monkeypatch.setattr(sys, "argv", ["lerobot-rollout", *rollout.rollout_command(args)[3:]])
+    cfg = load()
+    assert (cfg.robot.type, cfg.robot.port) == ("nexarm_follower", "COM19")
+    if strategy == "dagger":
+        # DAgger hands control to the leader arm for corrections; LeRobot refuses it without one.
+        assert (cfg.teleop.type, cfg.teleop.port) == ("nexarm_leader", "COM18")
+        assert cfg.dataset.single_task == "Pick up the cube"
+    else:
+        assert cfg.teleop is None
