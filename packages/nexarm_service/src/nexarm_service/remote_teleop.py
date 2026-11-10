@@ -27,7 +27,7 @@ import time
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
 
-from lerobot_robot_nexarm.motors.nexarm import JOINT_NAMES
+from lerobot_robot_nexarm.motors.nexarm import DEFAULT_FPS, JOINT_NAMES
 from nexarm_service import API_VERSION
 from nexarm_service.arm_worker import JOINT_PUBLISH_EVERY, ArmWorker, joint_update_payload
 from nexarm_service.events import EventHub
@@ -36,7 +36,6 @@ from nexarm_service.safety import clamp_action
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_FPS = 30
 DEFAULT_RATE_CAP_TICKS_S = 1500.0
 SILENCE_S = 1.0
 SOFT_START_S = 1.0

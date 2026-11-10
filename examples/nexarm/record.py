@@ -41,6 +41,7 @@ import sys
 from pathlib import Path
 
 from lerobot_robot_nexarm.camera_config import CameraSetupError, add_camera_args, build_camera_dicts
+from lerobot_robot_nexarm.motors.nexarm import DEFAULT_FPS
 
 
 def parse_args():
@@ -52,7 +53,7 @@ def parse_args():
     parser.add_argument("--num-episodes", type=int, default=50)
     parser.add_argument("--episode-time", type=int, default=10, help="Seconds per episode")
     parser.add_argument("--reset-time", type=int, default=10, help="Seconds to reset between episodes")
-    parser.add_argument("--fps", type=int, default=30)
+    parser.add_argument("--fps", type=int, default=DEFAULT_FPS, help="Record rate (default: %(default)s)")
     add_camera_args(parser)
     parser.add_argument("--push-to-hub", action="store_true")
     parser.add_argument(
@@ -64,7 +65,7 @@ def parse_args():
 
 def main():
     args = parse_args()
-    cameras_json = json.dumps(build_camera_dicts(args, args.fps))
+    cameras_json = json.dumps(build_camera_dicts(args))
 
     cmd = [
         sys.executable,

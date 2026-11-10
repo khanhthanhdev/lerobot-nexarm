@@ -32,5 +32,5 @@ teleop:
   port: /dev/ttyUSB0
   baudrate: 1000000
 
-fps: 30
+fps: 20  # control rate; cameras capture at 30 fps
 display_data: false

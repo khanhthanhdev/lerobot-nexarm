@@ -28,6 +28,7 @@ from lerobot.processor import make_default_processors
 from lerobot.utils.constants import ACTION, OBS_STR
 from lerobot.utils.feature_utils import build_dataset_frame, combine_feature_dicts
 from lerobot.utils.robot_utils import precise_sleep
+from lerobot_robot_nexarm.motors.nexarm import DEFAULT_FPS
 from nexarm_service.arm_worker import JOINT_PUBLISH_EVERY, ArmWorker, joint_update_payload
 from nexarm_service.events import EventHub
 from nexarm_service.profiles import RobotProfile
@@ -56,7 +57,7 @@ class RecordingWorker(ArmWorker):
         self._cfg = DatasetRecordConfig(
             repo_id=params["repo_id"],
             single_task=params["task"],
-            fps=int(params.get("fps", 30)),
+            fps=int(params.get("fps", DEFAULT_FPS)),
             episode_time_s=float(params.get("episode_time_s", 20)),
             reset_time_s=float(params.get("reset_time_s", 10)),
             num_episodes=int(params.get("num_episodes", 50)),

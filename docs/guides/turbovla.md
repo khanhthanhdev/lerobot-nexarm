@@ -70,13 +70,13 @@ Domain randomization is on by default (`--no-dr` disables it). Generation flags 
 
 ### Option B: Real Hardware Demonstration Recording
 
-Collect real stack-bowls demonstrations with the collection launcher, which merges sessions into the local root `thanhkt/nexarm_stack_bowls_top` (front, wrist, top). See [Data collection](data-collection.md):
+Collect real stack-bowls demonstrations with the collection launcher, which merges sessions into the local root `thanhkt/nexarm_stack_bowls_top_20fps` (front, wrist, top). See [Data collection](data-collection.md):
 
 ```bash
 ./scripts/nexarm/collect.sh --num-episodes 50
 ```
 
-The merged root lives at `~/.cache/huggingface/lerobot/thanhkt/nexarm_stack_bowls_top`; pass that directory as `--dataset.root` (with `--dataset.repo_id=thanhkt/nexarm_stack_bowls_top`) below. Its prompt is _"Stack the bowls with red on bottom, blue in middle, and black on top."_
+The merged root lives at `~/.cache/huggingface/lerobot/thanhkt/nexarm_stack_bowls_top_20fps`; pass that directory as `--dataset.root` (with `--dataset.repo_id=thanhkt/nexarm_stack_bowls_top_20fps`) below. Its prompt is _"Stack the bowls with red on bottom, blue in middle, and black on top."_
 
 ---
 

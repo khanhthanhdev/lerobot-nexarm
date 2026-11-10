@@ -17,6 +17,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from lerobot_robot_nexarm.motors.nexarm import DEFAULT_FPS
 from nexarm_service.arm_worker import JOINT_PUBLISH_EVERY, FollowerGuard, joint_update_payload
 from nexarm_service.events import EventHub
 from nexarm_service.hardware_factory import follower_config, leader_config
@@ -73,7 +74,7 @@ class RolloutApi:
                 repo_id=repo_id,
                 single_task=task,
                 root=datasets_root / repo_id,
-                fps=int(params.get("fps", 30)),
+                fps=int(params.get("fps", DEFAULT_FPS)),
                 episode_time_s=float(params.get("episode_time_s", 30)),
                 reset_time_s=float(params.get("reset_time_s", 10)),
                 num_episodes=int(params.get("num_episodes", 5)),
@@ -93,7 +94,7 @@ class RolloutApi:
                 repo_id=repo_id,
                 single_task=task,
                 root=datasets_root / repo_id,
-                fps=int(params.get("fps", 30)),
+                fps=int(params.get("fps", DEFAULT_FPS)),
                 num_episodes=episodes,
                 push_to_hub=False,
             )
@@ -107,7 +108,7 @@ class RolloutApi:
             policy=policy,
             strategy=strategy,
             dataset=dataset,
-            fps=float(params.get("fps", 30)),
+            fps=float(params.get("fps", DEFAULT_FPS)),
             duration=float(params.get("duration_s", 30 if kind == "rollout" else 0)),
             task=task,
             play_sounds=False,

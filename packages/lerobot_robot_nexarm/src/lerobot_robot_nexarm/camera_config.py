@@ -9,6 +9,9 @@ same camera flags with the same defaults:
   --no-top-cam                   Record/run with front and wrist cameras only
 
 The top RealSense camera is on by default. It needs the ``intelrealsense`` extra (pyrealsense2).
+
+Cameras always capture at ``CAMERA_FPS``, whatever the control rate: the D435i colour stream offers only
+6, 15, 30 and 60 fps, and LeRobot reads the newest frame each step, so a 20 Hz loop records fresh images.
 """
 
 from __future__ import annotations
@@ -23,6 +26,7 @@ DEFAULT_WRIST_CAM = 1
 TOP_CAM_AUTO = "auto"
 DEFAULT_WIDTH = 640
 DEFAULT_HEIGHT = 480
+CAMERA_FPS = 30
 
 
 class CameraSetupError(RuntimeError):
@@ -139,7 +143,6 @@ def realsense_camera_dict(serial: str, fps: int, width: int, height: int) -> dic
 
 def build_camera_dicts(
     args: argparse.Namespace,
-    fps: int,
     width: int = DEFAULT_WIDTH,
     height: int = DEFAULT_HEIGHT,
     top_serial: str | None = None,
@@ -149,23 +152,23 @@ def build_camera_dicts(
     The RealSense is detected here unless ``top_serial`` was already resolved.
     """
     cameras = {
-        "front": opencv_camera_dict(args.front_cam, fps, width, height, args.front_fourcc),
-        "wrist": opencv_camera_dict(args.wrist_cam, fps, width, height, args.wrist_fourcc),
+        "front": opencv_camera_dict(args.front_cam, CAMERA_FPS, width, height, args.front_fourcc),
+        "wrist": opencv_camera_dict(args.wrist_cam, CAMERA_FPS, width, height, args.wrist_fourcc),
     }
     if not args.no_top_cam:
         serial = top_serial or find_realsense_serial(args.top_cam)
-        cameras["top"] = realsense_camera_dict(serial, fps, width, height)
+        cameras["top"] = realsense_camera_dict(serial, CAMERA_FPS, width, height)
     return cameras
 
 
 def build_camera_configs(
-    args: argparse.Namespace, fps: int, width: int = DEFAULT_WIDTH, height: int = DEFAULT_HEIGHT
+    args: argparse.Namespace, width: int = DEFAULT_WIDTH, height: int = DEFAULT_HEIGHT
 ) -> dict[str, Any]:
     """Camera config objects for constructing a ``NexArmFollowerConfig`` directly."""
     from lerobot.cameras.opencv import OpenCVCameraConfig
 
     configs: dict[str, Any] = {}
-    for name, config in build_camera_dicts(args, fps, width, height).items():
+    for name, config in build_camera_dicts(args, width, height).items():
         kwargs = {key: value for key, value in config.items() if key != "type"}
         if config["type"] == "opencv":
             configs[name] = OpenCVCameraConfig(**kwargs)

@@ -12,7 +12,7 @@ From this checkout, run:
 ./scripts/nexarm/collect.sh
 ```
 
-The launcher checks access to the selected USB devices (automatically runs `sudo chmod 666` only if necessary), tests all cameras together at 640×480 / 30 fps, saves snapshots under `outputs/collection/<timestamp>/`, and connects the recorder. If sudo is needed, Linux may ask for your password. Defaults: leader `/dev/ttyUSB0`, follower `/dev/ttyUSB1`, Logitech front camera (MJPG) and icSpring wrist camera (YUYV) via stable `/dev/v4l/by-id/` paths, and the RealSense D435i `top` camera auto-detected (exactly one connected; pass `--top-cam <SERIAL>` otherwise). Any flag you pass overrides these, for example if your cables use different ports:
+The launcher checks access to the selected USB devices (automatically runs `sudo chmod 666` only if necessary), tests all cameras together at 640×480 / 30 fps (the cameras always capture at 30 fps; the session records at 20 fps, see [Pipeline](pipeline.md#record-rate)), saves snapshots under `outputs/collection/<timestamp>/`, and connects the recorder. If sudo is needed, Linux may ask for your password. Defaults: leader `/dev/ttyUSB0`, follower `/dev/ttyUSB1`, Logitech front camera (MJPG) and icSpring wrist camera (YUYV) via stable `/dev/v4l/by-id/` paths, and the RealSense D435i `top` camera auto-detected (exactly one connected; pass `--top-cam <SERIAL>` otherwise). Any flag you pass overrides these, for example if your cables use different ports:
 
 ```bash
 ./scripts/nexarm/collect.sh --leader-port /dev/ttyUSB1 --follower-port /dev/ttyUSB0
@@ -40,10 +40,10 @@ The terminal shows a large **saved episode count** and the current phase:
 
 Recording and reset have no timeout. Keys are ignored while saving (except quit), so wait for the reset screen before pressing again. Keep the terminal focused. Routine logs go to `outputs/collection/<timestamp>/recording.log`; setup/recording failures are printed.
 
-Defaults collect 50 bowl-stacking episodes into a timestamped local session (`thanhkt/nexarm_stack_bowls_<YYYYMMDD_HHMMSS>`). When you press **Esc / q** or reach the episode limit, the session automatically merges into the **local** root dataset `thanhkt/nexarm_stack_bowls_top` (front, wrist and top cameras):
+Defaults collect 50 bowl-stacking episodes into a timestamped local session (`thanhkt/nexarm_stack_bowls_<YYYYMMDD_HHMMSS>`). When you press **Esc / q** or reach the episode limit, the session automatically merges into the **local** root dataset `thanhkt/nexarm_stack_bowls_top_20fps` (front, wrist and top cameras):
 
 ```text
-~/.cache/huggingface/lerobot/thanhkt/nexarm_stack_bowls_top
+~/.cache/huggingface/lerobot/thanhkt/nexarm_stack_bowls_top_20fps
 ```
 
 **The collector never uploads or modifies the Hub dataset.** The screen shows **MERGING DATA...** until completion. Existing root episodes are preserved. The previous local root is kept at the sibling path `nexarm_stack_bowls_top.previous`; session recordings are also retained. If the local root does not exist yet, its Hub version is downloaded once as the starting point; if the Hub has no such dataset either, the first session creates the root. Checking the Hub needs a login (`hf auth login`): without one, a private root looks missing, so the collector stops instead of creating it. Subsequent merges use the local root and work offline.
@@ -87,7 +87,7 @@ Wire the arms and cameras, find the ports and check teleoperation as in the [Har
 
 ## 2. Record Demonstrations
 
-`collect.sh` above is the recommended path. The equivalent command follows. It runs `examples/nexarm/record_collection.py`, which is `lerobot-record` plus the NexArm collection flags (`--manual_control`, `--root_repo_id`, `--merge_root`, `--rerun_save_path`); its cameras must match the root (`thanhkt/nexarm_stack_bowls_top` has front, wrist and top).
+`collect.sh` above is the recommended path. The equivalent command follows. It runs `examples/nexarm/record_collection.py`, which is `lerobot-record` plus the NexArm collection flags (`--manual_control`, `--root_repo_id`, `--merge_root`, `--rerun_save_path`); its cameras must match the root (`thanhkt/nexarm_stack_bowls_top_20fps` has front, wrist and top).
 
 ### Step 2.1: Set Hugging Face User
 
@@ -108,6 +108,7 @@ uv run python examples/nexarm/record_collection.py \
     --dataset.repo_id="${HF_USER}/nexarm_stack_bowls" \
     --dataset.single_task="Stack the bowls with red on bottom, blue in middle, and black on top." \
     --dataset.num_episodes=50 \
+    --dataset.fps=20 \
     --dataset.episode_time_s=inf \
     --dataset.reset_time_s=inf \
     --dataset.streaming_encoding=true \
@@ -116,12 +117,12 @@ uv run python examples/nexarm/record_collection.py \
     --play_sounds=false \
     --manual_control=true \
     --dataset.push_to_hub=false \
-    --root_repo_id=thanhkt/nexarm_stack_bowls_top
+    --root_repo_id=thanhkt/nexarm_stack_bowls_top_20fps
 ```
 
 For the 2-camera root, remove the `top` entry and use `--root_repo_id=thanhkt/nexarm_stack_bowls`.
 
-The recorder appends `_YYYYMMDD_HHMMSS` to `--dataset.repo_id` and prints the final `Dataset repo_id:` and `Dataset root:` when it finishes. Use that printed id in the commands below (shown as `${HF_USER}/nexarm_stack_bowls_<YYYYMMDD_HHMMSS>`), or the merged root `thanhkt/nexarm_stack_bowls_top`.
+The recorder appends `_YYYYMMDD_HHMMSS` to `--dataset.repo_id` and prints the final `Dataset repo_id:` and `Dataset root:` when it finishes. Use that printed id in the commands below (shown as `${HF_USER}/nexarm_stack_bowls_<YYYYMMDD_HHMMSS>`), or the merged root `thanhkt/nexarm_stack_bowls_top_20fps`.
 
 ### Key Parameter Explanations:
 
@@ -176,7 +177,7 @@ uv run lerobot-dataset-viz \
     --episode-index 0
 ```
 
-Use `--repo-id thanhkt/nexarm_stack_bowls_top` (or `--dataset.repo_id=` for replay) to inspect the merged root.
+Use `--repo-id thanhkt/nexarm_stack_bowls_top_20fps` (or `--dataset.repo_id=` for replay) to inspect the merged root.
 
 ---
 

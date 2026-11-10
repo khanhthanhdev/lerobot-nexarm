@@ -77,7 +77,7 @@ The `examples/nexarm/*.py` scripts and `tools/nexarm/prepare_collection.py` shar
 | `--front-fourcc`, `--wrist-fourcc` | auto                      | `MJPG` when frames drop on a shared USB bus             |
 | `--top-cam`                        | auto-detect one RealSense | Its serial when several are connected                   |
 | `--no-top-cam`                     | off                       | On when you have no RealSense or use a 2-camera dataset |
-| `--fps`                            | `30`                      | Control loop, camera and dataset rate                   |
+| `--fps`                            | `20`                      | Control loop and dataset rate (cameras capture at 30)   |
 
 ### LeRobot CLI flags and YAML configs
 
@@ -148,7 +148,7 @@ Keys while recording:
 | **← / r**         | —             | Discard and reset     | —                  |
 | **Esc / q**       | Finish        | Save and finish       | Finish             |
 
-Sessions merge into the local root `thanhkt/nexarm_stack_bowls_top`; nothing is uploaded. Resume a session with `--resume --repo-id <exact timestamped id>`, keep it separate with `--no-merge`, and retry a failed merge with `uv run python tools/nexarm/merge_collection.py --repo-id <session id>`. Details: [Data collection](guides/data-collection.md).
+Sessions merge into the local root `thanhkt/nexarm_stack_bowls_top_20fps`; nothing is uploaded. Resume a session with `--resume --repo-id <exact timestamped id>`, keep it separate with `--no-merge`, and retry a failed merge with `uv run python tools/nexarm/merge_collection.py --repo-id <session id>`. Details: [Data collection](guides/data-collection.md).
 
 ### Your own task
 

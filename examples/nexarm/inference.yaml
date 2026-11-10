@@ -34,12 +34,12 @@ strategy:
 dataset:
   repo_id: local/rollout_nexarm_pick
   single_task: Pick up the object
-  fps: 30
+  fps: 20
   video: true
   push_to_hub: false
   streaming_encoding: true
 
-fps: 30
+fps: 20  # use the fps of the policy's training dataset; cameras capture at 30 fps
 duration: 30
 device: cuda
 task: Pick up the object

@@ -38,7 +38,7 @@ dataset:
   num_episodes: 50
   episode_time_s: 10
   reset_time_s: 10
-  fps: 30
+  fps: 20  # cameras above capture at 30 fps; each step takes the newest frame
   video: true
   push_to_hub: false
 

@@ -11,10 +11,16 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from lerobot_robot_nexarm.camera_config import add_camera_args, build_camera_dicts, find_realsense_serial
+from lerobot_robot_nexarm.camera_config import (
+    CAMERA_FPS,
+    add_camera_args,
+    build_camera_dicts,
+    find_realsense_serial,
+)
+from lerobot_robot_nexarm.motors.nexarm import DEFAULT_FPS
 
 REPO = Path(__file__).resolve().parents[2]
-DEFAULT_ROOT_REPO_ID = "thanhkt/nexarm_stack_bowls_top"
+DEFAULT_ROOT_REPO_ID = "thanhkt/nexarm_stack_bowls_top_20fps"
 
 
 def parse_args(argv=None):
@@ -26,8 +32,9 @@ def parse_args(argv=None):
     parser.add_argument(
         "--root-repo-id",
         default=DEFAULT_ROOT_REPO_ID,
-        help="Merged root dataset (default: %(default)s, 3 cameras, created by the first session). "
-        "For the 2-camera root use --no-top-cam --root-repo-id thanhkt/nexarm_stack_bowls.",
+        help="Merged root dataset (default: %(default)s, 3 cameras at 20 fps, created by the first session). "
+        "For the earlier 30 fps root use --fps 30 --root-repo-id thanhkt/nexarm_stack_bowls_top; for the "
+        "2-camera root use --no-top-cam --root-repo-id thanhkt/nexarm_stack_bowls.",
     )
     parser.add_argument("--no-merge", action="store_true", help="Keep the session separate without merging")
     parser.add_argument("--merge-root", type=Path, help="Local merged root directory")
@@ -35,7 +42,7 @@ def parse_args(argv=None):
         "--task", default="Stack the bowls with red on bottom, blue in middle, and black on top."
     )
     parser.add_argument("--num-episodes", type=int, default=50)
-    parser.add_argument("--fps", type=int, default=30)
+    parser.add_argument("--fps", type=int, default=DEFAULT_FPS, help="Record rate (default: %(default)s)")
     parser.add_argument("--width", type=int, default=640)
     parser.add_argument("--height", type=int, default=480)
     parser.add_argument(
@@ -132,7 +139,7 @@ def test_realsense(serial, args, output_dir):
             serial_number_or_name=serial,
             width=args.width,
             height=args.height,
-            fps=args.fps,
+            fps=CAMERA_FPS,
             use_depth=True,
         )
     )
@@ -172,7 +179,7 @@ def test_realsense(serial, args, output_dir):
         )
         np.savetxt(f, points, fmt="%.4f")
     print(
-        f"Camera OK: top (RealSense {serial}) — RGB+depth {args.width}×{args.height}, {args.fps} fps; "
+        f"Camera OK: top (RealSense {serial}) — RGB+depth {args.width}×{args.height}, {CAMERA_FPS} fps; "
         f"{len(points)} point-cloud points, depth {z.min():.2f}–{z.max():.2f} m; {ply}"
     )
 
@@ -197,7 +204,7 @@ def stress_test_cameras(configs, serial, args, seconds):
                 serial_number_or_name=serial,
                 width=args.width,
                 height=args.height,
-                fps=args.fps,
+                fps=CAMERA_FPS,
                 use_depth=True,
             )
         )
@@ -300,7 +307,7 @@ def main():
         ensure_access([args.follower_port, args.leader_port])
         print(f"USB OK: follower={args.follower_port}, leader={args.leader_port}")
     serial = None if args.no_top_cam else find_realsense_serial(args.top_cam)
-    configs = build_camera_dicts(args, args.fps, args.width, args.height, top_serial=serial)
+    configs = build_camera_dicts(args, args.width, args.height, top_serial=serial)
     opencv = {name: config for name, config in configs.items() if config["type"] == "opencv"}
     sources = [
         Path(f"/dev/video{source}" if isinstance(source, int) else source).resolve()

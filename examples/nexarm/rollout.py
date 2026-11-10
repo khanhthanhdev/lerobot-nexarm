@@ -30,7 +30,7 @@
 #       --robot.type=nexarm_follower \
 #       --robot.port=/dev/ttyUSB1 \
 #       --robot.cameras='{"front":{"type":"opencv","index_or_path":0,"width":640,"height":480,"fps":30},"wrist":{"type":"opencv","index_or_path":1,"width":640,"height":480,"fps":30},"top":{"type":"intelrealsense","serial_number_or_name":"YOUR_SERIAL","width":640,"height":480,"fps":30}}' \
-#       --fps=30 \
+#       --fps=20 \
 #       --display_data=true
 
 import argparse
@@ -45,6 +45,7 @@ from lerobot_robot_nexarm.camera_config import (
     camera_names,
     check_policy_cameras,
 )
+from lerobot_robot_nexarm.motors.nexarm import DEFAULT_FPS
 
 IMAGE_PREFIX = "observation.images."
 
@@ -58,7 +59,12 @@ def parse_args(argv=None):
         help="Leader arm serial port, used by --strategy dagger for human corrections",
     )
     parser.add_argument("--policy-path", required=True, help="Local checkpoint dir or HF Hub repo id")
-    parser.add_argument("--fps", type=int, default=30, help="Control loop and camera frame rate")
+    parser.add_argument(
+        "--fps",
+        type=int,
+        default=DEFAULT_FPS,
+        help="Control loop rate; use the fps of the policy's training dataset (default: %(default)s)",
+    )
     add_camera_args(parser)
     parser.add_argument(
         "--strategy",
@@ -111,7 +117,7 @@ def policy_camera_names(policy_path: str) -> list[str]:
 
 def rollout_command(args: argparse.Namespace) -> list[str]:
     """The ``lerobot-nexarm-rollout`` command for the parsed arguments."""
-    cameras_json = json.dumps(build_camera_dicts(args, args.fps))
+    cameras_json = json.dumps(build_camera_dicts(args))
     cmd = [
         sys.executable,
         "-m",

@@ -12,9 +12,13 @@ All stages use up to three RGB cameras. Names must match between collection, tra
 | `wrist` | USB webcam on the gripper (OpenCV) | `wrist`                  | `observation.images.wrist` |
 | `top`   | Intel RealSense D435i              | `top`                    | `observation.images.top`   |
 
-All are 640x480 at 30 FPS. The `top` camera is on by default everywhere (real collection, record, teleoperate, rollout, `inference.yaml`, simulation); pass `--no-top-cam` to run with `front` and `wrist` only. A policy must be given exactly the cameras it was trained on: `rollout.py` exits at startup when the opened cameras differ from the policy's image inputs. Legacy 2-camera models and datasets (for example `thanhkt/nexarm_stack_bowls`) need `--no-top-cam`.
+All are 640x480 and capture at 30 FPS. The `top` camera is on by default everywhere (real collection, record, teleoperate, rollout, `inference.yaml`, simulation); pass `--no-top-cam` to run with `front` and `wrist` only. A policy must be given exactly the cameras it was trained on: `rollout.py` exits at startup when the opened cameras differ from the policy's image inputs. Legacy 2-camera models and datasets (for example `thanhkt/nexarm_stack_bowls`) need `--no-top-cam`.
 
 Install: use the full NexArm profile from [Install, Dependency profiles](../getting-started/install.md#dependency-profiles), which includes `intelrealsense`. Add `--extra turbovla` to it for TurboVLA. `uv sync` removes extras you do not list, so do not sync a smaller set.
+
+### Record rate
+
+The real arm records, teleoperates and rolls out at **20 fps** by default (`--fps`, `--dataset.fps`, `fps:` in the YAML configs), while the cameras keep capturing at 30 fps and each step takes the newest frame. 20 fps is the highest rate at which every step gets a fresh image from all three cameras: the icSpring wrist camera delivers at most about 22.6 fps (a limit of the camera itself, not of USB or exposure), and the D435i colour stream has no 20 fps mode (only 6, 15, 30 and 60). A dataset has one fps, so 20 fps sessions cannot be merged into a 30 fps root such as `thanhkt/nexarm_stack_bowls_top`, and a policy runs at the fps of its training data: pass `--fps 30` to roll out a policy trained on 30 fps data. Sim datasets keep their own `--fps` (default 30).
 
 ## 1. Data collection
 
@@ -58,7 +62,7 @@ uv run python tools/nexarm/prepare_collection.py \
 - `--top-cam` auto-detects the RealSense when exactly one is connected; pass `--top-cam <SERIAL>` when several are. `--no-top-cam` records front and wrist only.
 - `--test-cameras` checks the cameras only (no arm needed); `--stress-test [SECONDS]` runs all streams, including RealSense RGB and depth, together and reports fps, drops and stalls.
 - Only RGB is recorded for `top`. Depth and a point cloud are checked during the test and saved to `outputs/collection/<timestamp>/`, but not stored in the dataset.
-- Sessions merge into the local root `thanhkt/nexarm_stack_bowls_top` (3 cameras, created by the first session after `hf auth login`) at `~/.cache/huggingface/lerobot/thanhkt/nexarm_stack_bowls_top`; nothing is uploaded. For the old 2-camera root use `--no-top-cam --root-repo-id thanhkt/nexarm_stack_bowls`. Details, keys and merge recovery: [Data collection](data-collection.md).
+- Sessions merge into the local root `thanhkt/nexarm_stack_bowls_top_20fps` (3 cameras, 20 fps, created by the first session after `hf auth login`) at `~/.cache/huggingface/lerobot/thanhkt/nexarm_stack_bowls_top_20fps`; nothing is uploaded. For the earlier 30 fps root use `--fps 30 --root-repo-id thanhkt/nexarm_stack_bowls_top`; for the old 2-camera root use `--no-top-cam --root-repo-id thanhkt/nexarm_stack_bowls`. Details, keys and merge recovery: [Data collection](data-collection.md).
 
 ### 1c. Any task: record.py and lerobot-record
 
@@ -85,6 +89,7 @@ uv run python examples/nexarm/record_collection.py \
     --dataset.repo_id=local/nexarm_pick_cube \
     --dataset.single_task="Pick up the red cube and place it into the green zone" \
     --dataset.num_episodes=50 \
+    --dataset.fps=20 \
     --dataset.episode_time_s=12 \
     --dataset.reset_time_s=8 \
     --dataset.push_to_hub=false \

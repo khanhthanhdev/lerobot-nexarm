@@ -7,6 +7,7 @@
 import time
 from typing import Any
 
+from lerobot_robot_nexarm.motors.nexarm import DEFAULT_FPS
 from nexarm_service.arm_worker import JOINT_PUBLISH_EVERY, ArmWorker, joint_update_payload
 from nexarm_service.events import EventHub
 from nexarm_service.profiles import RobotProfile
@@ -16,7 +17,9 @@ from nexarm_service.safety import clamp_action
 class TeleopWorker(ArmWorker):
     thread_name = "nexarm-teleop"
 
-    def __init__(self, profile: RobotProfile, hardware: Any, events: EventHub, fps: int = 30) -> None:
+    def __init__(
+        self, profile: RobotProfile, hardware: Any, events: EventHub, fps: int = DEFAULT_FPS
+    ) -> None:
         super().__init__(profile, hardware, events)
         self._period = 1.0 / fps
         self._last_loop_ms = 0.0

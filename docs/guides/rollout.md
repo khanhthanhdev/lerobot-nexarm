@@ -40,7 +40,7 @@ uv run python examples/nexarm/rollout.py --follower-port /dev/ttyUSB1 --front-ca
 | `--top-cam`, `--no-top-cam`                                      | auto-detect    | RealSense serial when several are connected; disable for 2-camera checkpoints                         |
 | `--task`                                                         | empty          | Prompt for language-conditioned policies                                                              |
 | `--duration`                                                     | `0` (no limit) | Stop after this many seconds                                                                          |
-| `--fps`                                                          | `30`           | Control loop and camera rate; keep the dataset's rate                                                 |
+| `--fps`                                                          | `20`           | Control loop rate; keep the dataset's rate (`--fps 30` for policies trained on 30 fps data)           |
 | `--strategy`, `--repo-id`                                        | `base`         | Record the rollout as a dataset; see [Strategies](#strategies)                                        |
 | `--inference-type`                                               | `sync`         | `rtc` for real-time chunking with policies that support it; others fail at startup with a clear error |
 | `--rerun-save-path`                                              | none           | Save the session to an `.rrd` file you can replay with `uv run rerun <file>`                          |
@@ -132,6 +132,7 @@ uv run lerobot-rollout \
     --robot.type=nexarm_follower --robot.port=/dev/ttyUSB1 \
     --robot.cameras='{"front":{"type":"opencv","index_or_path":0,"width":640,"height":480,"fps":30},"wrist":{"type":"opencv","index_or_path":1,"width":640,"height":480,"fps":30},"top":{"type":"intelrealsense","serial_number_or_name":"<REALSENSE_SERIAL>","width":640,"height":480,"fps":30}}' \
     --task="Stack the bowls with red on bottom, blue in middle, and black on top." \
+    --fps=20 \
     --display_data=true
 ```
 
@@ -165,6 +166,7 @@ uv run lerobot-rollout \
     --robot.type=nexarm_follower --robot.port=/dev/ttyUSB1 \
     --robot.cameras='<same JSON as above>' \
     --teleop.type=nexarm_leader --teleop.port=/dev/ttyUSB0 \
+    --fps=20 --dataset.fps=20 \
     --dataset.repo_id="${HF_USER}/nexarm_dagger" \
     --dataset.single_task="<training prompt>" \
     --dataset.push_to_hub=false

@@ -9,9 +9,9 @@ import contextlib
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from lerobot_robot_nexarm.motors.nexarm import DEFAULT_FPS
 from nexarm_service import API_VERSION
 from nexarm_service.remote_teleop import (
-    DEFAULT_FPS,
     JOINT_KEYS,
     HostingWorker,
     ProtocolError,

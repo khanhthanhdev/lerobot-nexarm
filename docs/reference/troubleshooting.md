@@ -80,6 +80,7 @@ uv run lerobot-record \
     --dataset.repo_id="${HF_USER}/nexarm_stack_bowls" \
     --dataset.single_task="Stack the bowls with red on bottom, blue in middle, and black on top." \
     --dataset.num_episodes=50 \
+    --dataset.fps=20 \
     --dataset.episode_time_s=15 \
     --dataset.reset_time_s=20 \
     --display_data=false \

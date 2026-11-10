@@ -15,7 +15,7 @@ def main():
     parser.add_argument("--root", type=Path, help="Local session directory, if outside the normal cache")
     parser.add_argument(
         "--root-repo-id",
-        default="thanhkt/nexarm_stack_bowls_top",
+        default="thanhkt/nexarm_stack_bowls_top_20fps",
         help="Merged root dataset (same default as prepare_collection.py; created if it does not exist)",
     )
     parser.add_argument("--merge-root", type=Path, help="Local merged root directory")

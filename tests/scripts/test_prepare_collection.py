@@ -21,14 +21,16 @@ def parse(*argv):
 def test_collection_defaults_follow_port_and_root_conventions():
     args = prepare_collection.parse_args([])
     assert (args.leader_port, args.follower_port) == ("/dev/ttyUSB0", "/dev/ttyUSB1")
-    assert args.root_repo_id == "thanhkt/nexarm_stack_bowls_top"
+    assert args.root_repo_id == "thanhkt/nexarm_stack_bowls_top_20fps"
     assert (args.top_cam, args.no_top_cam) == ("auto", False)
+    assert args.fps == 20
 
 
 def test_camera_sources_accept_index_or_device_path():
     args = parse("--front-cam", "2", "--wrist-cam", "/dev/v4l/by-id/wrist", "--wrist-fourcc", "yuyv")
-    cameras = camera_config.build_camera_dicts(args, fps=15, top_serial="123")
-    assert cameras["front"] == {"type": "opencv", "index_or_path": 2, "width": 640, "height": 480, "fps": 15}
+    cameras = camera_config.build_camera_dicts(args, top_serial="123")
+    # Cameras capture at 30 fps whatever the control rate: the D435i colour stream has no 20 fps mode.
+    assert cameras["front"] == {"type": "opencv", "index_or_path": 2, "width": 640, "height": 480, "fps": 30}
     assert cameras["wrist"]["index_or_path"].replace("\\", "/").endswith("/dev/v4l/by-id/wrist")
     assert cameras["wrist"]["fourcc"] == "YUYV"
     assert cameras["top"] == {
@@ -36,10 +38,10 @@ def test_camera_sources_accept_index_or_device_path():
         "serial_number_or_name": "123",
         "width": 640,
         "height": 480,
-        "fps": 15,
+        "fps": 30,
         "use_depth": False,
     }
-    assert list(camera_config.build_camera_dicts(parse("--no-top-cam"), fps=30)) == ["front", "wrist"]
+    assert list(camera_config.build_camera_dicts(parse("--no-top-cam"))) == ["front", "wrist"]
     with pytest.raises(SystemExit):
         parse("--front-fourcc", "MJPEG")
 
@@ -47,7 +49,7 @@ def test_camera_sources_accept_index_or_device_path():
 def test_missing_realsense_driver_names_the_fix(monkeypatch):
     monkeypatch.setitem(sys.modules, "pyrealsense2", None)
     with pytest.raises(camera_config.CameraSetupError, match="--no-top-cam") as error:
-        camera_config.build_camera_dicts(parse(), fps=30)
+        camera_config.build_camera_dicts(parse())
     assert "intelrealsense" in str(error.value)
 
 
@@ -157,6 +159,8 @@ def test_rollout_command_is_a_valid_lerobot_rollout_config(monkeypatch, tmp_path
     monkeypatch.setattr(sys, "argv", ["lerobot-rollout", *rollout.rollout_command(args)[3:]])
     cfg = load()
     assert (cfg.robot.type, cfg.robot.port) == ("nexarm_follower", "COM19")
+    assert cfg.fps == 20
+    assert {camera.fps for camera in cfg.robot.cameras.values()} == {30}
     if strategy == "dagger":
         # DAgger hands control to the leader arm for corrections; LeRobot refuses it without one.
         assert (cfg.teleop.type, cfg.teleop.port) == ("nexarm_leader", "COM18")

@@ -89,6 +89,11 @@ def radians_to_raw(angle: float) -> float:
     return POSITION_CENTER + float(angle) * TICKS_PER_REVOLUTION / (2.0 * math.pi)
 
 
+# Control, record and rollout rate of the real arms. The cameras capture faster (camera_config.CAMERA_FPS)
+# and each step takes the newest frame: the wrist camera tops out at about 22.6 fps and the D435i colour
+# stream has no 20 fps mode, so 20 Hz is the highest rate at which every step gets a fresh image from all three.
+DEFAULT_FPS = 20
+
 DEFAULT_BAUDRATE = 1_000_000
 DEFAULT_TIMEOUT = 0.05
 REPLY_TIMEOUT = 0.15

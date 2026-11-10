@@ -24,7 +24,7 @@ Example (``tools/nexarm/prepare_collection.py`` builds this command for you)::
         --dataset.repo_id=thanhkt/nexarm_stack_bowls_session \\
         --dataset.single_task="Stack the bowls" --dataset.num_episodes=10 \\
         --dataset.episode_time_s=inf --dataset.reset_time_s=inf \\
-        --manual_control=true --root_repo_id=thanhkt/nexarm_stack_bowls_top
+        --manual_control=true --root_repo_id=thanhkt/nexarm_stack_bowls_top_20fps
 """
 
 import functools

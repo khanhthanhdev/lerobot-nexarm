@@ -7,7 +7,7 @@
 #   python examples/nexarm/teleoperate.py --leader-port COM18 --follower-port COM19
 #
 # Optional flags:
-#   --fps            Control loop rate (default: 30)
+#   --fps            Control loop rate (default: 20)
 #   --front-cam      Front camera index or /dev/v4l/by-id path (default: 0)
 #   --wrist-cam      Wrist camera index or /dev/v4l/by-id path (default: 1)
 #   --front-fourcc / --wrist-fourcc  Camera pixel format, e.g. MJPG or YUYV (default: auto)
@@ -22,6 +22,7 @@ import time
 from lerobot.utils.robot_utils import precise_sleep
 from lerobot.utils.visualization_utils import log_rerun_data, shutdown_rerun
 from lerobot_robot_nexarm.camera_config import CameraSetupError, add_camera_args, build_camera_configs
+from lerobot_robot_nexarm.motors.nexarm import DEFAULT_FPS
 from lerobot_robot_nexarm.nexarm_follower import NexArmFollower, NexArmFollowerConfig
 from lerobot_robot_nexarm.rerun_recording import init_rerun
 from lerobot_teleoperator_nexarm import NexArmLeader, NexArmLeaderConfig
@@ -31,7 +32,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Teleoperate NexArm")
     parser.add_argument("--leader-port", default="/dev/ttyUSB0", help="Serial port for the leader ESP32")
     parser.add_argument("--follower-port", default="/dev/ttyUSB1", help="Serial port for the follower ESP32")
-    parser.add_argument("--fps", type=int, default=30)
+    parser.add_argument("--fps", type=int, default=DEFAULT_FPS)
     add_camera_args(parser)
     parser.add_argument("--no-display", action="store_true")
     parser.add_argument(
@@ -46,7 +47,7 @@ def main():
     if args.no_display and args.rerun_save_path:
         raise ValueError("--rerun-save-path requires Rerun visualization; omit --no-display.")
 
-    camera_config = build_camera_configs(args, args.fps)
+    camera_config = build_camera_configs(args)
     follower_config = NexArmFollowerConfig(port=args.follower_port, cameras=camera_config)
     leader_config = NexArmLeaderConfig(port=args.leader_port)
 

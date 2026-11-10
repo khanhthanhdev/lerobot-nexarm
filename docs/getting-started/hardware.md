@@ -71,7 +71,7 @@ uv run python examples/nexarm/teleoperate.py \
     --follower-port /dev/ttyUSB1 \
     --front-cam 0 \
     --wrist-cam 1 \
-    --fps 30
+    --fps 20
 
 # Windows
 uv run python examples/nexarm/teleoperate.py \

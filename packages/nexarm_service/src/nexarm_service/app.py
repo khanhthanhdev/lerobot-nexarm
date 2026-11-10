@@ -14,6 +14,7 @@ from typing import Any
 from fastapi import FastAPI
 
 from lerobot.utils.constants import HF_LEROBOT_HOME
+from lerobot_robot_nexarm.motors.nexarm import DEFAULT_FPS
 from nexarm_service import API_VERSION
 from nexarm_service.auth import TokenAuthMiddleware
 from nexarm_service.calibration import reset_non_identity_files
@@ -167,7 +168,7 @@ class _State:
 
     def _teleop(self, profile_name: str, params: dict[str, Any]) -> Worker:
         return TeleopWorker(
-            self._profile(profile_name), self.hardware, self.events, fps=int(params.get("fps", 30))
+            self._profile(profile_name), self.hardware, self.events, fps=int(params.get("fps", DEFAULT_FPS))
         )
 
     def _recording(self, profile_name: str, params: dict[str, Any]) -> Worker:
