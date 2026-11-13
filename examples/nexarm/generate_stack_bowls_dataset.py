@@ -82,19 +82,51 @@ JAW_CENTER_OFFSET = np.array([0.0, 0.033, 0.0])  # Jaw collision pad center in g
 # can hook a neighbor bowl.
 RIM_DESCENT_SAG_M = 0.0
 RIM_DESCENT_ATTEMPTS = 4
-# Frames held after a grasp or release command. The gripper, like the real one, needs about 0.5 s (15 frames)
-# for a full stroke, and the command ramp covers only part of it.
-GRIPPER_SETTLE_STEPS = 12
-RIM_DESCENT_TOLERANCE_M = 0.003
+RIM_DESCENT_TOLERANCE_M = 0.0015  # 3 mm leaves the jaws too high on the rim to hold the bowl reliably
+# Expert timing in seconds, converted to frames at the robot's fps, so the demos take as long at any --fps.
+# Tuned to the real demos (thanhkt/nexarm_stack_bowls_20fps), where the jaws peak at about 0.37 m/s, the joints
+# at about 1000 ticks/s (95th percentile) and the gripper command closes in about 0.25 s and opens in 0.15 s.
+# The real carries are faster (1.45 s from grasp to release, against about 4 s here); see CARRY_SPEED_M_S.
+GRIPPER_CLOSE_S = 0.25
+GRIPPER_OPEN_S = 0.15
+# Held after the grasp command, with the ramp about the gripper's 0.5 s full stroke: the jaws must squeeze the
+# rim before the lift (0.3 s misses grasps). Opening only has to clear the rim before the jaws rise.
+GRASP_SETTLE_S = 0.4
+RELEASE_SETTLE_S = 0.2
+CARTESIAN_SPEED_M_S = 0.155  # Mean travel speed along a segment; the bell profile peaks at about 0.37 m/s
+# The same with a bowl in the jaws, which hold it by friction alone: faster carries swing it loose in the grip
+# (at 0.12 m/s one seed in 20 of the calibrated check fails without domain randomization).
+CARRY_SPEED_M_S = 0.1
+MIN_SEGMENT_S = 0.4  # Shortest straight segment
+JOINT_SPEED_TICKS_S = 600.0  # Mean speed cap of the fastest joint over a move; the bell profile peaks at 1.9x
+SEGMENT_SETTLE_S = 0.1  # Held at the end of each straight segment
+APPROACH_S = 1.0  # From home to above the first bowl
+DESCENT_S = 0.5  # First re-aim onto the rim, then each further one takes a third of it
+HOLD_BEFORE_RELEASE_S = 0.1
+SETTLE_TIMEOUT_S = 1.0  # Longest wait for the arm to reach a stage target
+PHASE_PAUSE_S = 0.1
+# After the last release the real operators take the arm back to where it started and rest it there, about 3 s.
+RETURN_S = 1.5
+FINAL_HOLD_S = 0.6
 # Like a teleoperator, the expert moves in straight segments: up to a transit height, across, then down. In
 # transit, the carried bowl's bottom (or the open jaws' tips) clears the highest rim of every other bowl by this
 # much. Held by its rim top, the bowl hangs low in the jaws, so higher transits leave far placements out of reach.
 TRANSIT_CLEARANCE_M = 0.065
 JAW_TIP_BELOW_CENTER_M = 0.015  # Open jaw tips below the jaw pad center
 CARTESIAN_SPACING_M = 0.02  # IK waypoint spacing along a straight segment
-CARTESIAN_SPEED_M = 0.006  # Travel per frame along a segment
 # Carried bowl center above the bowl it goes onto at release.
 RELEASE_HEIGHT_M = 0.025
+
+
+def _frames(robot: NexArmSim, seconds: float) -> int:
+    """Frames spanning ``seconds`` at the robot's control rate."""
+    return round(seconds * robot.config.fps)
+
+
+def _timed_out(task: NexArmStackBowlsTask) -> bool:
+    """Whether the episode ran out of time. A success does not stop the expert: it still returns to the start."""
+    status = task.observe()
+    return status.terminated and not status.success
 
 
 def _get_rim_and_unit_vector(bowl_pos: np.ndarray, angle_rad: float = 0.0) -> tuple[np.ndarray, np.ndarray]:
@@ -314,8 +346,8 @@ def _descend_to_rim(
             sol,
             OPEN_GRIPPER,
             OPEN_GRIPPER,
-            steps=15 if attempt == 0 else 5,
-            settle_steps=2,
+            steps=_frames(robot, DESCENT_S if attempt == 0 else DESCENT_S / 3),
+            settle_steps=_frames(robot, SEGMENT_SETTLE_S),
             record_frame=record_frame,
         )
         sag = rim[2] - _jaw_center(robot.backend)[2]
@@ -350,7 +382,7 @@ def _interpolate_stage(
 
     # Scale steps if large joint travel is required (prevent PD motor lag on long transits)
     max_delta = max(abs(start[k] - target[k]) for k in target if k != "gripper.pos")
-    min_steps = int(np.ceil(max_delta / 25.0))
+    min_steps = int(np.ceil(max_delta / JOINT_SPEED_TICKS_S * robot.config.fps))
     effective_steps = max(steps, min_steps)
 
     for alpha in _min_jerk(effective_steps):
@@ -360,7 +392,7 @@ def _interpolate_stage(
         sent = robot.send_action(action)
         if record_frame is not None:
             record_frame(observation, sent)
-        if task.observe().terminated:
+        if _timed_out(task):
             # Stop here: settling would jump the command straight to the target in one frame.
             return True
 
@@ -368,12 +400,12 @@ def _interpolate_stage(
     # commanding the target before releasing or starting the next motion.
     arm_keys = [k for k in target if k != "gripper.pos"]  # closed jaws stop on the rim, short of their target
     previous = robot.backend.joint_positions()
-    for settle_index in range(max(settle_steps, robot.config.fps)):
+    for settle_index in range(max(settle_steps, _frames(robot, SETTLE_TIMEOUT_S))):
         observation = robot.get_observation() if record_frame is not None else {}
         sent = robot.send_action(target)
         if record_frame is not None:
             record_frame(observation, sent)
-        if task.observe().terminated:
+        if _timed_out(task):
             break
         positions = robot.backend.joint_positions()
         arm_error = max(abs(positions[k] - target[k]) for k in arm_keys)
@@ -412,7 +444,7 @@ def _follow_path(
     cumulative = np.concatenate([[0.0], np.cumsum(lengths)])
     if cumulative[-1] <= 0.0:
         return True
-    effective_steps = max(steps, int(np.ceil(cumulative[-1] / 25.0)))
+    effective_steps = max(steps, int(np.ceil(cumulative[-1] / JOINT_SPEED_TICKS_S * robot.config.fps)))
     for alpha in _min_jerk(effective_steps):
         distance = alpha * cumulative[-1]
         segment = min(int(np.searchsorted(cumulative, distance, side="right")) - 1, len(lengths) - 1)
@@ -424,7 +456,7 @@ def _follow_path(
         sent = robot.send_action(action)
         if record_frame is not None:
             record_frame(observation, sent)
-        if task.observe().terminated:
+        if _timed_out(task):
             return True
     final = {key: float(value) for key, value in zip(keys, points[-1], strict=True)}
     final["gripper.pos"] = gripper
@@ -433,7 +465,7 @@ def _follow_path(
         sent = robot.send_action(final)
         if record_frame is not None:
             record_frame(observation, sent)
-        if task.observe().terminated:
+        if _timed_out(task):
             break
     return True
 
@@ -484,8 +516,17 @@ def _move_straight(
             return None
         qpos = _solution_qpos(robot.backend, sol, qpos)
         solutions.append(sol)
-    steps = max(12, int(np.ceil(np.linalg.norm(end - start) / CARTESIAN_SPEED_M)))
-    _follow_path(robot, task, solutions, gripper, steps=steps, settle_steps=2, record_frame=record_frame)
+    speed = CARTESIAN_SPEED_M_S if task.held_bowl is None else CARRY_SPEED_M_S
+    seconds = max(MIN_SEGMENT_S, float(np.linalg.norm(end - start)) / speed)
+    _follow_path(
+        robot,
+        task,
+        solutions,
+        gripper,
+        steps=_frames(robot, seconds),
+        settle_steps=_frames(robot, SEGMENT_SETTLE_S),
+        record_frame=record_frame,
+    )
     return solutions[-1]
 
 
@@ -516,7 +557,14 @@ def _pick_and_place(
         if not sol:
             return "approach"
         _interpolate_stage(
-            robot, task, sol, OPEN_GRIPPER, OPEN_GRIPPER, steps=20, settle_steps=2, record_frame=record_frame
+            robot,
+            task,
+            sol,
+            OPEN_GRIPPER,
+            OPEN_GRIPPER,
+            steps=_frames(robot, APPROACH_S),
+            settle_steps=_frames(robot, SEGMENT_SETTLE_S),
+            record_frame=record_frame,
         )
     else:
         jaw = _jaw_center(robot.backend)
@@ -555,8 +603,8 @@ def _pick_and_place(
         sol,
         OPEN_GRIPPER,
         CLOSED_GRIPPER,
-        steps=10,
-        settle_steps=GRIPPER_SETTLE_STEPS,
+        steps=_frames(robot, GRIPPER_CLOSE_S),
+        settle_steps=_frames(robot, GRASP_SETTLE_S),
         record_frame=record_frame,
     )
     if task.held_bowl is None:
@@ -602,7 +650,14 @@ def _pick_and_place(
         return "lower"
     # Motor lag leaves the loaded arm short of the last waypoint; hold it there before letting go.
     _interpolate_stage(
-        robot, task, sol, CLOSED_GRIPPER, CLOSED_GRIPPER, steps=5, settle_steps=3, record_frame=record_frame
+        robot,
+        task,
+        sol,
+        CLOSED_GRIPPER,
+        CLOSED_GRIPPER,
+        steps=_frames(robot, HOLD_BEFORE_RELEASE_S),
+        settle_steps=_frames(robot, SEGMENT_SETTLE_S),
+        record_frame=record_frame,
     )
 
     # Release
@@ -612,8 +667,8 @@ def _pick_and_place(
         sol,
         CLOSED_GRIPPER,
         OPEN_GRIPPER,
-        steps=15,
-        settle_steps=GRIPPER_SETTLE_STEPS,
+        steps=_frames(robot, GRIPPER_OPEN_S),
+        settle_steps=_frames(robot, RELEASE_SETTLE_S),
         record_frame=record_frame,
     )
 
@@ -649,7 +704,7 @@ def generate_episode(
 
     # Settle between phases
     current_joints = robot.backend.joint_positions()
-    for _ in range(5):
+    for _ in range(_frames(robot, PHASE_PAUSE_S)):
         observation = robot.get_observation() if record_frame is not None else {}
         sent = robot.send_action(current_joints)
         if record_frame is not None:
@@ -662,20 +717,25 @@ def generate_episode(
 
     task.target_bowl = None
 
-    # Stability hold until success or timeout
+    # Back to the start pose, the jaws closing on the way, then rest there. The stack must still stand at the end.
+    _interpolate_stage(
+        robot,
+        task,
+        {},
+        OPEN_GRIPPER,
+        HOME_POSITIONS["gripper"],
+        steps=_frames(robot, RETURN_S),
+        settle_steps=_frames(robot, SEGMENT_SETTLE_S),
+        record_frame=record_frame,
+    )
     hold_action = robot.backend.joint_positions()
-    for _ in range(35):
+    for _ in range(_frames(robot, FINAL_HOLD_S)):
         observation = robot.get_observation() if record_frame is not None else {}
         sent = robot.send_action(hold_action)
         if record_frame is not None:
             record_frame(observation, sent)
-        status = task.observe()
-        if status.terminated:
-            return (
-                status.success,
-                status.reason or ("success" if status.success else "terminated"),
-                task_prompt,
-            )
+        if _timed_out(task):
+            break
 
     status = task.status()
     return status.success, status.reason or ("success" if status.success else "task_gate_failed"), task_prompt

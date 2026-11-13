@@ -44,8 +44,11 @@
   <worldbody>
     <light pos="0 0 3" dir="0 0 -1" directional="true" />
     <geom name="floor" type="plane" size="1 1 0.05" rgba="0.8 0.8 0.8 1" friction="1 0.005 0.0001" contype="2" conaffinity="2" />
-    <camera name="front" mode="fixed" pos="-0.032 -0.868756 0.716789" xyaxes="1 0 0 0 0.709822 0.704381" fovy="37.6" />
-    <camera name="top" mode="fixed" pos="-0.0458 -0.349378 0.76965" xyaxes="0 -1 0 1 0 0" fovy="42.6" />
+    <!-- front and top are fitted to thanhkt/nexarm_stack_bowls_20fps: bowl centres located by the top camera and the
+         jaw positions at grasp (probe run 1 joint mapping), then a perspective-n-point fit of those centres in the front frames. The front
+         fit leaves fovy against distance unresolved, so the C270 fovy is kept. -->
+    <camera name="front" mode="fixed" pos="-0.0321 -0.6164 0.4804" xyaxes="0.995528 0.075568 -0.056691 -0.011751 0.694497 0.719400" fovy="37.6" />
+    <camera name="top" mode="fixed" pos="-0.0564 -0.2722 0.76965" xyaxes="-0.088894 -0.996041 0 0.996041 -0.088894 0" fovy="42.6" />
 
     <!-- bowl_red -->
     <body name="bowl_red" pos="-0.1100 -0.2700 0.0200">

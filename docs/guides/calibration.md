@@ -349,7 +349,7 @@ uv run python tools/nexarm/calibrate_camera_alignment.py --cam-index 0 --camera-
 
 The tool overlays the simulated view on the live camera. Keys: `m` switches mode, `+` and `-` change the blend, `s` saves a snapshot, `q` quits. Compare the table edge, the base of the arm and the target zone. If they do not line up, edit the camera `pos`, `quat`/`xyaxes` or `fovy` in the scene XML (`sim/description/mjcf/`) until they do, then repeat with `--camera-name wrist` and `--camera-name top`. For the RealSense `top` camera, `uv run python tools/nexarm/realsense_fovy.py` reads the colour intrinsics and prints the matching `fovy`. For `top`, pass the RealSense RGB V4L2 node as `--cam-index` (e.g. `/dev/video4`); the sim top camera looks straight down from 0.75 m. Check that the resolution and fps match your real cameras.
 
-Known open point: the `front` camera sits at z = 0.817 m in `scene.xml` and 0.717 m in `bowl_stack_scene.xml`. Only one can match your rig, so measure the real height and correct the other file.
+Known open point: the `front` and `top` cameras of `bowl_stack_scene.xml` are fitted to `thanhkt/nexarm_stack_bowls_20fps` (bowl centres from the top images and the jaw positions at each grasp under the probe mapping, then a perspective-n-point fit of the bowls in the front images), while `scene.xml` keeps the older values. The front fit cannot separate `fovy` from distance (any `fovy` from 20° to 38° fits equally well along one viewing ray), so it keeps the C270's 37.6°; a checkerboard `fovy` (step 1) fixes the distance. Measure the real cameras to confirm, and copy them to `scene.xml` if the pick-place rig is the same.
 
 Step by step for each camera. Fix the field of view first; a pose error cannot be tuned away while the field of view is wrong.
 
@@ -364,13 +364,13 @@ Step by step for each camera. Fix the field of view first; a pose error cannot b
 
    Current sim values:
 
-   | Camera  | Position (x, y, z) in m                        | Points                                 |
-   | ------- | ---------------------------------------------- | -------------------------------------- |
-   | `front` | -0.03, -0.87, 0.82 (pick-place) / 0.72 (bowls) | Back at the arm, tilted down about 45° |
-   | `top`   | -0.05, -0.35, 0.77                             | Straight down                          |
-   | `wrist` | On the gripper; edit it in `nexarm.xml`        | Along the jaws                         |
+   | Camera  | Position (x, y, z) in m                                      | Points                                 |
+   | ------- | ------------------------------------------------------------ | -------------------------------------- |
+   | `front` | -0.03, -0.87, 0.82 (pick-place) / -0.03, -0.62, 0.48 (bowls) | Back at the arm, tilted down about 45° |
+   | `top`   | -0.05, -0.35, 0.77 (pick-place) / -0.06, -0.27, 0.77 (bowls) | Straight down, turned 5° on bowls      |
+   | `wrist` | On the gripper; edit it in `nexarm.xml`                      | Along the jaws                         |
 
-3. **Set the measured `pos`** in both `scene.xml` and `bowl_stack_scene.xml`, unless the camera really is in a different place for the two tasks. Today the `front` camera height differs between them by 0.1 m, so check which one is right.
+3. **Set the measured `pos`** in both `scene.xml` and `bowl_stack_scene.xml`, unless the camera really is in a different place for the two tasks. Today both cameras differ between them (see the open point above), so check which one is right.
 4. **Fine-tune the orientation in the overlay.** Run the alignment tool, look at where the table edge and the arm base land, edit `xyaxes`, and restart the tool. `xyaxes` holds the camera's right direction and its up direction, both in world coordinates.
    - Tilt (the image is too high or too low): change the second vector, for example `0 0.71 0.70` (about 45° down) toward `0 0.77 0.64` (about 50° down, looking further down).
    - Pan (the image is shifted left or right): rotate both vectors about `z`.
